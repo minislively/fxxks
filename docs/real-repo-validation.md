@@ -164,6 +164,9 @@ Cache behavior:
 Quality notes:
 - semantic loss:
 - fallback needed:
+- tiny raw injection acceptable?:
+  - yes if repeated raw files under 500 bytes injected `useOriginal: true`
+  - no if they still fell back to `raw-mode`
 - next tuning target:
 ```
 

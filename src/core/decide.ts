@@ -1,10 +1,13 @@
 import type { DecisionConfidence, ExtractionResult, OutputMode } from "./schema";
 
+export const RAW_ORIGINAL_SIZE_THRESHOLD_BYTES = 500;
+
 export type DecideMetrics = {
   mode: OutputMode;
   complexityScore: number;
   reasons: string[];
   confidence: DecisionConfidence;
+  useOriginal: boolean;
 };
 
 function confidenceForRaw(
@@ -85,6 +88,7 @@ export function decideMode(base: Omit<ExtractionResult, "mode">): DecideMetrics 
   const handlerCount = base.behavior?.eventHandlers?.length ?? 0;
   const styleBranching = base.style?.hasStyleBranching ? 1 : 0;
   const importCount = base.meta.importCount;
+  const rawSizeBytes = base.meta.rawSizeBytes;
 
   const complexityScore =
     lineCount * 0.05 +
@@ -116,6 +120,7 @@ export function decideMode(base: Omit<ExtractionResult, "mode">): DecideMetrics 
       complexityScore,
       reasons,
       confidence: confidenceForRaw(lineCount, jsxDepth, conditionalCount, hookCount, handlerCount, styleBranching),
+      useOriginal: rawSizeBytes < RAW_ORIGINAL_SIZE_THRESHOLD_BYTES,
     };
   }
 
@@ -125,6 +130,7 @@ export function decideMode(base: Omit<ExtractionResult, "mode">): DecideMetrics 
       complexityScore,
       reasons,
       confidence: confidenceForHybrid(lineCount, conditionalCount, repeatedCount, hookCount, handlerCount, styleBranching, importCount),
+      useOriginal: false,
     };
   }
 
@@ -133,5 +139,6 @@ export function decideMode(base: Omit<ExtractionResult, "mode">): DecideMetrics 
     complexityScore,
     reasons,
     confidence: confidenceForCompressed(lineCount, jsxDepth, conditionalCount, hookCount, handlerCount, styleBranching, importCount),
+    useOriginal: false,
   };
 }

@@ -128,8 +128,10 @@ test("init prefers FOOKS_TARGET_ACCOUNT for canonical config writes", () => {
 test("extract keeps small fixture raw", () => {
   const result = run(["extract", "fixtures/raw/SimpleButton.tsx"]);
   assert.equal(result.mode, "raw");
+  assert.equal(result.useOriginal, true);
   assert.equal(result.componentName, "SimpleButton");
   assert.ok(result.rawText.includes("button"));
+  assert.equal(result.meta.rawSizeBytes, 356);
   assert.ok(result.fileHash);
   assert.ok(result.meta.generatedAt);
   assert.equal(result.meta.decideConfidence, "high");
@@ -182,6 +184,17 @@ test("model-facing payload keeps hybrid snippets and prunes unknown style noise"
   assert.ok(payload.structure.conditionalRenders.length >= 1);
 });
 
+test("model-facing payload uses original source for tiny raw fixtures", () => {
+  const fullResult = extractFile(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"));
+  const payload = toModelFacingPayload(fullResult, repoRoot);
+  assert.deepEqual(payload, {
+    mode: "raw",
+    filePath: path.join("fixtures", "raw", "SimpleButton.tsx"),
+    useOriginal: true,
+    rawText: fullResult.rawText,
+  });
+});
+
 test("readiness helper uses stable reasons and ignores debug metadata", () => {
   const compressed = extractFile(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"));
   const compressedPayload = toModelFacingPayload(compressed, repoRoot);
@@ -192,8 +205,10 @@ test("readiness helper uses stable reasons and ignores debug metadata", () => {
   const raw = extractFile(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"));
   const rawPayload = toModelFacingPayload(raw, repoRoot);
   const rawReadiness = assessPayloadReadiness(raw, rawPayload);
-  assert.equal(rawReadiness.ready, false);
-  assert.ok(rawReadiness.reasons.includes("raw-mode"));
+  assert.equal(rawReadiness.ready, true);
+  assert.deepEqual(rawReadiness.reasons, []);
+  assert.equal(rawPayload.useOriginal, true);
+  assert.equal(rawPayload.rawText, raw.rawText);
 
   const missingContract = assessPayloadReadiness(compressed, { ...compressedPayload, contract: undefined });
   assert.ok(missingContract.reasons.includes("missing-contract"));
@@ -234,15 +249,29 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
 
   const raw = decideCodexPreRead(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"), repoRoot);
   assert.equal(raw.eligible, true);
-  assert.equal(raw.decision, "fallback");
-  assert.ok(raw.reasons.includes("raw-mode"));
-  assert.equal(raw.fallback.reason, "raw-mode");
+  assert.equal(raw.decision, "payload");
+  assert.deepEqual(raw.reasons, []);
+  assert.equal(raw.payload.useOriginal, true);
+  assert.equal(raw.payload.rawText?.length, 356);
 
   const linkedTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-linked", "Button.types.ts"), repoRoot);
   assert.equal(linkedTs.eligible, false);
   assert.equal(linkedTs.decision, "fallback");
   assert.ok(linkedTs.reasons.includes("ineligible-extension"));
   assert.equal(linkedTs.filePath, path.join("fixtures", "ts-linked", "Button.types.ts"));
+});
+
+test("codex pre-read falls back for larger raw files past the original-source threshold", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-large-raw-"));
+  const largeRawPath = path.join(tempDir, "LargeRawButton.tsx");
+  const baseSource = fs.readFileSync(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"), "utf8").trimEnd();
+  fs.writeFileSync(largeRawPath, `${baseSource}\n/* ${"x".repeat(220)} */\n`);
+
+  const result = decideCodexPreRead(largeRawPath, tempDir);
+  assert.equal(result.debug.mode, "raw");
+  assert.equal(result.decision, "fallback");
+  assert.ok(result.reasons.includes("raw-mode"));
+  assert.equal(result.fallback.reason, "raw-mode");
 });
 
 test("cli codex-pre-read reuses the same decision seam and advertises the command", () => {
@@ -255,8 +284,8 @@ test("cli codex-pre-read reuses the same decision seam and advertises the comman
   assert.deepEqual(cliJsx, directJsx);
 
   const cliFallback = run(["codex-pre-read", "fixtures/raw/SimpleButton.tsx"]);
-  assert.equal(cliFallback.decision, "fallback");
-  assert.ok(cliFallback.reasons.includes("raw-mode"));
+  assert.equal(cliFallback.decision, "payload");
+  assert.equal(cliFallback.payload.useOriginal, true);
 
   let usage = "";
   try {
@@ -268,7 +297,10 @@ test("cli codex-pre-read reuses the same decision seam and advertises the comman
 });
 
 test("runtime prompt parser finds eligible tsx/jsx paths and escape hatches", () => {
-  const tsxTarget = extractPromptTarget("Please update components/QuestionAnswerForm.tsx for this flow", path.join(repoRoot, "..", "ai-job-finder"));
+  const promptDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-prompt-target-"));
+  fs.mkdirSync(path.join(promptDir, "components"), { recursive: true });
+  fs.writeFileSync(path.join(promptDir, "components", "QuestionAnswerForm.tsx"), "export function QuestionAnswerForm() { return null; }\n");
+  const tsxTarget = extractPromptTarget("Please update components/QuestionAnswerForm.tsx for this flow", promptDir);
   assert.equal(tsxTarget, path.join("components", "QuestionAnswerForm.tsx"));
 
   const jsxTarget = extractPromptTarget("Review fixtures/jsx/SimpleWidget.jsx for repeated work", repoRoot);
@@ -337,7 +369,7 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(second.debug.repeatedFile, true);
 });
 
-test("runtime hook falls back for escape hatch and raw readiness failures", () => {
+test("runtime hook injects tiny raw originals and still honors escape hatch fallbacks", () => {
   const rawSession = `hook-raw-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: rawSession }, repoRoot);
   handleCodexRuntimeHook(
@@ -356,9 +388,9 @@ test("runtime hook falls back for escape hatch and raw readiness failures", () =
     },
     repoRoot,
   );
-  assert.equal(rawSecond.action, "fallback");
-  assert.ok(rawSecond.reasons.includes("raw-mode"));
-  assert.equal(rawSecond.fallback.reason, "raw-mode");
+  assert.equal(rawSecond.action, "inject");
+  assert.match(rawSecond.additionalContext, /"useOriginal": true/);
+  assert.match(rawSecond.additionalContext, /"rawText":/);
 
   const overrideSession = `hook-override-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: overrideSession }, repoRoot);
@@ -613,7 +645,7 @@ test("native hook bridge only activates inside attached codex projects", () => {
   );
 });
 
-test("native hook bridge emits full-read guidance for repeated fallback cases", () => {
+test("native hook bridge injects tiny raw originals on repeated prompts", () => {
   const attachedDir = makeTempProject();
   run(["attach", "codex"], attachedDir, { FOOKS_CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-")) });
 
@@ -639,8 +671,9 @@ test("native hook bridge emits full-read guidance for repeated fallback cases", 
   assert.equal(fallback.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(
     fallback.hookSpecificOutput.additionalContext,
-    /fooks: fallback \(raw-mode\) · file: src\/components\/SimpleButton\.tsx · Read the full source file for this turn\./,
+    /fooks: reused pre-read \(raw\) · file: src\/components\/SimpleButton\.tsx/,
   );
+  assert.match(fallback.hookSpecificOutput.additionalContext, /"useOriginal": true/);
 });
 
 test("native hook bridge uses fixed full-read status vocabulary for escape hatch overrides", () => {

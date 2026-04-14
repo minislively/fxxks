@@ -33,29 +33,30 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.action, "inject");
   assert.match(secondInject.additionalContext, /^fooks: reused pre-read \(compressed\)/);
 
-  const fallbackSession = `bridge-contract-fallback-${Date.now()}`;
-  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: fallbackSession }, repoRoot);
+  const smallRawSession = `bridge-contract-small-raw-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: smallRawSession }, repoRoot);
 
-  const firstFallback = handleCodexRuntimeHook(
+  const firstSmallRaw = handleCodexRuntimeHook(
     {
       hookEventName: "UserPromptSubmit",
-      sessionId: fallbackSession,
+      sessionId: smallRawSession,
       prompt: "Please inspect fixtures/raw/SimpleButton.tsx",
     },
     repoRoot,
   );
-  const secondFallback = handleCodexRuntimeHook(
+  const secondSmallRaw = handleCodexRuntimeHook(
     {
       hookEventName: "UserPromptSubmit",
-      sessionId: fallbackSession,
+      sessionId: smallRawSession,
       prompt: "Again, inspect fixtures/raw/SimpleButton.tsx",
     },
     repoRoot,
   );
 
-  assert.equal(firstFallback.action, "record");
-  assert.equal(secondFallback.action, "fallback");
-  assert.equal(secondFallback.fallback.reason, "raw-mode");
+  assert.equal(firstSmallRaw.action, "record");
+  assert.equal(secondSmallRaw.action, "inject");
+  assert.match(secondSmallRaw.additionalContext, /^fooks: reused pre-read \(raw\)/);
+  assert.match(secondSmallRaw.additionalContext, /"useOriginal": true/);
 
   const overrideSession = `bridge-contract-override-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: overrideSession }, repoRoot);

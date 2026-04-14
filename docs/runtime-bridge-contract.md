@@ -78,6 +78,9 @@ harnesses:
 - `missing-hybrid-snippets`
 - `escape-hatch-full-read`
 
+Exception: a `raw` file under 500 bytes may still inject a minimal payload with
+`useOriginal: true` and `rawText`, instead of using `raw-mode` fallback.
+
 ## Stable user-facing status vocabulary
 
 When the bridge chooses to surface status text, keep it short and fixed:
@@ -106,10 +109,10 @@ Future harnesses should prove the same three scenarios:
    - first mention: `record`
    - second mention: `inject`
 
-2. **Repeated raw/low-readiness file → fallback**
+2. **Repeated tiny raw file → inject original source**
    - first mention: `record`
-   - second mention: `fallback`
-   - reason token remains stable
+   - second mention: `inject`
+   - payload includes `useOriginal: true`
 
 3. **Escape hatch → full read requested**
    - any prompt with `#fooks-full-read` or `#fooks-disable-pre-read`

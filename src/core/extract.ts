@@ -320,14 +320,16 @@ export function extractSource(filePath: string, sourceText: string): ExtractionR
     meta: {
       lineCount: sourceText.split(/\r?\n/).length,
       importCount,
+      rawSizeBytes: Buffer.byteLength(sourceText, "utf8"),
       generatedAt: new Date().toISOString(),
     },
   };
 
-  const { mode, complexityScore, reasons, confidence } = decideMode(base);
+  const { mode, complexityScore, reasons, confidence, useOriginal } = decideMode(base);
   const result: ExtractionResult = {
     ...base,
     mode,
+    useOriginal,
     rawText: mode === "raw" ? sourceText : undefined,
     snippets: mode === "hybrid" ? base.snippets : undefined,
     meta: {

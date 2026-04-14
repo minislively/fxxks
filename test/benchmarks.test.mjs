@@ -8,6 +8,7 @@ import { createRequire } from "node:module";
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
+const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 const {
   loadFixtureSet,
   loadPreservationExpectations,
@@ -106,6 +107,21 @@ test("extract benchmark script emits file-type metrics for the v1 fixtures", () 
     assert.ok(["raw", "compressed", "hybrid"].includes(fixture.mode));
   }
   assert.ok(fs.existsSync(result.artifacts.latestPath));
+});
+
+test("small raw benchmark fixture uses original-source minimal payload", () => {
+  const file = path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx");
+  const extracted = extractFile(file);
+  const payload = toModelFacingPayload(extracted, repoRoot);
+  assert.equal(extracted.mode, "raw");
+  assert.equal(extracted.useOriginal, true);
+  assert.equal(extracted.meta.rawSizeBytes, 356);
+  assert.deepEqual(payload, {
+    mode: "raw",
+    filePath: path.join("fixtures", "raw", "SimpleButton.tsx"),
+    useOriginal: true,
+    rawText: fs.readFileSync(file, "utf8"),
+  });
 });
 
 test("gate benchmark script evaluates preservation and mode-decision checks", () => {

@@ -13,6 +13,7 @@ export type ExtractionResult = {
   fileHash: string;
   language: Language;
   mode: OutputMode;
+  useOriginal?: boolean;
   componentName?: string;
   exports: Array<{
     name: string;
@@ -51,6 +52,7 @@ export type ExtractionResult = {
   meta: {
     lineCount: number;
     importCount: number;
+    rawSizeBytes: number;
     complexityScore?: number;
     generatedAt: string;
     decideReason?: string[];
@@ -61,6 +63,8 @@ export type ExtractionResult = {
 export type ModelFacingPayload = {
   mode: OutputMode;
   filePath: string;
+  useOriginal?: boolean;
+  rawText?: string;
   componentName?: string;
   exports?: ExtractionResult["exports"];
   contract?: ExtractionResult["contract"];

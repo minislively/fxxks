@@ -156,6 +156,7 @@ The model-facing payload:
 - keeps `mode`, relative `filePath`, `componentName`, `exports`
 - keeps `contract`, `behavior`, `structure`, minimal `style`
 - keeps `snippets` for hybrid outputs
+- for tiny raw files (`raw` mode and source under 500 bytes), sets `useOriginal: true` and returns only the original source payload
 - drops engine metadata such as `fileHash` and `meta.generatedAt`
 
 ## Codex pre-read decision seam
@@ -171,7 +172,7 @@ It is intentionally narrow in v1:
 - `.tsx/.jsx` only
 - payload-first, never payload-only
 - falls back to `full-read` for:
-  - `raw-mode`
+  - `raw-mode` (except tiny raw files under 500 bytes, which reuse the original source as a minimal payload)
   - `missing-contract`
   - `missing-behavior`
   - `missing-structure`

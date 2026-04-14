@@ -15,6 +15,15 @@ function toRelativePath(filePath: string, cwd: string): string {
 }
 
 export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd()): ModelFacingPayload {
+  if (result.useOriginal && result.mode === "raw" && result.rawText) {
+    return {
+      mode: result.mode,
+      filePath: toRelativePath(result.filePath, cwd),
+      useOriginal: true,
+      rawText: result.rawText,
+    };
+  }
+
   const contract = result.contract
     ? pruneObject({
         ...(result.contract.propsName ? { propsName: result.contract.propsName } : {}),
