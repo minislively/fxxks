@@ -17,7 +17,8 @@
     "bench:scan": "npm run build && node benchmarks/scripts/scan-cache.mjs",
     "bench:extract": "npm run build && node benchmarks/scripts/extract.mjs",
     "bench:stability": "npm run build && node benchmarks/scripts/stability.mjs",
-    "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs"
+    "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs",
+    "lint": "npm run typecheck -- --pretty false"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
