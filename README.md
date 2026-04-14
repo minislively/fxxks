@@ -141,6 +141,8 @@ python3 quick-test.py     # 5-10 min single test
 python3 full-benchmark-suite.py  # 30-60 min full suite
 ```
 
+See [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md) for detailed setup and reproduction instructions.
+
 ## Model-facing payload
 
 `extract` keeps the canonical extraction output by default. For a leaner LLM-delivery view:
