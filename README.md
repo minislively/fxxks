@@ -80,29 +80,29 @@ Current verification snapshot:
   - `FormSection.tsx`: 34.59% reduction
   - `DashboardPanel.tsx`: 46.63% reduction
 - latest benchmark baseline (`benchmarks/results/latest/benchmark.json`):
-  - cold avg: 556.96ms
-  - warm avg: 182.43ms
-  - partial single avg: 426.36ms
-  - partial multi avg: 481.52ms
-  - rescan after invalidation avg: 582.67ms
+  - cold avg: 345.77ms
+  - warm avg: 101.56ms
+  - partial single avg: 253.1ms
+  - partial multi avg: 283.32ms
+  - rescan after invalidation avg: 326.25ms
   - warm runtime split:
-    - CLI wall: 182.43ms
-    - scan core: 17.13ms
-    - outside-scan: 165.3ms
+    - CLI wall: 101.56ms
+    - scan core: 8.92ms
+    - outside-scan: 92.64ms
   - warm outside-scan breakdown:
-    - command dispatch: 26.29ms
-    - result serialization: 0.2ms
-    - stdout write: 9.56ms
-    - unattributed residual: 129.25ms
+    - command dispatch: 15.48ms
+    - result serialization: 0.12ms
+    - stdout write: 2.82ms
+    - unattributed residual: 74.22ms
   - warm dispatch sub-breakdown:
-    - paths import: 7.64ms
-    - scan import: 18.3ms
-    - ensure dirs: 0.3ms
-    - dispatch residual: 0.05ms
+    - paths import: 5.14ms
+    - scan import: 10.09ms
+    - ensure dirs: 0.2ms
+    - dispatch residual: 0.04ms
   - warm harness/process floor:
-    - bare node process: 73.01ms (`bench:scan`, stable targeted reading)
-    - cli bootstrap without command: 79.66ms (`bench:scan`, stable targeted reading)
-    - cli bootstrap residual over bare node: 6.65ms (`bench:scan`, stable targeted reading)
+    - bare node process: 74.4ms (`bench`, latest full-suite reading)
+    - cli bootstrap without command: 119.02ms (`bench`, latest full-suite reading)
+    - cli bootstrap residual over bare node: 44.62ms (`bench`, latest full-suite reading)
   - scan observability now captures:
     - step timings (`discovery`, `stat`, `fileRead`, `hash`, `cacheRead`, `extract`, `cacheWrite`, `indexWrite`, `total`)
     - skip/hit/miss structure (`metadataReuseCount`, `fileReadCount`, `reparsedFileCount`)
@@ -111,11 +111,11 @@ Current verification snapshot:
     - scan startup sub-buckets (`pathsModuleImportMs`, `scanModuleImportMs`, `ensureProjectDataDirsMs`, `commandDispatchResidualMs`)
     - benchmark-harness overhead (`stdoutParseMsByScenario`, `bareNodeProcessAvgMs`, `cliBootstrapNoCommandAvgMs`, `cliBootstrapResidualAvgMs`, `artifactWriteMs`)
 - latest process-model falsification gate (`benchmarks/results/latest/process-model-probe.json`):
-  - current CLI warm avg: 171.87ms
-  - launcher → helper warm avg: 236.54ms
-  - direct helper warm avg: 14.67ms
-  - helper startup avg: 167.65ms
-  - takeaway: a helper can be dramatically faster only after the current CLI front door is removed; a launcher behind today's CLI contract does **not** clear the kill gate yet
+  - current CLI warm avg: 99.91ms
+  - launcher → helper warm avg: 114.08ms
+  - direct helper warm avg: 15.99ms
+  - helper startup avg: 102.3ms
+  - takeaway: a direct helper remains dramatically faster, but the current launcher path is still slower than today's CLI and does **not** clear the material-win kill gate
 - current optimization read: unchanged-file rereads are under control, current scan-core work is cheap, and the next architectural question is process-model design rather than more scan-core trimming
 - optimization follow-up ranking: [`docs/benchmark-phase-2-optimization-candidates.md`](docs/benchmark-phase-2-optimization-candidates.md)
 

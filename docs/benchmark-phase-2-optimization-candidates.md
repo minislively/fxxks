@@ -38,12 +38,12 @@ Use the dedicated scan suite when you want the cleaner process-floor read withou
 
 ### New process-model falsification gate (`process-model-probe.json`)
 
-- current CLI warm avg: `171.87ms`
-- launcher → helper warm avg: `236.54ms`
-- direct helper warm avg: `14.67ms`
-- helper startup avg: `167.65ms`
-- delta (`launcher - current`): `+64.67ms`
-- delta (`direct - current`): `-157.2ms`
+- current CLI warm avg: `99.91ms`
+- launcher → helper warm avg: `114.08ms`
+- direct helper warm avg: `15.99ms`
+- helper startup avg: `102.3ms`
+- delta (`launcher - current`): `+14.17ms`
+- delta (`direct - current`): `-83.92ms`
 
 ## What changed in this pass
 
@@ -59,21 +59,21 @@ The helper probe is benchmark-only. It does **not** change the shipped CLI contr
 
 ### 1. The direct helper path proves the process model matters
 
-The direct helper path lands at `14.67ms`, far below the current one-shot warm path (`171.87ms`).
+The direct helper path lands at `15.99ms`, far below the current one-shot warm path (`99.91ms`).
 
 **Implication:** a long-lived process can eliminate most of the repeated front-door cost when it already exists and is ready.
 
 ### 2. A helper behind the current CLI front door does not clear the gate yet
 
-The launcher → helper path (`236.54ms`) is **worse** than the current CLI warm path (`171.87ms`).
+The launcher → helper path (`114.08ms`) is still worse than the current CLI warm path (`99.91ms`).
 
-**Implication:** if we keep today's CLI front door and just add a helper behind it, we do not get a meaningful win. The helper complexity would be unjustified in that shape.
+**Implication:** with the current launcher shape we still do not get a meaningful win. Helper complexity would still be unjustified in that shape.
 
 ### 3. The kill criterion fired for “helper behind current CLI”
 
-Phase 0 asked whether the likely ship path actually beats the baseline. Right now the answer is **no** for the current launcher shape.
+Phase 0 asked whether the likely ship path actually beats the baseline by a meaningful margin. Right now the answer is still **no** for the current launcher shape.
 
-**Implication:** do **not** ship a helper behind the existing CLI front door just because the direct helper case looks attractive.
+**Implication:** do **not** ship a helper behind the existing CLI front door just because the direct helper case looks attractive; near-parity is not enough.
 
 ### 4. The next useful question is launcher design, not scan-core trimming
 
@@ -88,7 +88,7 @@ Warm scan-core work remains far smaller than front-door overhead in the latest f
 
 ### P0 — Decide whether a thinner front door exists
 
-Only reopen helper work if a thinner launcher/shim can materially beat the current `~170ms` warm path while preserving:
+Only reopen helper work if a thinner launcher/shim can materially beat the current `~100ms` warm path while preserving:
 
 - the existing CLI UX
 - automatic fallback
@@ -123,7 +123,7 @@ The backlog recommendation is now:
 
 A follow-up optimization/design PR should answer all of these with benchmark evidence:
 
-1. Does the proposed launcher/front-door materially beat the current `~170ms` warm path?
+1. Does the proposed launcher/front-door materially beat the current `~100ms` warm path?
 2. Does it preserve the existing CLI contract?
 3. Can it fail back automatically without invisible state?
 4. Is the gain large enough to justify the added lifecycle/observability complexity?

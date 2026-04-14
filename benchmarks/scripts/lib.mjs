@@ -93,10 +93,11 @@ async function waitForHelperReady(socketPath, deadlineMs = 3000) {
 }
 
 function makeHelperSocketPath() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-helper-"));
+  const tempRoot = process.platform === "darwin" ? "/tmp" : os.tmpdir();
+  const dir = fs.mkdtempSync(path.join(tempRoot, "fh-"));
   return {
-    dir: base,
-    socketPath: path.join(base, "scan-helper.sock"),
+    dir,
+    socketPath: path.join(dir, "s.sock"),
   };
 }
 
@@ -109,35 +110,65 @@ async function startHelperServer() {
     env: process.env,
   });
   let stderr = "";
+  let spawnError = null;
+  let exitedEarly = false;
   helper.stderr.setEncoding("utf8");
   helper.stderr.on("data", (chunk) => {
     stderr += chunk;
   });
-  const readyMs = await waitForHelperReady(socketPath);
-  return {
-    dir,
-    socketPath,
-    process: helper,
-    startupMs: round(performance.now() - startedAt),
-    readyMs,
-    stop: async () => {
-      try {
-        await connectToHelper(socketPath, { command: "shutdown" });
-      } catch {
-        // Ignore shutdown RPC failures and terminate below.
-      }
-      if (helper.exitCode === null && helper.signalCode === null && !helper.killed) {
-        helper.kill();
-      }
-      if (helper.exitCode === null && helper.signalCode === null) {
-        await new Promise((resolve) => helper.once("exit", resolve));
-      }
-      fs.rmSync(dir, { recursive: true, force: true });
-      if (stderr.trim()) {
+  helper.on("error", (error) => {
+    spawnError = error;
+  });
+  helper.once("exit", () => {
+    exitedEarly = true;
+  });
+  try {
+    const readyMs = await waitForHelperReady(socketPath);
+    return {
+      dir,
+      socketPath,
+      process: helper,
+      startupMs: round(performance.now() - startedAt),
+      readyMs,
+      stop: async () => {
+        try {
+          await connectToHelper(socketPath, { command: "shutdown" });
+        } catch {
+          // Ignore shutdown RPC failures and terminate below.
+        }
+        if (helper.exitCode === null && helper.signalCode === null && !helper.killed) {
+          helper.kill();
+        }
+        if (helper.exitCode === null && helper.signalCode === null) {
+          await new Promise((resolve) => helper.once("exit", resolve));
+        }
+        fs.rmSync(dir, { recursive: true, force: true });
         helper.stderr.removeAllListeners();
-      }
-    },
-  };
+      },
+    };
+  } catch (error) {
+    if (helper.exitCode === null && helper.signalCode === null && !helper.killed) {
+      helper.kill();
+    }
+    if (helper.exitCode === null && helper.signalCode === null) {
+      await new Promise((resolve) => helper.once("exit", resolve));
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+    helper.stderr.removeAllListeners();
+    const details = [
+      `socket=${socketPath}`,
+      `exitCode=${helper.exitCode ?? "null"}`,
+      `signal=${helper.signalCode ?? "null"}`,
+      `exitedEarly=${exitedEarly}`,
+    ];
+    if (spawnError) {
+      details.push(`spawnError=${spawnError.message}`);
+    }
+    if (stderr.trim()) {
+      details.push(`stderr=${stderr.trim()}`);
+    }
+    throw new Error(`Failed to start benchmark helper (${details.join(", ")})`, { cause: error });
+  }
 }
 
 async function runDirectHelperScan(socketPath, cwd) {
