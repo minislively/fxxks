@@ -11,3 +11,7 @@ benchmarks/frontend-harness/runners/.clawhip/
 benchmarks/frontend-harness/runners/.claude/
 benchmarks/frontend-harness/.worktrees/
 
+# Clawhip / worktrees
+.clawhip/
+.workclaw/
+.omx/
