@@ -5,7 +5,7 @@ import { performance } from "node:perf_hooks";
 import type { ExtractionResult } from "../core/schema";
 
 function print(value: unknown): void {
-  console.log(JSON.stringify(value, null, 2));
+  console.log(JSON.stringify(value));
 }
 
 function roundMs(value: number): number {
