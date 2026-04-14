@@ -117,7 +117,7 @@ Current verification snapshot:
 
 Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on frontend tasks.
 
-### Latest Results (2025-04-14)
+### Latest Results (2026-04-14)
 
 | Metric | Vanilla | Fooks | Improvement |
 |--------|---------|-------|-------------|

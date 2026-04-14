@@ -3,7 +3,7 @@
 Frontend-specific benchmark comparing vanilla Codex vs fooks-enabled Codex.
 Similar to TerminalBench/SWE-Bench but focused on frontend codebases.
 
-## Latest Results (2025-04-14)
+## Latest Results (2026-04-14)
 
 | Metric | Vanilla | Fooks | Improvement |
 |--------|---------|-------|-------------|
