@@ -80,29 +80,29 @@ Current verification snapshot:
   - `FormSection.tsx`: 34.59% reduction
   - `DashboardPanel.tsx`: 46.63% reduction
 - latest benchmark baseline (`benchmarks/results/latest/benchmark.json`):
-  - cold avg: 648.78ms
-  - warm avg: 142.33ms
-  - partial single avg: 449.9ms
-  - partial multi avg: 398.58ms
-  - rescan after invalidation avg: 635ms
+  - cold avg: 556.96ms
+  - warm avg: 182.43ms
+  - partial single avg: 426.36ms
+  - partial multi avg: 481.52ms
+  - rescan after invalidation avg: 582.67ms
   - warm runtime split:
-    - CLI wall: 142.33ms
-    - scan core: 14.67ms
-    - outside-scan: 127.66ms
+    - CLI wall: 182.43ms
+    - scan core: 17.13ms
+    - outside-scan: 165.3ms
   - warm outside-scan breakdown:
-    - command dispatch: 22.51ms
-    - result serialization: 0.18ms
-    - stdout write: 5.84ms
-    - unattributed residual: 99.13ms
+    - command dispatch: 26.29ms
+    - result serialization: 0.2ms
+    - stdout write: 9.56ms
+    - unattributed residual: 129.25ms
   - warm dispatch sub-breakdown:
-    - paths import: 7.58ms
-    - scan import: 14.52ms
-    - ensure dirs: 0.37ms
-    - dispatch residual: 0.04ms
+    - paths import: 7.64ms
+    - scan import: 18.3ms
+    - ensure dirs: 0.3ms
+    - dispatch residual: 0.05ms
   - warm harness/process floor:
-    - bare node process: 90.5ms
-    - cli bootstrap without command: 108.72ms
-    - cli bootstrap residual over bare node: 18.22ms
+    - bare node process: 73.01ms (`bench:scan`, stable targeted reading)
+    - cli bootstrap without command: 79.66ms (`bench:scan`, stable targeted reading)
+    - cli bootstrap residual over bare node: 6.65ms (`bench:scan`, stable targeted reading)
   - scan observability now captures:
     - step timings (`discovery`, `stat`, `fileRead`, `hash`, `cacheRead`, `extract`, `cacheWrite`, `indexWrite`, `total`)
     - skip/hit/miss structure (`metadataReuseCount`, `fileReadCount`, `reparsedFileCount`)
@@ -110,7 +110,13 @@ Current verification snapshot:
     - outside-scan command-path breakdown (`commandDispatchMs`, `resultSerializeMs`, `stdoutWriteMs`, `commandPathUnattributedMs`)
     - scan startup sub-buckets (`pathsModuleImportMs`, `scanModuleImportMs`, `ensureProjectDataDirsMs`, `commandDispatchResidualMs`)
     - benchmark-harness overhead (`stdoutParseMsByScenario`, `bareNodeProcessAvgMs`, `cliBootstrapNoCommandAvgMs`, `cliBootstrapResidualAvgMs`, `artifactWriteMs`)
-- current optimization read: unchanged-file rereads are under control, measured `scan` startup work is much smaller than before, and the next remaining startup cost is largely explained by bare Node process launch plus a smaller CLI bootstrap residual
+- latest process-model falsification gate (`benchmarks/results/latest/process-model-probe.json`):
+  - current CLI warm avg: 171.87ms
+  - launcher → helper warm avg: 236.54ms
+  - direct helper warm avg: 14.67ms
+  - helper startup avg: 167.65ms
+  - takeaway: a helper can be dramatically faster only after the current CLI front door is removed; a launcher behind today's CLI contract does **not** clear the kill gate yet
+- current optimization read: unchanged-file rereads are under control, current scan-core work is cheap, and the next architectural question is process-model design rather than more scan-core trimming
 - optimization follow-up ranking: [`docs/benchmark-phase-2-optimization-candidates.md`](docs/benchmark-phase-2-optimization-candidates.md)
 
 ## Frontend Benchmark Harness (vs vanilla Codex)
@@ -294,6 +300,7 @@ You can now validate the phase-1 benchmark baseline with:
 ```bash
 npm test
 npm run bench:cache
+npm run bench:process-model
 npm run bench:extract
 npm run bench:stability
 npm run bench:gate
@@ -303,6 +310,7 @@ npm run bench
 Phase 1 keeps the suite **local-first**, **JSON-first**, and **dependency-neutral**.
 
 - `bench:cache` keeps the legacy cache benchmark entrypoint, but now resolves to the dedicated scan/cache suite
+- `bench:process-model` runs the Phase 0 helper falsification gate (`current CLI` vs `launcher → helper` vs `direct helper`)
 - `bench:extract` records file-type extraction cost and reduction metrics for the v1 fixture corpus
 - `bench:stability` captures repeated-run distributions for scan and extract timings
 - `bench:gate` evaluates lightweight preservation + mode-decision guardrails
@@ -317,6 +325,7 @@ The canonical benchmark envelope includes:
 
 - benchmark version / run id / git SHA / node version / platform
 - scan/cache suite output
+- process-model probe output
 - scan observability for timing splits, skip/hit/miss counters, slow files, and CLI-vs-scan runtime breakdowns
 - extract suite output
 - repeated-run stability output

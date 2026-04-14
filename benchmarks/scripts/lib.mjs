@@ -1,8 +1,9 @@
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
-import { execFileSync, execSync, spawnSync } from "node:child_process";
+import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +20,8 @@ export const defaultFixtureCopyCount = 20;
 
 const require = createRequire(import.meta.url);
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
+const helperServerPath = path.join(benchmarksRoot, "scripts", "scan-helper-server.mjs");
+const helperClientPath = path.join(benchmarksRoot, "scripts", "scan-helper-client.mjs");
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
 const { decideMode } = require(path.join(repoRoot, "dist", "core", "decide.js"));
 
@@ -39,6 +42,142 @@ function runBareNodeProcess(cwd = repoRoot) {
 
 function runCliBootstrapNoCommand(cwd = repoRoot) {
   return runProcess(process.execPath, [cliPath], { cwd });
+}
+
+function connectToHelper(socketPath, payload) {
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection(socketPath);
+    let raw = "";
+    let settled = false;
+    socket.setEncoding("utf8");
+    const finish = (callback) => (value) => {
+      if (settled) return;
+      settled = true;
+      callback(value);
+    };
+    socket.on("connect", () => {
+      socket.write(`${JSON.stringify(payload)}\n`);
+    });
+    socket.on("data", (chunk) => {
+      raw += chunk;
+      if (!raw.includes("\n")) return;
+      socket.end();
+      try {
+        finish(resolve)(JSON.parse(raw.trim()));
+      } catch (error) {
+        finish(reject)(error);
+      }
+    });
+    socket.on("error", finish(reject));
+    socket.on("end", () => {
+      if (!raw.trim()) {
+        finish(reject)(new Error("Helper closed without a payload"));
+      }
+    });
+  });
+}
+
+async function waitForHelperReady(socketPath, deadlineMs = 3000) {
+  const startedAt = performance.now();
+  while (performance.now() - startedAt < deadlineMs) {
+    try {
+      const response = await connectToHelper(socketPath, { command: "ping" });
+      if (response?.ok) {
+        return round(performance.now() - startedAt);
+      }
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  throw new Error(`Timed out waiting for helper readiness at ${socketPath}`);
+}
+
+function makeHelperSocketPath() {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-helper-"));
+  return {
+    dir: base,
+    socketPath: path.join(base, "scan-helper.sock"),
+  };
+}
+
+async function startHelperServer() {
+  const { dir, socketPath } = makeHelperSocketPath();
+  const startedAt = performance.now();
+  const helper = spawn(process.execPath, [helperServerPath, socketPath], {
+    cwd: repoRoot,
+    stdio: ["ignore", "ignore", "pipe"],
+    env: process.env,
+  });
+  let stderr = "";
+  helper.stderr.setEncoding("utf8");
+  helper.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  const readyMs = await waitForHelperReady(socketPath);
+  return {
+    dir,
+    socketPath,
+    process: helper,
+    startupMs: round(performance.now() - startedAt),
+    readyMs,
+    stop: async () => {
+      try {
+        await connectToHelper(socketPath, { command: "shutdown" });
+      } catch {
+        // Ignore shutdown RPC failures and terminate below.
+      }
+      if (helper.exitCode === null && helper.signalCode === null && !helper.killed) {
+        helper.kill();
+      }
+      if (helper.exitCode === null && helper.signalCode === null) {
+        await new Promise((resolve) => helper.once("exit", resolve));
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+      if (stderr.trim()) {
+        helper.stderr.removeAllListeners();
+      }
+    },
+  };
+}
+
+async function runDirectHelperScan(socketPath, cwd) {
+  const startedAt = performance.now();
+  const response = await connectToHelper(socketPath, { command: "scan", cwd });
+  const cliWallMs = round(performance.now() - startedAt);
+  return {
+    cliWallMs,
+    stdoutParseMs: 0,
+    value: response.result,
+    timingPayload: {
+      status: "captured",
+      commandPathBreakdown: {
+        commandDispatchMs: round(response.commandPathBreakdown?.helperRequestMs ?? cliWallMs),
+        ...response.commandPathBreakdown,
+      },
+    },
+  };
+}
+
+function runHelperLauncherScan(socketPath, cwd) {
+  const timingDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-helper-launcher-"));
+  const timingPath = path.join(timingDir, "launcher-timing.json");
+  try {
+    const cliExecution = measure(() => execFileSync(process.execPath, [helperClientPath, socketPath, cwd], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, FOOKS_BENCH_TIMING_PATH: timingPath },
+    }));
+    const stdoutParse = measure(() => JSON.parse(cliExecution.value));
+    const timingPayload = readBenchTimingPayload(timingPath);
+    return {
+      cliWallMs: cliExecution.durationMs,
+      stdoutParseMs: stdoutParse.durationMs,
+      value: stdoutParse.value,
+      timingPayload,
+    };
+  } finally {
+    fs.rmSync(timingDir, { recursive: true, force: true });
+  }
 }
 
 function mean(values) {
@@ -250,7 +389,7 @@ function readBenchTimingPayload(timingPath) {
   try {
     const payload = JSON.parse(fs.readFileSync(timingPath, "utf8"));
     return {
-      status: payload?.command === "scan" && payload?.schemaVersion === 1 ? "captured" : "invalid",
+      status: payload?.schemaVersion === 1 && typeof payload?.commandPathBreakdown === "object" ? "captured" : "invalid",
       commandPathBreakdown: payload?.commandPathBreakdown ?? {},
     };
   } catch {
@@ -353,6 +492,72 @@ export function runScanScenario(cwd, changedFileCount = 0, invalidatedFileCount 
   };
 }
 
+function toScenarioSample(execution, changedFileCount = 0, invalidatedFileCount = 0) {
+  return {
+    durationMs: execution.cliWallMs,
+    fileCount: execution.value.files.length,
+    changedFileCount,
+    cacheHitCount: execution.value.reusedCacheEntries,
+    cacheMissCount: execution.value.refreshedEntries,
+    invalidatedFileCount,
+    stdoutParseMs: execution.stdoutParseMs ?? 0,
+    commandPathBreakdown: execution.timingPayload?.commandPathBreakdown ?? {},
+    timingTransportStatus: execution.timingPayload?.status ?? "missing",
+    observability: execution.value.observability,
+    result: execution.value,
+  };
+}
+
+export async function runProcessModelProbeSuite({ repeatCount = resolveRepeatCount() } = {}) {
+  const currentCliSamples = [];
+  const launcherToHelperSamples = [];
+  const directHelperSamples = [];
+  const helperStartupSamples = [];
+  let totalFiles = 0;
+
+  for (let index = 0; index < repeatCount; index += 1) {
+    const benchmarkProject = makeBenchmarkProject();
+    try {
+      runScanScenario(benchmarkProject);
+      const baselineWarm = runScanScenario(benchmarkProject);
+      const helper = await startHelperServer();
+      try {
+        helperStartupSamples.push(helper.readyMs);
+        const launcherToHelper = runHelperLauncherScan(helper.socketPath, benchmarkProject);
+        const directHelper = await runDirectHelperScan(helper.socketPath, benchmarkProject);
+        totalFiles = baselineWarm.fileCount;
+        currentCliSamples.push(baselineWarm);
+        launcherToHelperSamples.push(toScenarioSample(launcherToHelper));
+        directHelperSamples.push(toScenarioSample(directHelper));
+      } finally {
+        await helper.stop();
+      }
+    } finally {
+      fs.rmSync(benchmarkProject, { recursive: true, force: true });
+    }
+  }
+
+  const runs = {
+    currentCliWarm: aggregateScenario(currentCliSamples),
+    launcherToHelperWarm: aggregateScenario(launcherToHelperSamples),
+    directHelperWarm: aggregateScenario(directHelperSamples),
+  };
+
+  return {
+    kind: "process-model-probe",
+    layer: "cli-e2e",
+    repeatCount,
+    totalFiles,
+    helperStartupAvgMs: round(mean(helperStartupSamples)),
+    runs,
+    deltas: {
+      launcherVsCurrentWarmMs: round(runs.launcherToHelperWarm.avgMs - runs.currentCliWarm.avgMs),
+      directVsCurrentWarmMs: round(runs.directHelperWarm.avgMs - runs.currentCliWarm.avgMs),
+      launcherVsDirectMs: round(runs.launcherToHelperWarm.avgMs - runs.directHelperWarm.avgMs),
+    },
+  };
+}
+
 export function runScanCacheSuite({ repeatCount = resolveRepeatCount() } = {}) {
   const coldSamples = [];
   const warmSamples = [];
@@ -364,34 +569,38 @@ export function runScanCacheSuite({ repeatCount = resolveRepeatCount() } = {}) {
 
   for (let index = 0; index < repeatCount; index += 1) {
     const benchmarkProject = makeBenchmarkProject();
-    const cold = runScanScenario(benchmarkProject);
-    const warm = runScanScenario(benchmarkProject);
+    try {
+      const cold = runScanScenario(benchmarkProject);
+      const warm = runScanScenario(benchmarkProject);
 
-    const singleFile = path.join(benchmarkProject, "src", "components", "DashboardPanel7.tsx");
-    appendMarker(singleFile, `// benchmark-single-invalidation:${index}`);
-    const partialSingle = runScanScenario(benchmarkProject, 1, 1);
+      const singleFile = path.join(benchmarkProject, "src", "components", "DashboardPanel7.tsx");
+      appendMarker(singleFile, `// benchmark-single-invalidation:${index}`);
+      const partialSingle = runScanScenario(benchmarkProject, 1, 1);
 
-    const multiFiles = [
-      path.join(benchmarkProject, "src", "components", "FormSection7.tsx"),
-      path.join(benchmarkProject, "src", "components", "SimpleButton7.tsx"),
-    ];
-    multiFiles.forEach((filePath, offset) => appendMarker(filePath, `// benchmark-multi-invalidation:${index}:${offset}`));
-    const partialMulti = runScanScenario(benchmarkProject, multiFiles.length, multiFiles.length);
+      const multiFiles = [
+        path.join(benchmarkProject, "src", "components", "FormSection7.tsx"),
+        path.join(benchmarkProject, "src", "components", "SimpleButton7.tsx"),
+      ];
+      multiFiles.forEach((filePath, offset) => appendMarker(filePath, `// benchmark-multi-invalidation:${index}:${offset}`));
+      const partialMulti = runScanScenario(benchmarkProject, multiFiles.length, multiFiles.length);
 
-    clearProjectState(benchmarkProject);
-    const rescanAfterInvalidation = runScanScenario(benchmarkProject, cold.fileCount, cold.fileCount);
+      clearProjectState(benchmarkProject);
+      const rescanAfterInvalidation = runScanScenario(benchmarkProject, cold.fileCount, cold.fileCount);
 
-    totalFiles = cold.fileCount;
-    kindCounts = {
-      components: cold.result.files.filter((item) => item.kind === "component").length,
-      linkedTs: cold.result.files.filter((item) => item.kind === "linked-ts").length,
-    };
+      totalFiles = cold.fileCount;
+      kindCounts = {
+        components: cold.result.files.filter((item) => item.kind === "component").length,
+        linkedTs: cold.result.files.filter((item) => item.kind === "linked-ts").length,
+      };
 
-    coldSamples.push({ ...cold, changedFileCount: cold.fileCount });
-    warmSamples.push({ ...warm, changedFileCount: 0 });
-    partialSingleSamples.push(partialSingle);
-    partialMultiSamples.push(partialMulti);
-    rescanAfterInvalidationSamples.push(rescanAfterInvalidation);
+      coldSamples.push({ ...cold, changedFileCount: cold.fileCount });
+      warmSamples.push({ ...warm, changedFileCount: 0 });
+      partialSingleSamples.push(partialSingle);
+      partialMultiSamples.push(partialMulti);
+      rescanAfterInvalidationSamples.push(rescanAfterInvalidation);
+    } finally {
+      fs.rmSync(benchmarkProject, { recursive: true, force: true });
+    }
   }
 
   const runs = {
@@ -732,10 +941,24 @@ export function gateSummary(report, latestPath) {
   ];
 }
 
-export function runAllSuites({ repeatCount = resolveRepeatCount() } = {}) {
+export function processModelProbeSummary(report, latestPath) {
+  return [
+    `fooks benchmark | process-model-probe | latest: ${relativeToRepo(latestPath)}`,
+    `- current warm avg: ${report.runs.currentCliWarm.avgMs}ms`,
+    `- launcher -> helper warm avg: ${report.runs.launcherToHelperWarm.avgMs}ms`,
+    `- direct helper warm avg: ${report.runs.directHelperWarm.avgMs}ms`,
+    `- helper startup avg: ${report.helperStartupAvgMs}ms`,
+    `- delta (launcher - current): ${report.deltas.launcherVsCurrentWarmMs}ms`,
+    `- delta (direct - current): ${report.deltas.directVsCurrentWarmMs}ms`,
+    `- delta (launcher - direct): ${report.deltas.launcherVsDirectMs}ms`,
+  ];
+}
+
+export async function runAllSuites({ repeatCount = resolveRepeatCount() } = {}) {
   const fixtureSet = loadFixtureSet();
   const runId = new Date().toISOString();
   const scanCache = runScanCacheSuite({ repeatCount });
+  const processModelProbe = await runProcessModelProbeSuite({ repeatCount });
   const extract = runExtractSuite();
   const stability = runStabilitySuite({ repeatCount, scanScenarios: scanCache.runs });
   const gateSuite = runGateSuite();
@@ -745,6 +968,7 @@ export function runAllSuites({ repeatCount = resolveRepeatCount() } = {}) {
     fixtureSetVersion: fixtureSet.version,
     suites: {
       scanCache,
+      processModelProbe,
       extract: extract.fixtures,
       stability,
       preservation: gateSuite.preservation,
@@ -752,5 +976,5 @@ export function runAllSuites({ repeatCount = resolveRepeatCount() } = {}) {
     },
     gates,
   });
-  return { runId, fixtureSetVersion: fixtureSet.version, envelope, scanCache, extract, stability, gateSuite, gates };
+  return { runId, fixtureSetVersion: fixtureSet.version, envelope, scanCache, processModelProbe, extract, stability, gateSuite, gates };
 }

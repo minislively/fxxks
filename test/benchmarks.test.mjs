@@ -90,6 +90,22 @@ test("scan-cache benchmark script emits expanded scenarios and writes the latest
   assert.ok(fs.existsSync(result.artifacts.latestPath));
 });
 
+test("process-model probe compares current cli against helper-backed warm paths", () => {
+  const result = runScript(path.join("benchmarks", "scripts", "process-model-probe.mjs"));
+  assert.equal(result.kind, "process-model-probe");
+  assert.equal(result.layer, "cli-e2e");
+  assert.ok(result.helperStartupAvgMs >= 0);
+  assert.ok(result.runs.currentCliWarm.avgMs > 0);
+  assert.ok(result.runs.launcherToHelperWarm.avgMs > 0);
+  assert.ok(result.runs.directHelperWarm.avgMs > 0);
+  assert.ok(result.runs.launcherToHelperWarm.runtimeBreakdown.outsideScanBreakdown.commandDispatchMs >= 0);
+  assert.ok(result.runs.launcherToHelperWarm.runtimeBreakdown.outsideScanBreakdown.commandPathMeasuredMs >= 0);
+  assert.ok(result.runs.directHelperWarm.runtimeBreakdown.outsideScanBreakdown.commandDispatchMs >= 0);
+  assert.equal(typeof result.deltas.launcherVsCurrentWarmMs, "number");
+  assert.equal(typeof result.deltas.directVsCurrentWarmMs, "number");
+  assert.ok(fs.existsSync(result.artifacts.latestPath));
+});
+
 test("legacy bench:cache wrapper still resolves to the new scan-cache suite", () => {
   const result = runScript(path.join("scripts", "benchmark-cache.mjs"));
   assert.equal(result.kind, "scan-cache-bench");
@@ -146,6 +162,10 @@ test("run-all benchmark script emits the canonical envelope", () => {
   assert.ok(result.suites.scanCache.harnessBreakdown.cliBootstrapResidualAvgMs >= 0);
   assert.ok(result.suites.scanCache.harnessBreakdown.artifactWriteMs >= 0);
   assert.ok(result.suites.scanCache.runs.warm.runtimeBreakdown.outsideScanBreakdown.commandPathMeasuredMs >= 0);
+  assert.ok(result.suites.processModelProbe);
+  assert.ok(result.suites.processModelProbe.runs.currentCliWarm.avgMs > 0);
+  assert.ok(result.suites.processModelProbe.runs.launcherToHelperWarm.avgMs > 0);
+  assert.ok(result.suites.processModelProbe.runs.directHelperWarm.avgMs > 0);
   assert.ok(Array.isArray(result.suites.extract));
   assert.ok(result.suites.stability);
   assert.ok(result.suites.preservation);

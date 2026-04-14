@@ -15,6 +15,7 @@
     "clean": "rm -rf dist",
     "bench": "npm run build && node benchmarks/scripts/run-all.mjs",
     "bench:scan": "npm run build && node benchmarks/scripts/scan-cache.mjs",
+    "bench:process-model": "npm run build && node benchmarks/scripts/process-model-probe.mjs",
     "bench:extract": "npm run build && node benchmarks/scripts/extract.mjs",
     "bench:stability": "npm run build && node benchmarks/scripts/stability.mjs",
     "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs",
