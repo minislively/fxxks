@@ -3,3 +3,11 @@ node_modules/
 dist/
 .fooks/
 benchmarks/results/**/*.json
+
+# Benchmark harness artifacts
+benchmarks/frontend-harness/runners/__pycache__/
+benchmarks/frontend-harness/runners/.omx/
+benchmarks/frontend-harness/runners/.clawhip/
+benchmarks/frontend-harness/runners/.claude/
+benchmarks/frontend-harness/.worktrees/
+

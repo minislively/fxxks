@@ -8,14 +8,28 @@ import subprocess
 import json
 import os
 import time
-import random
+import shutil
+import sys
 from pathlib import Path
 from datetime import datetime
 
-BASE_DIR = Path("/home/bellman/Workspace/fooks-benchmark-harness")
-REPOS_DIR = Path("/home/bellman/Workspace/fooks-test-repos")
-FOOKS_DIR = Path("/home/bellman/Workspace/fooks")
-OMX_BIN = Path("/home/bellman/Workspace/oh-my-codex/dist/cli/omx.js")
+# Auto-detect paths
+SCRIPT_DIR = Path(__file__).parent.resolve()
+BENCHMARK_DIR = SCRIPT_DIR.parent.resolve()
+FOOKS_DIR = BENCHMARK_DIR.parent.parent.resolve()  # fooks repo root
+
+# Test repos location (can be overridden via env var)
+REPOS_DIR = Path(os.environ.get("BENCHMARK_REPOS_DIR", Path.home() / "Workspace/fooks-test-repos"))
+
+# OMX binary (can be overridden via env var)
+OMX_BIN = Path(os.environ.get("OMX_BIN", Path.home() / "Workspace/oh-my-codex/dist/cli/omx.js"))
+
+# Verify paths
+FOOKS_CLI = FOOKS_DIR / "dist/cli/index.js"
+if not FOOKS_CLI.exists():
+    print(f"Error: fooks CLI not found at {FOOKS_CLI}")
+    print("Please build fooks first: npm run build")
+    sys.exit(1)
 
 REPOS = {
     "shadcn-ui": REPOS_DIR / "ui",
@@ -185,7 +199,7 @@ def run_fooks_omx(worktree: dict, task: dict) -> dict:
     try:
         # Initialize fooks first
         fooks_init = subprocess.run(
-            ["node", str(FOOKS_DIR / "dist/cli/index.js"), "init"],
+            ["node", str(FOOKS_CLI), "init"],
             cwd=worktree["path"],
             capture_output=True,
             text=True,
@@ -194,7 +208,7 @@ def run_fooks_omx(worktree: dict, task: dict) -> dict:
         
         # Run fooks scan
         fooks_scan = subprocess.run(
-            ["node", str(FOOKS_DIR / "dist/cli/index.js"), "scan"],
+            ["node", str(FOOKS_CLI), "scan"],
             cwd=worktree["path"],
             capture_output=True,
             text=True,

@@ -5,12 +5,27 @@ import subprocess
 import os
 import time
 import json
+import sys
 from pathlib import Path
 from datetime import datetime
 
-REPOS_DIR = Path("/home/bellman/Workspace/fooks-test-repos")
-FOOKS_DIR = Path("/home/bellman/Workspace/fooks")
-OMX_BIN = Path("/home/bellman/Workspace/oh-my-codex/dist/cli/omx.js")
+# Auto-detect paths
+SCRIPT_DIR = Path(__file__).parent.resolve()
+BENCHMARK_DIR = SCRIPT_DIR.parent.resolve()
+FOOKS_DIR = BENCHMARK_DIR.parent.parent.resolve()  # fooks repo root
+
+# Test repos location (can be overridden via env var)
+REPOS_DIR = Path(os.environ.get("BENCHMARK_REPOS_DIR", Path.home() / "Workspace/fooks-test-repos"))
+
+# OMX binary (can be overridden via env var)
+OMX_BIN = Path(os.environ.get("OMX_BIN", Path.home() / "Workspace/oh-my-codex/dist/cli/omx.js"))
+
+# Verify paths
+FOOKS_CLI = FOOKS_DIR / "dist/cli/index.js"
+if not FOOKS_CLI.exists():
+    print(f"Error: fooks CLI not found at {FOOKS_CLI}")
+    print("Please build fooks first: npm run build")
+    sys.exit(1)
 
 repo_path = REPOS_DIR / "ui"
 
@@ -27,7 +42,7 @@ def get_fooks_token_estimate(worktree_path, sample_file="apps/v4/registry/new-yo
     
     try:
         result = subprocess.run(
-            ["node", str(FOOKS_DIR / "dist/cli/index.js"), "extract", str(full_path), "--model-payload"],
+            ["node", str(FOOKS_CLI), "extract", str(full_path), "--model-payload"],
             capture_output=True, text=True, timeout=10
         )
         if result.returncode == 0:
@@ -137,9 +152,9 @@ print(f"  CODEX_HOME: {wt_fooks['codex_home']}")
 # Init fooks with timing
 print("  Initializing fooks...")
 fooks_start = time.time()
-subprocess.run(["node", str(FOOKS_DIR / "dist/cli/index.js"), "init"], 
+subprocess.run(["node", str(FOOKS_CLI), "init"], 
                cwd=wt_fooks["path"], capture_output=True, timeout=30)
-subprocess.run(["node", str(FOOKS_DIR / "dist/cli/index.js"), "scan"],
+subprocess.run(["node", str(FOOKS_CLI), "scan"],
                cwd=wt_fooks["path"], capture_output=True, timeout=120)
 fooks_scan_time = int((time.time() - fooks_start) * 1000)
 print(f"  Fooks scan: {fooks_scan_time:,}ms")

@@ -23,44 +23,108 @@ Similar to TerminalBench/SWE-Bench but focused on frontend codebases.
 | T1: Button Relocation | easy | cal.com | 92,182ms | 79,732ms | +13.5% |
 | T5: Form Validation | hard | cal.com | 102,676ms | 137,327ms | -33.7% |
 
-### Key Insights
+## Quick Start (Local Reproduction)
 
-1. **Token Efficiency**: Fooks compresses codebase context by ~78%, saving ~1.76M tokens per session
-2. **Speed**: Average 20.7% faster execution on typical tasks
-3. **Scalability**: Works effectively on large repos (cal.com: 1,691 TSX files)
-4. **Isolation**: Each benchmark uses isolated `.codex` folders per worktree
+### Prerequisites
+
+1. **fooks** - Must be built locally
+   ```bash
+   cd /path/to/fooks
+   npm install
+   npm run build
+   ```
+
+2. **oh-my-codex** - Required for OMX execution
+   ```bash
+   git clone https://github.com/minislively/oh-my-codex ~/Workspace/oh-my-codex
+   cd ~/Workspace/oh-my-codex
+   npm install
+   npm run build
+   ```
+
+3. **Test Repositories** - Frontend projects to benchmark
+   ```bash
+   mkdir -p ~/Workspace/fooks-test-repos
+   cd ~/Workspace/fooks-test-repos
+   gh repo clone shadcn-ui/ui -- --depth 1
+   gh repo clone calcom/cal.com -- --depth 1
+   gh repo clone documenso/documenso -- --depth 1
+   gh repo clone formbricks/formbricks -- --depth 1
+   ```
+
+4. **Codex Auth** - Must be logged in
+   ```bash
+   codex login
+   # Ensure ~/.codex/auth.json exists
+   ```
+
+### Environment Check
+
+Run the setup check script to verify everything:
+
+```bash
+cd benchmarks/frontend-harness/runners
+python3 setup.py
+```
+
+### Running Benchmarks
+
+#### Option 1: Quick Test (5-10 minutes)
+Single task (T5: Form Validation) on shadcn-ui:
+
+```bash
+cd benchmarks/frontend-harness/runners
+python3 quick-test.py
+```
+
+#### Option 2: Full Suite (30-60 minutes)
+All 5 tasks across multiple repos:
+
+```bash
+cd benchmarks/frontend-harness/runners
+python3 full-benchmark-suite.py
+```
+
+Results will be saved to `../reports/benchmark-{timestamp}.json`
+
+### Custom Configuration
+
+Override default paths via environment variables:
+
+```bash
+# Custom test repos location
+export BENCHMARK_REPOS_DIR=/path/to/your/repos
+
+# Custom OMX binary location
+export OMX_BIN=/path/to/omx.js
+
+# Then run benchmarks
+python3 full-benchmark-suite.py
+```
 
 ## Structure
 
 ```
-fooks-benchmark-harness/
-├── tasks/           # Task definitions (T1-T5)
-├── runners/         # Benchmark execution scripts
-├── reports/         # Generated comparison reports
-└── metrics/         # Raw metrics data
-```
-
-## Running Benchmarks
-
-```bash
-cd runners
-
-# Quick test (single task)
-python3 quick-test.py
-
-# Full suite (5 tasks)
-python3 full-benchmark-suite.py
-
-# Environment validation
-python3 test-setup.py
+benchmarks/frontend-harness/
+├── README.md              # This file
+├── tasks/
+│   └── task-definitions.json    # T1-T5 task definitions
+├── runners/
+│   ├── setup.py           # Environment check script
+│   ├── quick-test.py      # Single task test
+│   ├── full-benchmark-suite.py  # Complete benchmark
+│   └── test-setup.py      # Basic environment validation
+└── reports/               # Generated benchmark results
 ```
 
 ## Test Repositories
 
-- **shadcn-ui**: 2,967 TSX files, 118MB
-- **cal.com**: 1,691 TSX files, 562MB
-- **documenso**: 621 TSX files, 174MB
-- **formbricks**: 882 TSX files, 192MB
+| Repository | TSX Files | Size | Notes |
+|------------|-----------|------|-------|
+| shadcn-ui/ui | 2,967 | 118MB | UI component library |
+| calcom/cal.com | 1,691 | 562MB | Scheduling app |
+| documenso/documenso | 621 | 174MB | Doc signing |
+| formbricks/formbricks | 882 | 192MB | Survey tool |
 
 ## Task Definitions
 
@@ -89,15 +153,51 @@ python3 test-setup.py
 5. Clean up worktrees
 6. Aggregate results across tasks/repos
 
+### Key Insights
+
+1. **Token Efficiency**: Fooks compresses codebase context by ~78%, saving ~1.76M tokens per session
+2. **Speed**: Average 20.7% faster execution on typical tasks
+3. **Scalability**: Works effectively on large repos (cal.com: 1,691 TSX files)
+4. **Isolation**: Each benchmark uses isolated `.codex` folders per worktree
+
+## Troubleshooting
+
+### "fooks CLI not found"
+Build fooks first:
+```bash
+cd /path/to/fooks
+npm run build
+```
+
+### "omx not found"
+Install oh-my-codex:
+```bash
+git clone https://github.com/minislively/oh-my-codex ~/Workspace/oh-my-codex
+cd ~/Workspace/oh-my-codex
+npm install && npm run build
+```
+
+### "Test repos not found"
+Clone test repositories:
+```bash
+mkdir -p ~/Workspace/fooks-test-repos
+cd ~/Workspace/fooks-test-repos
+gh repo clone shadcn-ui/ui -- --depth 1
+```
+
+### Timeout errors
+Increase timeout in scripts (default: 600s / 10 minutes)
+
 ## Requirements
 
 - Python 3.10+
 - Node.js 20+
 - Git with worktree support
-- fooks CLI (`~/Workspace/fooks`)
-- oh-my-codex (`~/Workspace/oh-my-codex`)
-- Test repos cloned to `~/Workspace/fooks-test-repos`
+- fooks CLI (built from source)
+- oh-my-codex (built from source)
+- Test repos cloned
+- Codex CLI authenticated
 
 ## License
 
-MIT
+MIT - Part of the fooks project
