@@ -1,0 +1,8 @@
+{
+  "observed_at": "2026-04-14T07:02:54.330Z",
+  "provider": "codex",
+  "event_name": "UserPromptSubmit",
+  "session_id": "019d8acc-d703-7e03-8751-e9be9be111b6",
+  "turn_id": "019d8acc-d79e-7771-9d11-27b9645db2ed",
+  "prompt_summary": "Analyze the fooks compression efficiency issue. The problem: when using --model-payload on small files in 'raw' mode, the JSON payload (661 bytes) is LARGER than the original source file (356 bytes). …"
+}

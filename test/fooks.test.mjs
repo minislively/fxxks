@@ -1,3 +1,9 @@
+// @ts-check
+/// <reference types="node" />
+
+/** @typedef {import('../dist/core/schema.js').ExtractionResult} ExtractionResult */
+/** @typedef {import('../dist/core/schema.js').PayloadReadiness} PayloadReadiness */
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
