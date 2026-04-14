@@ -113,6 +113,34 @@ Current verification snapshot:
 - current optimization read: unchanged-file rereads are under control, measured `scan` startup work is much smaller than before, and the next remaining startup cost is largely explained by bare Node process launch plus a smaller CLI bootstrap residual
 - optimization follow-up ranking: [`docs/benchmark-phase-2-optimization-candidates.md`](docs/benchmark-phase-2-optimization-candidates.md)
 
+## Frontend Benchmark Harness (vs vanilla Codex)
+
+Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on frontend tasks.
+
+### Latest Results (2025-04-14)
+
+| Metric | Vanilla | Fooks | Improvement |
+|--------|---------|-------|-------------|
+| **Token Reduction** | ~2.1M tokens | ~450K tokens | **-78.2%** |
+| **Execution Time** | 98,216ms | 77,929ms | **+20.7% faster** |
+| **Tokens Saved** | - | **~1.76M per session** | - |
+| **Success Rate** | 100% (5/5) | 100% (5/5) | - |
+
+**Tested on:**
+- shadcn-ui (2,967 TSX files)
+- cal.com (1,691 TSX files)
+- 5 tasks: Button Relocation → Form Validation (easy → hard)
+
+**Location:** `benchmarks/frontend-harness/`
+
+**Quick reproduction:**
+```bash
+cd benchmarks/frontend-harness/runners
+python3 setup.py          # Check environment
+python3 quick-test.py     # 5-10 min single test
+python3 full-benchmark-suite.py  # 30-60 min full suite
+```
+
 ## Model-facing payload
 
 `extract` keeps the canonical extraction output by default. For a leaner LLM-delivery view:
