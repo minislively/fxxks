@@ -274,6 +274,24 @@ test("runtime prompt parser finds eligible tsx/jsx paths and escape hatches", ()
   const jsxTarget = extractPromptTarget("Review fixtures/jsx/SimpleWidget.jsx for repeated work", repoRoot);
   assert.equal(jsxTarget, path.join("fixtures", "jsx", "SimpleWidget.jsx"));
 
+  const newRelativeTsxTarget = extractPromptTarget("Create src/components/NewCard.tsx for this feature", repoRoot);
+  assert.equal(newRelativeTsxTarget, path.join("src", "components", "NewCard.tsx"));
+
+  const newRelativeJsxTarget = extractPromptTarget("Add src/widgets/NewWidget.jsx before wiring it up", repoRoot);
+  assert.equal(newRelativeJsxTarget, path.join("src", "widgets", "NewWidget.jsx"));
+
+  const traversalTarget = extractPromptTarget("Edit ../outside/HiddenPanel.tsx next", repoRoot);
+  assert.equal(traversalTarget, null);
+
+  const absoluteMissingTarget = extractPromptTarget("Create /tmp/BrandNewPanel.tsx for this flow", repoRoot);
+  assert.equal(absoluteMissingTarget, null);
+
+  const absoluteOutsideExistingTarget = extractPromptTarget(
+    `Inspect ${path.join(repoRoot, "..", "ai-job-finder", "components", "QuestionAnswerForm.tsx")} as well`,
+    repoRoot,
+  );
+  assert.equal(absoluteOutsideExistingTarget, null);
+
   const tsTarget = extractPromptTarget("Check fixtures/ts-linked/Button.types.ts too", repoRoot);
   assert.equal(tsTarget, null);
 

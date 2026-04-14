@@ -9,6 +9,11 @@ function trimPromptToken(token: string): string {
   return token.replace(/^[`"'([{<]+/, "").replace(/[`"')\]}>:;,!?]+$/, "");
 }
 
+function isWithinCwd(resolved: string, cwd: string): boolean {
+  const relativeToCwd = path.relative(cwd, resolved);
+  return relativeToCwd === "" || (!relativeToCwd.startsWith(`..${path.sep}`) && relativeToCwd !== ".." && !path.isAbsolute(relativeToCwd));
+}
+
 function normalizeCandidate(token: string, cwd: string): string | null {
   const cleaned = trimPromptToken(token);
   if (!cleaned) return null;
@@ -16,8 +21,16 @@ function normalizeCandidate(token: string, cwd: string): string | null {
   const resolved = path.isAbsolute(cleaned) ? path.resolve(cleaned) : path.resolve(cwd, cleaned);
   const extension = path.extname(resolved).toLowerCase();
   if (!ELIGIBLE_EXTENSIONS.has(extension)) return null;
-  if (!fs.existsSync(resolved)) return null;
-  return path.relative(cwd, resolved) || path.basename(resolved);
+  if (!isWithinCwd(resolved, cwd)) return null;
+
+  const relativeToCwd = path.relative(cwd, resolved);
+
+  if (fs.existsSync(resolved)) {
+    return relativeToCwd || path.basename(resolved);
+  }
+
+  if (path.isAbsolute(cleaned)) return null;
+  return relativeToCwd || path.basename(resolved);
 }
 
 export function extractPromptTarget(prompt: string, cwd = process.cwd()): string | null {
