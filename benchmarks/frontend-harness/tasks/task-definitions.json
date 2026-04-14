@@ -1,0 +1,49 @@
+{
+  "tasks": [
+    {
+      "id": "T1",
+      "name": "Button Relocation",
+      "description": "Move the primary action button from left to right side of the form",
+      "difficulty": "easy",
+      "targetRepos": ["shadcn-ui", "cal.com", "documenso"],
+      "prompt": "Find the main submit/action button in the component and move it to the right side of its container. Use flexbox justify-end or equivalent."
+    },
+    {
+      "id": "T2",
+      "name": "Style Modification",
+      "description": "Change primary button color from default to blue (bg-blue-600)",
+      "difficulty": "easy",
+      "targetRepos": ["shadcn-ui", "cal.com", "formbricks"],
+      "prompt": "Locate the primary button component and change its background color to blue (bg-blue-600 or equivalent). Keep all other functionality intact."
+    },
+    {
+      "id": "T3",
+      "name": "Loading State Addition",
+      "description": "Add isLoading prop to button component with disabled state and spinner",
+      "difficulty": "medium",
+      "targetRepos": ["shadcn-ui", "cal.com"],
+      "prompt": "Add an isLoading prop to the main button component. When true, show a loading spinner and disable the button. Use existing loading/spinner components if available."
+    },
+    {
+      "id": "T4",
+      "name": "Component Extraction",
+      "description": "Extract inline header JSX into separate Header component",
+      "difficulty": "medium",
+      "targetRepos": ["cal.com", "documenso", "formbricks"],
+      "prompt": "Find a component with inline header JSX (title, subtitle, actions). Extract this into a separate Header component with appropriate props."
+    },
+    {
+      "id": "T5",
+      "name": "Form Validation",
+      "description": "Add email validation to input field with error message display",
+      "difficulty": "hard",
+      "targetRepos": ["cal.com", "documenso"],
+      "prompt": "Add email format validation to an email input field. Show red error message below input when invalid. Use useState for validation state."
+    }
+  ],
+  "config": {
+    "maxSessionTime": 300,
+    "timeoutPerTask": 600,
+    "repetitions": 3
+  }
+}
