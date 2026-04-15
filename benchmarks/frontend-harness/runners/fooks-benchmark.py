@@ -35,7 +35,9 @@ REPOS = {
     "shadcn-ui": REPOS_DIR / "ui",
     "cal.com": REPOS_DIR / "cal.com",
     "documenso": REPOS_DIR / "documenso",
-    "formbricks": REPOS_DIR / "formbricks"
+    "formbricks": REPOS_DIR / "formbricks",
+    "nextjs": REPOS_DIR / "nextjs",
+    "tailwindcss": REPOS_DIR / "tailwindcss",
 }
 
 # Task definitions matching the JSON
@@ -44,21 +46,21 @@ TASKS = [
         "id": "T1",
         "name": "Button Relocation",
         "prompt": "Find the main submit/action button in the component and move it to the right side of its container using flexbox justify-end or equivalent. Make minimal changes - only move the button position.",
-        "target_repos": ["shadcn-ui", "cal.com"],
+        "target_repos": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"],
         "difficulty": "easy"
     },
     {
         "id": "T2", 
         "name": "Style Modification",
         "prompt": "Locate the primary button component and change its background color to blue (bg-blue-600 or styled-components equivalent). Keep all other functionality intact.",
-        "target_repos": ["shadcn-ui", "cal.com"],
+        "target_repos": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"],
         "difficulty": "easy"
     },
     {
         "id": "T3",
         "name": "Loading State Addition",
         "prompt": "Add an isLoading prop to the main button component. When true, show 'Loading...' text and disable the button. Use existing patterns in the codebase.",
-        "target_repos": ["shadcn-ui", "cal.com"],
+        "target_repos": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"],
         "difficulty": "medium"
     }
 ]

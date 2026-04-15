@@ -63,6 +63,8 @@ def check_test_repos():
             ("calcom/cal.com", "cal.com"),
             ("documenso/documenso", "documenso"),
             ("formbricks/formbricks", "formbricks"),
+            ("vercel/next.js", "nextjs"),
+            ("tailwindlabs/tailwindcss", "tailwindcss"),
         ]
         
         for repo, name in repos:
@@ -74,7 +76,7 @@ def check_test_repos():
         return False
     
     # Check individual repos
-    required = ["ui", "cal.com", "documenso", "formbricks"]
+    required = ["ui", "cal.com", "documenso", "formbricks", "nextjs", "tailwindcss"]
     missing = []
     for repo in required:
         if not (test_repos_dir / repo).exists():

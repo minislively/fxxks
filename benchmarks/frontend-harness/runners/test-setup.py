@@ -61,7 +61,9 @@ def check_repos():
         "shadcn-ui": REPOS_DIR / "ui",
         "cal.com": REPOS_DIR / "cal.com",
         "documenso": REPOS_DIR / "documenso",
-        "formbricks": REPOS_DIR / "formbricks"
+        "formbricks": REPOS_DIR / "formbricks",
+        "nextjs": REPOS_DIR / "nextjs",
+        "tailwindcss": REPOS_DIR / "tailwindcss",
     }
     
     all_ok = True

@@ -24,7 +24,9 @@ const REPOS = {
   'shadcn-ui': join(REPOS_DIR, 'ui'),
   'cal.com': join(REPOS_DIR, 'cal.com'),
   'documenso': join(REPOS_DIR, 'documenso'),
-  'formbricks': join(REPOS_DIR, 'formbricks')
+  'formbricks': join(REPOS_DIR, 'formbricks'),
+  'nextjs': join(REPOS_DIR, 'nextjs'),
+  'tailwindcss': join(REPOS_DIR, 'tailwindcss')
 };
 
 /**

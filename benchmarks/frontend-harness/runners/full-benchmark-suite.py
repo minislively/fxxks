@@ -37,7 +37,9 @@ REPOS = {
     "shadcn-ui": REPOS_DIR / "ui",
     "cal.com": REPOS_DIR / "cal.com",
     "documenso": REPOS_DIR / "documenso",
-    "formbricks": REPOS_DIR / "formbricks"
+    "formbricks": REPOS_DIR / "formbricks",
+    "nextjs": REPOS_DIR / "nextjs",
+    "tailwindcss": REPOS_DIR / "tailwindcss",
 }
 
 # Task definitions
@@ -76,11 +78,11 @@ TASKS = [
 
 # Map tasks to appropriate repos (simplified for benchmark)
 TASK_REPO_MAPPING = {
-    "T1": ["shadcn-ui", "cal.com"],
-    "T2": ["shadcn-ui", "cal.com"],
-    "T3": ["shadcn-ui", "cal.com"],
-    "T4": ["shadcn-ui", "documenso"],
-    "T5": ["shadcn-ui", "cal.com"]
+    "T1": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"],
+    "T2": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"],
+    "T3": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"],
+    "T4": ["shadcn-ui", "documenso", "nextjs"],
+    "T5": ["shadcn-ui", "cal.com", "nextjs", "tailwindcss"]
 }
 
 def get_session_token_estimate(repo_path):
@@ -312,7 +314,7 @@ def main():
     print("="*70)
     print(f"Start time: {datetime.now().isoformat()}")
     print(f"Tasks: T1-T5")
-    print(f"Repos: shadcn-ui, cal.com, documenso, formbricks")
+    print(f"Repos: shadcn-ui, cal.com, documenso, formbricks, nextjs, tailwindcss")
     print(f"Variants: Vanilla vs Fooks (with token estimates)")
     print("="*70)
     
