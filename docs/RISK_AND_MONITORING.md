@@ -134,3 +134,4 @@ const monitoring = {
 - 관련 테스트: `tests/shadcn-ui-large.test.ts`
 - 성능 벤치마크: `docs/PERFORMANCE_BENCHMARK.md`
 - 구조 변경 채택 기준: [`docs/performance-vs-operational-complexity.md`](docs/performance-vs-operational-complexity.md)
+- 실환경 검증 가이드: [`docs/real-environment-process-model-validation.md`](docs/real-environment-process-model-validation.md)

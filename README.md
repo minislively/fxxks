@@ -97,6 +97,7 @@ Current verification snapshot:
 - current optimization read: unchanged-file rereads are under control, measured `scan` startup work is much smaller than before, and the next remaining startup cost is largely explained by bare Node process launch plus a smaller CLI bootstrap residual
 - optimization follow-up ranking: [`docs/benchmark-phase-2-optimization-candidates.md`](docs/benchmark-phase-2-optimization-candidates.md)
 - adoption guardrail for future launcher/helper work: [`docs/performance-vs-operational-complexity.md`](docs/performance-vs-operational-complexity.md)
+- real-environment validation checklist for launcher/helper decisions: [`docs/real-environment-process-model-validation.md`](docs/real-environment-process-model-validation.md)
 
 ## Frontend Benchmark Harness (vs vanilla Codex)
 
