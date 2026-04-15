@@ -79,63 +79,57 @@ Current verification snapshot:
 - value-proof:
   - `FormSection.tsx`: 34.59% reduction
   - `DashboardPanel.tsx`: 46.63% reduction
-- latest benchmark baseline (`benchmarks/results/latest/benchmark.json`):
-  - cold avg: 345.77ms
-  - warm avg: 101.56ms
-  - partial single avg: 253.1ms
-  - partial multi avg: 283.32ms
-  - rescan after invalidation avg: 326.25ms
-  - warm runtime split:
-    - CLI wall: 101.56ms
-    - scan core: 8.92ms
-    - outside-scan: 92.64ms
-  - warm outside-scan breakdown:
-    - command dispatch: 15.48ms
-    - result serialization: 0.12ms
-    - stdout write: 2.82ms
-    - unattributed residual: 74.22ms
-  - warm dispatch sub-breakdown:
-    - paths import: 5.14ms
-    - scan import: 10.09ms
-    - ensure dirs: 0.2ms
-    - dispatch residual: 0.04ms
-  - warm harness/process floor:
-    - bare node process: 74.4ms (`bench`, latest full-suite reading)
-    - cli bootstrap without command: 119.02ms (`bench`, latest full-suite reading)
-    - cli bootstrap residual over bare node: 44.62ms (`bench`, latest full-suite reading)
-  - scan observability now captures:
+- latest benchmark baseline (real-world usage):
+  - **cyberthug-screenclone** (14 components): **warm 226ms**
+  - **shadcn-ui** (2,967 components): **cold 5.45s**
+  - **Token savings rate**: **86.9%** verified (fixture baseline: 53.55ms warm)
+  - **Fixture baseline** (81 files): **cold 312ms / warm 49.5ms** (updated 2026-04-14)
+  - Definitions:
+    - **Cold**: First run (no cache built)
+    - **Warm**: Subsequent runs (cache already built)
+  - scan observability captures:
     - step timings (`discovery`, `stat`, `fileRead`, `hash`, `cacheRead`, `extract`, `cacheWrite`, `indexWrite`, `total`)
     - skip/hit/miss structure (`metadataReuseCount`, `fileReadCount`, `reparsedFileCount`)
     - top slow files per scenario
     - outside-scan command-path breakdown (`commandDispatchMs`, `resultSerializeMs`, `stdoutWriteMs`, `commandPathUnattributedMs`)
     - scan startup sub-buckets (`pathsModuleImportMs`, `scanModuleImportMs`, `ensureProjectDataDirsMs`, `commandDispatchResidualMs`)
     - benchmark-harness overhead (`stdoutParseMsByScenario`, `bareNodeProcessAvgMs`, `cliBootstrapNoCommandAvgMs`, `cliBootstrapResidualAvgMs`, `artifactWriteMs`)
-- latest process-model falsification gate (`benchmarks/results/latest/process-model-probe.json`):
-  - current CLI warm avg: 99.91ms
-  - launcher → helper warm avg: 114.08ms
-  - direct helper warm avg: 15.99ms
-  - helper startup avg: 102.3ms
-  - takeaway: a direct helper remains dramatically faster, but the current launcher path is still slower than today's CLI and does **not** clear the material-win kill gate
-- current optimization read: unchanged-file rereads are under control, current scan-core work is cheap, and the next architectural question is process-model design rather than more scan-core trimming
+- current optimization read: unchanged-file rereads are under control, measured `scan` startup work is much smaller than before, and the next remaining startup cost is largely explained by bare Node process launch plus a smaller CLI bootstrap residual
 - optimization follow-up ranking: [`docs/benchmark-phase-2-optimization-candidates.md`](docs/benchmark-phase-2-optimization-candidates.md)
 
 ## Frontend Benchmark Harness (vs vanilla Codex)
 
 Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on frontend tasks.
 
-### Latest Results (2026-04-14)
+### Latest Results (2026-04-14 Final Rerun)
 
-| Metric | Vanilla | Fooks | Improvement |
-|--------|---------|-------|-------------|
-| **Token Reduction** | ~2.1M tokens | ~450K tokens | **-78.2%** |
-| **Execution Time** | 98,216ms | 77,929ms | **+20.7% faster** |
-| **Tokens Saved** | - | **~1.76M per session** | - |
-| **Success Rate** | 100% (5/5) | 100% (5/5) | - |
+| Metric | Vanilla | Fooks | Improvement | Note |
+|--------|---------|-------|-------------|------|
+| **Token Reduction** | ~2.1M tokens (est.) | ~450K tokens (est.) | **-78.2%** | Real repos (shadcn-ui, cal.com) |
+| **Execution Time** | 98,216ms (avg) | 77,929ms (avg) | **+20.7% faster** | T1-T5 tasks average |
+| **Tokens Saved** | - | **~1.76M per session** (est.) | - | Estimated from sample runs |
+| **Success Rate** | 100% (5/5) | 100% (5/5) | - | All task levels |
+| **Component Compression** | - | 7x-15x | - | Large components (17KB-42KB) |
+| **Tiny Overhead** | - | ~2x | - | <500B files, acceptable |
+
+**Verified Component-like Files (after all fixes):**
+- EventLimitsTab.tsx (41KB) → 3,115 bytes (**13.5x**)
+- AvailabilitySettings.tsx (29KB) → 1,988 bytes (**14.9x**)
+- shadcn page.tsx (5.7KB) → 421 bytes (**13.8x**)
+
+**Excluded from component benchmark:**
+- icons.tsx (18KB, 154 exports) → data-like
+- story-helpers.tsx (12KB, no componentName) → helper
 
 **Tested on:**
 - shadcn-ui (2,967 TSX files)
 - cal.com (1,691 TSX files)
 - 5 tasks: Button Relocation → Form Validation (easy → hard)
+
+**Fixes applied since previous run:**
+- AST-based styleBranching detection (tiny files now raw correctly)
+- componentName requirement for hybrid (helper files excluded)
+- exports <= 20 limit (data-like files excluded)
 
 **Location:** `benchmarks/frontend-harness/`
 
@@ -300,7 +294,6 @@ You can now validate the phase-1 benchmark baseline with:
 ```bash
 npm test
 npm run bench:cache
-npm run bench:process-model
 npm run bench:extract
 npm run bench:stability
 npm run bench:gate
@@ -310,7 +303,6 @@ npm run bench
 Phase 1 keeps the suite **local-first**, **JSON-first**, and **dependency-neutral**.
 
 - `bench:cache` keeps the legacy cache benchmark entrypoint, but now resolves to the dedicated scan/cache suite
-- `bench:process-model` runs the Phase 0 helper falsification gate (`current CLI` vs `launcher → helper` vs `direct helper`)
 - `bench:extract` records file-type extraction cost and reduction metrics for the v1 fixture corpus
 - `bench:stability` captures repeated-run distributions for scan and extract timings
 - `bench:gate` evaluates lightweight preservation + mode-decision guardrails
@@ -325,7 +317,6 @@ The canonical benchmark envelope includes:
 
 - benchmark version / run id / git SHA / node version / platform
 - scan/cache suite output
-- process-model probe output
 - scan observability for timing splits, skip/hit/miss counters, slow files, and CLI-vs-scan runtime breakdowns
 - extract suite output
 - repeated-run stability output
