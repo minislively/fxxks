@@ -50,6 +50,8 @@ Similar to TerminalBench/SWE-Bench but focused on frontend codebases.
    gh repo clone calcom/cal.com -- --depth 1
    gh repo clone documenso/documenso -- --depth 1
    gh repo clone formbricks/formbricks -- --depth 1
+   gh repo clone vercel/next.js -- --depth 1
+   gh repo clone tailwindlabs/tailwindcss -- --depth 1
    ```
 
 4. **Codex Auth** - Must be logged in
@@ -119,12 +121,14 @@ benchmarks/frontend-harness/
 
 ## Test Repositories
 
-| Repository | TSX Files | Size | Notes |
-|------------|-----------|------|-------|
-| shadcn-ui/ui | 2,967 | 118MB | UI component library |
-| calcom/cal.com | 1,691 | 562MB | Scheduling app |
-| documenso/documenso | 621 | 174MB | Doc signing |
-| formbricks/formbricks | 882 | 192MB | Survey tool |
+| Repository | Type | TSX/TS Files | Size | Notes |
+|------------|------|--------------|------|-------|
+| shadcn-ui/ui | UI Library | 2,967 | 118MB | UI component library |
+| calcom/cal.com | App | 1,691 | 562MB | Scheduling app |
+| documenso/documenso | App | 621 | 174MB | Doc signing |
+| formbricks/formbricks | App | 882 | 192MB | Survey tool |
+| **vercel/next.js** | Framework | 28,000+ | 343MB | React Framework (packages + examples) |
+| **tailwindlabs/tailwindcss** | Framework | 2,500+ | 8MB | CSS utility framework |
 
 ## Task Definitions
 
@@ -157,8 +161,9 @@ benchmarks/frontend-harness/
 
 1. **Token Efficiency**: Fooks compresses codebase context by ~78%, saving ~1.76M tokens per session
 2. **Speed**: Average 20.7% faster execution on typical tasks
-3. **Scalability**: Works effectively on large repos (cal.com: 1,691 TSX files)
-4. **Isolation**: Each benchmark uses isolated `.codex` folders per worktree
+3. **Scalability**: Works effectively on large repos (cal.com: 1,691 TSX files, next.js: 28,000+ files)
+4. **Framework Coverage**: Tests span UI libraries, apps, and frameworks (React, Next.js, TailwindCSS)
+5. **Isolation**: Each benchmark uses isolated `.codex` folders per worktree
 
 ## Troubleshooting
 
@@ -183,6 +188,11 @@ Clone test repositories:
 mkdir -p ~/Workspace/fooks-test-repos
 cd ~/Workspace/fooks-test-repos
 gh repo clone shadcn-ui/ui -- --depth 1
+gh repo clone calcom/cal.com -- --depth 1
+gh repo clone documenso/documenso -- --depth 1
+gh repo clone formbricks/formbricks -- --depth 1
+gh repo clone vercel/next.js -- --depth 1
+gh repo clone tailwindlabs/tailwindcss -- --depth 1
 ```
 
 ### Timeout errors
