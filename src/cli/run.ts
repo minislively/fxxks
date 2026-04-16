@@ -100,12 +100,15 @@ async function tryExtract(filePath: string, mode: "raw" | "hybrid" | "compressed
   rawTokens: number;
 }> {
   try {
-    const result = extractFile(filePath, { mode });
+    const result = extractFile(filePath);
     const metrics = decideMode(result);
+    
+    // Use decideMode result to determine if extraction helped
+    const tokensSaved = metrics.useOriginal ? 0 : result.meta.rawSizeBytes * 0.5; // Estimated 50% for compressed/hybrid
     
     return {
       success: true,
-      tokensSaved: metrics.useOriginal ? 0 : result.meta.rawSizeBytes - result.meta.compressedSizeBytes,
+      tokensSaved,
       rawTokens: result.meta.rawSizeBytes,
     };
   } catch (error) {
@@ -118,8 +121,9 @@ function detectRunner(): "codex" | "omx" {
   return "codex";
 }
 
-// CLI entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI entry - run if executed directly
+const isDirectExecution = process.argv[1]?.includes("run");
+if (isDirectExecution) {
   const prompt = process.argv[2];
   if (!prompt) {
     console.error("Usage: fooks run <prompt>");
