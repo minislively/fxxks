@@ -51,3 +51,67 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
         })();
   return finalizeAttach("codex", sample, runtimeProof, cwd, trustStatus);
 }
+
+export interface ExecutionContext {
+  contextPath: string;
+  fileCount: number;
+  totalSize: number;
+  prompt: string;
+  handoffCommand: string;
+}
+
+// Prepare context for AI execution - execution is handed off to external runtime
+export async function prepareExecutionContext(
+  prompt: string,
+  contextFiles: string[],
+  cwd = process.cwd(),
+): Promise<ExecutionContext> {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  // Read and combine context files into a temporary context file
+  let contextContent = "# Context Files\n\n";
+  let totalSize = 0;
+
+  for (const filePath of contextFiles) {
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      const size = Buffer.byteLength(content, "utf8");
+      totalSize += size;
+      contextContent += `## ${path.basename(filePath)}\n\n${content}\n\n`;
+    } catch (err) {
+      console.error(`Failed to read ${filePath}:`, err);
+    }
+  }
+
+  // Write temporary context file
+  const tempContextPath = path.join(cwd, ".fooks", "temp-context.md");
+  fs.mkdirSync(path.dirname(tempContextPath), { recursive: true });
+  fs.writeFileSync(tempContextPath, contextContent);
+
+  // Adapter contract: handoff command is abstracted, exact invocation not yet standardized
+  // This allows swapping between Codex, OMX, Claude, or other runtimes
+  const handoffCommand = `[runtime-adapter] ${prompt} --context ${tempContextPath}`;
+
+  return {
+    contextPath: tempContextPath,
+    fileCount: contextFiles.length,
+    totalSize,
+    prompt,
+    handoffCommand,
+  };
+}
+
+// Deprecated: direct Codex execution path - identified as product blocker (300s+ timeout, no file changes)
+// Kept for reference but not used in production path
+export async function executeViaCodex(
+  _prompt: string,
+  _contextFiles: string[],
+  _cwd = process.cwd(),
+): Promise<{ success: boolean; modifiedFiles: string[]; error?: string }> {
+  return {
+    success: false,
+    modifiedFiles: [],
+    error: "Direct Codex execution deprecated. Use prepareExecutionContext() + handoff pattern.",
+  };
+}

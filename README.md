@@ -48,12 +48,12 @@ Attach commands resolve account context in this order:
 
 For this project, the expected target account is `minislively`.
 
-## Runtime proof
+## Environment detection proof
 
 Attach uses two proof layers:
 
 - **contract proof**: verifies adapter consumption of the core schema
-- **runtime proof**: writes a runtime manifest into a detected runtime home
+- **environment proof**: writes an adapter manifest into a detected config home
 
 Environment overrides for deterministic verification:
 
@@ -62,7 +62,9 @@ Environment overrides for deterministic verification:
 - `FOOKS_TARGET_ACCOUNT`
 - `FOOKS_ACTIVE_ACCOUNT`
 
-If a runtime home is missing, attach returns an explicit blocker instead of a false success.
+If a config home is missing, attach returns an explicit blocker instead of a false success.
+
+**Note**: This is adapter-layer integration (codex/omx hooks), not browser/E2E runtime interception—those remain out of current Layer 2 scope.
 
 ## Verification snapshot
 
@@ -126,7 +128,19 @@ Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on f
 **Tested on:**
 - shadcn-ui (2,967 TSX files)
 - cal.com (1,691 TSX files)
+- nextjs (28,614 TSX files) - meta-framework extraction (20 files tested)
+- tailwindcss (2,500 TS files) - CSS framework extraction (20 files tested)
 - 5 tasks: Button Relocation → Form Validation (easy → hard)
+
+**Framework Extraction Reference (2026-04-16 Expanded):**
+| Repo | Total Files | Raw Mode | Extract/Hybrid | Reference Compression Ratio | Notes |
+|------|-------------|----------|----------------|----------------------------|-------|
+| nextjs | 20 | 11 (55%) | 9 (45%) | **55.7% smaller (extract mode)** | Small files dominant; reference only, not task parity |
+| tailwindcss | 20 | 5 (25%) | 15 (75%) | **77.8% smaller (extract mode)** | AST parsing heavy; reference only, not task parity |
+
+- Expanded from 5 files to 20 files per repo (size-distributed sampling)
+- Raw mode overhead is expected (JSON metadata wrapper); actual delivery uses `useOriginal: true` for tiny files
+- Framework repos are **extraction-test-reference only** — not comparative gating, not task parity benchmark
 
 **Fixes applied since previous run:**
 - AST-based styleBranching detection (tiny files now raw correctly)
@@ -183,9 +197,9 @@ It is intentionally narrow in v1:
 
 This command proves the decision/debug seam that a future automatic Codex hook can reuse. It is **not** the full runtime-wide interception layer yet.
 
-## Codex runtime hook bridge
+## Codex adapter hook bridge
 
-`fooks` now exposes a first runtime-hook bridge that is grounded in the Codex hook surfaces we can actually verify locally today:
+`fooks` exposes an adapter hook bridge grounded in Codex CLI hook surfaces:
 
 - `SessionStart`
 - `UserPromptSubmit`
@@ -194,10 +208,12 @@ This command proves the decision/debug seam that a future automatic Codex hook c
 The v1 bridge is intentionally narrow:
 
 - `.tsx/.jsx` only
-- repeated same-file work in one session
-- quiet by default
-- full-read escape hatch via `#fooks-full-read` or `#fooks-disable-pre-read`
-- only active inside repos that already ran `fooks attach codex`
+- Repeated same-file work in one session
+- Quiet by default
+- Full-read escape hatch via `#fooks-full-read` or `#fooks-disable-pre-read`
+- Only active inside repos that already ran `fooks attach codex`
+
+**Scope**: This is adapter-layer integration (CLI hooks), not browser/E2E runtime interception—those remain out of current Layer 2 scope.
 
 Example debug flow:
 
