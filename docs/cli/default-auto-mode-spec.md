@@ -139,6 +139,8 @@ fooks run --runner=omx "Add button to header"
 ### Debug/Benchmark Path (Hidden)
 Internal tooling exists for fooks vs vanilla comparison studies. Not exposed in CLI help/docs—used only for benchmark validation and debugging.
 
+**Note**: Browser/E2E runtime verification remains out of current Layer 2 scope.
+
 # Shows side-by-side: tokens, time, files
 ```
 
