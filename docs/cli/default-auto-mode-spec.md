@@ -76,43 +76,46 @@ No issues found. Ready to run.
 
 ## Auto Mode Decision Logic
 
-### File Classification
-| Category | Criteria | Default Mode |
-|----------|----------|--------------|
-| **Tiny** | < 500 bytes, no JSX | raw |
-| **Small component** | 500-2000 bytes, simple JSX | hybrid |
-| **Medium component** | 2-10KB, moderate complexity | hybrid |
-| **Large component** | > 10KB, complex JSX/hooks | compressed |
-| **Style-heavy** | > 50% CSS-in-JS/styled | compressed |
-| **Form-heavy** | validation logic, complex state | compressed |
-| **Data/utility** | pure functions, types, configs | raw or hybrid |
+### File Classification (3-Tier)
+| Category | Criteria | Default Mode | Heuristic Adjustments |
+|----------|----------|--------------|----------------------|
+| **Tiny** | < 500 bytes | raw | — |
+| **Medium** | 500B – 10KB | hybrid | Style/form-heavy → compressed |
+| **Large** | > 10KB | compressed | Simple pure component → hybrid |
 
-### Decision Factors
+### Decision Factors (priority order)
 1. **File size** (primary)
-2. **JSX density** (tags vs. logic ratio)
-3. **Hook complexity** (useState/useEffect count)
-4. **Import graph depth** (component dependencies)
-5. **Historical performance** (previous extraction fidelity)
+2. **Content complexity** (JSX density, hook count)
+3. **Domain hints** (form validation, styled-components)
+4. **Historical success rate** (previous extraction failures)
 
 ---
 
 ## Fallback Behavior
 
-### Fail-Open Chain
+### Fail-Open Chain (3-Stage)
 ```
-compressed → hybrid → raw → native (no fooks)
+compressed → hybrid → raw
 ```
 
 **Rules**:
 - If compressed extraction fails → try hybrid
 - If hybrid fails → try raw
-- If all fail → run native (vanilla Codex)
-- Never block user task due to optimization failure
+- If raw also fails → **error with manual retry guidance**
+  - Suggest: `fooks run --mode=raw` or check file manually
+  - Never auto-degrade to vanilla/native (preserves product boundary)
 
 **Logging**:
 ```
 ⚠ LargeComponent.tsx: compressed failed (parse error), fallback to hybrid
 ✓ LargeComponent.tsx: hybrid success
+```
+
+**Error Case**:
+```
+✗ LoginForm.tsx: all modes failed
+  Try: fooks run --mode=raw "your task"
+  Or check file syntax and retry
 ```
 
 ---
@@ -133,10 +136,13 @@ fooks run --runner=codex "Add button to header"
 fooks run --runner=omx "Add button to header"
 ```
 
-### Debug/Compare Path
+### Debug/Internal Tools (Hidden)
 ```bash
-# Vanilla comparison (no fooks optimization)
-fooks run --vanilla "Add button to header"
+# Benchmark/debug only (not in help/docs)
+fooks run --internal-mode=vanilla "Add button to header"
+
+# Used for: fooks vs vanilla comparison studies
+```
 
 # Shows side-by-side: tokens, time, files
 ```
@@ -167,31 +173,24 @@ npx fooks run "Fix form validation"
 
 ## Output UX
 
-### Minimal Result (default)
+### Default Output (1-line)
 ```
-✓ Task complete
-  Duration: 4.2s
-  Mode: hybrid (auto-selected)
-  Reduction: 62% (~840K → ~319K tokens)
-  Files: 1 modified
+✓ Done: 4.2s, 62% smaller, 1 file changed
 ```
 
-### Verbose Mode (`--verbose`)
+### Error Output
+```
+✗ Failed: LoginForm.tsx parse error
+  Fix: check syntax or run with --mode=raw
+```
+
+### Verbose Mode (`--verbose`, hidden from help)
 ```
 ✓ Task complete: Add form validation
   Duration: 4.2s (scan: 0.8s, execution: 3.4s)
-  
-  Files processed:
-    - LoginForm.tsx (compressed): 15.2KB → 2.1KB
-    - validation.ts (raw): 890B → 1.2KB
-    
-  Token summary:
-    Raw: ~840,053 tokens
-    Compressed: ~319,210 tokens
-    Saved: ~520,843 tokens (62%)
-    
-  Files modified: 1
-    - components/LoginForm.tsx
+  Mode: hybrid (auto-selected)
+  Token summary: ~840K → ~319K (62% reduction)
+  Files modified: 1 (LoginForm.tsx)
 ```
 
 ---
