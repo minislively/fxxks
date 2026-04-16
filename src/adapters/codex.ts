@@ -59,28 +59,49 @@ export async function executeViaCodex(
   cwd = process.cwd(),
 ): Promise<{ success: boolean; modifiedFiles: string[]; error?: string }> {
   try {
-    // Check if codex is available
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
+    const fs = await import("node:fs");
+    const path = await import("node:path");
     const execFilePromise = promisify(execFile);
     
-    // Prepare context as pre-read files
-    const contextArgs = contextFiles.flatMap((f) => ["--file", f]);
+    // Read and combine context files into a temporary context file
+    let contextContent = "# Context Files\n\n";
+    for (const filePath of contextFiles) {
+      try {
+        const content = fs.readFileSync(filePath, "utf8");
+        contextContent += `## ${path.basename(filePath)}\n\n${content}\n\n`;
+      } catch (err) {
+        console.error(`Failed to read ${filePath}:`, err);
+      }
+    }
     
-    // Execute codex with prompt and context
+    // Write temporary context file
+    const tempContextPath = path.join(cwd, ".fooks", "temp-context.md");
+    fs.mkdirSync(path.dirname(tempContextPath), { recursive: true });
+    fs.writeFileSync(tempContextPath, contextContent);
+    
+    // Build enhanced prompt with context reference
+    const enhancedPrompt = `${prompt}\n\nContext files have been prepared in: ${tempContextPath}\n\nKey files to consider:\n${contextFiles.map(f => `- ${f}`).join("\n")}`;
+    
+    // Execute codex exec with prompt
     const { stdout, stderr } = await execFilePromise(
       "codex",
-      [prompt, ...contextArgs, "--quiet"],
+      ["exec", enhancedPrompt, "--quiet"],
       { cwd, timeout: 120000 },
     );
     
-    // Parse output for modified files (simplified - would need actual parsing)
     console.log("Codex output:", stdout);
     if (stderr) console.error("Codex stderr:", stderr);
     
+    // Cleanup temp file
+    try {
+      fs.unlinkSync(tempContextPath);
+    } catch {}
+    
     return {
       success: true,
-      modifiedFiles: [], // Would parse from codex output
+      modifiedFiles: [],
     };
   } catch (error) {
     return {
