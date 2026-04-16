@@ -178,7 +178,7 @@ Move to `docs/internal/` or archive:
 | `license: null` | ❌ 누락 | ✅ 필수 | P0 |
 | README 미완성 | ❌ repo-level 설명만 | ✅ 3-step quick start | P0 |
 | 내부 문서 노출 | ❌ public/docs 섞임 | ✅ 정리 후 공개 | P1 |
-| typecheck/build 훅 | ❌ 없음 | ⚠️ 권장 (blocking 아님) | P2 |
+| typecheck/build verification | ❌ 없음 | ✅ 신뢰도 필수 | P1 |
 | Runner adapter seam | ⚠️ 부분적 | ⚠️ codex 먼저, omx 나중 | P1 |
 
 ### 판단 기준
@@ -221,9 +221,3 @@ Task 5 parallel with all
 - [ ] README has 3-step quick start (필수 P0)
 - [ ] Internal docs separated (권장 P1)
 - [ ] **public blockers list 정리 완료** (오늘 핵심 산출물)
-
----
-
-## Next Step (Not Today)
-
-P0 모두 해결 후 `npm publish` 또는 GitHub Actions publish workflow 검토.
