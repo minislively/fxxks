@@ -20,222 +20,128 @@
 
 ---
 
-## Implementation Phases
+## Immediate Tasks (Orchestration-Centered)
 
-### Phase 1: First-Success CLI Path
-**Goal**: `npm install -g fooks && fooks init && fooks run "task"` works
+### Task 1: Implement `fooks run` Orchestration
+**Purpose**: One-shot task execution with full pipeline
 
-**Tasks**:
-1. Implement `fooks run` command
-   - Accepts natural language task prompt
-   - Auto-triggers scan if cache stale
-   - Selects files via discover.ts
-   - Executes via attached runtime
-   - Shows 1-line result summary
-
-2. Add cache staleness detection
-   - File mtime vs cache timestamp
-   - Auto-scan trigger before run
-
-3. Basic error handling with fallback guidance
-   - If extraction fails → suggest `--mode=raw`
-   - Clear error messages, not stack traces
-
-**Acceptance Criteria**:
-- [ ] User can complete first task in 3 steps without reading docs
-- [ ] Default output shows: ✓ Done: Xs, Y% smaller, N files changed
-- [ ] Error case shows actionable fix suggestion
-
-**Risk**: Medium - requires integration testing across different repo types
-
----
-
-### Phase 2: Auto Mode Decision + Fallback Chain
-**Goal**: Robust auto mode with graceful degradation
-
-**Tasks**:
-1. Refine decide.ts for 3-tier classification
-   - Tiny (<500B) → raw (already implemented)
-   - Medium (500B-10KB) → hybrid (heuristic: style/form → compressed)
-   - Large (>10KB) → compressed (heuristic: simple pure → hybrid)
-
-2. Implement fallback chain in extract.ts
-   - Try compressed → on failure, try hybrid
-   - Try hybrid → on failure, try raw
-   - Raw fails → error with manual guidance (no native fallback)
-
-3. Add mode selection logging
-   - Verbose mode shows per-file mode decisions
-   - Fallback events logged with reasons
-
-**Acceptance Criteria**:
-- [ ] Formbricks-style repo auto-selects compressed for large components
-- [ ] Small utils auto-select raw
-- [ ] Fallback chain activates transparently on parse errors
-- [ ] User never sees stack traces in normal flow
-
-**Risk**: Low - decision logic exists, needs polish and testing
-
----
-
-### Phase 3: Runner Integration Path
-**Goal**: Unified UX across codex/omx, hidden vanilla compare
-
-**Tasks**:
-1. Codex integration polish
-   - codex-runtime-hook event handling
-   - Trust status verification
-   - Context template generation
-
-2. OMX integration path
-   - Detect omx availability
-   - Route through omx exec with same UX
-   - Maintain parity with codex path
-
-3. Hidden vanilla compare (internal/benchmark only)
-   - Not exposed in CLI help
-   - Used for: fooks vs vanilla comparison studies
-   - Flag name: internal, not documented
-
-**Acceptance Criteria**:
-- [ ] Same task produces same file modifications via codex or omx
-- [ ] Token efficiency comparable or better than vanilla
-- [ ] Vanilla compare path exists for benchmark validation
-
-**Risk**: Medium - requires coordination with omx version compatibility
-
----
-
-### Phase 4: NPM Install / OSS Release Readiness
-**Goal**: Public installable package
-
-**Tasks**:
-1. Package.json polish
-   - Correct bin entry
-   - Dependencies audit
-   - Post-install message
-
-2. Typecheck/build verification hooks
-   - Optional typecheck after modification
-   - Build pass verification (if applicable)
-   - Not blocking, but warning if fails
-
-3. Documentation
-   - README quick start
-   - Troubleshooting guide
-   - Benchmark result summary
-
-4. CI/CD setup
-   - Automated tests
-   - Build verification
-   - Publish workflow
-
-**Acceptance Criteria**:
-- [ ] `npm install -g fooks` works
-- [ ] First-run success without additional setup
-- [ ] Typecheck/build hooks available (optional)
-- [ ] OSS-ready documentation
-
-**Risk**: Low - mostly packaging and docs
-
----
-
-## Immediate Tasks (Next 3-5)
-
-### Task 1: Implement `fooks run` Command
-**Purpose**: One-shot task execution for first-success path
+**Flow**: scan → decide → extract → fallback → execute → summary
 
 **Touched Files**:
-- `src/cli/index.ts` - Add "run" case
-- `src/cli/run.ts` (new) - Task execution orchestration
+- `src/cli/run.ts` (new) - Main orchestration
+- `src/cli/index.ts` - Add "run" command entry
 
 **Acceptance Criteria**:
-- Accepts string prompt argument
-- Auto-scans if cache stale
-- Discovers relevant files
-- Executes via attached runtime
-- Shows 1-line success summary
+- [ ] Accepts natural language task prompt
+- [ ] Auto-triggers scan if cache stale (mtime vs timestamp)
+- [ ] Discovers relevant files via discover.ts
+- [ ] Executes via attached runtime
+- [ ] Shows 1-line result: ✓ Done: Xs, Y% smaller, N files changed
+- [ ] Error shows actionable fix: ✗ Failed: [reason]. Fix: [action]
 
 **Risk**: Medium
 
 ---
 
-### Task 2: Auto Fallback Chain
+### Task 2: Wire Auto Mode Decision + Fallback Chain
 **Purpose**: Robust mode selection with graceful degradation
+
+**Classification**:
+- Tiny (<500B) → raw
+- Medium (500B-10KB) → hybrid (heuristic: style/form-heavy → compressed)
+- Large (>10KB) → compressed (heuristic: simple pure → hybrid)
+
+**Fallback Chain**:
+```
+compressed → hybrid → raw → error (no native degrade)
+```
 
 **Touched Files**:
 - `src/core/extract.ts` - Add try/catch fallback logic
 - `src/core/decide.ts` - Refine 3-tier thresholds
 
 **Acceptance Criteria**:
-- compressed→hybrid→raw chain works
-- Each fallback logs reason
-- Final failure shows actionable error
+- [ ] Formbricks-style repo auto-selects compressed for large components
+- [ ] Small utils auto-select raw
+- [ ] Fallback activates transparently on parse errors
+- [ ] Final failure shows: "Fix: fooks run --mode=raw" or manual check
 
 **Risk**: Low
 
 ---
 
-### Task 3: Basic `fooks doctor`
-**Purpose**: Setup validation for first-time users
+### Task 3: Add Runner Adapter Seam
+**Purpose**: Unified UX across codex/omx, hidden vanilla compare
+
+**Structure**:
+- `src/adapters/runner.ts` (new) - Adapter interface
+- Codex adapter: primary implementation
+- OMX adapter: compatible structure (placeholder for omx integration)
+- Vanilla adapter: hidden, benchmark-only
 
 **Touched Files**:
-- `src/cli/index.ts` - Add "doctor" case
-- `src/cli/doctor.ts` (new) - Setup validation
+- `src/adapters/runner.ts` (new)
+- `src/adapters/codex.ts` (refactor from existing)
+- `src/cli/run.ts` - Use adapter seam
 
 **Acceptance Criteria**:
-- Checks auth.json existence
-- Checks runner availability
-- Checks project type detection
-- Clear pass/fail output
+- [ ] Same UX regardless of runner (codex/omx)
+- [ ] Vanilla compare exists for benchmark validation (hidden from CLI help)
+- [ ] Runner selection: auto-detect or explicit flag
 
-**Risk**: Low
+**Risk**: Medium
 
 ---
 
-### Task 4: Output UX Polish
-**Purpose**: 1-line default, helpful errors
+### Task 4: Add Minimal Init/Doctor Path
+**Purpose**: First-success entry + environment diagnostics
+
+**Priority**: Doctor is secondary to first-success path
+- Primary: `install → init → run` just works
+- Secondary: `fooks doctor` for troubleshooting
 
 **Touched Files**:
-- `src/cli/run.ts` - Output formatting
-- `src/cli/index.ts` - Error handling
+- `src/cli/init.ts` - Polish existing
+- `src/cli/doctor.ts` (new) - Environment check
 
 **Acceptance Criteria**:
-- Default: "✓ Done: 4.2s, 62% smaller, 1 file changed"
-- Error: "✗ Failed: [reason]. Fix: [action]"
-- Verbose flag exists (hidden from help)
+- [ ] `fooks init` detects project type, sets mode:auto, detects runner
+- [ ] `fooks doctor` checks: auth.json, runner availability, project type, cache integrity
+- [ ] Doctor output: clear pass/fail with fix suggestions
 
 **Risk**: Low
 
 ---
 
-### Task 5: Package + README Polish
+### Task 5: Package/README Quick-Start Polish
 **Purpose**: NPM install ready
 
 **Touched Files**:
-- `package.json` - Metadata, bin entry
-- `README.md` - Quick start, troubleshooting
+- `package.json` - Metadata, bin entry, dependencies
+- `README.md` - 3-step quick start, troubleshooting
 
 **Acceptance Criteria**:
-- `npm install -g fooks` works
-- README has 3-step quick start
-- Troubleshooting section covers common issues
+- [ ] `npm install -g fooks` works
+- [ ] README has 3-step quick start without external docs
+- [ ] Troubleshooting covers common issues
 
 **Risk**: Low
 
 ---
 
 ## Dependencies
-- Task 1 depends on: None (can start immediately)
-- Task 2 depends on: None (can start immediately)
-- Task 3 depends on: None (can start immediately)
-- Task 4 depends on: Task 1
-- Task 5 depends on: Task 1, 2, 3, 4
+- Task 1 (run orchestration) → Task 2 (fallback needs execution path)
+- Task 1 → Task 3 (runner seam needs execution path)
+- Task 4 (init/doctor) parallel with 1-3
+- Task 5 (package) after 1-4 complete
 
 ---
 
-## Timeline Estimate
-- **Task 1-3**: 1-2 days each (parallel possible)
-- **Task 4**: 0.5-1 day
-- **Task 5**: 0.5-1 day
-- **Total**: 3-5 days to NPM-ready state
+## Summary
+
+**Goal**: `npm install -g fooks && fooks init && fooks run "task"` first-success path
+
+**Key Decisions**:
+- Orchestration-centered: scan → decide → extract → fallback → execute
+- Runner adapter seam: codex first, omx-compatible structure
+- No timeline estimates until implementation starts
