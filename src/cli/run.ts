@@ -61,7 +61,7 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     }
     
     // 4. Execute via attached runtime
-    const runner = options.runner === "auto" ? detectRunner() : options.runner;
+    const runner = (options.runner === "auto" || !options.runner) ? detectRunner() : options.runner;
     console.log("Detected runner:", runner);
     let executionResult;
     if (runner === "codex") {
