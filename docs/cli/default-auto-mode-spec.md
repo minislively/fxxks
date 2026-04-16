@@ -194,14 +194,18 @@ npx fooks run "Fix form validation"
 
 ### Explicitly Excluded from Default UX
 - **Manual mode study**: Users shouldn't need to learn raw/hybrid/compressed differences
-- **Browser/E2E verification**: Out of scope (see benchmark layer separation)
+- **Browser/E2E verification**: Not part of default Layer 2 scope—deferred to optional higher-trust Layer 3
 - **Universal speed guarantees**: Claims are directional, context-dependent
 - **Production correctness proof**: Task-level parity, not full regression testing
+
+### Success Criteria Additions
+- **Required verification**: typecheck (syntactic/semantic correctness)
+- **Strongly recommended**: build pass (when applicable for the repo)
 
 ### Power-User Escapes (available, not promoted)
 - `--mode=raw|hybrid|compressed` (manual override)
 - `--no-fallback` (strict mode)
-- `--runner=vanilla` (debug comparison)
+- Hidden debug tooling (benchmark/internal use only)
 
 ---
 
