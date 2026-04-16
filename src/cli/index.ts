@@ -204,6 +204,23 @@ async function run(): Promise<void> {
       print({ config, cacheDir: path.join(process.cwd(), ".fooks", "cache") });
       return;
     }
+    case "run": {
+      const { runTask } = await import("./run.js");
+      const prompt = process.argv[3];
+      if (!prompt) {
+        console.error("Usage: fooks run <prompt>");
+        process.exit(1);
+      }
+      const result = await runTask({ prompt });
+      if (result.success) {
+        console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, ${result.reductionPercent}% smaller, ${result.filesProcessed} files`);
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        console.error("Fix: Check file syntax or run with --mode=raw");
+        process.exit(1);
+      }
+      return;
+    }
     case "scan": {
       const pathsImport = await timedImport<typeof import("../core/paths")>("../core/paths.js");
       const scanImport = await timedImport<typeof import("../core/scan")>("../core/scan.js");
