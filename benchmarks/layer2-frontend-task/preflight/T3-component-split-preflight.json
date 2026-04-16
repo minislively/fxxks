@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-04-15T06:50:43.154955",
+  "taskId": "T3",
+  "taskName": "Component Split",
+  "target": {
+    "repo": "shadcn-ui",
+    "file": "combobox-example.tsx",
+    "lines": 1249,
+    "type": "large-mixed"
+  },
+  "extraction": {
+    "rawBytes": 39209,
+    "payloadBytes": 2011,
+    "savingsRatio": 0.949,
+    "mode": "hybrid",
+    "componentsDetected": 12
+  },
+  "approaches": {
+    "vanilla": {
+      "approach": "vanilla",
+      "file": "combobox-example.tsx",
+      "task": "component-split-3",
+      "inputTokens": 11202,
+      "success": true,
+      "retryCount": 2,
+      "completionLatencyMs": 45500,
+      "outputFiles": 3,
+      "breakingChanges": 1,
+      "notes": "Full file caused token limit pressure, required 2 retries"
+    },
+    "fooks": {
+      "approach": "fooks",
+      "file": "combobox-example.tsx",
+      "task": "component-split-3",
+      "inputTokens": 574,
+      "success": true,
+      "retryCount": 0,
+      "completionLatencyMs": 25300,
+      "outputFiles": 3,
+      "breakingChanges": 0,
+      "notes": "Extracted structure guided clean split, no retries needed"
+    }
+  },
+  "comparison": {
+    "tokenReduction": "94.9%",
+    "tokenDeltaAbsolute": 10628,
+    "retryReduction": 2,
+    "latencyReductionMs": 20200,
+    "latencyReductionPercent": "44.4%"
+  },
+  "status": "simulated-execution",
+  "disclaimer": "SIMULATED - Not actual AI execution. Latency and retry counts are estimates.",
+  "nextStep": "actual-ai-execution-required"
+}
