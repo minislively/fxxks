@@ -55,8 +55,8 @@
       {
         "name": "runtime_token_claim",
         "level": "medium",
-        "evidence": "Actual OMX/Codex tokens available; fooks used more runtime tokens in 0/1 pair(s).",
-        "interpretation": "Do not claim runtime token reduction from this run; keep proxy compression and actual tokens separate."
+        "evidence": "Actual OMX/Codex tokens available; fooks used fewer runtime tokens in 1/1 pair (39% less: 57705 -> 34978).",
+        "interpretation": "Runtime token reduction observed, but N=1 sample. Repeat N>=3 before claiming stable runtime token savings. Keep proxy compression and actual tokens separate in reporting."
       }
     ]
   },
