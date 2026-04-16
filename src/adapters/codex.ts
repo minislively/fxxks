@@ -51,3 +51,42 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
         })();
   return finalizeAttach("codex", sample, runtimeProof, cwd, trustStatus);
 }
+
+// Execute task via Codex CLI with prepared context
+export async function executeViaCodex(
+  prompt: string,
+  contextFiles: string[],
+  cwd = process.cwd(),
+): Promise<{ success: boolean; modifiedFiles: string[]; error?: string }> {
+  try {
+    // Check if codex is available
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFilePromise = promisify(execFile);
+    
+    // Prepare context as pre-read files
+    const contextArgs = contextFiles.flatMap((f) => ["--file", f]);
+    
+    // Execute codex with prompt and context
+    const { stdout, stderr } = await execFilePromise(
+      "codex",
+      [prompt, ...contextArgs, "--quiet"],
+      { cwd, timeout: 120000 },
+    );
+    
+    // Parse output for modified files (simplified - would need actual parsing)
+    console.log("Codex output:", stdout);
+    if (stderr) console.error("Codex stderr:", stderr);
+    
+    return {
+      success: true,
+      modifiedFiles: [], // Would parse from codex output
+    };
+  } catch (error) {
+    return {
+      success: false,
+      modifiedFiles: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}

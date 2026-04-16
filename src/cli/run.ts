@@ -2,8 +2,8 @@
 import { scanProject } from "../core/scan.js";
 import { extractFile } from "../core/extract.js";
 import { decideMode } from "../core/decide.js";
-import { discoverRelevantFiles } from "../core/discover.js";
-import { createCodexContext } from "../adapters/codex.js";
+import { discoverProjectFiles, discoverRelevantFiles } from "../core/discover.js";
+import { executeViaCodex } from "../adapters/codex.js";
 
 export interface RunOptions {
   prompt: string;
@@ -30,7 +30,8 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     const scanResult = scanProject();
     
     // 2. Discover relevant files
-    const relevantFiles = discoverRelevantFiles(options.prompt, scanResult);
+    const allFiles = discoverProjectFiles();
+    const relevantFiles = discoverRelevantFiles(options.prompt, allFiles);
     
     // 3. Process each file with fallback chain
     let totalTokensSaved = 0;
@@ -115,11 +116,6 @@ async function tryExtract(filePath: string, mode: "raw" | "hybrid" | "compressed
 function detectRunner(): "codex" | "omx" {
   // TODO: Detect based on availability
   return "codex";
-}
-
-async function executeViaCodex(prompt: string, files: string[]): Promise<void> {
-  // TODO: Integrate with codex adapter
-  console.log(`Executing: ${prompt} with ${files.length} files`);
 }
 
 // CLI entry

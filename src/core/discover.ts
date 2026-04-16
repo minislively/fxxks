@@ -160,3 +160,40 @@ export function discoverProjectFilesWithStats(cwd = process.cwd()): DiscoveryRes
 export function discoverProjectFiles(cwd = process.cwd()): FileTarget[] {
   return discoverProjectFilesWithStats(cwd).targets;
 }
+
+// Simple keyword-based relevance discovery for task prompts
+export function discoverRelevantFiles(
+  prompt: string,
+  allFiles: FileTarget[],
+): string[] {
+  // Extract keywords from prompt (component names, file hints)
+  const keywords = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !["add", "the", "fix", "update", "to", "for", "with", "from"].includes(w));
+
+  // Score files by keyword matches
+  const scored = allFiles.map((target) => {
+    const fileName = path.basename(target.filePath).toLowerCase();
+    const fileDir = path.dirname(target.filePath).toLowerCase();
+    
+    let score = 0;
+    for (const kw of keywords) {
+      if (fileName.includes(kw)) score += 10;
+      if (fileDir.includes(kw)) score += 5;
+    }
+    
+    // Prefer component files
+    if (target.kind === "component") score += 3;
+    
+    return { filePath: target.filePath, score };
+  });
+
+  // Return top 5 files with score > 0
+  return scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((s) => s.filePath);
+}
