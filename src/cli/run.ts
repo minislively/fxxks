@@ -62,8 +62,12 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     
     // 4. Execute via attached runtime
     const runner = options.runner === "auto" ? detectRunner() : options.runner;
+    let executionResult;
     if (runner === "codex") {
-      await executeViaCodex(options.prompt, processedFiles);
+      executionResult = await executeViaCodex(options.prompt, processedFiles);
+      console.log("Execution result:", executionResult);
+    } else {
+      executionResult = { success: true, modifiedFiles: [] };
     }
     
     // 5. Summary
