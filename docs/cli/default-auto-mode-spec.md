@@ -136,13 +136,8 @@ fooks run --runner=codex "Add button to header"
 fooks run --runner=omx "Add button to header"
 ```
 
-### Debug/Internal Tools (Hidden)
-```bash
-# Benchmark/debug only (not in help/docs)
-fooks run --internal-mode=vanilla "Add button to header"
-
-# Used for: fooks vs vanilla comparison studies
-```
+### Debug/Benchmark Path (Hidden)
+Internal tooling exists for fooks vs vanilla comparison studies. Not exposed in CLI help/docs—used only for benchmark validation and debugging.
 
 # Shows side-by-side: tokens, time, files
 ```
