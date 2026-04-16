@@ -89,6 +89,32 @@ python3 full-benchmark-suite.py
 
 Results will be saved to `../reports/benchmark-{timestamp}.json`
 
+#### Option 3: Single External-App Proof
+Run one repo/task pair when the goal is a first credible external benchmark
+instead of a full matrix. For example, a Next.js + Tailwind app proof on
+Formbricks:
+
+```bash
+cd benchmarks/frontend-harness/runners
+python3 full-benchmark-suite.py \
+  --runner codex \
+  --repo formbricks \
+  --task T5 \
+  --task-prompt "Modify exactly apps/web/modules/account/components/DeleteAccountModal/index.tsx. Improve the account deletion email confirmation field by using type=email, showing a small red inline error message under the input after the user types a non-matching or malformed email, and ensuring deletion stays disabled while the confirmation email is invalid or the delete action is already running."
+```
+
+Use `--runner codex` for the cleanest direct Codex CLI benchmark without OMX
+orchestration. Use `--runner omx` when you specifically want to measure the
+OMX execution lane. Use `--dry-run` to inspect the selected case without
+running Codex/OMX.
+
+The vanilla and fooks variants both run through the same selected runner with
+the same task prompt and isolated `CODEX_HOME` directories. The intended
+variant difference is that fooks runs `fooks init`/`fooks scan`/`fooks attach
+codex` before the same agent command, while vanilla does not. Reports include
+command hashes, modified file lists, cleanup status, parsed runtime tokens, and
+a conservative risk assessment.
+
 ### Custom Configuration
 
 Override default paths via environment variables:
@@ -99,6 +125,12 @@ export BENCHMARK_REPOS_DIR=/path/to/your/repos
 
 # Custom OMX binary location
 export OMX_BIN=/path/to/omx.js
+
+# Custom direct Codex binary location
+export CODEX_BIN=/path/to/codex
+
+# Custom report output location
+export BENCHMARK_REPORTS_DIR=/path/to/reports
 
 # Then run benchmarks
 python3 full-benchmark-suite.py
@@ -145,8 +177,9 @@ benchmarks/frontend-harness/
 1. **Execution Time**: Time spent in OMX/Codex (excluding fooks scan)
 2. **Total Time**: Including fooks scan for baseline comparison
 3. **Token Reduction**: Estimated via fooks extract compression ratio
-4. **Files Modified**: Number of files changed during task
-5. **Success Rate**: Task completion without timeout/error
+4. **Codex Tokens Used**: Parsed from OMX/Codex output when available
+5. **Files Modified**: Number of files changed during task, plus file list
+6. **Success Rate**: Task completion without timeout/error
 
 ## Methodology
 
@@ -156,6 +189,8 @@ benchmarks/frontend-harness/
 4. Measure time, token compression, files modified
 5. Clean up worktrees
 6. Aggregate results across tasks/repos
+7. Attach risk levels for sample size, environment parity, cleanup,
+   wall-clock noise, and runtime-token claims
 
 ### Key Insights
 
