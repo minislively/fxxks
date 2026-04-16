@@ -126,7 +126,19 @@ Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on f
 **Tested on:**
 - shadcn-ui (2,967 TSX files)
 - cal.com (1,691 TSX files)
+- nextjs (28,614 TSX files) - meta-framework extraction (20 files tested)
+- tailwindcss (2,500 TS files) - CSS framework extraction (20 files tested)
 - 5 tasks: Button Relocation → Form Validation (easy → hard)
+
+**Framework Extraction Reference (2026-04-16 Expanded):**
+| Repo | Total Files | Raw Mode | Extract/Hybrid | Reference Compression Ratio | Notes |
+|------|-------------|----------|----------------|----------------------------|-------|
+| nextjs | 20 | 11 (55%) | 9 (45%) | **55.7% smaller (extract mode)** | Small files dominant; reference only, not task parity |
+| tailwindcss | 20 | 5 (25%) | 15 (75%) | **77.8% smaller (extract mode)** | AST parsing heavy; reference only, not task parity |
+
+- Expanded from 5 files to 20 files per repo (size-distributed sampling)
+- Raw mode overhead is expected (JSON metadata wrapper); actual delivery uses `useOriginal: true` for tiny files
+- Framework repos are **extraction-test-reference only** — not comparative gating, not task parity benchmark
 
 **Fixes applied since previous run:**
 - AST-based styleBranching detection (tiny files now raw correctly)
