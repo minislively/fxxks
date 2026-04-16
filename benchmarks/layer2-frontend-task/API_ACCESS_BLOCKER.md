@@ -109,8 +109,8 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 
 | # | Blocker | 심각도 | 해결 방법 | 상태 |
 |---|---------|--------|-----------|------|
-| 1 | **R4 Runner 미구현** | ✅ RESOLVED | runner.js, codex-wrapper.js 구현 완료 | 해결됨 |
-| 2 | **Metric 수집 파이프라인 없음** | ✅ RESOLVED | 수집 로직 구현 완료 | 해결됨 |
+| 1 | **R4 Runner 미구현** | ⏸️ PARTIAL | runner.js, codex-wrapper.js 구현됐으나 실행은 502 blocked | 미해결 |
+| 2 | **Metric 수집 파이프라인 없음** | ⏸️ PARTIAL | 수집 로직 구현됐으나 실행 불가 | 미해결 |
 | 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | api.layofflabs.com 502 Bad Gateway | **현재 병목** |
 
 ---
@@ -174,8 +174,8 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 ## 다음 단계
 
 **현재 상황:**
-- ✅ Runner 구현 완료
-- ✅ Wrapper 연결 완료
+- ⏸️ Runner 구현됐으나 실행 blocked
+- ⏸️ Wrapper 구현됐으나 실행 blocked
 - ⚠️ **Codex Gateway 502로 인해 실제 benchmark 실행 불가**
 
 **즉시 가능:**
