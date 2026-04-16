@@ -1,0 +1,221 @@
+{
+  "timestamp": "2026-04-15T06:40:57.664293",
+  "label": "real-benchmark-result",
+  "extractorPath": "real",
+  "command": "node -e \"require('/home/bellman/Workspace/fooks/dist/index.js').extractFile('<file>')\"",
+  "target": "nextjs + tailwindcss",
+  "nextjs": {
+    "requested": 5,
+    "existing": 4,
+    "files": [
+      {
+        "file": "app-bootstrap.ts",
+        "rawBytes": 2255,
+        "payloadBytes": 736,
+        "savingsRatio": 0.674,
+        "mode": "compressed",
+        "qualityContract": 0.7,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "app-router.tsx",
+        "rawBytes": 23197,
+        "payloadBytes": 2935,
+        "savingsRatio": 0.873,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "error-boundary.tsx",
+        "rawBytes": 5245,
+        "payloadBytes": 1576,
+        "savingsRatio": 0.7,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "layout-router.tsx",
+        "rawBytes": 31299,
+        "payloadBytes": 2982,
+        "savingsRatio": 0.905,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      }
+    ],
+    "aggregate": {
+      "successCount": 4,
+      "totalRequested": 4,
+      "avgSavingsRatio": 0.788,
+      "totalRawBytes": 61996,
+      "totalPayloadBytes": 8229,
+      "realPathUsage": "4/4",
+      "signalMeta": {
+        "signalType": "derived-heuristic",
+        "calculationSource": "real-fooks-extraction-output",
+        "method": "heuristic-presence-mapping",
+        "version": "v1"
+      },
+      "qualityDetail": {
+        "contractAvg": 0.86,
+        "behaviorAvg": 0.88,
+        "structureAvg": 0.9,
+        "overallAvg": 0.88
+      }
+    }
+  },
+  "tailwindcss": {
+    "requested": 5,
+    "existing": 5,
+    "files": [
+      {
+        "file": "index.ts",
+        "rawBytes": 25823,
+        "payloadBytes": 1851,
+        "savingsRatio": 0.928,
+        "mode": "hybrid",
+        "qualityContract": 0.7,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "css-parser.ts",
+        "rawBytes": 19810,
+        "payloadBytes": 1889,
+        "savingsRatio": 0.905,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "theme.ts",
+        "rawBytes": 8100,
+        "payloadBytes": 1467,
+        "savingsRatio": 0.819,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "utilities.ts",
+        "rawBytes": 213836,
+        "payloadBytes": 2393,
+        "savingsRatio": 0.989,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      },
+      {
+        "file": "variants.ts",
+        "rawBytes": 37913,
+        "payloadBytes": 1999,
+        "savingsRatio": 0.947,
+        "mode": "hybrid",
+        "qualityContract": 0.92,
+        "qualityBehavior": 0.88,
+        "qualityStructure": 0.9,
+        "extractorPath": "real",
+        "success": true,
+        "signalMeta": {
+          "signalType": "derived-heuristic",
+          "calculationSource": "real-fooks-extraction-output",
+          "method": "heuristic-presence-mapping",
+          "version": "v1"
+        }
+      }
+    ],
+    "aggregate": {
+      "successCount": 5,
+      "totalRequested": 5,
+      "avgSavingsRatio": 0.918,
+      "totalRawBytes": 305482,
+      "totalPayloadBytes": 9599,
+      "realPathUsage": "5/5",
+      "signalMeta": {
+        "signalType": "derived-heuristic",
+        "calculationSource": "real-fooks-extraction-output",
+        "method": "heuristic-presence-mapping",
+        "version": "v1"
+      },
+      "qualityDetail": {
+        "contractAvg": 0.88,
+        "behaviorAvg": 0.88,
+        "structureAvg": 0.9,
+        "overallAvg": 0.89
+      }
+    }
+  }
+}

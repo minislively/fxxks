@@ -35,6 +35,23 @@ code editing efficiency and outcome parity, not browser behavior correctness.
 | T1: Button Relocation | easy | cal.com | 92,182ms | 79,732ms | +13.5% |
 | T5: Form Validation | hard | cal.com | 102,676ms | 137,327ms | -33.7% |
 
+### Framework Repo Extraction (2026-04-16 Expanded)
+
+**Non-comparative extraction test** (extraction-test-reference only):
+
+| Repo | Files Tested | Raw Mode | Extract/Hybrid/Compressed | Avg Savings (extract modes) |
+|------|--------------|----------|-------------------------|----------------------------|
+| nextjs | 20 (2,719 found) | 11 (55%) | 9 (45%) | **55.7%** |
+| tailwindcss | 20 (166 found) | 5 (25%) | 15 (75%) | **77.8%** |
+
+**Notes:**
+- Size-distributed sampling (200B to 50KB range)
+- Raw mode files show overhead (JSON metadata wrapper)
+- Actual delivery uses `useOriginal: true` for tiny files (<500 bytes)
+- Not included in comparative gating (different bucket coverage)
+
+**Results file:** `benchmarks/results/latest/nextjs-tailwindcss-expanded.json`
+
 ## Quick Start (Local Reproduction)
 
 ### Prerequisites

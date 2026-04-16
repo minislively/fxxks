@@ -268,6 +268,168 @@ def changed_files(worktree_path):
     )
     return [f for f in files_result.stdout.strip().split('\n') if f]
 
+def detect_package_manager(worktree_path):
+    """Detect package manager (npm, pnpm, yarn) based on lock files"""
+    if (worktree_path / "pnpm-lock.yaml").exists() or (worktree_path / "pnpm-workspace.yaml").exists():
+        return "pnpm"
+    if (worktree_path / "yarn.lock").exists():
+        return "yarn"
+    return "npm"
+
+def get_package_manager_cmd(package_manager, cmd_type="run"):
+    """Get package manager command for running scripts or executing binaries"""
+    if package_manager == "pnpm":
+        if cmd_type == "exec":
+            return ["pnpm", "exec"]
+        return ["pnpm", "run"]
+    if package_manager == "yarn":
+        if cmd_type == "exec":
+            return ["yarn", "exec"]
+        return ["yarn", "run"]
+    if cmd_type == "exec":
+        return ["npx"]
+    return ["npm", "run"]
+
+def validate_typecheck(worktree_path):
+    """Run TypeScript type check (tsc --noEmit) with package manager auto-detection"""
+    package_manager = detect_package_manager(worktree_path)
+    
+    # Try to find tsc
+    tsc_paths = [
+        worktree_path / "node_modules/.bin/tsc",
+        worktree_path / "node_modules/typescript/bin/tsc",
+    ]
+    tsc = None
+    for p in tsc_paths:
+        if p.exists():
+            tsc = str(p)
+            break
+    
+    # If no direct tsc, use package manager exec
+    if not tsc:
+        tsc_cmd = get_package_manager_cmd(package_manager, "exec") + ["tsc"]
+    else:
+        tsc_cmd = [tsc]
+    
+    # Check for tsconfig.json (at root or in apps/web for monorepos)
+    tsconfig_paths = [
+        worktree_path / "tsconfig.json",
+        worktree_path / "apps/web/tsconfig.json",
+        worktree_path / "packages/app/tsconfig.json",
+    ]
+    tsconfig = None
+    for p in tsconfig_paths:
+        if p.exists():
+            tsconfig = p
+            break
+    
+    if not tsconfig:
+        return {"success": False, "error": "tsconfig.json not found", "skipped": True}
+    
+    # For turborepo workspaces, try turbo typecheck if available
+    turbo_config = worktree_path / "turbo.json"
+    if turbo_config.exists() and package_manager == "pnpm":
+        # Check for typecheck task in turbo
+        turbo_result = subprocess.run(
+            ["pnpm", "exec", "turbo", "run", "typecheck", "--filter=./apps/web", "--no-daemon"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if turbo_result.returncode == 0:
+            return {
+                "success": True,
+                "method": "turbo",
+                "package_manager": package_manager,
+            }
+        # If turbo typecheck fails, try direct tsc in apps/web
+    
+    # Run tsc with the found tsconfig
+    cwd_for_tsc = tsconfig.parent if tsconfig != worktree_path / "tsconfig.json" else worktree_path
+    result = subprocess.run(
+        tsc_cmd + ["--noEmit", "--skipLibCheck"],
+        cwd=cwd_for_tsc,
+        capture_output=True,
+        text=True,
+        timeout=60
+    )
+    
+    return {
+        "success": result.returncode == 0,
+        "error_count": result.stdout.count("error TS") if result.stdout else 0,
+        "stderr": output_tail(result.stderr, 1000) if result.stderr else None,
+        "stdout": output_tail(result.stdout, 1000) if result.stdout else None,
+        "package_manager": package_manager,
+        "method": "tsc",
+        "tsconfig_path": str(tsconfig.relative_to(worktree_path)) if tsconfig else None,
+    }
+
+def validate_build(worktree_path):
+    """Run build command if available with package manager auto-detection"""
+    package_manager = detect_package_manager(worktree_path)
+    
+    # Check package.json for build script
+    pkg_json = worktree_path / "package.json"
+    if not pkg_json.exists():
+        return {"success": False, "error": "package.json not found", "skipped": True}
+    
+    try:
+        import json
+        with open(pkg_json) as f:
+            pkg = json.load(f)
+        
+        if not pkg.get("scripts", {}).get("build"):
+            return {"success": False, "error": "build script not found", "skipped": True}
+    except:
+        return {"success": False, "error": "failed to parse package.json", "skipped": True}
+    
+    # For turborepo workspaces with pnpm, try turbo build
+    turbo_config = worktree_path / "turbo.json"
+    if turbo_config.exists() and package_manager == "pnpm":
+        build_cmd = ["pnpm", "exec", "turbo", "run", "build", "--filter=./apps/web", "--no-daemon"]
+        timeout = 600  # 10 min for turbo builds
+    else:
+        build_cmd = get_package_manager_cmd(package_manager, "run") + ["build"]
+        timeout = 300  # 5 min for regular builds
+    
+    result = subprocess.run(
+        build_cmd,
+        cwd=worktree_path,
+        capture_output=True,
+        text=True,
+        timeout=timeout
+    )
+    
+    # Check for env-gated failures (missing required env vars)
+    output_combined = (result.stdout or "") + (result.stderr or "")
+    env_gated_signals = [
+        "DATABASE_URL",
+        "ENCRYPTION_KEY", 
+        "REDIS_URL",
+        "Invalid environment variables",
+        "env var",
+        "environment variable",
+    ]
+    is_env_gated = any(signal in output_combined for signal in env_gated_signals) and result.returncode != 0
+    
+    return {
+        "success": result.returncode == 0,
+        "env_gated": is_env_gated,
+        "error": output_tail(result.stderr, 1000) if result.stderr else None,
+        "stdout_tail": output_tail(result.stdout, 1000) if result.stdout else None,
+        "package_manager": package_manager,
+        "method": "turbo" if (turbo_config.exists() and package_manager == "pnpm") else "direct",
+    }
+
+def run_validation(worktree_path, validation_type="typecheck"):
+    """Run validation based on type"""
+    if validation_type == "typecheck":
+        return validate_typecheck(worktree_path)
+    elif validation_type == "build":
+        return validate_build(worktree_path)
+    return {"success": False, "error": "unknown validation type", "skipped": True}
+
 def output_tail(value, limit=2000):
     if not value:
         return ""
@@ -487,7 +649,11 @@ def run_vanilla_agent(worktree, task, runner):
             "command": command_metadata(worktree, task, runner),
             "stdout_tail": output_tail(result.stdout),
             "stderr_tail": output_tail(result.stderr, 1000),
-            "error": None if result.returncode == 0 else result.stderr[:200]
+            "error": None if result.returncode == 0 else result.stderr[:200],
+            "validation": {
+                "typecheck": run_validation(worktree["path"], "typecheck") if files else {"skipped": True, "reason": "no files changed"},
+                "build": {"skipped": True, "reason": "build validation not run for vanilla"}
+            }
         }
     except subprocess.TimeoutExpired:
         return {"success": False, "duration_ms": 600000, "files": 0, "files_list": [], "error": "Timeout"}
@@ -536,7 +702,11 @@ def run_fooks_agent(worktree, task, runner):
             "command": command_metadata(worktree, task, runner),
             "stdout_tail": output_tail(result.stdout),
             "stderr_tail": output_tail(result.stderr, 1000),
-            "error": None if result.returncode == 0 else result.stderr[:200]
+            "error": None if result.returncode == 0 else result.stderr[:200],
+            "validation": {
+                "typecheck": run_validation(worktree["path"], "typecheck") if files else {"skipped": True, "reason": "no files changed"},
+                "build": run_validation(worktree["path"], "build") if files else {"skipped": True, "reason": "no files changed"}
+            }
         }
     except subprocess.TimeoutExpired:
         return {"success": False, "duration_ms": 600000, "scan_time": fooks_scan_time,

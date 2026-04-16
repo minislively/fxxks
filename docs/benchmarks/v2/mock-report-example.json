@@ -1,0 +1,498 @@
+{
+  "runMetadata": {
+    "runId": "run-2026-04-15-001",
+    "timestamp": "2026-04-15T05:30:00Z",
+    "fooksVersion": "2.1.3",
+    "harnessVersion": "v2",
+    "baselineRef": "run-2026-04-01-001",
+    "config": {
+      "repos": ["shadcn-ui", "cal.com", "documenso", "formbricks", "nextjs", "tailwindcss"],
+      "buckets": ["tiny-raw", "simple-presentational", "form-heavy", "hook-heavy", "conditional-heavy", "style-heavy", "large-mixed", "real-edit-task"],
+      "samplesPerBucket": {
+        "tiny-raw": 20,
+        "simple-presentational": 30,
+        "form-heavy": 25,
+        "hook-heavy": 25,
+        "conditional-heavy": 20,
+        "style-heavy": 20,
+        "large-mixed": 15,
+        "real-edit-task": 30
+      },
+      "seed": "v2:2026-04-15",
+      "comparativeGatingRepos": ["shadcn-ui", "cal.com", "documenso", "formbricks", "nextjs"],
+      "extractionTestRepos": ["tailwindcss"]
+    },
+    "environment": {
+      "nodeVersion": "20.11.0",
+      "codexVersion": "0.26.0",
+      "omxVersion": "0.5.2"
+    }
+  },
+  "gatingView": {
+    "overallStatus": "warn",
+    "blockerBuckets": [
+      {
+        "bucket": "large-mixed",
+        "repo": "documenso",
+        "reason": "undersampled-high-risk",
+        "metric": "deficitCount",
+        "threshold": 0,
+        "actual": 7,
+        "coverageBlocking": true
+      },
+      {
+        "bucket": "large-mixed",
+        "repo": "formbricks",
+        "reason": "undersampled-high-risk",
+        "metric": "deficitCount",
+        "threshold": 0,
+        "actual": 5,
+        "coverageBlocking": true
+      },
+      {
+        "bucket": "form-heavy",
+        "repo": "nextjs",
+        "reason": "undersampled-high-risk",
+        "metric": "deficitCount",
+        "threshold": 0,
+        "actual": 10,
+        "coverageBlocking": true
+      }
+    ],
+    "coverageBlocking": {
+      "globalSameCoverage": false,
+      "affectedRepos": ["documenso", "formbricks", "nextjs"],
+      "notApplicableRepos": ["tailwindcss"],
+      "blockingBucketCount": 3,
+      "excludedFromComparative": [
+        { "repo": "tailwindcss", "reason": "extraction-test-reference" }
+      ]
+    },
+    "topRegressions": [
+      {
+        "bucket": "hook-heavy",
+        "repo": "nextjs",
+        "metric": "savingsRatio",
+        "delta": -0.08,
+        "deltaRatio": -0.18,
+        "severity": "warning",
+        "coverageNote": "Bucket is comparative-gating eligible"
+      },
+      {
+        "bucket": "form-heavy",
+        "repo": "cal.com",
+        "metric": "behaviorSignal",
+        "delta": -0.05,
+        "deltaRatio": -0.05,
+        "severity": "warning",
+        "coverageNote": "Bucket is comparative-gating eligible"
+      }
+    ],
+    "topImprovements": [
+      {
+        "bucket": "style-heavy",
+        "repo": "shadcn-ui",
+        "metric": "savingsRatio",
+        "delta": 0.12,
+        "deltaRatio": 0.24,
+        "severity": "info"
+      },
+      {
+        "bucket": "conditional-heavy",
+        "repo": "formbricks",
+        "metric": "contractSignal",
+        "delta": 0.03,
+        "deltaRatio": 0.03,
+        "severity": "info"
+      }
+    ],
+    "sameCoverage": false,
+    "coverageDeficits": [
+      {
+        "bucket": "large-mixed",
+        "repo": "documenso",
+        "deficitCount": 7,
+        "deficitRatio": 0.47,
+        "status": "undersampled-high-risk",
+        "coverageBlocking": true
+      },
+      {
+        "bucket": "large-mixed",
+        "repo": "formbricks",
+        "deficitCount": 5,
+        "deficitRatio": 0.33,
+        "status": "undersampled-high-risk",
+        "coverageBlocking": true
+      },
+      {
+        "bucket": "form-heavy",
+        "repo": "nextjs",
+        "deficitCount": 10,
+        "deficitRatio": 0.4,
+        "status": "undersampled-high-risk",
+        "coverageBlocking": true
+      },
+      {
+        "bucket": "form-heavy",
+        "repo": "tailwindcss",
+        "deficitCount": 25,
+        "deficitRatio": 1.0,
+        "status": "not-applicable",
+        "coverageBlocking": false,
+        "reason": "CSS framework - not comparative gating target"
+      }
+    ],
+    "gatingConfidence": "medium",
+    "recommendedAction": "proceed-with-caution",
+    "summaryMetrics": {
+      "avgTokenSavingsRatio": 0.42,
+      "minQualitySignal": 0.96,
+      "maxRegressionDelta": -0.08,
+      "fallbackRate": 0.12,
+      "comparativeGatingRepos": 5,
+      "coverageCompleteRepos": 2
+    }
+  },
+  "perRepoSummaries": {
+    "shadcn-ui": {
+      "repo": "shadcn-ui",
+      "revision": "fc62d57",
+      "totalFiles": 3282,
+      "includedFiles": 2800,
+      "excludedPaths": ["apps/www/", "scripts/", "templates/", "*.stories.tsx"],
+      "comparativeGating": true,
+      "sameCoverage": true,
+      "metrics": {
+        "avgTokenSavings": 1800000,
+        "avgSavingsRatio": 0.52,
+        "avgCompressionRatio": 2.08,
+        "avgContractSignal": 0.97,
+        "avgBehaviorSignal": 0.96,
+        "avgStructureSignal": 0.98,
+        "fallbackRate": 0.08,
+        "coldScanAvgMs": 450,
+        "warmScanAvgMs": 85,
+        "cacheHitRatio": 0.92,
+        "modeDistribution": {
+          "extract": 145,
+          "contract": 35,
+          "original": 15
+        },
+        "fallbackReasonBreakdown": {
+          "parse-error": 3,
+          "too-small": 5,
+          "complexity": 7
+        },
+        "editTaskSuccessRate": 0.94,
+        "avgRetryCount": 0.8,
+        "retryNeededRate": 0.18
+      },
+      "bucketCounts": {
+        "tiny-raw": { "candidateCount": 45, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "simple-presentational": { "candidateCount": 120, "selectedCount": 30, "deficitCount": 0, "status": "complete" },
+        "form-heavy": { "candidateCount": 85, "selectedCount": 25, "deficitCount": 0, "status": "complete" },
+        "hook-heavy": { "candidateCount": 60, "selectedCount": 25, "deficitCount": 0, "status": "complete" },
+        "conditional-heavy": { "candidateCount": 35, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "style-heavy": { "candidateCount": 55, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "large-mixed": { "candidateCount": 18, "selectedCount": 15, "deficitCount": 0, "status": "complete" },
+        "real-edit-task": { "candidateCount": 0, "selectedCount": 0, "deficitCount": 30, "status": "excluded" }
+      },
+      "deficitSummary": {
+        "undersampledBuckets": 0,
+        "totalDeficitSamples": 30,
+        "sameCoverage": true
+      },
+      "alerts": []
+    },
+    "cal.com": {
+      "repo": "cal.com",
+      "revision": "c0d105e",
+      "totalFiles": 7438,
+      "includedFiles": 6200,
+      "excludedPaths": ["apps/api/", "packages/trpc/", "playwright/", "test/"],
+      "comparativeGating": true,
+      "sameCoverage": true,
+      "metrics": {
+        "avgTokenSavings": 2100000,
+        "avgSavingsRatio": 0.48,
+        "avgCompressionRatio": 1.92,
+        "avgContractSignal": 0.95,
+        "avgBehaviorSignal": 0.93,
+        "avgStructureSignal": 0.96,
+        "fallbackRate": 0.14,
+        "coldScanAvgMs": 680,
+        "warmScanAvgMs": 120,
+        "cacheHitRatio": 0.88,
+        "modeDistribution": {
+          "extract": 135,
+          "contract": 45,
+          "original": 30
+        },
+        "fallbackReasonBreakdown": {
+          "parse-error": 5,
+          "too-small": 8,
+          "complexity": 12,
+          "backend-mixed": 5
+        },
+        "editTaskSuccessRate": 0.89,
+        "avgRetryCount": 1.2,
+        "retryNeededRate": 0.28
+      },
+      "bucketCounts": {
+        "tiny-raw": { "candidateCount": 25, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "simple-presentational": { "candidateCount": 180, "selectedCount": 30, "deficitCount": 0, "status": "complete" },
+        "form-heavy": { "candidateCount": 150, "selectedCount": 25, "deficitCount": 0, "status": "complete" },
+        "hook-heavy": { "candidateCount": 200, "selectedCount": 25, "deficitCount": 0, "status": "complete" },
+        "conditional-heavy": { "candidateCount": 120, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "style-heavy": { "candidateCount": 80, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "large-mixed": { "candidateCount": 45, "selectedCount": 15, "deficitCount": 0, "status": "complete" },
+        "real-edit-task": { "candidateCount": 0, "selectedCount": 0, "deficitCount": 30, "status": "excluded" }
+      },
+      "deficitSummary": {
+        "undersampledBuckets": 0,
+        "totalDeficitSamples": 30,
+        "sameCoverage": true
+      },
+      "alerts": [
+        {
+          "id": "alert-002",
+          "severity": "warning",
+          "scope": "bucket",
+          "causeCategory": "quality",
+          "repo": "cal.com",
+          "bucket": "form-heavy",
+          "metric": "behaviorSignal",
+          "threshold": 0.95,
+          "actual": 0.93,
+          "baselineRef": "run-2026-04-01-001",
+          "baselineValue": 0.98,
+          "delta": -0.05,
+          "deltaRatio": -0.05,
+          "title": "Meaning preservation degraded in form-heavy",
+          "description": "behaviorSignal dropped from 0.98 to 0.93"
+        }
+      ]
+    },
+    "tailwindcss": {
+      "repo": "tailwindcss",
+      "revision": "aad6017",
+      "totalFiles": 300,
+      "includedFiles": 250,
+      "excludedPaths": ["tests/", "scripts/", "playground/", "stubs/"],
+      "comparativeGating": false,
+      "role": "extraction-test-reference",
+      "sameCoverage": false,
+      "note": "Not comparative gating target - extraction logic validation only",
+      "metrics": {
+        "avgTokenSavings": 45000,
+        "avgSavingsRatio": 0.35,
+        "avgCompressionRatio": 1.54,
+        "avgContractSignal": 0.99,
+        "avgBehaviorSignal": 0.98,
+        "avgStructureSignal": 0.99,
+        "fallbackRate": 0.05,
+        "coldScanAvgMs": 120,
+        "warmScanAvgMs": 45,
+        "cacheHitRatio": 0.95,
+        "modeDistribution": {
+          "extract": 45,
+          "contract": 10,
+          "original": 5
+        },
+        "fallbackReasonBreakdown": {
+          "too-small": 3,
+          "non-react": 2
+        }
+      },
+      "bucketCounts": {
+        "tiny-raw": { "candidateCount": 45, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "simple-presentational": { "candidateCount": 30, "selectedCount": 30, "deficitCount": 0, "status": "complete" },
+        "form-heavy": { "candidateCount": 0, "selectedCount": 0, "deficitCount": 25, "status": "not-applicable" },
+        "hook-heavy": { "candidateCount": 5, "selectedCount": 5, "deficitCount": 20, "status": "not-applicable" },
+        "conditional-heavy": { "candidateCount": 8, "selectedCount": 8, "deficitCount": 12, "status": "not-applicable" },
+        "style-heavy": { "candidateCount": 85, "selectedCount": 20, "deficitCount": 0, "status": "complete" },
+        "large-mixed": { "candidateCount": 2, "selectedCount": 2, "deficitCount": 13, "status": "not-applicable" },
+        "real-edit-task": { "candidateCount": 0, "selectedCount": 0, "deficitCount": 30, "status": "not-applicable" }
+      },
+      "deficitSummary": {
+        "undersampledBuckets": 0,
+        "notApplicableBuckets": 5,
+        "totalDeficitSamples": 100,
+        "sameCoverage": false,
+        "note": "CSS framework repo naturally has fewer React component buckets - this is expected, not a failure"
+      },
+      "alerts": []
+    }
+  },
+  "perBucketSummaries": {
+    "form-heavy": {
+      "bucket": "form-heavy",
+      "comparativeGating": true,
+      "targetSamples": 125,
+      "actualSamples": 90,
+      "deficitCount": 35,
+      "deficitRatio": 0.28,
+      "status": "undersampled",
+      "coverageBlockingRepos": ["nextjs"],
+      "metrics": {
+        "avgRawTokens": 52000,
+        "avgExtractedTokens": 28000,
+        "avgTokenSavings": 24000,
+        "avgSavingsRatio": 0.46,
+        "minSavingsRatio": 0.32,
+        "maxSavingsRatio": 0.58,
+        "p50SavingsRatio": 0.47,
+        "p90SavingsRatio": 0.53,
+        "avgContractSignal": 0.96,
+        "avgBehaviorSignal": 0.94,
+        "avgStructureSignal": 0.97,
+        "minStructureSignal": 0.89,
+        "fallbackCount": 12,
+        "fallbackRate": 0.13,
+        "fallbackReasonBreakdown": {
+          "parse-error": 2,
+          "too-small": 3,
+          "complexity": 7
+        },
+        "modeDistribution": {
+          "extract": 65,
+          "contract": 18,
+          "original": 7
+        },
+        "editTaskSuccessRate": 0.91,
+        "avgRetryCount": 1.1,
+        "retryNeededRate": 0.25
+      },
+      "kpi": {
+        "tokenSavings": { "value": 0.46, "threshold": 0.4, "status": "pass" },
+        "meaningPreservation": { "value": 0.94, "threshold": 0.9, "status": "pass" },
+        "efficiency": { "value": 0.13, "threshold": 0.15, "status": "pass" }
+      },
+      "comparison": {
+        "repoRank": 2,
+        "avgSavingsRank": 3,
+        "avgQualityRank": 2
+      }
+    },
+    "style-heavy": {
+      "bucket": "style-heavy",
+      "comparativeGating": true,
+      "targetSamples": 120,
+      "actualSamples": 120,
+      "deficitCount": 0,
+      "deficitRatio": 0.0,
+      "status": "complete",
+      "coverageBlockingRepos": [],
+      "metrics": {
+        "avgRawTokens": 15000,
+        "avgExtractedTokens": 8500,
+        "avgTokenSavings": 6500,
+        "avgSavingsRatio": 0.43,
+        "minSavingsRatio": 0.28,
+        "maxSavingsRatio": 0.62,
+        "p50SavingsRatio": 0.44,
+        "p90SavingsRatio": 0.55,
+        "avgContractSignal": 0.98,
+        "avgBehaviorSignal": 0.97,
+        "avgStructureSignal": 0.98,
+        "minStructureSignal": 0.94,
+        "fallbackCount": 6,
+        "fallbackRate": 0.05,
+        "fallbackReasonBreakdown": {
+          "too-small": 4,
+          "complexity": 2
+        },
+        "modeDistribution": {
+          "extract": 95,
+          "contract": 19,
+          "original": 6
+        }
+      },
+      "kpi": {
+        "tokenSavings": { "value": 0.43, "threshold": 0.4, "status": "pass" },
+        "meaningPreservation": { "value": 0.97, "threshold": 0.9, "status": "pass" },
+        "efficiency": { "value": 0.05, "threshold": 0.15, "status": "pass" }
+      },
+      "comparison": {
+        "repoRank": 1,
+        "avgSavingsRank": 2,
+        "avgQualityRank": 1
+      }
+    }
+  },
+  "alerts": [
+    {
+      "id": "alert-001",
+      "severity": "warning",
+      "scope": "bucket",
+      "causeCategory": "coverage",
+      "repo": "documenso",
+      "bucket": "large-mixed",
+      "metric": "deficitCount",
+      "threshold": 0,
+      "actual": 7,
+      "title": "large-mixed undersampled-high-risk in documenso",
+      "description": "Only 8 candidates available for 15 target samples (47% deficit)",
+      "recommendation": "Exclude from comparative gating; consider if this bucket is representative for this repo"
+    },
+    {
+      "id": "alert-002",
+      "severity": "warning",
+      "scope": "bucket",
+      "causeCategory": "coverage",
+      "repo": "formbricks",
+      "bucket": "large-mixed",
+      "metric": "deficitCount",
+      "threshold": 0,
+      "actual": 5,
+      "title": "large-mixed undersampled-high-risk in formbricks",
+      "description": "Only 10 candidates available for 15 target samples (33% deficit)",
+      "recommendation": "Exclude from comparative gating"
+    },
+    {
+      "id": "alert-003",
+      "severity": "warning",
+      "scope": "bucket",
+      "causeCategory": "coverage",
+      "repo": "nextjs",
+      "bucket": "form-heavy",
+      "metric": "deficitCount",
+      "threshold": 0,
+      "actual": 10,
+      "title": "form-heavy undersampled-high-risk in nextjs",
+      "description": "Only 15 candidates available for 25 target samples (40% deficit). Framework repo has fewer form components.",
+      "recommendation": "Exclude from comparative gating; this is expected for framework repos"
+    },
+    {
+      "id": "alert-004",
+      "severity": "info",
+      "scope": "repo",
+      "causeCategory": "coverage",
+      "repo": "tailwindcss",
+      "metric": "unsupportedBuckets",
+      "threshold": 0,
+      "actual": 5,
+      "title": "tailwindcss serves as extraction-test-reference only",
+      "description": "5 buckets marked not-applicable: form-heavy, hook-heavy, conditional-heavy, large-mixed, real-edit-task. This is expected for CSS framework.",
+      "recommendation": "Use for extraction logic validation, not comparative gating"
+    },
+    {
+      "id": "alert-005",
+      "severity": "warning",
+      "scope": "bucket",
+      "causeCategory": "regression",
+      "repo": "nextjs",
+      "bucket": "hook-heavy",
+      "metric": "savingsRatio",
+      "threshold": 0.35,
+      "actual": 0.27,
+      "baselineRef": "run-2026-04-01-001",
+      "baselineValue": 0.35,
+      "delta": -0.08,
+      "deltaRatio": -0.18,
+      "title": "Token savings regression in hook-heavy",
+      "description": "Savings ratio dropped 18% below baseline in nextjs",
+      "recommendation": "Investigate hook extraction efficiency"
+    }
+  ]
+}

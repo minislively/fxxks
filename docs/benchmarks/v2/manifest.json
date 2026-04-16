@@ -1,0 +1,270 @@
+{
+  "version": "v2",
+  "pinnedAt": "2026-04-15T05:00:00Z",
+  "fooksVersion": "2.1.0",
+  "harnessVersion": "v2",
+  "seed": "v2:2026-04-15",
+  "discoveryGlobs": [
+    "**/*.tsx",
+    "**/*.ts"
+  ],
+  "excludeGlobs": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/*.test.{ts,tsx}",
+    "**/*.spec.{ts,tsx}",
+    "**/test/**",
+    "**/tests/**",
+    "**/playwright/**",
+    "**/scripts/**",
+    "**/config/**",
+    "**/stubs/**",
+    "**/*.generated.{ts,tsx}",
+    "**/*.stories.{ts,tsx}",
+    "**/*.story.{ts,tsx}"
+  ],
+  "countRule": {
+    "description": "Count TS/TSX files after applying excludeGlobs",
+    "includeNonReact": false,
+    "countReactPatterns": ["JSXElement", "JSXFragment", "React"]
+  },
+  "countedAtRevision": "2026-04-15T05:00:00Z",
+  "repos": [
+    {
+      "name": "shadcn-ui",
+      "remote": "https://github.com/shadcn-ui/ui",
+      "revision": "fc62d57",
+      "pinnedAt": "2026-04-15T05:00:00Z",
+      "totalFiles": 3282,
+      "includedFiles": 2800,
+      "sourceRoots": [
+        "apps/*/",
+        "packages/*/components"
+      ],
+      "excludedPaths": [
+        "apps/www/",
+        "scripts/",
+        "templates/",
+        "*.stories.tsx"
+      ],
+      "representativeBuckets": [
+        "presentational",
+        "form-heavy",
+        "style-heavy",
+        "hook-heavy"
+      ],
+      "supportedBuckets": [
+        "tiny-raw",
+        "simple-presentational",
+        "form-heavy",
+        "hook-heavy",
+        "conditional-heavy",
+        "style-heavy",
+        "large-mixed",
+        "real-edit-task"
+      ],
+      "unsupportedBuckets": [],
+      "comparativeGating": true
+    },
+    {
+      "name": "cal.com",
+      "remote": "https://github.com/calcom/cal.com",
+      "revision": "c0d105e",
+      "pinnedAt": "2026-04-15T05:00:00Z",
+      "totalFiles": 7438,
+      "includedFiles": 6200,
+      "sourceRoots": [
+        "apps/web/components/",
+        "packages/ui/"
+      ],
+      "excludedPaths": [
+        "apps/api/",
+        "packages/trpc/",
+        "playwright/",
+        "test/"
+      ],
+      "representativeBuckets": [
+        "form-heavy",
+        "conditional-heavy",
+        "large-mixed",
+        "real-edit"
+      ],
+      "supportedBuckets": [
+        "tiny-raw",
+        "simple-presentational",
+        "form-heavy",
+        "hook-heavy",
+        "conditional-heavy",
+        "style-heavy",
+        "large-mixed",
+        "real-edit-task"
+      ],
+      "unsupportedBuckets": [],
+      "comparativeGating": true
+    },
+    {
+      "name": "documenso",
+      "remote": "https://github.com/documenso/documenso",
+      "revision": "5082226",
+      "pinnedAt": "2026-04-15T05:00:00Z",
+      "totalFiles": 1802,
+      "includedFiles": 1500,
+      "sourceRoots": [
+        "apps/web/app/",
+        "apps/web/components/"
+      ],
+      "excludedPaths": [
+        "test/",
+        "scripts/",
+        "docker/",
+        "*.spec.ts"
+      ],
+      "representativeBuckets": [
+        "form-heavy",
+        "conditional-heavy",
+        "real-edit"
+      ],
+      "supportedBuckets": [
+        "tiny-raw",
+        "simple-presentational",
+        "form-heavy",
+        "hook-heavy",
+        "conditional-heavy",
+        "style-heavy",
+        "large-mixed",
+        "real-edit-task"
+      ],
+      "unsupportedBuckets": [],
+      "comparativeGating": true
+    },
+    {
+      "name": "formbricks",
+      "remote": "https://github.com/formbricks/formbricks",
+      "revision": "439dd0b",
+      "pinnedAt": "2026-04-15T05:00:00Z",
+      "totalFiles": 2178,
+      "includedFiles": 1800,
+      "sourceRoots": [
+        "apps/web/app/",
+        "packages/ui/"
+      ],
+      "excludedPaths": [
+        "playwright/",
+        "test/",
+        "scripts/",
+        "*.test.tsx"
+      ],
+      "representativeBuckets": [
+        "form-heavy",
+        "hook-heavy",
+        "conditional-heavy"
+      ],
+      "supportedBuckets": [
+        "tiny-raw",
+        "simple-presentational",
+        "form-heavy",
+        "hook-heavy",
+        "conditional-heavy",
+        "style-heavy",
+        "large-mixed",
+        "real-edit-task"
+      ],
+      "unsupportedBuckets": [],
+      "comparativeGating": true
+    },
+    {
+      "name": "nextjs",
+      "remote": "https://github.com/vercel/next.js",
+      "revision": "b9cd4489",
+      "pinnedAt": "2026-04-15T05:00:00Z",
+      "totalFiles": 7631,
+      "includedFiles": 6500,
+      "sourceRoots": [
+        "packages/next/",
+        "packages/next/src/"
+      ],
+      "excludedPaths": [
+        "test/",
+        "scripts/",
+        "bench/",
+        "examples/"
+      ],
+      "representativeBuckets": [
+        "conditional-heavy",
+        "large-mixed",
+        "hook-heavy"
+      ],
+      "supportedBuckets": [
+        "tiny-raw",
+        "simple-presentational",
+        "form-heavy",
+        "hook-heavy",
+        "conditional-heavy",
+        "style-heavy",
+        "large-mixed",
+        "real-edit-task"
+      ],
+      "unsupportedBuckets": [],
+      "comparativeGating": true
+    },
+    {
+      "name": "tailwindcss",
+      "remote": "https://github.com/tailwindlabs/tailwindcss",
+      "revision": "aad6017",
+      "pinnedAt": "2026-04-15T05:00:00Z",
+      "totalFiles": 300,
+      "includedFiles": 250,
+      "sourceRoots": [
+        "src/",
+        "packages/*/src"
+      ],
+      "excludedPaths": [
+        "tests/",
+        "scripts/",
+        "playground/",
+        "stubs/"
+      ],
+      "representativeBuckets": [
+        "style-heavy",
+        "presentational"
+      ],
+      "supportedBuckets": [
+        "tiny-raw",
+        "simple-presentational",
+        "style-heavy"
+      ],
+      "unsupportedBuckets": [
+        {
+          "bucket": "form-heavy",
+          "reason": "CSS framework has no form components",
+          "gatingStatus": "not-applicable"
+        },
+        {
+          "bucket": "hook-heavy",
+          "reason": "CSS framework has minimal React hooks",
+          "gatingStatus": "not-applicable"
+        },
+        {
+          "bucket": "conditional-heavy",
+          "reason": "CSS framework has limited conditional rendering",
+          "gatingStatus": "not-applicable"
+        },
+        {
+          "bucket": "large-mixed",
+          "reason": "CSS framework has minimal large components",
+          "gatingStatus": "not-applicable"
+        },
+        {
+          "bucket": "real-edit-task",
+          "reason": "CSS framework is not a product repo",
+          "gatingStatus": "not-applicable"
+        }
+      ],
+      "comparativeGating": false,
+      "role": "extraction-test-reference",
+      "note": "Tailwindcss serves as extraction logic validation, not comparative gating target"
+    }
+  ]
+}

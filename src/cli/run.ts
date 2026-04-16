@@ -3,7 +3,7 @@ import { scanProject } from "../core/scan.js";
 import { extractFile } from "../core/extract.js";
 import { decideMode } from "../core/decide.js";
 import { discoverProjectFiles, discoverRelevantFiles } from "../core/discover.js";
-import { executeViaCodex } from "../adapters/codex.js";
+import { prepareExecutionContext } from "../adapters/codex.js";
 
 export interface RunOptions {
   prompt: string;
@@ -60,15 +60,20 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
       }
     }
     
-    // 4. Execute via attached runtime
+    // 4. Prepare execution context (handoff pattern)
     const runner = (options.runner === "auto" || !options.runner) ? detectRunner() : options.runner;
     console.log("Detected runner:", runner);
-    let executionResult;
-    if (runner === "codex") {
-      executionResult = await executeViaCodex(options.prompt, processedFiles);
-      console.log("Execution result:", executionResult);
-    } else {
-      executionResult = { success: true, modifiedFiles: [] };
+    
+    let executionContext;
+    if (runner === "codex" || runner === "omx") {
+      executionContext = await prepareExecutionContext(options.prompt, processedFiles);
+      console.log("\n=== Handoff Summary ===");
+      console.log(`Context ready: ${executionContext.contextPath}`);
+      console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
+      console.log(`Prompt: "${executionContext.prompt}"`);
+      console.log(`\nNext: Execute with your preferred runtime (omx, codex, claude, etc.)`);
+      console.log(`Context file: ${executionContext.contextPath}`);
+      console.log("======================\n");
     }
     
     // 5. Summary
@@ -83,7 +88,7 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
       filesProcessed: processedFiles.length,
       tokensSaved: totalTokensSaved,
       reductionPercent,
-      modifiedFiles: [], // TODO: Get from runner execution
+      modifiedFiles: [],
     };
     
   } catch (error) {

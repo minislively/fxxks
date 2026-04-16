@@ -52,62 +52,66 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
   return finalizeAttach("codex", sample, runtimeProof, cwd, trustStatus);
 }
 
-// Execute task via Codex CLI with prepared context
-export async function executeViaCodex(
+export interface ExecutionContext {
+  contextPath: string;
+  fileCount: number;
+  totalSize: number;
+  prompt: string;
+  handoffCommand: string;
+}
+
+// Prepare context for AI execution - execution is handed off to external runtime
+export async function prepareExecutionContext(
   prompt: string,
   contextFiles: string[],
   cwd = process.cwd(),
-): Promise<{ success: boolean; modifiedFiles: string[]; error?: string }> {
-  try {
-    const { execFile } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const execFilePromise = promisify(execFile);
-    
-    // Read and combine context files into a temporary context file
-    let contextContent = "# Context Files\n\n";
-    for (const filePath of contextFiles) {
-      try {
-        const content = fs.readFileSync(filePath, "utf8");
-        contextContent += `## ${path.basename(filePath)}\n\n${content}\n\n`;
-      } catch (err) {
-        console.error(`Failed to read ${filePath}:`, err);
-      }
-    }
-    
-    // Write temporary context file
-    const tempContextPath = path.join(cwd, ".fooks", "temp-context.md");
-    fs.mkdirSync(path.dirname(tempContextPath), { recursive: true });
-    fs.writeFileSync(tempContextPath, contextContent);
-    
-    // Build enhanced prompt with context reference
-    const enhancedPrompt = `${prompt}\n\nContext files have been prepared in: ${tempContextPath}\n\nKey files to consider:\n${contextFiles.map(f => `- ${f}`).join("\n")}`;
-    
-    // Execute codex exec with prompt (without --quiet, capture output)
-    const { stdout, stderr } = await execFilePromise(
-      "codex",
-      ["exec", enhancedPrompt],
-      { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024 },
-    );
-    
-    console.log("Codex output:", stdout);
-    if (stderr) console.error("Codex stderr:", stderr);
-    
-    // Cleanup temp file
+): Promise<ExecutionContext> {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  // Read and combine context files into a temporary context file
+  let contextContent = "# Context Files\n\n";
+  let totalSize = 0;
+
+  for (const filePath of contextFiles) {
     try {
-      fs.unlinkSync(tempContextPath);
-    } catch {}
-    
-    return {
-      success: true,
-      modifiedFiles: [],
-    };
-  } catch (error) {
-    return {
-      success: false,
-      modifiedFiles: [],
-      error: error instanceof Error ? error.message : String(error),
-    };
+      const content = fs.readFileSync(filePath, "utf8");
+      const size = Buffer.byteLength(content, "utf8");
+      totalSize += size;
+      contextContent += `## ${path.basename(filePath)}\n\n${content}\n\n`;
+    } catch (err) {
+      console.error(`Failed to read ${filePath}:`, err);
+    }
   }
+
+  // Write temporary context file
+  const tempContextPath = path.join(cwd, ".fooks", "temp-context.md");
+  fs.mkdirSync(path.dirname(tempContextPath), { recursive: true });
+  fs.writeFileSync(tempContextPath, contextContent);
+
+  // Adapter contract: handoff command is abstracted, exact invocation not yet standardized
+  // This allows swapping between Codex, OMX, Claude, or other runtimes
+  const handoffCommand = `[runtime-adapter] ${prompt} --context ${tempContextPath}`;
+
+  return {
+    contextPath: tempContextPath,
+    fileCount: contextFiles.length,
+    totalSize,
+    prompt,
+    handoffCommand,
+  };
+}
+
+// Deprecated: direct Codex execution path - identified as product blocker (300s+ timeout, no file changes)
+// Kept for reference but not used in production path
+export async function executeViaCodex(
+  _prompt: string,
+  _contextFiles: string[],
+  _cwd = process.cwd(),
+): Promise<{ success: boolean; modifiedFiles: string[]; error?: string }> {
+  return {
+    success: false,
+    modifiedFiles: [],
+    error: "Direct Codex execution deprecated. Use prepareExecutionContext() + handoff pattern.",
+  };
 }

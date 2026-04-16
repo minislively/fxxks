@@ -1,0 +1,439 @@
+{
+  "version": "v2",
+  "dryRunId": "dryrun-2026-04-15",
+  "seed": "v2:2026-04-15",
+  "bucketTargets": {
+    "tiny-raw": 20,
+    "simple-presentational": 30,
+    "form-heavy": 25,
+    "hook-heavy": 25,
+    "conditional-heavy": 20,
+    "style-heavy": 20,
+    "large-mixed": 15,
+    "real-edit-task": 30
+  },
+  "coverageScope": {
+    "global": {
+      "sameCoverage": false,
+      "reason": "Multiple repos have undersampled buckets",
+      "totalBuckets": 48,
+      "completeBuckets": 34,
+      "undersampledBuckets": 14,
+      "excludedBuckets": 6,
+      "notApplicableBuckets": 5
+    },
+    "byRepo": {
+      "shadcn-ui": {
+        "sameCoverage": true,
+        "comparativeGating": true
+      },
+      "cal.com": {
+        "sameCoverage": true,
+        "comparativeGating": true
+      },
+      "documenso": {
+        "sameCoverage": false,
+        "reason": "large-mixed undersampled-high-risk",
+        "comparativeGating": true,
+        "coverageBlockingBuckets": ["large-mixed"]
+      },
+      "formbricks": {
+        "sameCoverage": false,
+        "reason": "tiny-raw undersampled, large-mixed undersampled-high-risk",
+        "comparativeGating": true,
+        "coverageBlockingBuckets": ["large-mixed"]
+      },
+      "nextjs": {
+        "sameCoverage": false,
+        "reason": "form-heavy undersampled-high-risk",
+        "comparativeGating": true,
+        "coverageBlockingBuckets": ["form-heavy"]
+      },
+      "tailwindcss": {
+        "sameCoverage": false,
+        "reason": "5 buckets not-applicable for CSS framework",
+        "comparativeGating": false,
+        "coverageBlockingBuckets": [],
+        "note": "Extraction-test-reference only, not comparative gating target"
+      }
+    }
+  },
+  "results": {
+    "shadcn-ui": {
+      "revision": "fc62d57",
+      "totalFiles": 2800,
+      "comparativeGating": true,
+      "buckets": {
+        "tiny-raw": {
+          "candidateCount": 45,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "simple-presentational": {
+          "candidateCount": 120,
+          "selectedCount": 30,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "form-heavy": {
+          "candidateCount": 85,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "hook-heavy": {
+          "candidateCount": 60,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "conditional-heavy": {
+          "candidateCount": 35,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "style-heavy": {
+          "candidateCount": 55,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "large-mixed": {
+          "candidateCount": 18,
+          "selectedCount": 15,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "real-edit-task": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 30,
+          "status": "excluded",
+          "reason": "PR-based extraction not available in dry-run"
+        }
+      },
+      "sameCoverage": true
+    },
+    "cal.com": {
+      "revision": "c0d105e",
+      "totalFiles": 6200,
+      "comparativeGating": true,
+      "buckets": {
+        "tiny-raw": {
+          "candidateCount": 25,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "simple-presentational": {
+          "candidateCount": 180,
+          "selectedCount": 30,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "form-heavy": {
+          "candidateCount": 150,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "hook-heavy": {
+          "candidateCount": 200,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "conditional-heavy": {
+          "candidateCount": 120,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "style-heavy": {
+          "candidateCount": 80,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "large-mixed": {
+          "candidateCount": 45,
+          "selectedCount": 15,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "real-edit-task": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 30,
+          "status": "excluded",
+          "reason": "PR-based extraction not available in dry-run"
+        }
+      },
+      "sameCoverage": true
+    },
+    "documenso": {
+      "revision": "5082226",
+      "totalFiles": 1500,
+      "comparativeGating": true,
+      "coverageBlockingBuckets": ["large-mixed"],
+      "buckets": {
+        "tiny-raw": {
+          "candidateCount": 15,
+          "selectedCount": 15,
+          "deficitCount": 5,
+          "status": "undersampled"
+        },
+        "simple-presentational": {
+          "candidateCount": 55,
+          "selectedCount": 30,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "form-heavy": {
+          "candidateCount": 40,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "hook-heavy": {
+          "candidateCount": 35,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "conditional-heavy": {
+          "candidateCount": 28,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "style-heavy": {
+          "candidateCount": 22,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "large-mixed": {
+          "candidateCount": 8,
+          "selectedCount": 8,
+          "deficitCount": 7,
+          "status": "undersampled-high-risk",
+          "coverageBlocking": true
+        },
+        "real-edit-task": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 30,
+          "status": "excluded"
+        }
+      },
+      "sameCoverage": false
+    },
+    "formbricks": {
+      "revision": "439dd0b",
+      "totalFiles": 1800,
+      "comparativeGating": true,
+      "coverageBlockingBuckets": ["large-mixed"],
+      "buckets": {
+        "tiny-raw": {
+          "candidateCount": 18,
+          "selectedCount": 18,
+          "deficitCount": 2,
+          "status": "undersampled"
+        },
+        "simple-presentational": {
+          "candidateCount": 65,
+          "selectedCount": 30,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "form-heavy": {
+          "candidateCount": 85,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "hook-heavy": {
+          "candidateCount": 95,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "conditional-heavy": {
+          "candidateCount": 55,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "style-heavy": {
+          "candidateCount": 30,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "large-mixed": {
+          "candidateCount": 10,
+          "selectedCount": 10,
+          "deficitCount": 5,
+          "status": "undersampled-high-risk",
+          "coverageBlocking": true
+        },
+        "real-edit-task": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 30,
+          "status": "excluded"
+        }
+      },
+      "sameCoverage": false
+    },
+    "nextjs": {
+      "revision": "b9cd4489",
+      "totalFiles": 6500,
+      "comparativeGating": true,
+      "coverageBlockingBuckets": ["form-heavy"],
+      "buckets": {
+        "tiny-raw": {
+          "candidateCount": 35,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "simple-presentational": {
+          "candidateCount": 80,
+          "selectedCount": 30,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "form-heavy": {
+          "candidateCount": 15,
+          "selectedCount": 15,
+          "deficitCount": 10,
+          "status": "undersampled-high-risk",
+          "coverageBlocking": true
+        },
+        "hook-heavy": {
+          "candidateCount": 150,
+          "selectedCount": 25,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "conditional-heavy": {
+          "candidateCount": 200,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "style-heavy": {
+          "candidateCount": 25,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "large-mixed": {
+          "candidateCount": 80,
+          "selectedCount": 15,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "real-edit-task": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 30,
+          "status": "excluded"
+        }
+      },
+      "sameCoverage": false
+    },
+    "tailwindcss": {
+      "revision": "aad6017",
+      "totalFiles": 250,
+      "comparativeGating": false,
+      "role": "extraction-test-reference",
+      "note": "Not comparative gating target - extraction logic validation only",
+      "buckets": {
+        "tiny-raw": {
+          "candidateCount": 45,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "simple-presentational": {
+          "candidateCount": 30,
+          "selectedCount": 30,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "form-heavy": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 25,
+          "status": "not-applicable",
+          "reason": "CSS framework has no form components",
+          "gatingStatus": "not-comparative"
+        },
+        "hook-heavy": {
+          "candidateCount": 5,
+          "selectedCount": 5,
+          "deficitCount": 20,
+          "status": "not-applicable",
+          "reason": "CSS framework has minimal React hooks",
+          "gatingStatus": "not-comparative"
+        },
+        "conditional-heavy": {
+          "candidateCount": 8,
+          "selectedCount": 8,
+          "deficitCount": 12,
+          "status": "not-applicable",
+          "reason": "CSS framework has limited conditional rendering",
+          "gatingStatus": "not-comparative"
+        },
+        "style-heavy": {
+          "candidateCount": 85,
+          "selectedCount": 20,
+          "deficitCount": 0,
+          "status": "complete"
+        },
+        "large-mixed": {
+          "candidateCount": 2,
+          "selectedCount": 2,
+          "deficitCount": 13,
+          "status": "not-applicable",
+          "reason": "CSS framework has minimal large components",
+          "gatingStatus": "not-comparative"
+        },
+        "real-edit-task": {
+          "candidateCount": 0,
+          "selectedCount": 0,
+          "deficitCount": 30,
+          "status": "not-applicable",
+          "reason": "CSS framework is not a product repo",
+          "gatingStatus": "not-comparative"
+        }
+      },
+      "sameCoverage": false,
+      "unsupportedSummary": {
+        "count": 5,
+        "buckets": ["form-heavy", "hook-heavy", "conditional-heavy", "large-mixed", "real-edit-task"],
+        "reason": "CSS framework nature - not a failure"
+      }
+    }
+  },
+  "summary": {
+    "totalRepos": 6,
+    "comparativeGatingRepos": 5,
+    "extractionTestRepos": 1,
+    "totalBuckets": 48,
+    "completeBuckets": 34,
+    "undersampledBuckets": 14,
+    "excludedBuckets": 6,
+    "notApplicableBuckets": 5,
+    "coverageBlocking": {
+      "globalSameCoverage": false,
+      "repoCountWithIssues": 4,
+      "blockingBuckets": ["documenso:large-mixed", "formbricks:large-mixed", "nextjs:form-heavy"]
+    }
+  }
+}
