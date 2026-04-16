@@ -1,0 +1,137 @@
+{
+  "timestamp": "2026-04-16T12:37:55.486869",
+  "summary": {
+    "total_benchmarks": 1,
+    "vanilla_success": 1,
+    "fooks_success": 1,
+    "avg_token_reduction": 66.46864989258164,
+    "avg_tokens_saved": 639001.0
+  },
+  "notes": {
+    "tokenEstimate": {
+      "scope": "tsx-only proxy",
+      "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+    },
+    "environmentParity": {
+      "runner": "omx exec --full-auto",
+      "prompt": "Identical task text for vanilla and fooks variants.",
+      "codexHome": "Each variant uses an isolated CODEX_HOME with auth.json and config.toml symlinked from the same host account.",
+      "variantDifference": "The fooks variant runs fooks init/scan before the same OMX command; vanilla does not."
+    }
+  },
+  "riskAssessment": {
+    "overall": "high",
+    "scale": {
+      "low": "Safe to cite with caveat.",
+      "medium": "Useful but should be repeated.",
+      "high": "Round-1 directional evidence only.",
+      "critical": "Do not cite without fixing measurement."
+    },
+    "risks": [
+      {
+        "name": "sample_size",
+        "level": "high",
+        "evidence": "1 successful paired benchmark(s).",
+        "interpretation": "Use as round-1 proof only; repeat N>=3 before claiming stable performance."
+      },
+      {
+        "name": "environment_parity",
+        "level": "low",
+        "evidence": "same_prompt=True, same_files=True, runner=omx exec --full-auto",
+        "interpretation": "Both variants use OMX exec with isolated CODEX_HOME; fooks additionally prepares .fooks context."
+      },
+      {
+        "name": "cleanup_reproducibility",
+        "level": "low",
+        "evidence": "cleanup_removed=True",
+        "interpretation": "Worktree residue can contaminate reruns if cleanup fails."
+      },
+      {
+        "name": "wall_clock_noise",
+        "level": "medium",
+        "evidence": "Single-run wall-clock timing includes model/service variability.",
+        "interpretation": "Prefer median and p95 over repeated identical tasks."
+      },
+      {
+        "name": "runtime_token_claim",
+        "level": "medium",
+        "evidence": "Actual OMX/Codex tokens available; fooks used more runtime tokens in 0/1 pair(s).",
+        "interpretation": "Do not claim runtime token reduction from this run; keep proxy compression and actual tokens separate."
+      }
+    ]
+  },
+  "results": [
+    {
+      "task": "T5",
+      "task_name": "Form Validation",
+      "repo": "formbricks",
+      "difficulty": "hard",
+      "timestamp": "2026-04-16T12:31:48.040927",
+      "tokens": {
+        "total_files": 882,
+        "raw_bytes": 3845431.8,
+        "compressed_bytes": 1289425.2,
+        "raw_tokens": 961357.0,
+        "compressed_tokens": 322356.0,
+        "tokens_saved": 639001.0,
+        "reduction_pct": 66.46864989258164,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 176575,
+        "files": 1,
+        "files_list": [
+          "apps/web/modules/account/components/DeleteAccountModal/index.tsx"
+        ],
+        "tokens_used": 57705,
+        "command": {
+          "runner": "omx exec --full-auto",
+          "omx_bin": "/opt/homebrew/bin/omx",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776310315",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776310315/.codex",
+          "prompt_sha256": "920cc272ab8728825be4a2f4f96d868cb9a85bca7c59b0481da1bf2fa0b52a60"
+        },
+        "stdout_tail": "Implemented the requested one-file change.\n\nModified file:\n- `apps/web/modules/account/components/DeleteAccountModal/index.tsx`\n\nChanges made:\n- Changed the confirmation input to `type=\"email\"`.\n- Added inline red validation feedback under the input after typing a malformed or non-matching email.\n- Marked the input invalid visually/accessibly when showing the error.\n- Kept the delete action disabled while the confirmation email is invalid or deletion is already running.\n- Added guards so submit/delete won\u2019t proceed while invalid or already deleting.\n\nValidation:\n- `git diff --check` passed.\n- `pnpm exec prettier --check ...` could not run because `prettier` was not found in the current environment.\n",
+        "stderr_tail": "?? .codex/logs_2.sqlite-shm\n?? .codex/logs_2.sqlite-wal\n?? .codex/models_cache.json\n?? .codex/plugins/\n?? .codex/sessions/\n?? .codex/shell_snapshots/\n?? .codex/skills/\n?? .codex/state_5.sqlite\n?? .codex/state_5.sqlite-shm\n?? .codex/state_5.sqlite-wal\n?? .codex/tmp/\n\ncodex\nImplemented the requested one-file change.\n\nModified file:\n- `apps/web/modules/account/components/DeleteAccountModal/index.tsx`\n\nChanges made:\n- Changed the confirmation input to `type=\"email\"`.\n- Added inline red validation feedback under the input after typing a malformed or non-matching email.\n- Marked the input invalid visually/accessibly when showing the error.\n- Kept the delete action disabled while the confirmation email is invalid or deletion is already running.\n- Added guards so submit/delete won\u2019t proceed while invalid or already deleting.\n\nValidation:\n- `git diff --check` passed.\n- `pnpm exec prettier --check ...` could not run because `prettier` was not found in the current environment.\ntokens used\n57,705\n",
+        "error": null,
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 168468,
+        "scan_time": 2816,
+        "total_time": 171284,
+        "files": 1,
+        "files_list": [
+          "apps/web/modules/account/components/DeleteAccountModal/index.tsx"
+        ],
+        "tokens_used": 34978,
+        "command": {
+          "runner": "omx exec --full-auto",
+          "omx_bin": "/opt/homebrew/bin/omx",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776310497",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776310497/.codex",
+          "prompt_sha256": "920cc272ab8728825be4a2f4f96d868cb9a85bca7c59b0481da1bf2fa0b52a60"
+        },
+        "stdout_tail": "Implemented the account deletion email confirmation improvements.\n\nModified file:\n- `apps/web/modules/account/components/DeleteAccountModal/index.tsx`\n\nChanges made:\n- Changed confirmation input to `type=\"email\"`.\n- Added inline red error text under the input after the user types an invalid confirmation.\n- Distinguishes malformed email from non-matching email using existing translation keys.\n- Keeps delete action disabled while:\n  - the confirmation email is malformed,\n  - the confirmation does not exactly match `user.email`,\n  - or deletion is already running.\n- Guarded both delete button flow and form submit flow from running while invalid/disabled.\n\nVerification:\n- Confirmed only this tracked file is modified via `git diff --name-only`.\n- Tried `pnpm exec prettier --check apps/web/modules/account/components/DeleteAccountModal/index.tsx`, but `prettier` was not available in the workspace environment.\n",
+        "stderr_tail": "   await deleteAccount();\n+            await handleDeleteAccount();\n           }}>\n           <label htmlFor=\"deleteAccountConfirmation\">\n             {t(\"environments.settings.profile.please_enter_email_to_confirm_account_deletion\", {\n@@ -111,10 +126,19 @@\n             onChange={handleInputChange}\n             placeholder={user.email}\n             className=\"mt-5\"\n-            type=\"text\"\n+            type=\"email\"\n             id=\"deleteAccountConfirmation\"\n             name=\"deleteAccountConfirmation\"\n+            aria-invalid={showEmailConfirmationError}\n+            aria-describedby={\n+              showEmailConfirmationError ? \"deleteAccountConfirmationError\" : undefined\n+            }\n           />\n+          {showEmailConfirmationError && (\n+            <p id=\"deleteAccountConfirmationError\" className=\"mt-2 text-sm text-red-500\">\n+              {emailConfirmationErrorMessage}\n+            </p>\n+          )}\n         </form>\n       </div>\n     </DeleteDialog>\n\ntokens used\n34,978\n",
+        "error": null,
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 4.591250176978621,
+        "total": 2.9964604275803484
+      }
+    }
+  ]
+}
