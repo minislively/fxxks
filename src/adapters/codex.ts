@@ -84,11 +84,11 @@ export async function executeViaCodex(
     // Build enhanced prompt with context reference
     const enhancedPrompt = `${prompt}\n\nContext files have been prepared in: ${tempContextPath}\n\nKey files to consider:\n${contextFiles.map(f => `- ${f}`).join("\n")}`;
     
-    // Execute codex exec with prompt
+    // Execute codex exec with prompt (without --quiet, capture output)
     const { stdout, stderr } = await execFilePromise(
       "codex",
-      ["exec", enhancedPrompt, "--quiet"],
-      { cwd, timeout: 120000 },
+      ["exec", enhancedPrompt],
+      { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024 },
     );
     
     console.log("Codex output:", stdout);
