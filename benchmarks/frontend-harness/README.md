@@ -3,6 +3,18 @@
 Frontend-specific benchmark comparing vanilla Codex vs fooks-enabled Codex.
 Similar to TerminalBench/SWE-Bench but focused on frontend codebases.
 
+## Core Requirements
+
+This benchmark validates AI editing task efficiency + outcome parity through:
+
+1. **Real repository** - Actual open-source frontend projects (shadcn-ui, cal.com, formbricks, etc.)
+2. **Real AI execution** - Actual Codex CLI execution (not mocked/simulated)
+3. **Isolated environment** - Worktree-per-run with isolated `CODEX_HOME`, explicit auth/config sources
+4. **Verifiable output checks** - Modified file count, diff integrity, build/typecheck where applicable
+
+**Out of scope**: Browser runtime, live app execution, E2E verification. This benchmark measures
+code editing efficiency and outcome parity, not browser behavior correctness.
+
 ## Latest Results (2026-04-14)
 
 | Metric | Vanilla | Fooks | Improvement |
