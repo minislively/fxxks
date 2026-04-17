@@ -1,0 +1,48 @@
+======================================================================
+Fooks Full Benchmark Suite
+======================================================================
+Start time: 2026-04-17T22:22:40.530351
+Tasks: T1, T2, T3, T4, T5
+Repos: cal.com, documenso, formbricks, nextjs, saleor-storefront, shadcn-ui, tailwindcss
+Runner: codex exec --full-auto
+Variants: Vanilla vs Fooks (with token estimates)
+Reports dir: /Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/risk-reduction-20260417/exact-bypass
+======================================================================
+
+======================================================================
+[T5] Form Validation (hard)
+Repo: formbricks
+Runner: codex exec --full-auto
+======================================================================
+  Calculating token estimates...
+    Repo: 882 TSX files
+    Raw: ~762,172 tokens
+    Compressed: ~250,142 tokens
+    Saved: ~512,030 tokens (67.2%)
+
+  [VANILLA] Running...
+    ✓ 137,851ms, 2 files
+
+  [FOOKS] Running...
+    ✓ exec:178,465ms + scan:0ms = 178,465ms, 2 files
+
+  Execution time diff: -29.5%
+  Total time diff: -29.5%
+
+======================================================================
+FINAL SUMMARY
+======================================================================
+
+Completed: 1 benchmarks
+Vanilla success: 1/1
+Fooks success: 1/1
+
+Avg Vanilla time: 137,851ms
+Avg Fooks exec: 178,465ms (-29.5%)
+Avg Fooks total: 178,465ms (-29.5%)
+
+Avg token reduction: 67.2%
+Avg tokens saved: ~512,030 per session
+
+Report saved: /Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/risk-reduction-20260417/exact-bypass/benchmark-full-1776432160.json
+======================================================================

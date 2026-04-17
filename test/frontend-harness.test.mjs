@@ -20,6 +20,17 @@ function runRunnerConfig(args = [], envOverrides = {}) {
   );
 }
 
+function runPythonHarnessSnippet(snippet) {
+  return JSON.parse(
+    execFileSync("python3", ["-c", snippet], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, BENCHMARK_REPOS_DIR: isolatedReposDir },
+      stdio: ["ignore", "pipe", "pipe"],
+    }),
+  );
+}
+
 test("frontend harness defaults to repo-local reports and preserves the legacy case matrix", () => {
   const result = runRunnerConfig();
   assert.equal(result.reportSchemaVersion, "frontend-harness.v2-context-mode");
@@ -43,6 +54,7 @@ test("frontend harness defaults to repo-local reports and preserves the legacy c
   assert.equal(result.selectedCases[0].promptSpecificity, "ambiguous");
   assert.equal(result.selectedCases[0].expectedContextPolicy, "auto");
   assert.equal(result.selectedCases[0].expectedFirstTurnRuntimeContext, "auto");
+  assert.equal(result.selectedCases[0].expectedFooksPrepare, "scan-attach");
 });
 
 test("frontend harness supports single-case round-1 configuration and report dir overrides", () => {
@@ -66,6 +78,7 @@ test("frontend harness supports single-case round-1 configuration and report dir
   assert.equal(result.selectedCases[0].promptSpecificity, "ambiguous");
   assert.equal(result.selectedCases[0].expectedContextPolicy, "auto");
   assert.equal(result.selectedCases[0].expectedFirstTurnRuntimeContext, "auto");
+  assert.equal(result.selectedCases[0].expectedFooksPrepare, "scan-attach");
 });
 
 test("frontend harness marks exact-file single-turn Codex context as no-op", () => {
@@ -78,4 +91,38 @@ test("frontend harness marks exact-file single-turn Codex context as no-op", () 
   assert.equal(result.selectedCases[0].promptSpecificity, "exact-file");
   assert.equal(result.selectedCases[0].expectedContextPolicy, "light");
   assert.equal(result.selectedCases[0].expectedFirstTurnRuntimeContext, "no-op");
+  assert.equal(result.selectedCases[0].expectedFooksPrepare, "bypass");
+});
+
+test("frontend harness scores Caps Lock artifacts and catches broad locale scope", () => {
+  const snippet = `
+import importlib.util, json
+spec = importlib.util.spec_from_file_location("bench", ${JSON.stringify(runnerPath)})
+bench = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bench)
+task = {"prompt": "Add a Caps Lock warning to the login password field."}
+patch = '''
++const [isCapsLockOn, setIsCapsLockOn] = useState(false);
++const onPasswordKey = (event) => setIsCapsLockOn(event.getModifierState("CapsLock"));
++<PasswordInput onKeyDown={onPasswordKey} onKeyUp={onPasswordKey} />
++<p role="alert" className="text-red-600">{t("auth.login.caps_lock_warning")}</p>
+'''
+target = "apps/web/modules/auth/login/components/login-form.tsx"
+good = bench.evaluate_acceptance(task, [target, "apps/web/locales/en-US.json"], patch)
+broad = bench.evaluate_acceptance(task, [target] + [f"apps/web/locales/locale-{i}.json" for i in range(3)], patch)
+print(json.dumps({"good": good, "broad": broad}))
+`;
+  const result = runPythonHarnessSnippet(snippet);
+
+  assert.equal(result.good.available, true);
+  assert.equal(result.good.passed, true);
+  assert.equal(result.broad.passed, false);
+  assert.equal(
+    result.broad.checks.find((check) => check.name === "locale_scope_capped").passed,
+    false,
+  );
+  assert.equal(
+    result.broad.checks.find((check) => check.name === "file_scope_capped").passed,
+    false,
+  );
 });

@@ -20,6 +20,7 @@ FOOKS_DIR = BENCHMARK_DIR.parent.parent.resolve()  # fooks repo root
 DEFAULT_REPORTS_DIR = BENCHMARK_DIR / "reports"
 REPORT_SCHEMA_VERSION = "frontend-harness.v2-context-mode"
 CONTEXT_POLICY_VERSION = "context-policy.v1"
+RUNTIME_FILE_PREFIXES = (".codex/", ".fooks/", ".omx/", "node_modules/")
 
 # Test repos location (can be overridden via env var)
 REPOS_DIR = Path(os.environ.get("BENCHMARK_REPOS_DIR", Path.home() / "Workspace/fooks-test-repos"))
@@ -110,7 +111,7 @@ ROUND1_NOTES = {
         "runner": "Selected with --runner; vanilla and fooks variants use the same runner.",
         "prompt": "Identical task text for vanilla and fooks variants.",
         "codexHome": "Each variant uses an isolated CODEX_HOME with auth.json and config.toml symlinked from the same host account.",
-        "variantDifference": "The fooks variant runs fooks init/scan/attach before the same agent command; vanilla does not.",
+        "variantDifference": "The fooks variant either runs fooks init/scan/attach before the same agent command or records an exact-file first-turn bypass when no fooks context would be injected; vanilla does not.",
     }
 }
 
@@ -171,6 +172,7 @@ def classify_task_context(task):
             "promptSpecificity": "exact-file",
             "expectedContextPolicy": "light",
             "expectedFirstTurnRuntimeContext": "no-op",
+            "expectedFooksPrepare": "bypass",
         }
     if task.get("id") in {"T4", "T5"}:
         return {
@@ -178,12 +180,14 @@ def classify_task_context(task):
             "promptSpecificity": "ambiguous",
             "expectedContextPolicy": "auto",
             "expectedFirstTurnRuntimeContext": "auto",
+            "expectedFooksPrepare": "scan-attach",
         }
     return {
         "taskClass": "ambiguous-single-file",
         "promptSpecificity": "ambiguous",
         "expectedContextPolicy": "auto",
         "expectedFirstTurnRuntimeContext": "auto",
+        "expectedFooksPrepare": "scan-attach",
     }
 
 def variant_context_metadata(task, variant):
@@ -218,6 +222,86 @@ def variant_context_metadata(task, variant):
         "contextPolicyVersion": CONTEXT_POLICY_VERSION,
         "contextBudgetSource": "expected-policy",
     }
+
+def expected_fooks_prepare_strategy(task):
+    classification = classify_task_context(task)
+    return classification.get("expectedFooksPrepare", "scan-attach")
+
+
+def should_bypass_fooks_prepare(task):
+    return expected_fooks_prepare_strategy(task) == "bypass"
+
+
+def is_caps_lock_task(task):
+    prompt = task.get("prompt", "").lower()
+    return "caps lock" in prompt or "capslock" in prompt
+
+
+def check_patch_contains(patch_text, *patterns):
+    return any(re.search(pattern, patch_text, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def evaluate_caps_lock_acceptance(files, patch_text, prompt):
+    locale_files = [f for f in files if f.startswith("apps/web/locales/") and f.endswith(".json")]
+    prompt_lower = prompt.lower()
+    locale_scope_requested = any(term in prompt_lower for term in ["all locale", "all translation", "all language", "translate"])
+    target_file = "apps/web/modules/auth/login/components/login-form.tsx"
+    checks = [
+        {
+            "name": "target_login_form_changed",
+            "passed": target_file in files,
+        },
+        {
+            "name": "caps_lock_state",
+            "passed": check_patch_contains(patch_text, r"isCapsLock", r"capsLock"),
+        },
+        {
+            "name": "get_modifier_state",
+            "passed": check_patch_contains(patch_text, r"getModifierState\([\"']CapsLock[\"']\)"),
+        },
+        {
+            "name": "password_input_handlers",
+            "passed": check_patch_contains(patch_text, r"onKeyDown") and check_patch_contains(patch_text, r"onKeyUp"),
+        },
+        {
+            "name": "inline_warning_text",
+            "passed": check_patch_contains(patch_text, r"caps_lock", r"Caps Lock is on"),
+        },
+        {
+            "name": "red_tailwind_warning",
+            "passed": check_patch_contains(patch_text, r"text-red-"),
+        },
+        {
+            "name": "accessible_announcement",
+            "passed": check_patch_contains(patch_text, r"role=\{?[\"'](?:alert|status)[\"']\}?", r"aria-live"),
+        },
+        {
+            "name": "locale_scope_capped",
+            "passed": locale_scope_requested or len(locale_files) <= 1,
+            "details": f"locale_files={len(locale_files)}",
+        },
+        {
+            "name": "file_scope_capped",
+            "passed": len(files) <= 2,
+            "details": f"files={len(files)}",
+        },
+    ]
+    score = sum(1 for check in checks if check["passed"])
+    return {
+        "available": True,
+        "kind": "caps-lock-login-warning",
+        "score": score,
+        "max_score": len(checks),
+        "passed": score == len(checks),
+        "checks": checks,
+    }
+
+
+def evaluate_acceptance(task, files, patch_text):
+    if is_caps_lock_task(task):
+        return evaluate_caps_lock_acceptance(files, patch_text, task.get("prompt", ""))
+    return {"available": False, "reason": "no scorer for task prompt"}
+
 
 def get_session_token_estimate(repo_path):
     """Estimate session-level token savings"""
@@ -327,26 +411,33 @@ def remove_worktree(worktree, repo_path):
 
     return status
 
-def changed_files(worktree_path):
-    files_result = subprocess.run(
-        ["git", "diff", "--name-only"], cwd=worktree_path,
-        capture_output=True, text=True
-    )
-    return [f for f in files_result.stdout.strip().split('\n') if f]
+def is_runtime_path(file_path):
+    return file_path.startswith(RUNTIME_FILE_PREFIXES)
 
-def mark_untracked_intent(worktree_path):
-    """Make safe untracked source files visible to git diff without staging contents."""
+
+def untracked_source_files(worktree_path):
     result = subprocess.run(
         ["git", "ls-files", "--others", "--exclude-standard"],
         cwd=worktree_path,
         capture_output=True,
         text=True,
     )
-    candidates = [
-        f
-        for f in result.stdout.splitlines()
-        if f and not f.startswith((".codex/", ".fooks/", ".omx/", "node_modules/"))
-    ]
+    return [f for f in result.stdout.splitlines() if f and not is_runtime_path(f)]
+
+
+def changed_files(worktree_path):
+    files_result = subprocess.run(
+        ["git", "diff", "--name-only", "--", ".", ":(exclude).codex", ":(exclude).fooks", ":(exclude).omx"],
+        cwd=worktree_path,
+        capture_output=True,
+        text=True
+    )
+    files = [f for f in files_result.stdout.strip().split('\n') if f]
+    return sorted(set(files + untracked_source_files(worktree_path)))
+
+def mark_untracked_intent(worktree_path):
+    """Make safe untracked source files visible to git diff without staging contents."""
+    candidates = untracked_source_files(worktree_path)
     if candidates:
         subprocess.run(["git", "add", "-N", "--", *candidates], cwd=worktree_path, capture_output=True, text=True)
 
@@ -377,6 +468,17 @@ def capture_artifact(worktree_path, artifact_dir, stem):
             "stderr": output_tail(diff_check.stderr, 1000),
         },
     }
+
+def capture_artifact_with_acceptance(worktree_path, artifact_dir, stem, task, files):
+    artifact = capture_artifact(worktree_path, artifact_dir, stem)
+    patch_text = ""
+    try:
+        patch_text = Path(artifact["patch_path"]).read_text()
+    except Exception:
+        patch_text = ""
+    artifact["acceptance"] = evaluate_acceptance(task, files, patch_text)
+    return artifact
+
 
 def detect_package_manager(worktree_path):
     """Detect package manager (npm, pnpm, yarn) based on lock files"""
@@ -679,6 +781,19 @@ def assess_benchmark_risks(results):
         r for r in successful_pairs
         if actual_tokens_available and r["fooks"]["tokens_used"] > r["vanilla"]["tokens_used"]
     ]
+    acceptance_available = any(
+        r.get("fooks", {}).get("artifact", {}).get("acceptance", {}).get("available")
+        for r in successful_pairs
+    )
+    fooks_acceptance_failures = [
+        r for r in successful_pairs
+        if r.get("fooks", {}).get("artifact", {}).get("acceptance", {}).get("available")
+        and not r.get("fooks", {}).get("artifact", {}).get("acceptance", {}).get("passed")
+    ]
+    scope_regressions = [
+        r for r in successful_pairs
+        if len(r.get("fooks", {}).get("files_list", [])) > max(2, len(r.get("vanilla", {}).get("files_list", [])) + 1)
+    ]
 
     risks = [
         {
@@ -691,7 +806,7 @@ def assess_benchmark_risks(results):
             "name": "environment_parity",
             "level": "low" if same_prompt and same_files and same_runner else "medium",
             "evidence": f"same_prompt={same_prompt}, same_files={same_files}, same_runner={same_runner}, runner={','.join(runner_names)}",
-            "interpretation": "Both variants use the same selected runner with isolated CODEX_HOME; fooks additionally prepares native fooks context.",
+            "interpretation": "Both variants use the same selected runner with isolated CODEX_HOME; fooks may prepare native context or explicitly bypass exact-file first-turn preparation.",
         },
         {
             "name": "orchestration_overhead",
@@ -710,6 +825,14 @@ def assess_benchmark_risks(results):
             "level": "medium" if len(successful_pairs) == 1 else "low",
             "evidence": "Single-run wall-clock timing includes model/service variability.",
             "interpretation": "Prefer median and p95 over repeated identical tasks.",
+        },
+        {
+            "name": "artifact_quality_scope",
+            "level": "high" if fooks_acceptance_failures or scope_regressions else "low" if acceptance_available else "medium",
+            "evidence": (
+                f"acceptance_available={acceptance_available}, fooks_acceptance_failures={len(fooks_acceptance_failures)}, scope_regressions={len(scope_regressions)}"
+            ),
+            "interpretation": "Do not cite wins unless fooks passes task acceptance and avoids broader edit scope than vanilla.",
         },
         {
             "name": "runtime_token_claim",
@@ -773,7 +896,17 @@ def run_vanilla_agent(worktree, task, runner):
 
 def run_fooks_agent(worktree, task, runner):
     """Run fooks-prepared agent runner"""
-    prepare = fooks_prepare(worktree, runner)
+    if should_bypass_fooks_prepare(task):
+        prepare = {
+            "success": True,
+            "duration_ms": 0,
+            "steps": [],
+            "error": None,
+            "bypassed": True,
+            "reason": "exact-file-first-turn-no-context",
+        }
+    else:
+        prepare = fooks_prepare(worktree, runner)
     fooks_scan_time = prepare["duration_ms"]
     if not prepare["success"]:
         return {
@@ -847,7 +980,8 @@ def run_benchmark(task, repo_name, runner, artifact_dir):
                "taskClass": classification["taskClass"],
                "promptSpecificity": classification["promptSpecificity"],
                "expectedContextPolicy": classification["expectedContextPolicy"],
-               "expectedFirstTurnRuntimeContext": classification.get("expectedFirstTurnRuntimeContext", classification["expectedContextPolicy"])}
+               "expectedFirstTurnRuntimeContext": classification.get("expectedFirstTurnRuntimeContext", classification["expectedContextPolicy"]),
+               "expectedFooksPrepare": classification.get("expectedFooksPrepare", "scan-attach")}
 
     # Token estimate (once per repo)
     print("  Calculating token estimates...")
@@ -862,7 +996,7 @@ def run_benchmark(task, repo_name, runner, artifact_dir):
     print("\n  [VANILLA] Running...")
     wt_v = create_worktree(repo_path, task['id'], "vanilla")
     res_v = run_vanilla_agent(wt_v, task, runner)
-    res_v["artifact"] = capture_artifact(wt_v["path"], artifact_dir, f"{repo_name}-{task['id']}-vanilla")
+    res_v["artifact"] = capture_artifact_with_acceptance(wt_v["path"], artifact_dir, f"{repo_name}-{task['id']}-vanilla", task, res_v.get("files_list", []))
     res_v["cleanup"] = remove_worktree(wt_v, repo_path)
     results["vanilla"] = res_v
     print(f"    {'✓' if res_v['success'] else '✗'} {res_v['duration_ms']:,}ms, {res_v['files']} files")
@@ -875,7 +1009,7 @@ def run_benchmark(task, repo_name, runner, artifact_dir):
     print("\n  [FOOKS] Running...")
     wt_f = create_worktree(repo_path, task['id'], "fooks")
     res_f = run_fooks_agent(wt_f, task, runner)
-    res_f["artifact"] = capture_artifact(wt_f["path"], artifact_dir, f"{repo_name}-{task['id']}-fooks")
+    res_f["artifact"] = capture_artifact_with_acceptance(wt_f["path"], artifact_dir, f"{repo_name}-{task['id']}-fooks", task, res_f.get("files_list", []))
     res_f["cleanup"] = remove_worktree(wt_f, repo_path)
     results["fooks"] = res_f
     print(f"    {'✓' if res_f['success'] else '✗'} exec:{res_f['duration_ms']:,}ms + scan:{res_f['scan_time']:,}ms = {res_f['total_time']:,}ms, {res_f['files']} files")
@@ -917,6 +1051,7 @@ def main():
                 "promptSpecificity": classification["promptSpecificity"],
                 "expectedContextPolicy": classification["expectedContextPolicy"],
                 "expectedFirstTurnRuntimeContext": classification.get("expectedFirstTurnRuntimeContext", classification["expectedContextPolicy"]),
+                "expectedFooksPrepare": classification.get("expectedFooksPrepare", "scan-attach"),
             })
         print(json.dumps({
             "reportSchemaVersion": REPORT_SCHEMA_VERSION,
