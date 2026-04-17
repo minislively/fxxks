@@ -1,0 +1,235 @@
+{
+  "reportSchemaVersion": "frontend-harness.v2-context-mode",
+  "timestamp": "2026-04-17T12:12:36.345810",
+  "summary": {
+    "total_benchmarks": 1,
+    "vanilla_success": 1,
+    "fooks_success": 1,
+    "avg_token_reduction": 64.04264833536462,
+    "avg_tokens_saved": 536844.0
+  },
+  "notes": {
+    "tokenEstimate": {
+      "scope": "tsx-only proxy",
+      "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+    },
+    "environmentParity": {
+      "runner": "Selected with --runner; vanilla and fooks variants use the same runner.",
+      "prompt": "Identical task text for vanilla and fooks variants.",
+      "codexHome": "Each variant uses an isolated CODEX_HOME with auth.json and config.toml symlinked from the same host account.",
+      "variantDifference": "The fooks variant runs fooks init/scan/attach before the same agent command; vanilla does not."
+    }
+  },
+  "riskAssessment": {
+    "overall": "high",
+    "scale": {
+      "low": "Safe to cite with caveat.",
+      "medium": "Useful but should be repeated.",
+      "high": "Round-1 directional evidence only.",
+      "critical": "Do not cite without fixing measurement."
+    },
+    "risks": [
+      {
+        "name": "sample_size",
+        "level": "high",
+        "evidence": "1 successful paired benchmark(s).",
+        "interpretation": "Use as round-1 proof only; repeat N>=3 before claiming stable performance."
+      },
+      {
+        "name": "environment_parity",
+        "level": "low",
+        "evidence": "same_prompt=True, same_files=True, same_runner=True, runner=codex exec --full-auto",
+        "interpretation": "Both variants use the same selected runner with isolated CODEX_HOME; fooks additionally prepares native fooks context."
+      },
+      {
+        "name": "orchestration_overhead",
+        "level": "low",
+        "evidence": "runner=codex exec --full-auto",
+        "interpretation": "Direct Codex is the cleaner product benchmark; OMX runner includes orchestration overhead and policy surface."
+      },
+      {
+        "name": "cleanup_reproducibility",
+        "level": "low",
+        "evidence": "cleanup_removed=True",
+        "interpretation": "Worktree residue can contaminate reruns if cleanup fails."
+      },
+      {
+        "name": "wall_clock_noise",
+        "level": "medium",
+        "evidence": "Single-run wall-clock timing includes model/service variability.",
+        "interpretation": "Prefer median and p95 over repeated identical tasks."
+      },
+      {
+        "name": "runtime_token_claim",
+        "level": "medium",
+        "evidence": "Actual OMX/Codex tokens available; fooks used more runtime tokens in 0/1 pair(s).",
+        "interpretation": "Do not claim runtime token reduction from this run; keep proxy compression and actual tokens separate."
+      }
+    ]
+  },
+  "results": [
+    {
+      "task": "T5",
+      "task_name": "Form Validation",
+      "repo": "formbricks",
+      "difficulty": "hard",
+      "timestamp": "2026-04-17T12:05:05.765180",
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "targeted-edit",
+      "promptSpecificity": "exact-file",
+      "expectedContextPolicy": "light",
+      "expectedFirstTurnRuntimeContext": "no-op",
+      "tokens": {
+        "total_files": 882,
+        "raw_bytes": 3353040.5999999996,
+        "compressed_bytes": 1205664.5999999999,
+        "raw_tokens": 838260.0,
+        "compressed_tokens": 301416.0,
+        "tokens_saved": 536844.0,
+        "reduction_pct": 64.04264833536462,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 212563,
+        "files": 2,
+        "files_list": [
+          "apps/web/locales/en-US.json",
+          "apps/web/modules/auth/login/components/login-form.tsx"
+        ],
+        "tokens_used": 70735,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776395113",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776395113/.codex",
+          "prompt_sha256": "987a9d9db0f371bd58681eb3961d4754c7791f513478917ae8335486a0949954",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "vanilla-baseline-no-fooks-context",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the Caps Lock warning.\n\nModified files:\n- [login-form.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776395113/apps/web/modules/auth/login/components/login-form.tsx:148)\n- [en-US.json](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776395113/apps/web/locales/en-US.json:58)\n\nWhat changed:\n- Added password-field-only Caps Lock detection using `event.getModifierState(\"CapsLock\")` on `onKeyDown` / `onKeyUp`.\n- Shows an inline Tailwind red warning below the password field: `text-xs text-red-600`.\n- Hides the warning on password blur.\n- Added the i18n key `auth.login.caps_lock_warning`.\n\nValidation:\n- `apps/web/locales/en-US.json` parses successfully.\n- `git diff --check` passed.\n- Full formatting/lint/typecheck could not run because local dependencies are not installed/exposed: `prettier`, `eslint`, and `typescript` were not found.\n",
+        "stderr_tail": "me=\"text-center\">\n@@ -238,7 +243,15 @@\n                             className=\"block w-full rounded-md border-slate-300 pr-8 shadow-sm focus:border-brand-dark focus:ring-brand-dark sm:text-sm\"\n                             value={field.value}\n                             onChange={(password) => field.onChange(password)}\n+                            onBlur={() => setIsCapsLockOn(false)}\n+                            onKeyDown={handlePasswordKeyEvent}\n+                            onKeyUp={handlePasswordKeyEvent}\n                           />\n+                          {isCapsLockOn && (\n+                            <p className=\"mt-1 text-left text-xs text-red-600\">\n+                              {t(\"auth.login.caps_lock_warning\")}\n+                            </p>\n+                          )}\n                           {error?.message && <FormError className=\"text-left\">{error.message}</FormError>}\n                         </div>\n                       </FormControl>\n\ntokens used\n70,735\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "skipped": true,
+            "reason": "build validation not run for vanilla"
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 210943,
+        "scan_time": 3700,
+        "total_time": 214643,
+        "files": 2,
+        "files_list": [
+          "apps/web/locales/en-US.json",
+          "apps/web/modules/auth/login/components/login-form.tsx"
+        ],
+        "tokens_used": 68984,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3700,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 98,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 3088,
+              "stdout_tail": "lveCacheHits\": 165\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/survey/follow-ups/components/follow-up-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 1153.46\n      },\n      {\n        \"filePath\": \"apps/storybook/src/App.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 170.65\n      },\n      {\n        \"filePath\": \"apps/web/modules/survey/editor/components/block-card.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 89.38\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/view-permission-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 77.69\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/add-api-key-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 71.03\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 512,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-17T03:08:58.040Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/.codex/fooks/attachments/bm-t5-fooks-1776395333.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/.codex/fooks/attachments/bm-t5-fooks-1776395333.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-17T03:08:58.029Z\",\"attachedAt\":\"2026-04-17T03:08:58.023Z\",\"lastScanAt\":\"2026-04-17T03:08:58.023Z\",\"lastRefreshAt\":\"2026-04-17T03:08:58.023Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/.codex",
+          "prompt_sha256": "987a9d9db0f371bd58681eb3961d4754c7791f513478917ae8335486a0949954",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "fooks-first-turn-exact-file-record-only",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the Caps Lock warning below the password field. It tracks `event.getModifierState(\"CapsLock\")` on password key events and clears the warning on blur, without changing submit, reset, email sign-in, or two-factor logic.\n\nModified files:\n- [login-form.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/apps/web/modules/auth/login/components/login-form.tsx:148)\n- [en-US.json](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776395333/apps/web/locales/en-US.json:58)\n\nValidation:\n- `git diff --check` passed.\n- `pnpm exec eslint apps/web/modules/auth/login/components/login-form.tsx` could not run because `eslint` is not installed in this checkout (`Command \"eslint\" not found`).\n",
+        "stderr_tail": "_WITH_LS) || \"\");\n@@ -238,7 +243,15 @@\n                             className=\"block w-full rounded-md border-slate-300 pr-8 shadow-sm focus:border-brand-dark focus:ring-brand-dark sm:text-sm\"\n                             value={field.value}\n                             onChange={(password) => field.onChange(password)}\n+                            onBlur={() => setIsCapsLockOn(false)}\n+                            onKeyDown={handlePasswordKeyEvent}\n+                            onKeyUp={handlePasswordKeyEvent}\n                           />\n+                          {isCapsLockOn && (\n+                            <p className=\"mt-1 text-left text-xs text-red-600\">\n+                              {t(\"auth.login.caps_lock_warning\")}\n+                            </p>\n+                          )}\n                           {error?.message && <FormError className=\"text-left\">{error.message}</FormError>}\n                         </div>\n                       </FormControl>\n\ntokens used\n68,984\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"turbo\" not found\n",
+            "package_manager": "pnpm",
+            "method": "turbo"
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 0.7621269929385641,
+        "total": -0.9785334230322305
+      }
+    }
+  ]
+}

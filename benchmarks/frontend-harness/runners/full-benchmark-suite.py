@@ -170,17 +170,20 @@ def classify_task_context(task):
             "taskClass": "targeted-edit",
             "promptSpecificity": "exact-file",
             "expectedContextPolicy": "light",
+            "expectedFirstTurnRuntimeContext": "no-op",
         }
     if task.get("id") in {"T4", "T5"}:
         return {
             "taskClass": "ambiguous-multi-file",
             "promptSpecificity": "ambiguous",
             "expectedContextPolicy": "auto",
+            "expectedFirstTurnRuntimeContext": "auto",
         }
     return {
         "taskClass": "ambiguous-single-file",
         "promptSpecificity": "ambiguous",
         "expectedContextPolicy": "auto",
+        "expectedFirstTurnRuntimeContext": "auto",
     }
 
 def variant_context_metadata(task, variant):
@@ -191,12 +194,18 @@ def variant_context_metadata(task, variant):
         max_files = 0
         selected_files = 0
     else:
-        context_mode = classification["expectedContextPolicy"]
-        reason = f"fooks-{classification['promptSpecificity']}-policy"
+        context_mode = classification.get("expectedFirstTurnRuntimeContext", classification["expectedContextPolicy"])
+        reason = (
+            "fooks-first-turn-exact-file-record-only"
+            if classification["promptSpecificity"] == "exact-file" and context_mode == "no-op"
+            else f"fooks-{classification['promptSpecificity']}-policy"
+        )
         max_files = 1 if context_mode == "light" else 5 if context_mode == "auto" else 0
-        # The harness records expected policy metadata here. Runtime-observed
-        # selected file counts belong to the fooks hook/run context policy.
-        selected_files = 0 if context_mode == "auto" else max_files
+        # The harness records expected single-turn runtime metadata here.
+        # Runtime-observed selected file counts belong to the fooks hook/run
+        # context policy and should be measured separately from top-level
+        # extraction policy.
+        selected_files = 0 if context_mode in {"auto", "no-op"} else max_files
     return {
         "contextMode": context_mode,
         "contextModeReason": reason,
@@ -324,6 +333,50 @@ def changed_files(worktree_path):
         capture_output=True, text=True
     )
     return [f for f in files_result.stdout.strip().split('\n') if f]
+
+def mark_untracked_intent(worktree_path):
+    """Make safe untracked source files visible to git diff without staging contents."""
+    result = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=worktree_path,
+        capture_output=True,
+        text=True,
+    )
+    candidates = [
+        f
+        for f in result.stdout.splitlines()
+        if f and not f.startswith((".codex/", ".fooks/", ".omx/", "node_modules/"))
+    ]
+    if candidates:
+        subprocess.run(["git", "add", "-N", "--", *candidates], cwd=worktree_path, capture_output=True, text=True)
+
+
+def capture_artifact(worktree_path, artifact_dir, stem):
+    """Persist patch, diffstat, and whitespace check before the worktree is removed."""
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    mark_untracked_intent(worktree_path)
+
+    diff_pathspec = ["--", ".", ":(exclude).codex", ":(exclude).fooks", ":(exclude).omx"]
+    patch = subprocess.run(["git", "diff", "--binary", *diff_pathspec], cwd=worktree_path, capture_output=True, text=True)
+    diffstat = subprocess.run(["git", "diff", "--stat", *diff_pathspec], cwd=worktree_path, capture_output=True, text=True)
+    diff_check = subprocess.run(["git", "diff", "--check", *diff_pathspec], cwd=worktree_path, capture_output=True, text=True)
+
+    patch_path = artifact_dir / f"{stem}.patch"
+    diffstat_path = artifact_dir / f"{stem}.diffstat"
+    patch_path.write_text(patch.stdout)
+    diffstat_path.write_text(diffstat.stdout)
+
+    return {
+        "patch_path": str(patch_path),
+        "diffstat_path": str(diffstat_path),
+        "patch_bytes": len(patch.stdout.encode()),
+        "diffstat": diffstat.stdout,
+        "diff_check": {
+            "success": diff_check.returncode == 0,
+            "stdout": output_tail(diff_check.stdout, 1000),
+            "stderr": output_tail(diff_check.stderr, 1000),
+        },
+    }
 
 def detect_package_manager(worktree_path):
     """Detect package manager (npm, pnpm, yarn) based on lock files"""
@@ -776,7 +829,7 @@ def run_fooks_agent(worktree, task, runner):
                 "scan_time": fooks_scan_time, "total_time": fooks_scan_time + int((time.time() - start) * 1000),
                 "files": 0, "files_list": [], "error": str(e)}
 
-def run_benchmark(task, repo_name, runner):
+def run_benchmark(task, repo_name, runner, artifact_dir):
     """Run full benchmark for one task on one repo"""
     print(f"\n{'='*70}")
     print(f"[{task['id']}] {task['name']} ({task['difficulty']})")
@@ -793,7 +846,8 @@ def run_benchmark(task, repo_name, runner):
                "repoClass": "external-oss-nextjs-tailwind" if repo_name in {"formbricks", "cal.com", "shadcn-ui", "documenso", "nextjs"} else "external-oss-frontend",
                "taskClass": classification["taskClass"],
                "promptSpecificity": classification["promptSpecificity"],
-               "expectedContextPolicy": classification["expectedContextPolicy"]}
+               "expectedContextPolicy": classification["expectedContextPolicy"],
+               "expectedFirstTurnRuntimeContext": classification.get("expectedFirstTurnRuntimeContext", classification["expectedContextPolicy"])}
 
     # Token estimate (once per repo)
     print("  Calculating token estimates...")
@@ -808,6 +862,7 @@ def run_benchmark(task, repo_name, runner):
     print("\n  [VANILLA] Running...")
     wt_v = create_worktree(repo_path, task['id'], "vanilla")
     res_v = run_vanilla_agent(wt_v, task, runner)
+    res_v["artifact"] = capture_artifact(wt_v["path"], artifact_dir, f"{repo_name}-{task['id']}-vanilla")
     res_v["cleanup"] = remove_worktree(wt_v, repo_path)
     results["vanilla"] = res_v
     print(f"    {'✓' if res_v['success'] else '✗'} {res_v['duration_ms']:,}ms, {res_v['files']} files")
@@ -820,6 +875,7 @@ def run_benchmark(task, repo_name, runner):
     print("\n  [FOOKS] Running...")
     wt_f = create_worktree(repo_path, task['id'], "fooks")
     res_f = run_fooks_agent(wt_f, task, runner)
+    res_f["artifact"] = capture_artifact(wt_f["path"], artifact_dir, f"{repo_name}-{task['id']}-fooks")
     res_f["cleanup"] = remove_worktree(wt_f, repo_path)
     results["fooks"] = res_f
     print(f"    {'✓' if res_f['success'] else '✗'} exec:{res_f['duration_ms']:,}ms + scan:{res_f['scan_time']:,}ms = {res_f['total_time']:,}ms, {res_f['files']} files")
@@ -860,6 +916,7 @@ def main():
                 "taskClass": classification["taskClass"],
                 "promptSpecificity": classification["promptSpecificity"],
                 "expectedContextPolicy": classification["expectedContextPolicy"],
+                "expectedFirstTurnRuntimeContext": classification.get("expectedFirstTurnRuntimeContext", classification["expectedContextPolicy"]),
             })
         print(json.dumps({
             "reportSchemaVersion": REPORT_SCHEMA_VERSION,
@@ -887,12 +944,14 @@ def main():
     print("="*70)
 
     all_results = []
+    report_timestamp = int(time.time())
+    artifact_dir = reports_dir / "artifacts" / f"benchmark-full-{report_timestamp}"
 
     for task_id, repo_name in test_cases:
         task = resolve_task(task_id, args.task_prompt if (args.repo and args.task == task_id) else None)
 
         try:
-            result = run_benchmark(task, repo_name, args.runner)
+            result = run_benchmark(task, repo_name, args.runner, artifact_dir)
             all_results.append(result)
         except Exception as e:
             print(f"\n  ✗ Benchmark failed: {e}")
@@ -937,12 +996,13 @@ def main():
     print(f"Avg tokens saved: ~{avg_saved:,.0f} per session")
 
     # Save report
-    report_path = reports_dir / f"benchmark-full-{int(time.time())}.json"
+    report_path = reports_dir / f"benchmark-full-{report_timestamp}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, 'w') as f:
         json.dump({
             "reportSchemaVersion": REPORT_SCHEMA_VERSION,
             "timestamp": datetime.now().isoformat(),
+            "artifactDir": str(artifact_dir),
             "summary": {
                 "total_benchmarks": len(all_results),
                 "vanilla_success": len(vanilla_success),

@@ -1,0 +1,1 @@
+In apps/web/modules/auth/login/components/login-form.tsx add an inline Tailwind red Caps Lock warning below the password field when getModifierState('CapsLock') is true. Keep existing login, email sign-in, password reset, and two-factor flows unchanged. Report which file you modified.

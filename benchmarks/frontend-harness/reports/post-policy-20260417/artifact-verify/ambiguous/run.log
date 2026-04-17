@@ -1,0 +1,50 @@
+===== ARTIFACT-VERIFY ambiguous START 2026-04-17T03:57:29Z =====
+======================================================================
+Fooks Full Benchmark Suite
+======================================================================
+Start time: 2026-04-17T12:57:29.844152
+Tasks: T1, T2, T3, T4, T5
+Repos: cal.com, documenso, formbricks, nextjs, saleor-storefront, shadcn-ui, tailwindcss
+Runner: codex exec --full-auto
+Variants: Vanilla vs Fooks (with token estimates)
+Reports dir: /Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/post-policy-20260417/artifact-verify/ambiguous
+======================================================================
+
+======================================================================
+[T5] Form Validation (hard)
+Repo: formbricks
+Runner: codex exec --full-auto
+======================================================================
+  Calculating token estimates...
+    Repo: 882 TSX files
+    Raw: ~720,924 tokens
+    Compressed: ~252,465 tokens
+    Saved: ~468,459 tokens (65.0%)
+
+  [VANILLA] Running...
+    ✓ 265,821ms, 2 files
+
+  [FOOKS] Running...
+    ✓ exec:422,244ms + scan:3,162ms = 425,406ms, 15 files
+
+  Execution time diff: -58.8%
+  Total time diff: -60.0%
+
+======================================================================
+FINAL SUMMARY
+======================================================================
+
+Completed: 1 benchmarks
+Vanilla success: 1/1
+Fooks success: 1/1
+
+Avg Vanilla time: 265,821ms
+Avg Fooks exec: 422,244ms (-58.8%)
+Avg Fooks total: 425,406ms (-60.0%)
+
+Avg token reduction: 65.0%
+Avg tokens saved: ~468,459 per session
+
+Report saved: /Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/post-policy-20260417/artifact-verify/ambiguous/benchmark-full-1776398249.json
+======================================================================
+===== ARTIFACT-VERIFY ambiguous END 2026-04-17T04:09:26Z =====

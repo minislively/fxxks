@@ -42,6 +42,7 @@ test("frontend harness defaults to repo-local reports and preserves the legacy c
   assert.equal(result.selectedCases[0].taskClass, "ambiguous-single-file");
   assert.equal(result.selectedCases[0].promptSpecificity, "ambiguous");
   assert.equal(result.selectedCases[0].expectedContextPolicy, "auto");
+  assert.equal(result.selectedCases[0].expectedFirstTurnRuntimeContext, "auto");
 });
 
 test("frontend harness supports single-case round-1 configuration and report dir overrides", () => {
@@ -64,4 +65,17 @@ test("frontend harness supports single-case round-1 configuration and report dir
   assert.equal(result.selectedCases[0].taskClass, "ambiguous-multi-file");
   assert.equal(result.selectedCases[0].promptSpecificity, "ambiguous");
   assert.equal(result.selectedCases[0].expectedContextPolicy, "auto");
+  assert.equal(result.selectedCases[0].expectedFirstTurnRuntimeContext, "auto");
+});
+
+test("frontend harness marks exact-file single-turn Codex context as no-op", () => {
+  const customPrompt =
+    "In apps/web/modules/auth/login/components/login-form.tsx add a red Tailwind Caps Lock warning below the password field.";
+  const result = runRunnerConfig(["--runner", "codex", "--repo", "formbricks", "--task", "T5", "--task-prompt", customPrompt]);
+
+  assert.equal(result.selectedCases.length, 1);
+  assert.equal(result.selectedCases[0].taskClass, "targeted-edit");
+  assert.equal(result.selectedCases[0].promptSpecificity, "exact-file");
+  assert.equal(result.selectedCases[0].expectedContextPolicy, "light");
+  assert.equal(result.selectedCases[0].expectedFirstTurnRuntimeContext, "no-op");
 });
