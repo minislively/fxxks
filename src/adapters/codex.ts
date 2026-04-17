@@ -2,6 +2,8 @@ import { scanProject } from "../core/scan";
 import { extractFile } from "../core/extract";
 import { detectAccountContext, finalizeAttach, installRuntimeManifest } from "./shared";
 import { codexRuntimeEscapeHatches } from "./codex-runtime-prompt";
+import { classifyPromptContext } from "../core/context-policy";
+import type { PromptContextPolicy } from "../core/context-policy";
 import { completeCodexInitialScan, initializeCodexTrustStatus } from "./codex-runtime-trust";
 import { defaultCodexHookCommand } from "./codex-hook-preset";
 import type { AttachResult } from "../core/schema";
@@ -58,6 +60,11 @@ export interface ExecutionContext {
   totalSize: number;
   prompt: string;
   handoffCommand: string;
+  contextMode: PromptContextPolicy["contextMode"];
+  contextModeReason: string;
+  contextBudget: PromptContextPolicy["contextBudget"];
+  promptSpecificity: PromptContextPolicy["promptSpecificity"];
+  contextPolicyVersion: PromptContextPolicy["contextPolicyVersion"];
 }
 
 // Prepare context for AI execution - execution is handed off to external runtime
@@ -65,20 +72,31 @@ export async function prepareExecutionContext(
   prompt: string,
   contextFiles: string[],
   cwd = process.cwd(),
+  contextPolicy: PromptContextPolicy = classifyPromptContext(prompt, cwd),
 ): Promise<ExecutionContext> {
   const fs = await import("node:fs");
   const path = await import("node:path");
 
-  // Read and combine context files into a temporary context file
-  let contextContent = "# Context Files\n\n";
+  // Read and combine context files into a temporary context file.
+  // Relative paths are resolved against cwd so handoff behavior is stable when
+  // callers run fooks from another process directory.
   let totalSize = 0;
+  const metadata = {
+    contextMode: contextPolicy.contextMode,
+    contextModeReason: contextPolicy.contextModeReason,
+    contextBudget: contextPolicy.contextBudget,
+    promptSpecificity: contextPolicy.promptSpecificity,
+    contextPolicyVersion: contextPolicy.contextPolicyVersion,
+  };
+  let contextContent = `# Context Files\n\n<!-- fooks-context-policy ${JSON.stringify(metadata)} -->\n\n`;
 
   for (const filePath of contextFiles) {
     try {
-      const content = fs.readFileSync(filePath, "utf8");
+      const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath);
+      const content = fs.readFileSync(resolvedPath, "utf8");
       const size = Buffer.byteLength(content, "utf8");
       totalSize += size;
-      contextContent += `## ${path.basename(filePath)}\n\n${content}\n\n`;
+      contextContent += `## ${path.relative(cwd, resolvedPath) || path.basename(resolvedPath)}\n\n${content}\n\n`;
     } catch (err) {
       console.error(`Failed to read ${filePath}:`, err);
     }
@@ -99,6 +117,11 @@ export async function prepareExecutionContext(
     totalSize,
     prompt,
     handoffCommand,
+    contextMode: contextPolicy.contextMode,
+    contextModeReason: contextPolicy.contextModeReason,
+    contextBudget: contextPolicy.contextBudget,
+    promptSpecificity: contextPolicy.promptSpecificity,
+    contextPolicyVersion: contextPolicy.contextPolicyVersion,
   };
 }
 

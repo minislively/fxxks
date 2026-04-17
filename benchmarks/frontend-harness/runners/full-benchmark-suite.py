@@ -18,6 +18,8 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 BENCHMARK_DIR = SCRIPT_DIR.parent.resolve()
 FOOKS_DIR = BENCHMARK_DIR.parent.parent.resolve()  # fooks repo root
 DEFAULT_REPORTS_DIR = BENCHMARK_DIR / "reports"
+REPORT_SCHEMA_VERSION = "frontend-harness.v2-context-mode"
+CONTEXT_POLICY_VERSION = "context-policy.v1"
 
 # Test repos location (can be overridden via env var)
 REPOS_DIR = Path(os.environ.get("BENCHMARK_REPOS_DIR", Path.home() / "Workspace/fooks-test-repos"))
@@ -152,6 +154,61 @@ def resolve_task(task_id, prompt_override=None):
     if prompt_override:
         resolved["prompt"] = prompt_override
     return resolved
+
+def classify_task_context(task):
+    """Classify benchmark task prompts for report-level interpretation.
+
+    The Python harness cannot call the TypeScript policy during dry-run without
+    building/running the package, so it records an equivalent task taxonomy for
+    product report interpretation. Exact file prompts are intentionally rare in
+    public tasks; ambiguous prompts are where fooks should have room to win.
+    """
+    prompt = task.get("prompt", "")
+    has_explicit_file = bool(re.search(r"[A-Za-z0-9_./\\-]+\.(tsx|jsx)\b", prompt))
+    if has_explicit_file:
+        return {
+            "taskClass": "targeted-edit",
+            "promptSpecificity": "exact-file",
+            "expectedContextPolicy": "light",
+        }
+    if task.get("id") in {"T4", "T5"}:
+        return {
+            "taskClass": "ambiguous-multi-file",
+            "promptSpecificity": "ambiguous",
+            "expectedContextPolicy": "auto",
+        }
+    return {
+        "taskClass": "ambiguous-single-file",
+        "promptSpecificity": "ambiguous",
+        "expectedContextPolicy": "auto",
+    }
+
+def variant_context_metadata(task, variant):
+    classification = classify_task_context(task)
+    if variant == "vanilla":
+        context_mode = "no-op"
+        reason = "vanilla-baseline-no-fooks-context"
+        max_files = 0
+        selected_files = 0
+    else:
+        context_mode = classification["expectedContextPolicy"]
+        reason = f"fooks-{classification['promptSpecificity']}-policy"
+        max_files = 1 if context_mode == "light" else 5 if context_mode == "auto" else 0
+        # The harness records expected policy metadata here. Runtime-observed
+        # selected file counts belong to the fooks hook/run context policy.
+        selected_files = 0 if context_mode == "auto" else max_files
+    return {
+        "contextMode": context_mode,
+        "contextModeReason": reason,
+        "contextBudget": {
+            "maxFiles": max_files,
+            "selectedFiles": selected_files,
+            "totalBytes": 0,
+            "skippedFiles": 0,
+        },
+        "contextPolicyVersion": CONTEXT_POLICY_VERSION,
+        "contextBudgetSource": "expected-policy",
+    }
 
 def get_session_token_estimate(repo_path):
     """Estimate session-level token savings"""
@@ -647,6 +704,7 @@ def run_vanilla_agent(worktree, task, runner):
             "files_list": files,
             "tokens_used": parse_tokens_used(result.stderr),
             "command": command_metadata(worktree, task, runner),
+            **variant_context_metadata(task, "vanilla"),
             "stdout_tail": output_tail(result.stdout),
             "stderr_tail": output_tail(result.stderr, 1000),
             "error": None if result.returncode == 0 else result.stderr[:200],
@@ -674,6 +732,7 @@ def run_fooks_agent(worktree, task, runner):
             "files_list": [],
             "prepare": prepare,
             "command": command_metadata(worktree, task, runner),
+            **variant_context_metadata(task, "fooks"),
             "error": prepare["error"],
         }
 
@@ -700,6 +759,7 @@ def run_fooks_agent(worktree, task, runner):
             "tokens_used": parse_tokens_used(result.stderr),
             "prepare": prepare,
             "command": command_metadata(worktree, task, runner),
+            **variant_context_metadata(task, "fooks"),
             "stdout_tail": output_tail(result.stdout),
             "stderr_tail": output_tail(result.stderr, 1000),
             "error": None if result.returncode == 0 else result.stderr[:200],
@@ -727,8 +787,13 @@ def run_benchmark(task, repo_name, runner):
     repo_path = REPOS[repo_name]
     if not repo_path.exists():
         raise FileNotFoundError(f"Repository checkout not found at {repo_path}")
+    classification = classify_task_context(task)
     results = {"task": task['id'], "task_name": task['name'], "repo": repo_name,
-               "difficulty": task['difficulty'], "timestamp": datetime.now().isoformat()}
+               "difficulty": task['difficulty'], "timestamp": datetime.now().isoformat(),
+               "repoClass": "external-oss-nextjs-tailwind" if repo_name in {"formbricks", "cal.com", "shadcn-ui", "documenso", "nextjs"} else "external-oss-frontend",
+               "taskClass": classification["taskClass"],
+               "promptSpecificity": classification["promptSpecificity"],
+               "expectedContextPolicy": classification["expectedContextPolicy"]}
 
     # Token estimate (once per repo)
     print("  Calculating token estimates...")
@@ -784,6 +849,7 @@ def main():
         resolved_tasks = []
         for task_id, repo_name in test_cases:
             task = resolve_task(task_id, args.task_prompt if (args.repo and args.task == task_id) else None)
+            classification = classify_task_context(task)
             resolved_tasks.append({
                 "task": task["id"],
                 "task_name": task["name"],
@@ -791,8 +857,12 @@ def main():
                 "repo_path": str(REPOS[repo_name]),
                 "repo_exists": REPOS[repo_name].exists(),
                 "prompt": task["prompt"],
+                "taskClass": classification["taskClass"],
+                "promptSpecificity": classification["promptSpecificity"],
+                "expectedContextPolicy": classification["expectedContextPolicy"],
             })
         print(json.dumps({
+            "reportSchemaVersion": REPORT_SCHEMA_VERSION,
             "reportsDir": str(reports_dir),
             "defaultReportsDir": str(DEFAULT_REPORTS_DIR),
             "reposDir": str(REPOS_DIR),
@@ -871,6 +941,7 @@ def main():
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, 'w') as f:
         json.dump({
+            "reportSchemaVersion": REPORT_SCHEMA_VERSION,
             "timestamp": datetime.now().isoformat(),
             "summary": {
                 "total_benchmarks": len(all_results),

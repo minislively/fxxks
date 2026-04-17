@@ -22,6 +22,7 @@ function runRunnerConfig(args = [], envOverrides = {}) {
 
 test("frontend harness defaults to repo-local reports and preserves the legacy case matrix", () => {
   const result = runRunnerConfig();
+  assert.equal(result.reportSchemaVersion, "frontend-harness.v2-context-mode");
   assert.equal(result.reportsDir, defaultReportsDir);
   assert.equal(result.defaultReportsDir, defaultReportsDir);
   assert.equal(result.runner, "omx");
@@ -38,6 +39,9 @@ test("frontend harness defaults to repo-local reports and preserves the legacy c
     ],
   );
   assert.equal(result.tokenEstimateNotes.scope, "tsx-only proxy");
+  assert.equal(result.selectedCases[0].taskClass, "ambiguous-single-file");
+  assert.equal(result.selectedCases[0].promptSpecificity, "ambiguous");
+  assert.equal(result.selectedCases[0].expectedContextPolicy, "auto");
 });
 
 test("frontend harness supports single-case round-1 configuration and report dir overrides", () => {
@@ -57,4 +61,7 @@ test("frontend harness supports single-case round-1 configuration and report dir
   assert.equal(result.selectedCases[0].task, "T5");
   assert.equal(result.selectedCases[0].prompt, customPrompt);
   assert.equal(result.selectedCases[0].repo_exists, false);
+  assert.equal(result.selectedCases[0].taskClass, "ambiguous-multi-file");
+  assert.equal(result.selectedCases[0].promptSpecificity, "ambiguous");
+  assert.equal(result.selectedCases[0].expectedContextPolicy, "auto");
 });

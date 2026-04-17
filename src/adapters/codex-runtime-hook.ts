@@ -9,11 +9,15 @@ import {
   markCodexRuntimeSeenFile,
   resolveCodexRuntimeSessionKey,
 } from "./codex-runtime-session";
-import type { CodexRuntimeHookDecision, CodexRuntimeHookInput, ModelFacingPayload } from "../core/schema";
+import type { CodexRuntimeHookDecision, CodexRuntimeHookInput, ContextMode, ModelFacingPayload } from "../core/schema";
 
-function buildAdditionalContext(filePath: string, payload: ModelFacingPayload): string {
+function payloadContextMode(payload: ModelFacingPayload): ContextMode {
+  return payload.useOriginal ? "light-minimal" : "light";
+}
+
+function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, contextMode: ContextMode): string {
   return [
-    `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · use ${codexRuntimeEscapeHatches()[0]} for full source`,
+    `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode} · use ${codexRuntimeEscapeHatches()[0]} for full source`,
     "",
     JSON.stringify(payload, null, 2),
   ].join("\n");
@@ -28,6 +32,7 @@ function fallbackDecision(
   eligible: boolean,
   escapeHatchUsed: boolean,
   fallbackReason: string,
+  policy?: ReturnType<typeof resolvePromptFileContext>["policy"],
   decision?: ReturnType<typeof decideCodexPreRead>,
 ): CodexRuntimeHookDecision {
   return {
@@ -43,6 +48,11 @@ function fallbackDecision(
       escapeHatchUsed,
       decision,
     },
+    contextMode: "full",
+    contextModeReason: fallbackReason,
+    contextBudget: policy?.contextBudget,
+    promptSpecificity: policy?.promptSpecificity,
+    contextPolicyVersion: policy?.contextPolicyVersion,
     fallback: {
       action: "full-read",
       reason: fallbackReason,
@@ -63,6 +73,8 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       action: "noop",
       reasons: [],
       statePath,
+      contextMode: "no-op",
+      contextModeReason: "session-start",
       debug: {
         repeatedFile: false,
         eligible: false,
@@ -80,6 +92,8 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       action: "noop",
       reasons: [],
       statePath,
+      contextMode: "no-op",
+      contextModeReason: "session-stop",
       debug: {
         repeatedFile: false,
         eligible: false,
@@ -91,6 +105,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   const prompt = input.prompt ?? "";
   const promptContext = resolvePromptFileContext(prompt, cwd);
   const target = promptContext.filePath;
+  const policy = promptContext.policy;
   const escapeHatchUsed = hasFullReadEscapeHatch(prompt);
 
   if (!target) {
@@ -99,6 +114,11 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       hookEventName,
       action: "noop",
       reasons: ["no-eligible-file-in-prompt"],
+      contextMode: policy.contextMode,
+      contextModeReason: policy.contextModeReason,
+      contextBudget: policy.contextBudget,
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
       debug: {
         repeatedFile: false,
         eligible: false,
@@ -118,6 +138,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       true,
       true,
       "escape-hatch-full-read",
+      policy,
     );
   }
 
@@ -132,8 +153,13 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       hookEventName,
       action: "record",
       filePath: target,
-      reasons: ["first-seen-file"],
+      reasons: ["first-seen-file", "context-mode:no-op"],
       statePath,
+      contextMode: "no-op",
+      contextModeReason: "first-turn-exact-file-record-only",
+      contextBudget: { ...policy.contextBudget, selectedFiles: 0, totalBytes: 0, skippedFiles: policy.contextBudget.selectedFiles },
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
       debug: {
         repeatedFile: false,
         eligible: true,
@@ -144,6 +170,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
   const decision = decideCodexPreRead(path.join(cwd, target), cwd);
   if (decision.decision === "payload" && decision.payload) {
+    const contextMode = payloadContextMode(decision.payload);
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     return {
       runtime: "codex",
@@ -152,7 +179,12 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       filePath: target,
       reasons: freshness.refreshed ? ["repeated-file", "refreshed-before-attach"] : ["repeated-file"],
       statePath,
-      additionalContext: buildAdditionalContext(target, decision.payload),
+      additionalContext: buildAdditionalContext(target, decision.payload, contextMode),
+      contextMode,
+      contextModeReason: contextMode === "light-minimal" ? "repeated-exact-file-tiny-raw-original" : "repeated-exact-file-payload",
+      contextBudget: policy.contextBudget,
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
       debug: {
         repeatedFile: true,
         eligible: true,
@@ -172,6 +204,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     decision.eligible,
     false,
     decision.fallback?.reason ?? decision.reasons[0] ?? "raw-mode",
+    policy,
     decision,
   );
 }

@@ -27,6 +27,8 @@ const {
   codexRuntimeSessionPath,
 } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-session.js"));
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const { classifyPromptContext, discoverRelevantFilesByPolicy } = require(path.join(repoRoot, "dist", "core", "context-policy.js"));
+const { prepareExecutionContext } = require(path.join(repoRoot, "dist", "adapters", "codex.js"));
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
 
 function run(args, cwd = repoRoot, envOverrides = {}) {
@@ -332,6 +334,58 @@ test("runtime prompt parser finds eligible tsx/jsx paths and escape hatches", ()
   assert.equal(hasFullReadEscapeHatch("No override here"), false);
 });
 
+test("shared context policy distinguishes exact-file light/no-op from ambiguous auto", () => {
+  const tempDir = makeTempProject();
+  const exactExisting = classifyPromptContext("Modify exactly src/components/FormSection.tsx", tempDir);
+  assert.equal(exactExisting.promptSpecificity, "exact-file");
+  assert.equal(exactExisting.contextMode, "light");
+  assert.equal(exactExisting.selectionSource, "explicit-path");
+  assert.equal(exactExisting.contextBudget.maxFiles, 1);
+  assert.equal(exactExisting.contextBudget.selectedFiles, 1);
+
+  const exactNew = classifyPromptContext("Create src/components/NewPanel.tsx", tempDir);
+  assert.equal(exactNew.promptSpecificity, "exact-file");
+  assert.equal(exactNew.contextMode, "no-op");
+  assert.equal(exactNew.contextBudget.selectedFiles, 0);
+
+  const ambiguous = discoverRelevantFilesByPolicy("Add loading state to the form section", discoverProjectFilesForTest(tempDir), tempDir);
+  assert.equal(ambiguous.policy.promptSpecificity, "ambiguous");
+  assert.equal(ambiguous.policy.contextMode, "auto");
+  assert.ok(ambiguous.files.length > 0);
+  assert.ok(ambiguous.files.length <= 5);
+});
+
+function discoverProjectFilesForTest(cwd) {
+  return [
+    { filePath: path.join("src", "components", "FormSection.tsx"), kind: "component" },
+    { filePath: path.join("src", "components", "SimpleButton.tsx"), kind: "component" },
+    { filePath: path.join("src", "components", "DashboardPanel.tsx"), kind: "component" },
+  ];
+}
+
+test("prepareExecutionContext writes context policy metadata and resolves files from cwd", async () => {
+  const tempDir = makeTempProject();
+  const policy = classifyPromptContext("Modify src/components/FormSection.tsx", tempDir);
+  const result = await prepareExecutionContext("Modify src/components/FormSection.tsx", [path.join("src", "components", "FormSection.tsx")], tempDir, policy);
+  assert.equal(result.contextMode, "light");
+  assert.equal(result.promptSpecificity, "exact-file");
+  const context = fs.readFileSync(result.contextPath, "utf8");
+  assert.match(context, /fooks-context-policy/);
+  assert.match(context, /"contextMode":"light"/);
+  assert.match(context, /## src\/components\/FormSection.tsx/);
+});
+
+test("cli run keeps exact-file prompts to one light context file", () => {
+  const tempDir = makeTempProject();
+  const output = runText(["run", "Please", "update", "src/components/FormSection.tsx"], tempDir);
+  assert.match(output, /Context mode: light/);
+  assert.match(output, /1 files/);
+  const context = fs.readFileSync(path.join(tempDir, ".fooks", "temp-context.md"), "utf8");
+  assert.match(context, /"contextMode":"light"/);
+  assert.match(context, /## src\/components\/FormSection.tsx/);
+  assert.doesNotMatch(context, /## src\/components\/SimpleButton.tsx/);
+});
+
 test("runtime hook reuses payload only on repeated same-file prompts in one session", () => {
   const sessionId = `hook-repeat-${Date.now()}`;
   const start = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
@@ -348,6 +402,8 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   );
   assert.equal(first.action, "record");
   assert.equal(first.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(first.contextMode, "no-op");
+  assert.equal(first.promptSpecificity, "exact-file");
   assert.equal(first.additionalContext, undefined);
 
   const second = handleCodexRuntimeHook(
@@ -359,6 +415,7 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
     repoRoot,
   );
   assert.equal(second.action, "inject");
+  assert.equal(second.contextMode, "light");
   assert.equal(second.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
   assert.ok(
     second.additionalContext.startsWith(
@@ -389,6 +446,7 @@ test("runtime hook injects tiny raw originals and still honors escape hatch fall
     repoRoot,
   );
   assert.equal(rawSecond.action, "inject");
+  assert.equal(rawSecond.contextMode, "light-minimal");
   assert.match(rawSecond.additionalContext, /"useOriginal": true/);
   assert.match(rawSecond.additionalContext, /"rawText":/);
 
@@ -403,6 +461,7 @@ test("runtime hook injects tiny raw originals and still honors escape hatch fall
     repoRoot,
   );
   assert.equal(overridden.action, "fallback");
+  assert.equal(overridden.contextMode, "full");
   assert.ok(overridden.reasons.includes("escape-hatch-full-read"));
   assert.equal(overridden.fallback.reason, "escape-hatch-full-read");
   assert.equal(overridden.debug.escapeHatchUsed, true);

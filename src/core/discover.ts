@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { discoverRelevantFilesByPolicy } from "./context-policy";
 
 const IGNORE = new Set([".git", "node_modules", "dist", ".omx", ".fooks"]);
 const COMPONENT_EXTS = new Set([".tsx", ".jsx"]);
@@ -161,39 +162,13 @@ export function discoverProjectFiles(cwd = process.cwd()): FileTarget[] {
   return discoverProjectFilesWithStats(cwd).targets;
 }
 
-// Simple keyword-based relevance discovery for task prompts
+// Simple relevance discovery for task prompts. Exact file prompts are routed
+// through the shared context policy first so fooks does not over-inject broad
+// context when the user already named the target file.
 export function discoverRelevantFiles(
   prompt: string,
   allFiles: FileTarget[],
+  cwd = process.cwd(),
 ): string[] {
-  // Extract keywords from prompt (component names, file hints)
-  const keywords = prompt
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !["add", "the", "fix", "update", "to", "for", "with", "from"].includes(w));
-
-  // Score files by keyword matches
-  const scored = allFiles.map((target) => {
-    const fileName = path.basename(target.filePath).toLowerCase();
-    const fileDir = path.dirname(target.filePath).toLowerCase();
-    
-    let score = 0;
-    for (const kw of keywords) {
-      if (fileName.includes(kw)) score += 10;
-      if (fileDir.includes(kw)) score += 5;
-    }
-    
-    // Prefer component files
-    if (target.kind === "component") score += 3;
-    
-    return { filePath: target.filePath, score };
-  });
-
-  // Return top 5 files with score > 0
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5)
-    .map((s) => s.filePath);
+  return discoverRelevantFilesByPolicy(prompt, allFiles, cwd).files;
 }
