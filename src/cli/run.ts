@@ -2,7 +2,8 @@
 import { scanProject } from "../core/scan.js";
 import { extractFile } from "../core/extract.js";
 import { decideMode } from "../core/decide.js";
-import { discoverProjectFiles, discoverRelevantFiles } from "../core/discover.js";
+import { discoverProjectFiles } from "../core/discover.js";
+import { discoverRelevantFilesByPolicy } from "../core/context-policy.js";
 import { prepareExecutionContext } from "../adapters/codex.js";
 
 export interface RunOptions {
@@ -27,11 +28,13 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
   
   try {
     // 1. Scan if stale
-    const scanResult = scanProject();
+    const cwd = process.cwd();
+    scanProject(cwd);
     
     // 2. Discover relevant files
-    const allFiles = discoverProjectFiles();
-    const relevantFiles = discoverRelevantFiles(options.prompt, allFiles);
+    const allFiles = discoverProjectFiles(cwd);
+    const selection = discoverRelevantFilesByPolicy(options.prompt, allFiles, cwd);
+    const relevantFiles = selection.files;
     
     // 3. Process each file with fallback chain
     let totalTokensSaved = 0;
@@ -66,10 +69,11 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     
     let executionContext;
     if (runner === "codex" || runner === "omx") {
-      executionContext = await prepareExecutionContext(options.prompt, processedFiles);
+      executionContext = await prepareExecutionContext(options.prompt, processedFiles, cwd, selection.policy);
       console.log("\n=== Handoff Summary ===");
       console.log(`Context ready: ${executionContext.contextPath}`);
       console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
+      console.log(`Context mode: ${executionContext.contextMode} (${executionContext.contextModeReason})`);
       console.log(`Prompt: "${executionContext.prompt}"`);
       console.log(`\nNext: Execute with your preferred runtime (omx, codex, claude, etc.)`);
       console.log(`Context file: ${executionContext.contextPath}`);

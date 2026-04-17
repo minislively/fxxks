@@ -124,6 +124,17 @@ export type CodexPreReadDecision = {
   };
 };
 
+
+export type PromptSpecificity = "exact-file" | "file-hinted" | "ambiguous";
+export type ContextMode = "no-op" | "light" | "light-minimal" | "full" | "auto";
+
+export type ContextBudget = {
+  maxFiles: number;
+  selectedFiles: number;
+  totalBytes: number;
+  skippedFiles: number;
+};
+
 export type CodexRuntimeHookEvent = "SessionStart" | "UserPromptSubmit" | "Stop";
 
 export type CodexRuntimeHookInput = {
@@ -143,6 +154,11 @@ export type CodexRuntimeHookDecision = {
   reasons: string[];
   statePath?: string;
   additionalContext?: string;
+  contextMode?: ContextMode;
+  contextModeReason?: string;
+  contextBudget?: ContextBudget;
+  promptSpecificity?: PromptSpecificity;
+  contextPolicyVersion?: "context-policy.v1";
   debug?: {
     repeatedFile: boolean;
     eligible: boolean;

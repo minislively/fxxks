@@ -206,7 +206,7 @@ async function run(): Promise<void> {
     }
     case "run": {
       const { runTask } = await import("./run.js");
-      const prompt = process.argv[3];
+      const prompt = rest.join(" ");
       if (!prompt) {
         console.error("Usage: fooks run <prompt>");
         process.exit(1);
@@ -332,7 +332,8 @@ async function run(): Promise<void> {
     }
     default:
       console.error(`Unknown command: ${command ?? "<none>"}`);
-      console.error(`Usage: ${displayCliName} <init|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>`);
+      console.error(`Usage: ${displayCliName} <init|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>`);
+      console.error(`       ${displayCliName} run <prompt>`);
       console.error(`       ${displayCliName} extract <file> [--model-payload] [--json]`);
       console.error(`       ${displayCliName} install codex-hooks`);
       console.error(`       ${displayCliName} codex-pre-read <file> [--json]`);

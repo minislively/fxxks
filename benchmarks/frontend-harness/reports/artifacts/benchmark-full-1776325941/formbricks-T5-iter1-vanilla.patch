@@ -1,0 +1,70 @@
+diff --git a/apps/web/modules/account/components/DeleteAccountModal/index.tsx b/apps/web/modules/account/components/DeleteAccountModal/index.tsx
+index 2ac1335..aa5569b 100644
+--- a/apps/web/modules/account/components/DeleteAccountModal/index.tsx
++++ b/apps/web/modules/account/components/DeleteAccountModal/index.tsx
+@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
+ import { Trans, useTranslation } from "react-i18next";
+ import { TOrganization } from "@formbricks/types/organizations";
+ import { TUser } from "@formbricks/types/user";
++import { isValidEmail } from "@/lib/utils/email";
+ import { useSignOut } from "@/modules/auth/hooks/use-sign-out";
+ import { DeleteDialog } from "@/modules/ui/components/delete-dialog";
+ import { Input } from "@/modules/ui/components/input";
+@@ -29,11 +30,28 @@ export const DeleteAccountModal = ({
+   const [deleting, setDeleting] = useState(false);
+   const [inputValue, setInputValue] = useState("");
+   const { signOut: signOutWithAudit } = useSignOut({ id: user.id, email: user.email });
++  const hasInputValue = inputValue.length > 0;
++  const isInputValueValidEmail = isValidEmail(inputValue);
++  const isConfirmationEmailMalformed = hasInputValue && !isInputValueValidEmail;
++  const isConfirmationEmailMismatch =
++    hasInputValue && !isConfirmationEmailMalformed && inputValue !== user.email;
++  const confirmationEmailError = isConfirmationEmailMalformed
++    ? t("auth.verification-requested.invalid_email_address")
++    : isConfirmationEmailMismatch
++      ? t("auth.invite.email_does_not_match")
++      : "";
++  const isConfirmationEmailValid = isInputValueValidEmail && inputValue === user.email;
++  const isDeleteDisabled = !isConfirmationEmailValid || deleting;
++
+   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+     setInputValue(e.target.value);
+   };
+ 
+   const deleteAccount = async () => {
++    if (isDeleteDisabled) {
++      return;
++    }
++
+     try {
+       setDeleting(true);
+       await deleteUserAction();
+@@ -67,7 +85,7 @@ export const DeleteAccountModal = ({
+       onDelete={() => deleteAccount()}
+       text={t("environments.settings.profile.account_deletion_consequences_warning")}
+       isDeleting={deleting}
+-      disabled={inputValue !== user.email}>
++      disabled={isDeleteDisabled}>
+       <div className="py-5">
+         <ul className="list-disc pb-6 pl-6">
+           <li>
+@@ -111,10 +129,18 @@ export const DeleteAccountModal = ({
+             onChange={handleInputChange}
+             placeholder={user.email}
+             className="mt-5"
+-            type="text"
++            type="email"
+             id="deleteAccountConfirmation"
+             name="deleteAccountConfirmation"
++            isInvalid={!!confirmationEmailError}
++            aria-describedby={confirmationEmailError ? "deleteAccountConfirmation-error" : undefined}
++            aria-invalid={!!confirmationEmailError}
+           />
++          {confirmationEmailError && (
++            <p id="deleteAccountConfirmation-error" className="mt-1 text-sm text-red-500">
++              {confirmationEmailError}
++            </p>
++          )}
+         </form>
+       </div>
+     </DeleteDialog>
