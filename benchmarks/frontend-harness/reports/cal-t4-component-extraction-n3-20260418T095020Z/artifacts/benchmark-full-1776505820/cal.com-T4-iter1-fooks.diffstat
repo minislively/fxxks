@@ -1,0 +1,3 @@
+ packages/ui/components/alert/Alert.tsx  | 11 ++---------
+ packages/ui/components/alert/Header.tsx | 21 +++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 9 deletions(-)

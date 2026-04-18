@@ -1,0 +1,70 @@
+diff --git a/apps/web/modules/settings/my-account/components/HolidaysHeader.tsx b/apps/web/modules/settings/my-account/components/HolidaysHeader.tsx
+new file mode 100644
+index 0000000..10422d4
+--- /dev/null
++++ b/apps/web/modules/settings/my-account/components/HolidaysHeader.tsx
+@@ -0,0 +1,19 @@
++import type { ReactNode } from "react";
++
++type HolidaysHeaderProps = {
++  title: ReactNode;
++  subtitle?: ReactNode;
++  actions?: ReactNode;
++};
++
++export function HolidaysHeader({ title, subtitle, actions }: HolidaysHeaderProps) {
++  return (
++    <div className="mb-4 flex items-center justify-between">
++      <div>
++        <h3 className="text-emphasis font-semibold">{title}</h3>
++        {subtitle && <p className="text-subtle text-sm">{subtitle}</p>}
++      </div>
++      {actions}
++    </div>
++  );
++}
+diff --git a/apps/web/modules/settings/my-account/holidays-view.tsx b/apps/web/modules/settings/my-account/holidays-view.tsx
+index 9ae6787..96b8fad 100644
+--- a/apps/web/modules/settings/my-account/holidays-view.tsx
++++ b/apps/web/modules/settings/my-account/holidays-view.tsx
+@@ -16,6 +16,8 @@ import { showToast } from "@calcom/ui/components/toast";
+ import { memo, useCallback, useMemo } from "react";
+ import { OutOfOfficeToggleGroup } from "~/settings/outOfOffice/OutOfOfficeToggleGroup";
+ 
++import { HolidaysHeader } from "./components/HolidaysHeader";
++
+ function HolidaysCTA() {
+   const { t } = useLocale();
+   return (
+@@ -290,19 +292,18 @@ export function HolidaysView() {
+           )}
+ 
+           <div className="border-subtle bg-muted overflow-hidden rounded-lg border p-5">
+-            {/* Header with title and country selector */}
+-            <div className="mb-4 flex items-center justify-between">
+-              <div>
+-                <h3 className="text-emphasis font-semibold">{t("holidays")}</h3>
+-                <p className="text-subtle text-sm">{t("holidays_description")}</p>
+-              </div>
+-              <CountrySelector
+-                countries={countries || []}
+-                value={settings?.countryCode || ""}
+-                onChange={handleCountryChange}
+-                isLoading={isLoadingCountries}
+-              />
+-            </div>
++            <HolidaysHeader
++              title={t("holidays")}
++              subtitle={t("holidays_description")}
++              actions={
++                <CountrySelector
++                  countries={countries || []}
++                  value={settings?.countryCode || ""}
++                  onChange={handleCountryChange}
++                  isLoading={isLoadingCountries}
++                />
++              }
++            />
+ 
+             {/* Holidays list - inner container */}
+             {settings?.countryCode ? (

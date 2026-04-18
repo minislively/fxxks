@@ -1,0 +1,3 @@
+ packages/ui/components/layout/ShellSubHeading.tsx  | 24 ++++------------------
+ .../ui/components/layout/ShellSubHeadingHeader.tsx | 24 ++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 20 deletions(-)

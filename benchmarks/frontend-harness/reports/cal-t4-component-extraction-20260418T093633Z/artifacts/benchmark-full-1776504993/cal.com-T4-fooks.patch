@@ -1,0 +1,85 @@
+diff --git a/apps/web/components/security/TwoFactorAuthSection.tsx b/apps/web/components/security/TwoFactorAuthSection.tsx
+index 59928e3..d6605b7 100644
+--- a/apps/web/components/security/TwoFactorAuthSection.tsx
++++ b/apps/web/components/security/TwoFactorAuthSection.tsx
+@@ -6,6 +6,7 @@ import { Button } from "@calcom/ui/components/button";
+ 
+ import DisableTwoFactorModal from "./DisableTwoFactorModal";
+ import EnableTwoFactorModal from "./EnableTwoFactorModal";
++import TwoFactorAuthSectionHeader from "./TwoFactorAuthSectionHeader";
+ 
+ const TwoFactorAuthSection = ({ twoFactorEnabled }: { twoFactorEnabled: boolean }) => {
+   const [enabled, setEnabled] = useState(twoFactorEnabled);
+@@ -15,25 +16,23 @@ const TwoFactorAuthSection = ({ twoFactorEnabled }: { twoFactorEnabled: boolean
+ 
+   return (
+     <>
+-      <div className="flex flex-col justify-between pl-2 pt-9 sm:flex-row">
+-        <div>
+-          <div className="flex flex-row items-center">
+-            <h2 className="font-cal text-emphasis text-lg font-medium leading-6">{t("2fa")}</h2>
+-            <Badge className="ml-2 text-xs" variant={enabled ? "success" : "gray"}>
+-              {enabled ? t("enabled") : t("disabled")}
+-            </Badge>
+-          </div>
+-          <p className="text-subtle mt-1 text-sm">{t("add_an_extra_layer_of_security")}</p>
+-        </div>
+-        <div className="mt-5 sm:mt-0 sm:self-center">
++      <TwoFactorAuthSectionHeader
++        title={t("2fa")}
++        subtitle={t("add_an_extra_layer_of_security")}
++        titleSuffix={
++          <Badge className="ml-2 text-xs" variant={enabled ? "success" : "gray"}>
++            {enabled ? t("enabled") : t("disabled")}
++          </Badge>
++        }
++        actions={
+           <Button
+             type="submit"
+             color="secondary"
+             onClick={() => (enabled ? setDisableModalOpen(true) : setEnableModalOpen(true))}>
+             {enabled ? t("disable") : t("enable")}
+           </Button>
+-        </div>
+-      </div>
++        }
++      />
+       {enableModalOpen && (
+         <EnableTwoFactorModal
+           onEnable={() => {
+diff --git a/apps/web/components/security/TwoFactorAuthSectionHeader.tsx b/apps/web/components/security/TwoFactorAuthSectionHeader.tsx
+new file mode 100644
+index 0000000..e418e73
+--- /dev/null
++++ b/apps/web/components/security/TwoFactorAuthSectionHeader.tsx
+@@ -0,0 +1,30 @@
++import type { ReactNode } from "react";
++
++type TwoFactorAuthSectionHeaderProps = {
++  title: string;
++  subtitle: string;
++  titleSuffix?: ReactNode;
++  actions?: ReactNode;
++};
++
++const TwoFactorAuthSectionHeader = ({
++  title,
++  subtitle,
++  titleSuffix,
++  actions,
++}: TwoFactorAuthSectionHeaderProps) => {
++  return (
++    <div className="flex flex-col justify-between pl-2 pt-9 sm:flex-row">
++      <div>
++        <div className="flex flex-row items-center">
++          <h2 className="font-cal text-emphasis text-lg font-medium leading-6">{title}</h2>
++          {titleSuffix}
++        </div>
++        <p className="text-subtle mt-1 text-sm">{subtitle}</p>
++      </div>
++      {actions && <div className="mt-5 sm:mt-0 sm:self-center">{actions}</div>}
++    </div>
++  );
++};
++
++export default TwoFactorAuthSectionHeader;

@@ -1,0 +1,3 @@
+ apps/web/components/apps/AppPage.tsx       | 56 +++++-----------------
+ apps/web/components/apps/AppPageHeader.tsx | 77 ++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 45 deletions(-)

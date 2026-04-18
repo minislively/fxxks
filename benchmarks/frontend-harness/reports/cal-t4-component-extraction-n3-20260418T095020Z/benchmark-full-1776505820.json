@@ -1,0 +1,1072 @@
+{
+  "reportSchemaVersion": "frontend-harness.v2-context-mode",
+  "timestamp": "2026-04-18T20:30:23.753272",
+  "artifactDir": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820",
+  "iterations": 3,
+  "qualityGatedDecision": {
+    "rawMedianTotalTimeImprovement": 2.1458522872454506,
+    "rawMedianRuntimeTokenReduction": 26.595939444168817,
+    "qualityGatedPairCount": 1,
+    "qualityGatedMedianTotalTimeImprovement": -4.267697563058529,
+    "qualityGatedMedianRuntimeTokenReduction": 23.483431555916294,
+    "runtimeTokenClaimAvailable": true,
+    "fooksAcceptancePassRate": 1.0,
+    "broaderScopeRegressionCount": 0,
+    "severeTokenOutlierCount": 0,
+    "targetComparabilityBreakdown": {
+      "same_component_or_file": 0,
+      "semantically_comparable_target": 2,
+      "incomparable_target": 1
+    },
+    "proxyContextReductionLabel": "proxyContextReduction; context-size evidence only, not runtime token savings",
+    "verdict": "provisional-loss-or-non-goal",
+    "verdictReasons": [
+      "N=3 quality-gated total time does not improve."
+    ]
+  },
+  "summary": {
+    "total_benchmarks": 3,
+    "vanilla_success": 2,
+    "fooks_success": 3,
+    "avg_token_reduction": 75.58121705337071,
+    "avg_tokens_saved": 738377.3333333334,
+    "proxyContextReduction": {
+      "avg_reduction_pct": 75.58121705337071,
+      "avg_tokens_saved": 738377.3333333334,
+      "label": "proxyContextReduction; context-size evidence only, not runtime token savings"
+    }
+  },
+  "notes": {
+    "tokenEstimate": {
+      "scope": "tsx-only proxy",
+      "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+    },
+    "environmentParity": {
+      "runner": "Selected with --runner; vanilla and fooks variants use the same runner.",
+      "prompt": "Identical task text for vanilla and fooks variants.",
+      "codexHome": "Each variant uses an isolated CODEX_HOME with auth.json and config.toml symlinked from the same host account.",
+      "variantDifference": "The fooks variant either runs fooks init/scan/attach before the same agent command or records an exact-file first-turn bypass when no fooks context would be injected; vanilla does not."
+    }
+  },
+  "riskAssessment": {
+    "overall": "high",
+    "scale": {
+      "low": "Safe to cite with caveat.",
+      "medium": "Useful but should be repeated.",
+      "high": "Round-1 directional evidence only.",
+      "critical": "Do not cite without fixing measurement."
+    },
+    "risks": [
+      {
+        "name": "sample_size",
+        "level": "high",
+        "evidence": "2 successful paired benchmark(s).",
+        "interpretation": "Use as round-1 proof only; repeat N>=3 before claiming stable performance."
+      },
+      {
+        "name": "environment_parity",
+        "level": "medium",
+        "evidence": "same_prompt=True, same_files=False, same_runner=True, runner=codex exec --full-auto",
+        "interpretation": "Both variants use the same selected runner with isolated CODEX_HOME; fooks may prepare native context or explicitly bypass exact-file first-turn preparation."
+      },
+      {
+        "name": "orchestration_overhead",
+        "level": "low",
+        "evidence": "runner=codex exec --full-auto",
+        "interpretation": "Direct Codex is the cleaner product benchmark; OMX runner includes orchestration overhead and policy surface."
+      },
+      {
+        "name": "cleanup_reproducibility",
+        "level": "low",
+        "evidence": "cleanup_removed=True",
+        "interpretation": "Worktree residue can contaminate reruns if cleanup fails."
+      },
+      {
+        "name": "wall_clock_noise",
+        "level": "low",
+        "evidence": "Single-run wall-clock timing includes model/service variability.",
+        "interpretation": "Prefer median and p95 over repeated identical tasks."
+      },
+      {
+        "name": "artifact_quality_scope",
+        "level": "low",
+        "evidence": "acceptance_available=True, fooks_acceptance_failures=0, scope_regressions=0",
+        "interpretation": "Do not cite wins unless fooks passes task acceptance and avoids broader edit scope than vanilla."
+      },
+      {
+        "name": "runtime_token_claim",
+        "level": "medium",
+        "evidence": "Actual OMX/Codex tokens available; fooks used more runtime tokens in 0/2 pair(s).",
+        "interpretation": "Do not claim runtime token reduction from this run; keep proxy compression and actual tokens separate."
+      }
+    ]
+  },
+  "results": [
+    {
+      "task": "T4",
+      "task_name": "Component Extraction",
+      "repo": "cal.com",
+      "difficulty": "medium",
+      "timestamp": "2026-04-18T18:50:20.635375",
+      "iteration": 1,
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "ambiguous-multi-file",
+      "promptSpecificity": "ambiguous",
+      "expectedContextPolicy": "auto",
+      "expectedFirstTurnRuntimeContext": "auto",
+      "expectedFooksPrepare": "scan-attach",
+      "tokens": {
+        "total_files": 693,
+        "raw_bytes": 4574215.800000001,
+        "compressed_bytes": 970384.8,
+        "raw_tokens": 1143553.0,
+        "compressed_tokens": 242596.0,
+        "tokens_saved": 900957.0,
+        "reduction_pct": 78.78576695047926,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 282473,
+        "files": 2,
+        "files_list": [
+          "apps/web/components/apps/AppPage.tsx",
+          "apps/web/components/apps/AppPageHeader.tsx"
+        ],
+        "tokens_used": 116960,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776505828",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776505828/.codex",
+          "prompt_sha256": "e27c632963ecab52f14da20d2acd5ac7df95d613c024ec466fae2e1595339ff6",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "vanilla-baseline-no-fooks-context",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Extracted the app detail header into a new component.\n\nModified:\n- [AppPage.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776505828/apps/web/components/apps/AppPage.tsx:32) now imports `AppPageHeader` and passes title/logo/category/subtitle data plus the install/disconnect `actions` slot.\n\nCreated:\n- [AppPageHeader.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776505828/apps/web/components/apps/AppPageHeader.tsx:9) contains the extracted header JSX with typed props for `name`, `logo`, `category`, `author`, `website`, `paid`, `isTemplate`, and `actions`.\n\nVerification:\n- `git diff --check -- apps/web/components/apps/AppPage.tsx apps/web/components/apps/AppPageHeader.tsx` passed.\n- `yarn biome check --write ...` and `yarn type-check:ci --force` could not run because this worktree is missing Yarn\u2019s node_modules state file: `Couldn't find the node_modules state file`.\n",
+        "stderr_tail": "    <Link\n+              href={`categories/${category}`}\n+              className=\"bg-subtle text-emphasis rounded-md p-1 text-xs capitalize\">\n+              {category}\n+            </Link>{\" \"}\n+          </>\n+        ) : null}\n+        {paid && (\n+          <Badge className=\"mr-1\">\n+            {Intl.NumberFormat(i18n.language, {\n+              style: \"currency\",\n+              currency: \"USD\",\n+              useGrouping: false,\n+              maximumFractionDigits: 0,\n+            }).format(paid.priceInUsd)}\n+            /{t(\"month\")}\n+          </Badge>\n+        )}\n+        \u2022{\" \"}\n+        <a target=\"_blank\" rel=\"noreferrer\" href={website}>\n+          {t(\"published_by\", { author })}\n+        </a>\n+      </h2>\n+      {isTemplate && (\n+        <Badge variant=\"red\" className=\"mt-4\">\n+          Template - Available in Dev Environment only for testing\n+        </Badge>\n+      )}\n+      {actions ? <div className=\"mt-8\">{actions}</div> : null}\n+    </header>\n+  );\n+}\n\ntokens used\n116,960\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn exec <commandName> ...\n",
+            "package_manager": "yarn",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "skipped": true,
+            "reason": "build validation not run for vanilla"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter1-vanilla.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter1-vanilla.diffstat",
+          "patch_bytes": 5931,
+          "diffstat": " apps/web/components/apps/AppPage.tsx       | 56 +++++-----------------\n apps/web/components/apps/AppPageHeader.tsx | 77 ++++++++++++++++++++++++++++++\n 2 files changed, 88 insertions(+), 45 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": false,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=['apps/web/components/apps/AppPageHeader.tsx'], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/components/apps/AppPage.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": false,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=False, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=2, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=2, source_files=2"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": true,
+                "mandatory": false,
+                "details": "header_files=['apps/web/components/apps/AppPageHeader.tsx']"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 254707,
+        "scan_time": 3588,
+        "total_time": 258295,
+        "files": 2,
+        "files_list": [
+          "packages/ui/components/alert/Alert.tsx",
+          "packages/ui/components/alert/Header.tsx"
+        ],
+        "tokens_used": 82213,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3588,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 86,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 2900,
+              "stdout_tail": "18,\n      \"importProbeCount\": 1873,\n      \"importResolveCacheHits\": 521\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/embed/components/Embed.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 835.8\n      },\n      {\n        \"filePath\": \"apps/docs/app/[[...mdxPath]]/page.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 144.79\n      },\n      {\n        \"filePath\": \"apps/web/modules/event-types/views/event-types-listing-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 122.03\n      },\n      {\n        \"filePath\": \"apps/web/modules/bookings/views/bookings-single-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 117.89\n      },\n      {\n        \"filePath\": \"packages/platform/atoms/event-types/payments/PaymentForm.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 66.9\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 601,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-18T09:55:24.781Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/.codex/fooks/attachments/bm-t4-fooks-1776506119.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/.codex/fooks/attachments/bm-t4-fooks-1776506119.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-18T09:55:24.772Z\",\"attachedAt\":\"2026-04-18T09:55:24.769Z\",\"lastScanAt\":\"2026-04-18T09:55:24.769Z\",\"lastRefreshAt\":\"2026-04-18T09:55:24.769Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/.codex",
+          "prompt_sha256": "e27c632963ecab52f14da20d2acd5ac7df95d613c024ec466fae2e1595339ff6",
+          "codex_bin": "codex"
+        },
+        "contextMode": "auto",
+        "contextModeReason": "fooks-ambiguous-policy",
+        "contextBudget": {
+          "maxFiles": 5,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Extracted the inline alert header JSX into a new component.\n\nModified:\n- [Alert.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/packages/ui/components/alert/Alert.tsx): imports and uses the new `Header` component, passing `title`, `message` as `subtitle`, and `actions`.\n\nCreated:\n- [Header.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776506119/packages/ui/components/alert/Header.tsx): new header component with `title`, `subtitle`, and `actions` props.\n\nVerification:\n- `git diff --check` passed.\n- `yarn biome check --write ...`, `yarn test packages/ui/components/alert/alert.test.tsx`, and `yarn workspace @calcom/ui type-check` could not run because this worktree is missing Yarn\u2019s install state: `Couldn't find the node_modules state file`.\n",
+        "stderr_tail": "s.actions} />\n       </div>\n     </div>\n   );\ndiff --git a/packages/ui/components/alert/Header.tsx b/packages/ui/components/alert/Header.tsx\nnew file mode 100644\nindex 0000000000000000000000000000000000000000..c65ea0cb98a2671e5eb1cf9abca25561c7b54dbd\n--- /dev/null\n+++ b/packages/ui/components/alert/Header.tsx\n@@ -0,0 +1,21 @@\n+import type { ReactNode } from \"react\";\n+\n+type HeaderProps = {\n+  title?: ReactNode;\n+  subtitle?: ReactNode;\n+  actions?: ReactNode;\n+};\n+\n+export function Header(props: HeaderProps) {\n+  return (\n+    <div className=\"flex grow flex-col sm:flex-row\">\n+      <div className=\"stack-y-1 ltr:ml-3 rtl:mr-3\">\n+        {props.title && <h3 className=\"text-sm font-medium leading-none\">{props.title}</h3>}\n+        {props.subtitle && <div className=\"text-sm leading-5\">{props.subtitle}</div>}\n+      </div>\n+      {props.actions && (\n+        <div className=\"ml-auto mt-auto text-sm sm:mt-0 md:relative\">{props.actions}</div>\n+      )}\n+    </div>\n+  );\n+}\n\ntokens used\n82,213\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn exec <commandName> ...\n",
+            "package_manager": "yarn",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn run [--inspect] [--inspect-brk] [-T,--top-level] [-B,--binaries-only] [--require #0] <scriptName> ...\n",
+            "package_manager": "yarn",
+            "method": "direct"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter1-fooks.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter1-fooks.diffstat",
+          "patch_bytes": 2060,
+          "diffstat": " packages/ui/components/alert/Alert.tsx  | 11 ++---------\n packages/ui/components/alert/Header.tsx | 21 +++++++++++++++++++++\n 2 files changed, 23 insertions(+), 9 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 11,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=['packages/ui/components/alert/Header.tsx'], header_component_declared=False"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['packages/ui/components/alert/Alert.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=2, roots=['packages']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=2, source_files=2"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": true,
+                "mandatory": false,
+                "details": "header_files=['packages/ui/components/alert/Header.tsx']"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 9.829612033716497,
+        "total": 8.55940213754943
+      },
+      "targetComparability": {
+        "classification": "semantically_comparable_target",
+        "reason": "Both variants produced T4-scored header extraction artifacts, but chose different targets."
+      }
+    },
+    {
+      "task": "T4",
+      "task_name": "Component Extraction",
+      "repo": "cal.com",
+      "difficulty": "medium",
+      "timestamp": "2026-04-18T18:59:47.756598",
+      "iteration": 2,
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "ambiguous-multi-file",
+      "promptSpecificity": "ambiguous",
+      "expectedContextPolicy": "auto",
+      "expectedFirstTurnRuntimeContext": "auto",
+      "expectedFooksPrepare": "scan-attach",
+      "tokens": {
+        "total_files": 693,
+        "raw_bytes": 4747743.0,
+        "compressed_bytes": 1021089.3,
+        "raw_tokens": 1186935.0,
+        "compressed_tokens": 255272.0,
+        "tokens_saved": 931663.0,
+        "reduction_pct": 78.49316401498565,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": false,
+        "duration_ms": 600000,
+        "files": 0,
+        "files_list": [],
+        "error": "Timeout",
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter2-vanilla.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter2-vanilla.diffstat",
+          "patch_bytes": 5553,
+          "diffstat": " .../(main-nav)/ShellMainAppDir.tsx                 | 53 +++++------------\n .../(main-nav)/ShellMainAppDirHeader.tsx           | 66 ++++++++++++++++++++++\n 2 files changed, 79 insertions(+), 40 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 8,
+            "max_score": 11,
+            "passed": false,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": false,
+                "mandatory": true,
+                "details": "non_header_source_files=[]"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": false,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=0, roots=[]"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=0, source_files=0"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 225781,
+        "scan_time": 3704,
+        "total_time": 229485,
+        "files": 2,
+        "files_list": [
+          "apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDir.tsx",
+          "apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDirHeader.tsx"
+        ],
+        "tokens_used": 85871,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3704,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 87,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 3013,
+              "stdout_tail": ",\n      \"importProbeCount\": 1873,\n      \"importResolveCacheHits\": 521\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/embed/components/Embed.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 881.46\n      },\n      {\n        \"filePath\": \"apps/docs/app/[[...mdxPath]]/page.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 148.97\n      },\n      {\n        \"filePath\": \"apps/web/modules/event-types/views/event-types-listing-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 123.07\n      },\n      {\n        \"filePath\": \"apps/web/modules/bookings/views/bookings-single-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 120.73\n      },\n      {\n        \"filePath\": \"packages/platform/atoms/event-types/payments/PaymentForm.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 67.83\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 602,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-18T11:17:08.393Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/.codex/fooks/attachments/bm-t4-fooks-1776511022.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/.codex/fooks/attachments/bm-t4-fooks-1776511022.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-18T11:17:08.383Z\",\"attachedAt\":\"2026-04-18T11:17:08.380Z\",\"lastScanAt\":\"2026-04-18T11:17:08.380Z\",\"lastRefreshAt\":\"2026-04-18T11:17:08.380Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/.codex",
+          "prompt_sha256": "e27c632963ecab52f14da20d2acd5ac7df95d613c024ec466fae2e1595339ff6",
+          "codex_bin": "codex"
+        },
+        "contextMode": "auto",
+        "contextModeReason": "fooks-ambiguous-policy",
+        "contextBudget": {
+          "maxFiles": 5,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Extracted the inline shell header JSX into a new component.\n\nModified/created files:\n- Modified [ShellMainAppDir.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDir.tsx:1)\n- Created [ShellMainAppDirHeader.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511022/apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDirHeader.tsx:1)\n\nWhat changed:\n- `ShellMainAppDir` now keeps the outer heading/back-button wrapper and delegates the header markup to `ShellMainAppDirHeader`.\n- `ShellMainAppDirHeader` accepts a typed `Pick<LayoutProps, ...>` for heading, subtitle, CTA, pre-CTA actions, actions, icon, sizing, and header class props.\n\nValidation:\n- `git diff --check` passed.\n- `yarn biome check --write ...` and `yarn type-check:ci --force` could not run because this worktree is missing Yarn\u2019s `node_modules` state file.\n",
+        "stderr_tail": "Names(\n+              \"font-cal text-emphasis max-w-28 sm:max-w-72 md:max-w-80 inline truncate text-lg font-semibold tracking-wide sm:text-xl md:block xl:max-w-full\",\n+              smallHeading ? \"text-base\" : \"text-xl\"\n+            )}>\n+            {heading}\n+          </h3>\n+        )}\n+        {subtitle && (\n+          <p className=\"text-default hidden text-sm md:block\" data-testid=\"subtitle\">\n+            {subtitle}\n+          </p>\n+        )}\n+      </div>\n+      {beforeCTAactions}\n+      {CTA && (\n+        <div\n+          className={classNames(\n+            backPath\n+              ? \"relative\"\n+              : \"pwa:bottom-[max(7rem,_calc(5rem_+_env(safe-area-inset-bottom)))] fixed bottom-20 z-40 ltr:right-4 rtl:left-4 md:z-auto md:ltr:right-0 md:rtl:left-0\",\n+            \"shrink-0 [-webkit-app-region:no-drag] md:relative md:bottom-auto md:right-auto\"\n+          )}>\n+          {CTA}\n+        </div>\n+      )}\n+      {actions && actions}\n+    </header>\n+  );\n+}\n\ntokens used\n85,871\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn exec <commandName> ...\n",
+            "package_manager": "yarn",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn run [--inspect] [--inspect-brk] [-T,--top-level] [-B,--binaries-only] [--require #0] <scriptName> ...\n",
+            "package_manager": "yarn",
+            "method": "direct"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter2-fooks.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter2-fooks.diffstat",
+          "patch_bytes": 5153,
+          "diffstat": " .../(main-nav)/ShellMainAppDir.tsx                 | 44 +-------------\n .../(main-nav)/ShellMainAppDirHeader.tsx           | 69 ++++++++++++++++++++++\n 2 files changed, 71 insertions(+), 42 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 11,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=['apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDirHeader.tsx'], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDir.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=2, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=2, source_files=2"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": true,
+                "mandatory": false,
+                "details": "header_files=['apps/web/app/(use-page-wrapper)/(main-nav)/ShellMainAppDirHeader.tsx']"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 0,
+        "total": 0
+      },
+      "targetComparability": {
+        "classification": "incomparable_target",
+        "reason": "The variants did not produce comparable changed targets."
+      }
+    },
+    {
+      "task": "T4",
+      "task_name": "Component Extraction",
+      "repo": "cal.com",
+      "difficulty": "medium",
+      "timestamp": "2026-04-18T20:21:03.202781",
+      "iteration": 3,
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "ambiguous-multi-file",
+      "promptSpecificity": "ambiguous",
+      "expectedContextPolicy": "auto",
+      "expectedFirstTurnRuntimeContext": "auto",
+      "expectedFooksPrepare": "scan-attach",
+      "tokens": {
+        "total_files": 693,
+        "raw_bytes": 2202631.2,
+        "compressed_bytes": 672579.6000000001,
+        "raw_tokens": 550657.0,
+        "compressed_tokens": 168144.0,
+        "tokens_saved": 382512.0,
+        "reduction_pct": 69.4647201946472,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 262296,
+        "files": 2,
+        "files_list": [
+          "apps/web/modules/settings/my-account/components/HolidaysHeader.tsx",
+          "apps/web/modules/settings/my-account/holidays-view.tsx"
+        ],
+        "tokens_used": 113348,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776511270",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776511270/.codex",
+          "prompt_sha256": "e27c632963ecab52f14da20d2acd5ac7df95d613c024ec466fae2e1595339ff6",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "vanilla-baseline-no-fooks-context",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the header extraction.\n\nCreated:\n- [HolidaysHeader.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776511270/apps/web/modules/settings/my-account/components/HolidaysHeader.tsx:1) with `title`, `subtitle`, and `actions` props.\n\nModified:\n- [holidays-view.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776511270/apps/web/modules/settings/my-account/holidays-view.tsx:19) to import `HolidaysHeader` and replace the inline holidays section header JSX with the extracted component.\n\nVerification:\n- Attempted `yarn biome check --write apps/web/modules/settings/my-account/holidays-view.tsx apps/web/modules/settings/my-account/components/HolidaysHeader.tsx`, but Yarn could not run because `node_modules` is missing in this worktree.\n- I left the pre-existing untracked `.codex/` directory untouched.\n",
+        "stderr_tail": "-                <h3 className=\"text-emphasis font-semibold\">{t(\"holidays\")}</h3>\n-                <p className=\"text-subtle text-sm\">{t(\"holidays_description\")}</p>\n-              </div>\n-              <CountrySelector\n-                countries={countries || []}\n-                value={settings?.countryCode || \"\"}\n-                onChange={handleCountryChange}\n-                isLoading={isLoadingCountries}\n-              />\n-            </div>\n+            <HolidaysHeader\n+              title={t(\"holidays\")}\n+              subtitle={t(\"holidays_description\")}\n+              actions={\n+                <CountrySelector\n+                  countries={countries || []}\n+                  value={settings?.countryCode || \"\"}\n+                  onChange={handleCountryChange}\n+                  isLoading={isLoadingCountries}\n+                />\n+              }\n+            />\n \n             {/* Holidays list - inner container */}\n             {settings?.countryCode ? (\n\ntokens used\n113,348\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn exec <commandName> ...\n",
+            "package_manager": "yarn",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "skipped": true,
+            "reason": "build validation not run for vanilla"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter3-vanilla.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter3-vanilla.diffstat",
+          "patch_bytes": 2729,
+          "diffstat": " .../my-account/components/HolidaysHeader.tsx       | 19 +++++++++++++++\n .../modules/settings/my-account/holidays-view.tsx  | 27 +++++++++++-----------\n 2 files changed, 33 insertions(+), 13 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 11,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=['apps/web/modules/settings/my-account/components/HolidaysHeader.tsx'], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/modules/settings/my-account/holidays-view.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=False, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=2, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=2, source_files=2"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": true,
+                "mandatory": false,
+                "details": "header_files=['apps/web/modules/settings/my-account/components/HolidaysHeader.tsx']"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 269872,
+        "scan_time": 3618,
+        "total_time": 273490,
+        "files": 2,
+        "files_list": [
+          "packages/ui/components/layout/ShellSubHeading.tsx",
+          "packages/ui/components/layout/ShellSubHeadingHeader.tsx"
+        ],
+        "tokens_used": 86730,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3618,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 89,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 2920,
+              "stdout_tail": ",\n      \"importProbeCount\": 1873,\n      \"importResolveCacheHits\": 521\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/embed/components/Embed.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 836.58\n      },\n      {\n        \"filePath\": \"apps/docs/app/[[...mdxPath]]/page.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 144.28\n      },\n      {\n        \"filePath\": \"apps/web/modules/event-types/views/event-types-listing-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 121.01\n      },\n      {\n        \"filePath\": \"apps/web/modules/bookings/views/bookings-single-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 119.12\n      },\n      {\n        \"filePath\": \"packages/platform/atoms/event-types/payments/PaymentForm.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 66.75\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 608,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-18T11:25:45.727Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/.codex/fooks/attachments/bm-t4-fooks-1776511540.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/.codex/fooks/attachments/bm-t4-fooks-1776511540.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-18T11:25:45.717Z\",\"attachedAt\":\"2026-04-18T11:25:45.714Z\",\"lastScanAt\":\"2026-04-18T11:25:45.714Z\",\"lastRefreshAt\":\"2026-04-18T11:25:45.714Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/.codex",
+          "prompt_sha256": "e27c632963ecab52f14da20d2acd5ac7df95d613c024ec466fae2e1595339ff6",
+          "codex_bin": "codex"
+        },
+        "contextMode": "auto",
+        "contextModeReason": "fooks-ambiguous-policy",
+        "contextBudget": {
+          "maxFiles": 5,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Extracted the inline header JSX from `ShellSubHeading` into a new header component.\n\nModified:\n- [ShellSubHeading.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/packages/ui/components/layout/ShellSubHeading.tsx:1) now delegates to the extracted header component.\n\nCreated:\n- [ShellSubHeadingHeader.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776511540/packages/ui/components/layout/ShellSubHeadingHeader.tsx:1) with `title`, `subtitle`, `actions`, and `className` props.\n\nVerification:\n- `git diff --check -- packages/ui/components/layout/ShellSubHeading.tsx packages/ui/components/layout/ShellSubHeadingHeader.tsx` passed.\n- `yarn biome check --write ...`, `TZ=UTC yarn test packages/ui/components/layout/shellSubHeading.test.tsx`, and `yarn workspace @calcom/ui type-check:ci` could not run because this worktree is missing Yarn\u2019s `node_modules` state file.\n",
+        "stderr_tail": "000000000000000000000000..ee0eb3303f7c2d8aef92bdbcfaf1ad89c25630ce\n--- /dev/null\n+++ b/packages/ui/components/layout/ShellSubHeadingHeader.tsx\n@@ -0,0 +1,24 @@\n+import type { ReactNode } from \"react\";\n+\n+import classNames from \"@calcom/ui/classNames\";\n+\n+export type ShellSubHeadingHeaderProps = {\n+  title: ReactNode;\n+  subtitle?: ReactNode;\n+  actions?: ReactNode;\n+  className?: string;\n+};\n+\n+export function ShellSubHeadingHeader({ title, subtitle, actions, className }: ShellSubHeadingHeaderProps) {\n+  return (\n+    <header className={classNames(\"mb-3 block justify-between sm:flex\", className)}>\n+      <div>\n+        <h2 className=\"text-emphasis flex content-center items-center space-x-2 text-base font-bold leading-6 rtl:space-x-reverse\">\n+          {title}\n+        </h2>\n+        {subtitle && <p className=\"text-subtle text-sm ltr:mr-4\">{subtitle}</p>}\n+      </div>\n+      {actions && <div className=\"mt-2 shrink-0 sm:mt-0\">{actions}</div>}\n+    </header>\n+  );\n+}\n\ntokens used\n86,730\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn exec <commandName> ...\n",
+            "package_manager": "yarn",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "Usage Error: Couldn't find the node_modules state file - running an install might help (findPackageLocation)\n\n$ yarn run [--inspect] [--inspect-brk] [-T,--top-level] [-B,--binaries-only] [--require #0] <scriptName> ...\n",
+            "package_manager": "yarn",
+            "method": "direct"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter3-fooks.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/cal-t4-component-extraction-n3-20260418T095020Z/artifacts/benchmark-full-1776505820/cal.com-T4-iter3-fooks.diffstat",
+          "patch_bytes": 2362,
+          "diffstat": " packages/ui/components/layout/ShellSubHeading.tsx  | 24 ++++------------------\n .../ui/components/layout/ShellSubHeadingHeader.tsx | 24 ++++++++++++++++++++++\n 2 files changed, 28 insertions(+), 20 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 11,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=['packages/ui/components/layout/ShellSubHeadingHeader.tsx'], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['packages/ui/components/layout/ShellSubHeading.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=2, roots=['packages']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=2, source_files=2"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": true,
+                "mandatory": false,
+                "details": "header_files=['packages/ui/components/layout/ShellSubHeadingHeader.tsx']"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": -2.888339890810382,
+        "total": -4.267697563058529
+      },
+      "targetComparability": {
+        "classification": "semantically_comparable_target",
+        "reason": "Both variants produced T4-scored header extraction artifacts, but chose different targets."
+      }
+    }
+  ]
+}
