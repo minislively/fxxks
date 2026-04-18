@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { scanProject } from "../core/scan.js";
 import { extractFile } from "../core/extract.js";
 import { decideMode } from "../core/decide.js";
@@ -130,13 +134,33 @@ async function tryExtract(filePath: string, mode: "raw" | "hybrid" | "compressed
   }
 }
 
-function detectRunner(): "codex" | "omx" {
-  // TODO: Detect based on availability
+function codexHome(): string {
+  return process.env.FOOKS_CODEX_HOME || path.join(os.homedir(), ".codex");
+}
+
+function hasCodexAuth(): boolean {
+  return fs.existsSync(path.join(codexHome(), "auth.json"));
+}
+
+function commandExists(command: string): boolean {
+  const result = spawnSync(command, ["--version"], { stdio: "ignore" });
+  return !result.error;
+}
+
+export function detectRunner(): "codex" | "omx" {
+  if (hasCodexAuth()) {
+    return "codex";
+  }
+
+  if (commandExists("omx")) {
+    return "omx";
+  }
+
   return "codex";
 }
 
 // CLI entry - run if executed directly
-const isDirectExecution = process.argv[1]?.includes("run");
+const isDirectExecution = process.argv[1]?.endsWith("run.js");
 if (isDirectExecution) {
   const prompt = process.argv[2];
   if (!prompt) {

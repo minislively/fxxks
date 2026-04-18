@@ -31,6 +31,7 @@ const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters
 const { classifyPromptContext, discoverRelevantFilesByPolicy } = require(path.join(repoRoot, "dist", "core", "context-policy.js"));
 const { prepareExecutionContext } = require(path.join(repoRoot, "dist", "adapters", "codex.js"));
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
+const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
 
 function run(args, cwd = repoRoot, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
@@ -110,6 +111,30 @@ function appendMarker(filePath, marker) {
   fs.writeFileSync(filePath, `${source.trimEnd()}\n${marker}\n`);
 }
 
+function withEnv(overrides, fn) {
+  const previous = new Map();
+  for (const [key, value] of Object.entries(overrides)) {
+    previous.set(key, process.env[key]);
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    fn();
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
 test("init creates config and cache contract", () => {
   const tempDir = makeTempProject();
   const result = run(["init"], tempDir);
@@ -126,6 +151,37 @@ test("init prefers FOOKS_TARGET_ACCOUNT for canonical config writes", () => {
   assert.ok(result.config.endsWith(path.join(".fooks", "config.json")));
   const config = JSON.parse(fs.readFileSync(path.join(tempDir, ".fooks", "config.json"), "utf8"));
   assert.equal(config.targetAccount, "minislively");
+});
+
+test("detectRunner prefers codex when auth.json is present", () => {
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  fs.writeFileSync(path.join(codexHome, "auth.json"), "{}");
+  const emptyBin = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-empty-bin-"));
+
+  withEnv({ FOOKS_CODEX_HOME: codexHome, PATH: emptyBin }, () => {
+    assert.equal(detectRunner(), "codex");
+  });
+});
+
+test("detectRunner falls back to omx when codex auth is absent and omx is available", () => {
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-bin-"));
+  const omxPath = path.join(binDir, "omx");
+  fs.writeFileSync(omxPath, "#!/bin/sh\nexit 0\n");
+  fs.chmodSync(omxPath, 0o755);
+
+  withEnv({ FOOKS_CODEX_HOME: codexHome, PATH: binDir }, () => {
+    assert.equal(detectRunner(), "omx");
+  });
+});
+
+test("detectRunner keeps codex as the compatibility fallback when no runner signal exists", () => {
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const emptyBin = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-empty-bin-"));
+
+  withEnv({ FOOKS_CODEX_HOME: codexHome, PATH: emptyBin }, () => {
+    assert.equal(detectRunner(), "codex");
+  });
 });
 
 test("extract keeps small fixture raw", () => {
