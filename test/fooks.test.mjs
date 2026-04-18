@@ -16,6 +16,7 @@ const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
 const require = createRequire(import.meta.url);
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
+const { RAW_ORIGINAL_SIZE_THRESHOLD_BYTES } = require(path.join(repoRoot, "dist", "core", "decide.js"));
 const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 const { assessPayloadReadiness } = require(path.join(repoRoot, "dist", "core", "payload", "readiness.js"));
 const { decideCodexPreRead } = require(path.join(repoRoot, "dist", "adapters", "codex-pre-read.js"));
@@ -274,6 +275,30 @@ test("codex pre-read falls back for larger raw files past the original-source th
   assert.equal(result.decision, "fallback");
   assert.ok(result.reasons.includes("raw-mode"));
   assert.equal(result.fallback.reason, "raw-mode");
+});
+
+test("codex pre-read keeps original payloads for small raw files below the validated floor", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-small-raw-"));
+  const rawPath = path.join(tempDir, "SmallRawButton.tsx");
+  const baseSource = fs.readFileSync(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"), "utf8").trimEnd();
+  let extracted;
+  for (let extraBytes = 1; extraBytes < 220; extraBytes += 1) {
+    fs.writeFileSync(rawPath, `${baseSource}\n/* ${"x".repeat(extraBytes)} */\n`);
+    extracted = extractFile(rawPath);
+    if (extracted.meta.rawSizeBytes > 200 && extracted.meta.rawSizeBytes < RAW_ORIGINAL_SIZE_THRESHOLD_BYTES) {
+      break;
+    }
+  }
+
+  assert.ok(extracted);
+  assert.equal(extracted.mode, "raw");
+  assert.ok(extracted.meta.rawSizeBytes > 200);
+  assert.ok(extracted.meta.rawSizeBytes < RAW_ORIGINAL_SIZE_THRESHOLD_BYTES);
+
+  const result = decideCodexPreRead(rawPath, tempDir);
+  assert.equal(result.decision, "payload");
+  assert.equal(result.payload.useOriginal, true);
+  assert.equal(result.payload.rawText, extracted.rawText);
 });
 
 test("cli codex-pre-read reuses the same decision seam and advertises the command", () => {
