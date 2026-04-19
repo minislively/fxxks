@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+
 /**
  * Cache health monitoring dashboard
  * Provides real-time visibility into cache state and corruption events
@@ -33,7 +34,7 @@ export class CacheMonitor {
     const corruptionEvents = this.metrics.corruptionEvents;
 
     return {
-      status: this.resolveHealthStatus({ indexExists, indexValid, corruptionEvents, backupAvailable }),
+      status: this.resolveHealthStatus({ indexExists, indexValid, corruptionEvents }),
       indexExists,
       indexValid,
       entryCount,
@@ -53,6 +54,7 @@ export class CacheMonitor {
   }
 
   private indexStats(data: unknown): { valid: boolean; entryCount: number } {
+    // Support both "files" array (scan index) and "entries" object (cache index)
     if (
       typeof data === "object" &&
       data !== null &&
@@ -106,7 +108,7 @@ export class CacheMonitor {
   }
 
   private resolveHealthStatus(
-    report: Pick<CacheHealthReport, "indexExists" | "indexValid" | "corruptionEvents" | "backupAvailable">,
+    report: Pick<CacheHealthReport, "indexExists" | "indexValid" | "corruptionEvents">,
   ): CacheHealthStatus {
     if (!report.indexExists) {
       return "empty";
@@ -141,7 +143,7 @@ export class CacheMonitor {
     if (!existsSync(metricsPath)) {
       return { corruptionEvents: 0, lastCorruption: null };
     }
-    
+
     try {
       const content = readFileSync(metricsPath, "utf8");
       return JSON.parse(content);

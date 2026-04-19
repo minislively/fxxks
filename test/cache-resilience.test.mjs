@@ -96,7 +96,7 @@ test("CacheMonitor: missing index reports empty instead of corrupted", () => {
   fs.rmSync(cacheDir, { recursive: true });
 });
 
-test("CacheMonitor: valid index reports healthy entry count", () => {
+test("CacheMonitor: valid entries index reports healthy entry count", () => {
   const cacheDir = makeTempCacheDir();
   const resilience = new CacheResilience(cacheDir);
   resilience.writeIndexSafe({
@@ -106,6 +106,33 @@ test("CacheMonitor: valid index reports healthy entry count", () => {
       "file2.ts": { hash: "def456", timestamp: Date.now(), path: "/test/file2.ts" },
     },
   });
+
+  const monitor = new CacheMonitor(cacheDir);
+  const report = monitor.healthReport();
+
+  assert.equal(report.status, "healthy");
+  assert.equal(report.indexExists, true);
+  assert.equal(report.indexValid, true);
+  assert.equal(report.entryCount, 2);
+
+  fs.rmSync(cacheDir, { recursive: true });
+});
+
+test("CacheMonitor: valid scan files index reports healthy entry count", () => {
+  const cacheDir = makeTempCacheDir();
+  fs.writeFileSync(
+    path.join(cacheDir, "index.json"),
+    JSON.stringify({
+      projectRoot: "/tmp/project",
+      scannedAt: new Date().toISOString(),
+      files: [
+        { filePath: "file1.ts", fileHash: "abc123", kind: "component" },
+        { filePath: "file2.ts", fileHash: "def456", kind: "component" },
+      ],
+      reusedCacheEntries: 0,
+      refreshedEntries: 2,
+    }),
+  );
 
   const monitor = new CacheMonitor(cacheDir);
   const report = monitor.healthReport();
