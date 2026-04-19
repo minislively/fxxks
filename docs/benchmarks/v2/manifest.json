@@ -13,6 +13,8 @@
     "**/.next/**",
     "**/dist/**",
     "**/coverage/**",
+    "**/app/api/**",
+    "**/pages/api/**",
     "**/*.test.{ts,tsx}",
     "**/*.spec.{ts,tsx}",
     "**/test/**",
