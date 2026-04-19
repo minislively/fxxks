@@ -32,6 +32,8 @@ function createFixture() {
 
   writeFile(join(repoPath, 'apps/api/Route.tsx'), reactComponent);
   writeFile(join(repoPath, 'apps/web/api/Route.tsx'), reactComponent);
+  writeFile(join(repoPath, 'apps/web/app/api/Route.tsx'), reactComponent);
+  writeFile(join(repoPath, 'apps/web/pages/api/Route.tsx'), reactComponent);
   writeFile(join(repoPath, 'apps/web/components/Button.test.tsx'), reactComponent);
   writeFile(join(repoPath, 'apps/web/components/Widget.spec.tsx'), reactComponent);
   writeFile(join(repoPath, 'apps/web/components/Generated.generated.tsx'), reactComponent);
@@ -55,7 +57,9 @@ function createFixture() {
       '**/*.stories.{ts,tsx}',
       '**/*.story.{ts,tsx}',
       '**/test/**',
-      '**/playwright/**'
+      '**/playwright/**',
+      '**/app/api/**',
+      '**/pages/api/**'
     ],
     countRule: {
       includeNonReact: false,
@@ -104,12 +108,12 @@ test('BucketClassifier enforces discovery globs, source roots, excludes, and Rea
       'packages/ui/components/Dialog.tsx'
     ]);
 
-    assert.equal(classifier.lastDiscovery.candidateCount, 15);
+    assert.equal(classifier.lastDiscovery.candidateCount, 17);
     assert.equal(classifier.lastDiscovery.includedCount, 4);
     assert.equal(classifier.lastDiscovery.excludedCounts.discoveryGlobMismatch, 2);
     assert.equal(classifier.lastDiscovery.excludedCounts.outsideSourceRoots, 1);
     assert.equal(classifier.lastDiscovery.excludedCounts.repoExcludedPath, 2);
-    assert.equal(classifier.lastDiscovery.excludedCounts.globalExclude, 4);
+    assert.equal(classifier.lastDiscovery.excludedCounts.globalExclude, 6);
     assert.equal(classifier.lastDiscovery.excludedCounts.nonReactSource, 4);
 
     assert.equal(classifier.lastDiscovery.examples.outsideSourceRoots[0].path, 'apps/api/Route.tsx');
@@ -154,7 +158,7 @@ test('DryRunCommand reports additive discovery metadata and source-root traceabi
       assert.ok(Object.hasOwn(written, field), `expected top-level field ${field}`);
     }
 
-    assert.equal(report.discovery.candidateCount, 15);
+    assert.equal(report.discovery.candidateCount, 17);
     assert.equal(report.discovery.includedCount, 4);
     assert.ok(report.discovery.excludedCounts.outsideSourceRoots > 0);
     assert.ok(report.discovery.excludedCounts.repoExcludedPath > 0);
