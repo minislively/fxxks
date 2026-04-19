@@ -3,6 +3,10 @@
 Product / package / primary CLI name: `fooks`
 Local frontend-only context compression engine for React/TSX files.
 
+## Validation
+
+- Agent-neutral terminal CLI validation on current `main` (2026-04-19): [`docs/terminal-cli-validation-2026-04-19.md`](docs/terminal-cli-validation-2026-04-19.md)
+
 ## What it does
 
 `fooks` reduces AI read cost before a coding runtime opens full frontend source by returning one of:
