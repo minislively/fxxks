@@ -136,6 +136,7 @@ export class DryRunCommand {
         seed,
         selectedFiles: selected.map(f => ({
           path: relative(repo.localPath, f.filePath),
+          sourceRoot: f.sourceRoot,
           bytes: f.rawBytes,
           confidence: Math.round(f.confidence * 100) + '%',
           rank: f.selectionRank,
@@ -163,6 +164,7 @@ export class DryRunCommand {
         coverageRatio: totalTarget > 0 ? Math.round((totalSelected / totalTarget) * 100) / 100 : 0
       },
       buckets: bucketResults,
+      discovery: classifier.lastDiscovery,
       coverageStatus: criticalDeficits > 0 ? 'insufficient' : 
                       Object.values(bucketResults).some(b => b.status === 'undersampled') ? 'partial' : 'full'
     };
