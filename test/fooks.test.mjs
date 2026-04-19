@@ -1049,6 +1049,28 @@ test("install codex-hooks normalizes bridge commands to the canonical fooks comm
   assert.equal(normalized.hooks.Stop[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
 });
 
+test("status cache reports empty for a fresh project before any scan", () => {
+  const tempDir = makeTempProject();
+  const status = run(["status", "cache"], tempDir);
+
+  assert.equal(status.status, "empty");
+  assert.equal(status.indexExists, false);
+  assert.equal(status.indexValid, false);
+  assert.equal(status.entryCount, 0);
+});
+
+test("status cache reports healthy after scan builds the cache index", () => {
+  const tempDir = makeTempProject();
+  const scan = run(["scan"], tempDir);
+  const status = run(["status", "cache"], tempDir);
+
+  assert.ok(scan.files.length > 0);
+  assert.equal(status.status, "healthy");
+  assert.equal(status.indexExists, true);
+  assert.equal(status.indexValid, true);
+  assert.ok(status.entryCount >= 5);
+});
+
 test("attach codex proves contract and runtime under minislively account context", () => {
   const tempDir = makeTempProject();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));

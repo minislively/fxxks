@@ -1,19 +1,15 @@
-import { readFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { CacheResilience } from "./cache-resilience";
-
 /**
  * Cache health monitoring dashboard
  * Provides real-time visibility into cache state and corruption events
  */
 export class CacheMonitor {
   private cacheDir: string;
-  private resilience: CacheResilience;
   private metrics: CacheMetrics;
 
   constructor(cacheDir: string) {
     this.cacheDir = cacheDir;
-    this.resilience = new CacheResilience(cacheDir);
     this.metrics = this.loadMetrics();
   }
 
@@ -22,29 +18,61 @@ export class CacheMonitor {
    */
   healthReport(): CacheHealthReport {
     const indexPath = join(this.cacheDir, "index.json");
+    const backupPath = join(this.cacheDir, ".backups", "index.json.bak");
     const indexExists = existsSync(indexPath);
-    
+
     let indexValid = false;
     let entryCount = 0;
-    let corruptionEvents = this.metrics.corruptionEvents;
-    
     if (indexExists) {
-      const result = this.resilience.readIndexSafe();
-      indexValid = result !== null;
-      if (result) {
-        entryCount = Object.keys(result.entries).length;
-      }
+      const result = this.readIndexHealth(indexPath);
+      indexValid = result.valid;
+      entryCount = result.entryCount;
     }
 
+    const backupAvailable = existsSync(backupPath) && this.readIndexHealth(backupPath).valid;
+    const corruptionEvents = this.metrics.corruptionEvents;
+
     return {
-      status: indexValid ? "healthy" : corruptionEvents > 0 ? "recovered" : "corrupted",
+      status: this.resolveHealthStatus({ indexExists, indexValid, corruptionEvents, backupAvailable }),
       indexExists,
       indexValid,
       entryCount,
       corruptionEvents,
-      backupAvailable: existsSync(join(this.cacheDir, ".backups", "index.json.bak")),
+      backupAvailable,
       lastCheck: new Date().toISOString(),
     };
+  }
+
+  private readIndexHealth(indexPath: string): { valid: boolean; entryCount: number } {
+    try {
+      const parsed = JSON.parse(readFileSync(indexPath, "utf8")) as unknown;
+      return this.indexStats(parsed);
+    } catch {
+      return { valid: false, entryCount: 0 };
+    }
+  }
+
+  private indexStats(data: unknown): { valid: boolean; entryCount: number } {
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      "files" in data &&
+      Array.isArray((data as { files: unknown }).files)
+    ) {
+      return { valid: true, entryCount: (data as { files: unknown[] }).files.length };
+    }
+
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      "entries" in data &&
+      typeof (data as { entries: unknown }).entries === "object" &&
+      (data as { entries: unknown }).entries !== null
+    ) {
+      return { valid: true, entryCount: Object.keys((data as { entries: Record<string, unknown> }).entries).length };
+    }
+
+    return { valid: false, entryCount: 0 };
   }
 
   /**
@@ -61,32 +89,49 @@ export class CacheMonitor {
    */
   efficiencyStats(): EfficiencyStats {
     const report = this.healthReport();
-    const hitRate = this.calculateHitRate();
-    
+
     return {
-      hitRate,
+      hitRate: this.calculateHitRate(report),
       entryCount: report.entryCount,
       healthStatus: report.status,
       recommendation: this.generateRecommendation(report),
     };
   }
 
-  private calculateHitRate(): number {
-    // Implementation would track cache hits/misses over time
-    // For now, return placeholder based on index health
-    const report = this.healthReport();
-    return report.indexValid ? 0.95 : 0.0;
+  private calculateHitRate(report: CacheHealthReport): number | null {
+    if (report.status === "empty") {
+      return null;
+    }
+    return report.indexValid ? 1.0 : 0.0;
+  }
+
+  private resolveHealthStatus(
+    report: Pick<CacheHealthReport, "indexExists" | "indexValid" | "corruptionEvents" | "backupAvailable">,
+  ): CacheHealthStatus {
+    if (!report.indexExists) {
+      return "empty";
+    }
+    if (!report.indexValid) {
+      return "corrupted";
+    }
+    return report.corruptionEvents > 0 ? "recovered" : "healthy";
   }
 
   private generateRecommendation(report: CacheHealthReport): string {
-    if (!report.indexExists) {
-      return "Initialize cache with first extraction";
+    if (report.status === "empty") {
+      return "Initialize cache with first scan";
     }
-    if (!report.indexValid && report.corruptionEvents > 3) {
+    if (report.status === "corrupted" && report.backupAvailable) {
+      return "Cache index is corrupted; valid backup available for recovery";
+    }
+    if (report.status === "corrupted" && report.corruptionEvents > 3) {
       return "Consider cache reset - multiple corruption events detected";
     }
-    if (!report.indexValid) {
-      return "Cache recovered from backup or regeneration";
+    if (report.status === "corrupted") {
+      return "Cache index is corrupted; rerun scan to regenerate";
+    }
+    if (report.status === "recovered") {
+      return "Cache operating normally after recovery";
     }
     return "Cache operating normally";
   }
@@ -106,14 +151,16 @@ export class CacheMonitor {
   }
 
   private saveMetrics(): void {
-    const { writeFileSync } = require("node:fs");
     const metricsPath = join(this.cacheDir, ".metrics.json");
+    mkdirSync(this.cacheDir, { recursive: true });
     writeFileSync(metricsPath, JSON.stringify(this.metrics, null, 2));
   }
 }
 
+type CacheHealthStatus = "empty" | "healthy" | "recovered" | "corrupted";
+
 interface CacheHealthReport {
-  status: "healthy" | "recovered" | "corrupted";
+  status: CacheHealthStatus;
   indexExists: boolean;
   indexValid: boolean;
   entryCount: number;
@@ -123,9 +170,9 @@ interface CacheHealthReport {
 }
 
 interface EfficiencyStats {
-  hitRate: number;
+  hitRate: number | null;
   entryCount: number;
-  healthStatus: string;
+  healthStatus: CacheHealthStatus;
   recommendation: string;
 }
 

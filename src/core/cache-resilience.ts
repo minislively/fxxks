@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -108,6 +108,7 @@ export class CacheResilience {
       const backupPath = join(this.backupDir, "index.json.bak");
       
       const content = readFileSync(indexPath, "utf8");
+      mkdirSync(this.backupDir, { recursive: true });
       writeFileSync(backupPath, content);
     } catch (e) {
       // Silent fail on backup - primary write is more important

@@ -291,12 +291,19 @@ async function run(): Promise<void> {
       return;
     }
     case "status": {
-      if (arg1 !== "codex") {
-        throw new Error("status expects 'codex'");
+      if (arg1 === "codex") {
+        const { readCodexTrustStatus } = await import("../adapters/codex-runtime-trust.js");
+        print(readCodexTrustStatus(process.cwd()));
+        return;
       }
-      const { readCodexTrustStatus } = await import("../adapters/codex-runtime-trust.js");
-      print(readCodexTrustStatus(process.cwd()));
-      return;
+      if (arg1 === "cache") {
+        const { canonicalProjectDataDir } = await import("../core/paths.js");
+        const { CacheMonitor } = await import("../core/cache-monitor.js");
+        const monitor = new CacheMonitor(canonicalProjectDataDir(process.cwd()));
+        print(monitor.healthReport());
+        return;
+      }
+      throw new Error("status expects 'codex' or 'cache'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");
@@ -337,7 +344,8 @@ async function run(): Promise<void> {
       console.error(`       ${displayCliName} extract <file> [--model-payload] [--json]`);
       console.error(`       ${displayCliName} install codex-hooks`);
       console.error(`       ${displayCliName} codex-pre-read <file> [--json]`);
-      console.error(`       ${displayCliName} status codex`);
+      console.error(`       ${displayCliName} status codex
+       ${displayCliName} status cache`);
       console.error(`       ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]`);
       console.error(`       ${displayCliName} codex-runtime-hook --native-hook`);
       process.exitCode = 1;

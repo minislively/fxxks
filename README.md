@@ -31,6 +31,7 @@ fooks codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop>
 fooks codex-runtime-hook --native-hook
 fooks install codex-hooks
 fooks status codex
+fooks status cache
 fooks attach codex
 fooks attach claude
 ```
@@ -246,11 +247,14 @@ fooks install codex-hooks
 
 The installer is idempotent: it only adds the `fooks codex-runtime-hook --native-hook` command to `SessionStart`, `UserPromptSubmit`, and `Stop` when those entries are missing, and preserves other hooks already present in `~/.codex/hooks.json`.
 
-For a lightweight trust/debug surface after attach, inspect the Codex runtime status:
+For lightweight trust/debug surfaces after attach or before first scan, inspect runtime and cache status:
 
 ```bash
 fooks status codex
+fooks status cache
 ```
+
+`fooks status cache` reports whether the local cache is `empty`, `healthy`, `recovered`, or `corrupted`, plus entry count and backup availability. Fresh repos now report `empty` until the first scan builds `.fooks/index.json`.
 
 This keeps the product UX quiet by default while still exposing the minimum trust signals we care about in Phase 2B:
 
