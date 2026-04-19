@@ -1,0 +1,1105 @@
+{
+  "reportSchemaVersion": "frontend-harness.v2-context-mode",
+  "timestamp": "2026-04-20T01:11:11.470117",
+  "artifactDir": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131",
+  "iterations": 3,
+  "qualityGatedDecision": {
+    "rawMedianTotalTimeImprovement": 15.088006830527354,
+    "rawMedianRuntimeTokenReduction": 12.896307462284154,
+    "qualityGatedPairCount": 3,
+    "qualityGatedMedianTotalTimeImprovement": 15.088006830527354,
+    "qualityGatedMedianRuntimeTokenReduction": 12.896307462284154,
+    "runtimeTokenClaimAvailable": true,
+    "fooksAcceptancePassRate": 1.0,
+    "broaderScopeRegressionCount": 0,
+    "severeTokenOutlierCount": 0,
+    "targetComparabilityBreakdown": {
+      "same_component_or_file": 2,
+      "semantically_comparable_target": 1,
+      "incomparable_target": 0
+    },
+    "proxyContextReductionLabel": "proxyContextReduction; context-size evidence only, not runtime token savings",
+    "verdict": "proceed-to-n5",
+    "verdictReasons": [
+      "N=3 is promising but cannot produce a claimable win because the threshold requires 4/5."
+    ]
+  },
+  "summary": {
+    "total_benchmarks": 3,
+    "vanilla_success": 3,
+    "fooks_success": 3,
+    "avg_token_reduction": 66.40689095892075,
+    "avg_tokens_saved": 542439.3333333334,
+    "proxyContextReduction": {
+      "avg_reduction_pct": 66.40689095892075,
+      "avg_tokens_saved": 542439.3333333334,
+      "label": "proxyContextReduction; context-size evidence only, not runtime token savings"
+    }
+  },
+  "notes": {
+    "tokenEstimate": {
+      "scope": "tsx-only proxy",
+      "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+    },
+    "environmentParity": {
+      "runner": "Selected with --runner; vanilla and fooks variants use the same runner.",
+      "prompt": "Identical task text for vanilla and fooks variants.",
+      "codexHome": "Each variant uses an isolated CODEX_HOME with auth.json and config.toml symlinked from the same host account.",
+      "variantDifference": "The fooks variant either runs fooks init/scan/attach before the same agent command or records an exact-file first-turn bypass when no fooks context would be injected; vanilla does not."
+    }
+  },
+  "riskAssessment": {
+    "overall": "medium",
+    "scale": {
+      "low": "Safe to cite with caveat.",
+      "medium": "Useful but should be repeated.",
+      "high": "Round-1 directional evidence only.",
+      "critical": "Do not cite without fixing measurement."
+    },
+    "risks": [
+      {
+        "name": "sample_size",
+        "level": "medium",
+        "evidence": "3 successful paired benchmark(s).",
+        "interpretation": "Use as round-1 proof only; repeat N>=3 before claiming stable performance."
+      },
+      {
+        "name": "environment_parity",
+        "level": "medium",
+        "evidence": "same_prompt=True, same_files=False, same_runner=True, runner=codex exec --full-auto",
+        "interpretation": "Both variants use the same selected runner with isolated CODEX_HOME; fooks may prepare native context or explicitly bypass exact-file first-turn preparation."
+      },
+      {
+        "name": "orchestration_overhead",
+        "level": "low",
+        "evidence": "runner=codex exec --full-auto",
+        "interpretation": "Direct Codex is the cleaner product benchmark; OMX runner includes orchestration overhead and policy surface."
+      },
+      {
+        "name": "cleanup_reproducibility",
+        "level": "low",
+        "evidence": "cleanup_removed=True",
+        "interpretation": "Worktree residue can contaminate reruns if cleanup fails."
+      },
+      {
+        "name": "wall_clock_noise",
+        "level": "low",
+        "evidence": "Single-run wall-clock timing includes model/service variability.",
+        "interpretation": "Prefer median and p95 over repeated identical tasks."
+      },
+      {
+        "name": "artifact_quality_scope",
+        "level": "low",
+        "evidence": "acceptance_available=True, fooks_acceptance_failures=0, scope_regressions=0",
+        "interpretation": "Do not cite wins unless fooks passes task acceptance and avoids broader edit scope than vanilla."
+      },
+      {
+        "name": "runtime_token_claim",
+        "level": "medium",
+        "evidence": "Actual OMX/Codex tokens available; fooks used more runtime tokens in 0/3 pair(s).",
+        "interpretation": "Do not claim runtime token reduction from this run; keep proxy compression and actual tokens separate."
+      }
+    ]
+  },
+  "results": [
+    {
+      "task": "T4",
+      "task_name": "Component Extraction",
+      "repo": "formbricks",
+      "difficulty": "medium",
+      "timestamp": "2026-04-20T00:38:51.841695",
+      "iteration": 1,
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "ambiguous-multi-file",
+      "promptSpecificity": "ambiguous",
+      "expectedContextPolicy": "auto",
+      "expectedFirstTurnRuntimeContext": "auto",
+      "expectedFooksPrepare": "scan-attach",
+      "tokens": {
+        "total_files": 882,
+        "raw_bytes": 3607968.0,
+        "compressed_bytes": 1217483.4,
+        "raw_tokens": 901992.0,
+        "compressed_tokens": 304370.0,
+        "tokens_saved": 597621.0,
+        "reduction_pct": 66.25570404172099,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 245781,
+        "files": 1,
+        "files_list": [
+          "apps/web/app/(app)/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx"
+        ],
+        "tokens_used": 81597,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613139",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613139/.codex",
+          "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "vanilla-baseline-no-fooks-context",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the component extraction.\n\nModified:\n- [tab-container.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613139/apps/web/app/(app)/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx:9)\n\nCreated:\n- None\n\nWhat changed:\n- Extracted the visible tab section header JSX (`H3` title plus muted `Small` description) into a local typed `Header` component.\n- Kept `TabContainer`\u2019s props, behavior, layout classes, and rendered structure effectively unchanged.\n- Did not edit API routes, generated files, tests, or locale JSON.\n\nVerification:\n- `git diff --check` passed for the touched file.\n- `pnpm exec prettier --check ...` could not run because `prettier` is not installed in the available workspace binaries.\n",
+        "stderr_tail": ")/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx\n@@ -6,15 +6,23 @@\n   children: React.ReactNode;\n }\n \n+type HeaderProps = Pick<TabContainerProps, \"title\" | \"description\">;\n+\n+const Header = ({ title, description }: HeaderProps) => {\n+  return (\n+    <div className=\"pb-2\">\n+      <H3>{title}</H3>\n+      <Small color=\"muted\" margin=\"headerDescription\">\n+        {description}\n+      </Small>\n+    </div>\n+  );\n+};\n+\n export const TabContainer = ({ title, description, children }: TabContainerProps) => {\n   return (\n     <div className=\"flex h-full grow flex-col items-start space-y-4\">\n-      <div className=\"pb-2\">\n-        <H3>{title}</H3>\n-        <Small color=\"muted\" margin=\"headerDescription\">\n-          {description}\n-        </Small>\n-      </div>\n+      <Header title={title} description={description} />\n       <div className=\"h-full w-full space-y-4 overflow-y-auto\">{children}</div>\n     </div>\n   );\n\ntokens used\n81,597\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "skipped": true,
+            "reason": "build validation not run for vanilla"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-vanilla.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-vanilla.diffstat",
+          "patch_bytes": 1477,
+          "diffstat": " .../components/shareEmbedModal/tab-container.tsx     | 20 ++++++++++++++------\n 1 file changed, 14 insertions(+), 6 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(app)/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=False, action_preserved=False"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=1, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=1, source_files=1"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 321097,
+        "scan_time": 3251,
+        "total_time": 324348,
+        "files": 1,
+        "files_list": [
+          "apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx"
+        ],
+        "tokens_used": 71074,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3251,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 94,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 2656,
+              "stdout_tail": "olveCacheHits\": 165\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/survey/follow-ups/components/follow-up-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 901.67\n      },\n      {\n        \"filePath\": \"apps/storybook/src/App.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 161.45\n      },\n      {\n        \"filePath\": \"apps/web/modules/survey/editor/components/block-card.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 84.32\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/view-permission-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 77.53\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/add-api-key-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 67.26\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 500,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T15:43:16.453Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.codex/fooks/attachments/bm-t4-fooks-1776613391.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.codex/fooks/attachments/bm-t4-fooks-1776613391.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T15:43:16.443Z\",\"attachedAt\":\"2026-04-19T15:43:16.440Z\",\"lastScanAt\":\"2026-04-19T15:43:16.440Z\",\"lastRefreshAt\":\"2026-04-19T15:43:16.440Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.codex",
+          "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
+          "codex_bin": "codex"
+        },
+        "contextMode": "auto",
+        "contextModeReason": "fooks-ambiguous-policy",
+        "contextBudget": {
+          "maxFiles": 5,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the extraction in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16).\n\nChanged:\n- Added a local `Header` component with typed `HeaderProps`.\n- Moved the existing title, description, beta/soon badges, and optional action button JSX into that component.\n- Kept the original styling and behavior intact.\n- Tightened `children` from `any` to `ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- `pnpm exec prettier --check ...` and `pnpm exec eslint ...` could not run because `prettier` and `eslint` are not installed in this worktree.\n- The repo\u2019s local Next docs directory was missing; the required fallback `npx @next/codemod agents-md --output AGENTS.md` failed because network access to npm was blocked.\n",
+        "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n71,074\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"turbo\" not found\n",
+            "package_manager": "pnpm",
+            "method": "turbo"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-fooks.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-fooks.diffstat",
+          "patch_bytes": 3214,
+          "diffstat": " .../settings/components/SettingsCard.tsx           | 58 ++++++++++++++--------\n 1 file changed, 37 insertions(+), 21 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=1, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=1, source_files=1"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": -30.643540387580813,
+        "total": -31.966262648455334
+      },
+      "targetComparability": {
+        "classification": "semantically_comparable_target",
+        "reason": "Both variants produced T4-scored header extraction artifacts, but chose different targets."
+      }
+    },
+    {
+      "task": "T4",
+      "task_name": "Component Extraction",
+      "repo": "formbricks",
+      "difficulty": "medium",
+      "timestamp": "2026-04-20T00:48:45.184297",
+      "iteration": 2,
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "ambiguous-multi-file",
+      "promptSpecificity": "ambiguous",
+      "expectedContextPolicy": "auto",
+      "expectedFirstTurnRuntimeContext": "auto",
+      "expectedFooksPrepare": "scan-attach",
+      "tokens": {
+        "total_files": 882,
+        "raw_bytes": 3403344.0,
+        "compressed_bytes": 1143366.0,
+        "raw_tokens": 850836.0,
+        "compressed_tokens": 285841.0,
+        "tokens_saved": 564994.0,
+        "reduction_pct": 66.40463026952315,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 310672,
+        "files": 1,
+        "files_list": [
+          "apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx"
+        ],
+        "tokens_used": 215116,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613733",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613733/.codex",
+          "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "vanilla-baseline-no-fooks-context",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the component extraction in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613733/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx).\n\nWhat changed:\n- Extracted the section header JSX into a local typed `Header` component.\n- Kept the same title, description, beta/coming soon badges, optional action button, classes, and translation behavior.\n- Tightened `children` from `any` to `ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- `pnpm --filter @formbricks/web exec tsc --noEmit --pretty false` could not run because `tsc` is not installed in this checkout.\n- `pnpm exec prettier --check ...` could not run because `prettier` is not installed in this checkout.\n",
+        "stderr_tail": "e}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n215,116\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "skipped": true,
+            "reason": "build validation not run for vanilla"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-vanilla.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-vanilla.diffstat",
+          "patch_bytes": 3214,
+          "diffstat": " .../settings/components/SettingsCard.tsx           | 58 ++++++++++++++--------\n 1 file changed, 37 insertions(+), 21 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=1, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=1, source_files=1"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 228963,
+        "scan_time": 4482,
+        "total_time": 233445,
+        "files": 1,
+        "files_list": [
+          "apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx"
+        ],
+        "tokens_used": 81400,
+        "prepare": {
+          "success": true,
+          "duration_ms": 4482,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 109,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 3800,
+              "stdout_tail": "lveCacheHits\": 165\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/survey/follow-ups/components/follow-up-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 1357.1\n      },\n      {\n        \"filePath\": \"apps/storybook/src/App.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 192.43\n      },\n      {\n        \"filePath\": \"apps/web/modules/survey/editor/components/block-card.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 186.63\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/view-permission-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 93.84\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/add-api-key-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 80.13\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 572,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T15:54:16.959Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.codex/fooks/attachments/bm-t4-fooks-1776614050.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.codex/fooks/attachments/bm-t4-fooks-1776614050.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T15:54:16.947Z\",\"attachedAt\":\"2026-04-19T15:54:16.937Z\",\"lastScanAt\":\"2026-04-19T15:54:16.937Z\",\"lastRefreshAt\":\"2026-04-19T15:54:16.937Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.codex",
+          "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
+          "codex_bin": "codex"
+        },
+        "contextMode": "auto",
+        "contextModeReason": "fooks-ambiguous-policy",
+        "contextBudget": {
+          "maxFiles": 5,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Implemented the local header extraction in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16).\n\nWhat changed:\n- Added typed `HeaderProps` and `SettingsCardProps`.\n- Extracted the existing title, description, badge, and optional action button JSX into a local non-exported `Header` component.\n- Kept the existing classes, translation key, conditionals, and `buttonInfo` behavior intact.\n- Replaced `children: any` with `children: ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- Focused `prettier` and `eslint` checks could not run because this worktree has no installed dependencies; `pnpm exec prettier` and filtered `eslint` both reported the commands were not found.\n",
+        "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n81,400\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"turbo\" not found\n",
+            "package_manager": "pnpm",
+            "method": "turbo"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-fooks.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-fooks.diffstat",
+          "patch_bytes": 3393,
+          "diffstat": " .../settings/components/SettingsCard.tsx           | 73 +++++++++++++---------\n 1 file changed, 43 insertions(+), 30 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=1, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=1, source_files=1"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 26.3007287428542,
+        "total": 24.858049647216358
+      },
+      "targetComparability": {
+        "classification": "same_component_or_file",
+        "reason": "Both variants changed the same file set."
+      }
+    },
+    {
+      "task": "T4",
+      "task_name": "Component Extraction",
+      "repo": "formbricks",
+      "difficulty": "medium",
+      "timestamp": "2026-04-20T00:58:13.397145",
+      "iteration": 3,
+      "repoClass": "external-oss-nextjs-tailwind",
+      "taskClass": "ambiguous-multi-file",
+      "promptSpecificity": "ambiguous",
+      "expectedContextPolicy": "auto",
+      "expectedFirstTurnRuntimeContext": "auto",
+      "expectedFooksPrepare": "scan-attach",
+      "tokens": {
+        "total_files": 882,
+        "raw_bytes": 2792676.6,
+        "compressed_bytes": 933861.6,
+        "raw_tokens": 698169.0,
+        "compressed_tokens": 233465.0,
+        "tokens_saved": 464703.0,
+        "reduction_pct": 66.56033856551811,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 407582,
+        "files": 1,
+        "files_list": [
+          "apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx"
+        ],
+        "tokens_used": 93867,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776614300",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776614300/.codex",
+          "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
+          "codex_bin": "codex"
+        },
+        "contextMode": "no-op",
+        "contextModeReason": "vanilla-baseline-no-fooks-context",
+        "contextBudget": {
+          "maxFiles": 0,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Extracted the settings section header JSX into a local typed `Header` component in [SettingsCard.tsx](</Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776614300/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16>).\n\nWhat changed:\n- Added `HeaderProps` and `SettingsCardProps`.\n- Moved the existing title, description, beta/soon badges, and optional action button into `Header`.\n- Kept styling, rendered markup, button behavior, and existing translation usage intact.\n- Tightened `children` from `any` to `ReactNode`.\n\nModified files:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nCreated files:\n- None\n\nVerification:\n- `git diff --check -- apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx` passed.\n- Targeted `prettier` and `eslint` checks could not run because this workspace has no installed `prettier`/`eslint` binaries in `node_modules`.\n- I did not edit API routes, generated files, tests, or locale JSON.\n",
+        "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n93,867\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "skipped": true,
+            "reason": "build validation not run for vanilla"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-vanilla.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-vanilla.diffstat",
+          "patch_bytes": 3393,
+          "diffstat": " .../settings/components/SettingsCard.tsx           | 73 +++++++++++++---------\n 1 file changed, 43 insertions(+), 30 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=1, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=1, source_files=1"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 342696,
+        "scan_time": 3390,
+        "total_time": 346086,
+        "files": 1,
+        "files_list": [
+          "apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx"
+        ],
+        "tokens_used": 85063,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3390,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 90,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 2786,
+              "stdout_tail": "lveCacheHits\": 165\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/survey/follow-ups/components/follow-up-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 883.37\n      },\n      {\n        \"filePath\": \"apps/storybook/src/App.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 158.39\n      },\n      {\n        \"filePath\": \"apps/web/modules/survey/editor/components/block-card.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 103.38\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/view-permission-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 74.87\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/add-api-key-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 68.81\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 513,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T16:05:20.006Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.codex/fooks/attachments/bm-t4-fooks-1776614715.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.codex/fooks/attachments/bm-t4-fooks-1776614715.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T16:05:19.996Z\",\"attachedAt\":\"2026-04-19T16:05:19.993Z\",\"lastScanAt\":\"2026-04-19T16:05:19.993Z\",\"lastRefreshAt\":\"2026-04-19T16:05:19.993Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.codex",
+          "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
+          "codex_bin": "codex"
+        },
+        "contextMode": "auto",
+        "contextModeReason": "fooks-ambiguous-policy",
+        "contextBudget": {
+          "maxFiles": 5,
+          "selectedFiles": 0,
+          "totalBytes": 0,
+          "skippedFiles": 0
+        },
+        "contextPolicyVersion": "context-policy.v1",
+        "contextBudgetSource": "expected-policy",
+        "stdout_tail": "Extracted the settings card section header into a local typed `Header` component in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16). It keeps the same title, description, beta/coming-soon badges, optional action button, classes, and translation behavior. I also replaced the previous inline prop object with typed `HeaderProps` and `SettingsCardProps`.\n\nModified:\n- [apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:1)\n\nCreated:\n- None\n\nVerification:\n- `git diff --check` passed.\n- ESLint/TypeScript could not be run because this checkout has no installed `node_modules/.bin` tools, so `eslint` was not found.\n- The required Next docs bootstrap command from `AGENTS.md` failed due blocked network DNS (`ENOTFOUND registry.npmjs.org`) and did not modify `AGENTS.md`.\n",
+        "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n85,063\n",
+        "error": null,
+        "validation": {
+          "typecheck": {
+            "success": false,
+            "error_count": 0,
+            "stderr": null,
+            "stdout": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"tsc\" not found\n",
+            "package_manager": "pnpm",
+            "method": "tsc",
+            "tsconfig_path": "apps/web/tsconfig.json"
+          },
+          "build": {
+            "success": false,
+            "env_gated": false,
+            "error": null,
+            "stdout_tail": "undefined\n\u2009ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL\u2009 Command \"turbo\" not found\n",
+            "package_manager": "pnpm",
+            "method": "turbo"
+          }
+        },
+        "artifact": {
+          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-fooks.patch",
+          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-fooks.diffstat",
+          "patch_bytes": 3385,
+          "diffstat": " .../settings/components/SettingsCard.tsx           | 73 +++++++++++++---------\n 1 file changed, 43 insertions(+), 30 deletions(-)\n",
+          "diff_check": {
+            "success": true,
+            "stdout": "",
+            "stderr": ""
+          },
+          "acceptance": {
+            "available": true,
+            "kind": "component-extraction",
+            "score": 10,
+            "max_score": 11,
+            "passed": true,
+            "checks": [
+              {
+                "name": "header_component_created_or_extracted",
+                "passed": true,
+                "mandatory": true,
+                "details": "header_files=[], header_component_declared=True"
+              },
+              {
+                "name": "original_component_uses_header",
+                "passed": true,
+                "mandatory": true,
+                "details": "non_header_source_files=['apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx']"
+              },
+              {
+                "name": "header_semantics_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "title_signal=True, subtitle_signal=True, removed_semantics=True"
+              },
+              {
+                "name": "header_actions_preserved",
+                "passed": true,
+                "mandatory": true,
+                "details": "action_removed=True, action_preserved=True"
+              },
+              {
+                "name": "no_unused_header_false_positive",
+                "passed": true,
+                "mandatory": true
+              },
+              {
+                "name": "file_scope_capped",
+                "passed": true,
+                "mandatory": true,
+                "details": "source_files=1, roots=['apps']"
+              },
+              {
+                "name": "runtime_files_excluded",
+                "passed": true,
+                "mandatory": true,
+                "details": "files=1, source_files=1"
+              },
+              {
+                "name": "diff_check_passed",
+                "passed": true,
+                "mandatory": true,
+                "details": "ok"
+              },
+              {
+                "name": "style_continuity_present",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "props_are_reasonably_named",
+                "passed": true,
+                "mandatory": false
+              },
+              {
+                "name": "new_file_location_matches_local_pattern",
+                "passed": false,
+                "mandatory": false,
+                "details": "header_files=[]"
+              }
+            ]
+          }
+        },
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 15.919741303590444,
+        "total": 15.088006830527354
+      },
+      "targetComparability": {
+        "classification": "same_component_or_file",
+        "reason": "Both variants changed the same file set."
+      }
+    }
+  ]
+}
