@@ -459,8 +459,11 @@ test("prepareExecutionContext writes context policy metadata and resolves files 
 test("cli run keeps exact-file prompts to one light context file", () => {
   const tempDir = makeTempProject();
   const output = runText(["run", "Please", "update", "src/components/FormSection.tsx"], tempDir);
+  assert.match(output, /Shared Handoff Context/);
   assert.match(output, /Context mode: light/);
   assert.match(output, /1 files/);
+  assert.match(output, /preferred runtime \(codex, claude, omx, etc\.\)/);
+  assert.doesNotMatch(output, /Detected runner:/);
   const context = fs.readFileSync(path.join(tempDir, ".fooks", "temp-context.md"), "utf8");
   assert.match(context, /"contextMode":"light"/);
   assert.match(context, /## src\/components\/FormSection.tsx/);

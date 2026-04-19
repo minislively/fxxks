@@ -69,17 +69,16 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     
     // 4. Prepare execution context (handoff pattern)
     const runner = (options.runner === "auto" || !options.runner) ? detectRunner() : options.runner;
-    console.log("Detected runner:", runner);
-    
+
     let executionContext;
     if (runner === "codex" || runner === "omx") {
       executionContext = await prepareExecutionContext(options.prompt, processedFiles, cwd, selection.policy);
-      console.log("\n=== Handoff Summary ===");
+      console.log("\n=== Shared Handoff Context ===");
       console.log(`Context ready: ${executionContext.contextPath}`);
       console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
       console.log(`Context mode: ${executionContext.contextMode} (${executionContext.contextModeReason})`);
       console.log(`Prompt: "${executionContext.prompt}"`);
-      console.log(`\nNext: Execute with your preferred runtime (omx, codex, claude, etc.)`);
+      console.log(`\nNext: Open this context with your preferred runtime (codex, claude, omx, etc.)`);
       console.log(`Context file: ${executionContext.contextPath}`);
       console.log("======================\n");
     }

@@ -26,6 +26,7 @@ Phase 1 is intentionally narrow:
 
 ```bash
 fooks init
+fooks run "<prompt>"
 fooks scan
 fooks extract <file> --json
 fooks extract <file> --model-payload
@@ -41,6 +42,26 @@ fooks attach claude
 ```
 
 The shipping product name and all supported runtime/storage names are `fooks`.
+
+## First success
+
+Minimal shared path from a clean checkout:
+
+```bash
+npm run build
+fooks attach codex   # or: fooks attach claude
+fooks run "Update src/components/FormSection.tsx"
+```
+
+`fooks run` prepares a shared handoff context file, then leaves execution to the runtime you already use (`codex`, `claude`, `omx`, etc.).
+
+Current support boundary:
+
+- Shared terminal CLI proof today: `init`, `scan`, `decide`, `extract`, `run` handoff context, `attach codex`, `attach claude`
+- Codex-specific extras today: `codex-pre-read`, `codex-runtime-hook`, `install codex-hooks`, `status codex`
+- Claude-specific status today: attach/runtime-manifest proof only; this repo does not yet ship a Claude-native hook installer or runtime bridge
+
+See [`docs/terminal-cli-validation-2026-04-19.md`](docs/terminal-cli-validation-2026-04-19.md) for the exact commands and current proof boundary on `main`.
 
 ## Account context
 
