@@ -178,7 +178,7 @@ if (isDirectExecution) {
   
   runTask({ prompt }).then(result => {
     if (result.success) {
-      console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, ${result.reductionPercent}% smaller, ${result.filesProcessed} files`);
+      console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, processed ${result.filesProcessed} files, estimated extraction opportunity ${result.reductionPercent}%`);
     } else {
       console.error(`✗ Failed: ${result.error}`);
       process.exit(1);

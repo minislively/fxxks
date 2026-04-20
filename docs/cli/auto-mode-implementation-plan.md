@@ -1,5 +1,10 @@
 # Fooks Auto Mode Implementation Plan
 
+> Historical planning note. This document records an earlier proposed UX and is
+> not the current claim surface. Current `fooks run` behavior is a shared/manual
+> handoff path; size percentages should be treated as estimated extraction
+> opportunity, not delivered runtime-token savings for Claude.
+
 ## Current State
 
 ### Already Implemented
@@ -36,7 +41,7 @@
 - [ ] Auto-triggers scan if cache stale (mtime vs timestamp)
 - [ ] Discovers relevant files via discover.ts
 - [ ] Executes via attached runtime
-- [ ] Shows 1-line result: ✓ Done: Xs, Y% smaller, N files changed
+- [ ] Shows 1-line result: ✓ Done: Xs, processed N files, estimated extraction opportunity Y%
 - [ ] Error shows actionable fix: ✗ Failed: [reason]. Fix: [action]
 
 **Risk**: Medium

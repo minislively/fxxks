@@ -213,7 +213,7 @@ async function run(): Promise<void> {
       }
       const result = await runTask({ prompt });
       if (result.success) {
-        console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, ${result.reductionPercent}% smaller, ${result.filesProcessed} files`);
+        console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, processed ${result.filesProcessed} files, estimated extraction opportunity ${result.reductionPercent}%`);
       } else {
         console.error(`✗ Failed: ${result.error}`);
         console.error("Fix: Check file syntax or run with --mode=raw");

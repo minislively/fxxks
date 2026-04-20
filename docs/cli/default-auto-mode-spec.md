@@ -1,5 +1,9 @@
 # Fooks Default Auto Mode CLI UX Specification
 
+> Historical planning note. This spec predates the current claim-safety
+> boundary. Treat output percentages here as estimated extraction opportunity,
+> not as proof of delivered runtime-token savings or Claude runtime automation.
+
 ## Overview
 Fooks CLI provides **zero-configuration automatic optimization** for frontend AI coding tasks. Users install and run—no manual mode selection, no compression theory study required.
 
@@ -172,7 +176,7 @@ npx fooks run "Fix form validation"
 
 ### Default Output (1-line)
 ```
-✓ Done: 4.2s, 62% smaller, 1 file changed
+✓ Done: 4.2s, processed 1 file, estimated extraction opportunity 62%
 ```
 
 ### Error Output
@@ -186,7 +190,7 @@ npx fooks run "Fix form validation"
 ✓ Task complete: Add form validation
   Duration: 4.2s (scan: 0.8s, execution: 3.4s)
   Mode: hybrid (auto-selected)
-  Token summary: ~840K → ~319K (62% reduction)
+  Extraction opportunity: ~840K → ~319K estimated proxy size (62% reduction)
   Files modified: 1 (LoginForm.tsx)
 ```
 

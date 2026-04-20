@@ -59,7 +59,9 @@ Current support boundary:
 
 - Shared terminal CLI proof today: `init`, `scan`, `decide`, `extract`, `run` handoff context, `attach codex`, `attach claude`
 - Codex-specific extras today: `codex-pre-read`, `codex-runtime-hook`, `install codex-hooks`, `status codex`
-- Claude-specific status today: attach/runtime-manifest proof only; this repo does not yet ship a Claude-native hook installer or runtime bridge
+- Claude-specific status today: attach/runtime-manifest proof plus manual/shared handoff only; this repo does not yet ship a Claude-native hook installer, runtime bridge, `status claude`, or Claude runtime-token benchmark proof
+
+Claim boundary: Codex can use the in-repo runtime hook path for repeated-prompt context injection. Claude can consume reduced model-facing artifacts through manual/shared handoff, for example `fooks extract <file> --model-payload`, but this is **not** a claim of automatic Claude runtime token reduction.
 
 See [`docs/terminal-cli-validation-2026-04-19.md`](docs/terminal-cli-validation-2026-04-19.md) for the exact commands and current proof boundary on `main`.
 
@@ -131,6 +133,8 @@ Current verification snapshot:
 
 Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on frontend tasks.
 
+Claim-safety note: the benchmark numbers below are historical Codex-oriented estimates/proxy measurements unless a row explicitly says it was measured as live runtime tokens. They should not be read as Claude runtime-token savings or Claude benchmark wins.
+
 ### Latest Results (2026-04-14 Final Rerun)
 
 | Metric | Vanilla | Fooks | Improvement | Note |
@@ -166,7 +170,7 @@ Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on f
 
 - Expanded from 5 files to 20 files per repo (size-distributed sampling)
 - Raw mode overhead is expected (JSON metadata wrapper); actual delivery uses `useOriginal: true` for tiny files
-- Framework repos are **extraction-test-reference only** — not comparative gating, not task parity benchmark
+- Framework repos are **extraction-test-reference only** — not comparative gating, not task parity benchmark, and not runtime-token proof for Claude
 
 **Fixes applied since previous run:**
 - AST-based styleBranching detection (tiny files now raw correctly)

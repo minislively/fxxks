@@ -104,6 +104,8 @@ Observed result after the first-success wording pass:
 
 This keeps the value proof intact while making the first-success path honest about the product surface: `fooks run` prepares a reusable context handoff and does not claim Claude-native runtime automation.
 
+Follow-up claim-safety note: a Claude attach proof plus `extract --model-payload` proof should be described as a **Claude manual handoff-compatible reduced artifact proof**. It is not evidence of Claude automatic runtime hooks, Claude live runtime-token savings, or Claude benchmark wins.
+
 ## Current support boundary
 
 Validated on current `main` and preserved by the follow-up wording pass:
@@ -111,12 +113,13 @@ Validated on current `main` and preserved by the follow-up wording pass:
 - Shared terminal CLI prep surfaces are agent-neutral: `init`, `scan`, `decide`, `extract`, and attach artifact generation
 - Shared first-success handoff is agent-neutral: `run` prepares a reusable context file and points users back to their preferred runtime
 - Codex has the richer in-repo runtime path today: attach metadata, trust status, pre-read bridge, native hook bridge, and hook preset installer
-- Claude support is real but narrower: attach/runtime-manifest support plus the shared prep flow
+- Claude support is real but narrower: attach/runtime-manifest support plus the shared prep/manual handoff flow
 
 Current gap, still present after validation:
 
 - this repo does not currently ship a Claude-native hook installer or a Claude-specific runtime execution bridge comparable to the Codex hook path
 - internal `run` prep still uses the Codex execution-context helper under the hood, even though the user-facing handoff copy is now runtime-neutral
+- this repo does not currently ship `status claude` or Claude runtime-token benchmark proof
 
 ## Verification
 

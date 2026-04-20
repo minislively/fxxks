@@ -30,6 +30,7 @@ const {
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const { classifyPromptContext, discoverRelevantFilesByPolicy } = require(path.join(repoRoot, "dist", "core", "context-policy.js"));
 const { prepareExecutionContext } = require(path.join(repoRoot, "dist", "adapters", "codex.js"));
+const { attachClaude } = require(path.join(repoRoot, "dist", "adapters", "claude.js"));
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
 const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
 
@@ -467,6 +468,8 @@ test("cli run keeps exact-file prompts to one light context file", () => {
   assert.match(output, /Codex: start `codex` in this repo, then paste your prompt and the context from .*temp-context\.md/);
   assert.match(output, /Claude: start `claude` in this repo, then paste your prompt and the context from .*temp-context\.md/);
   assert.match(output, /preferred runtime \(codex, claude, omx, etc\.\)/);
+  assert.match(output, /estimated extraction opportunity \d+%/);
+  assert.doesNotMatch(output, /\d+% smaller/);
   assert.doesNotMatch(output, /Detected runner:/);
   assert.doesNotMatch(output, /--context/);
   assert.doesNotMatch(output, /hook installer/i);
@@ -1116,6 +1119,45 @@ test("attach claude can report blocker without failing contract proof", () => {
   assert.equal(result.runtimeProof.status, "blocked");
   assert.ok(result.runtimeProof.attemptedAt);
   assert.ok(result.runtimeProof.blocker);
+});
+
+test("attach claude pairs manual handoff proof with reduced model-facing artifact", () => {
+  const tempDir = makeTempProject();
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const samplePath = path.join(tempDir, "src", "components", "FormSection.tsx");
+
+  withEnv({ FOOKS_CLAUDE_HOME: claudeHome }, () => {
+    const result = attachClaude(samplePath, tempDir);
+    assert.equal(result.runtime, "claude");
+    assert.equal(result.contractProof.passed, true);
+    assert.equal(result.runtimeProof.status, "passed");
+    assert.ok(result.runtimeProof.attemptedAt);
+
+    const manifestPath = runtimeManifestPath(result);
+    assert.ok(manifestPath);
+    assert.ok(fs.existsSync(manifestPath));
+    assert.ok(result.filesCreated.some((item) => item.endsWith(path.join("claude", "adapter.json"))));
+    assert.ok(result.filesCreated.some((item) => item.endsWith(path.join("claude", "context-template.md"))));
+    assert.ok(fs.existsSync(path.join(tempDir, ".fooks", "adapters", "claude", "context-template.md")));
+
+    const manifestText = fs.readFileSync(manifestPath, "utf8");
+    const manifest = JSON.parse(manifestText);
+    assert.equal(manifest.runtime, "claude");
+    assert.equal(manifest.runtimeBridge, undefined);
+    assert.equal(manifest.supportedHookEvents, undefined);
+    assert.doesNotMatch(manifestText, /codex-runtime-hook|UserPromptSubmit|SessionStart|Stop/);
+  });
+
+  const fullResult = extractFile(samplePath);
+  const payload = toModelFacingPayload(fullResult, tempDir);
+  const sourceBytes = Buffer.byteLength(fs.readFileSync(samplePath, "utf8"), "utf8");
+  const payloadBytes = Buffer.byteLength(JSON.stringify(payload), "utf8");
+
+  assert.equal(fullResult.mode, "compressed");
+  assert.equal(payload.mode, "compressed");
+  assert.equal(payload.filePath, path.join("src", "components", "FormSection.tsx"));
+  assert.equal("rawText" in payload, false);
+  assert.ok(payloadBytes < sourceBytes, `expected reduced handoff artifact, got payload=${payloadBytes}, source=${sourceBytes}`);
 });
 
 test("attach can use explicit active account override instead of repository metadata", () => {
