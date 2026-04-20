@@ -23,6 +23,7 @@ jobs:
       matrix:
         node-version:
           - '20'
+          - '24'
 
     steps:
       - name: Check out repository
