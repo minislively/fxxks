@@ -29,6 +29,14 @@ permissions, and metadata before it could support an automatic savings claim.
 Keep [`docs/opencode-read-interception.md`](opencode-read-interception.md)
 aligned with any future change to this boundary.
 
+The opencode boundary is intentional. The current bridge may steer users toward
+`fooks_extract`, but it must not be described as automatic `read` interception.
+A future project-local `read` shadow would need to preserve opencode's native
+read behavior for directories, offset/limit ranges, binary/image/PDF handling,
+permissions, and metadata before it could support an automatic savings claim.
+Keep [`docs/opencode-read-interception.md`](opencode-read-interception.md)
+aligned with any future change to this boundary.
+
 Benchmark and language evidence for this boundary must be checked against:
 
 - `benchmarks/frontend-harness/README.md` — current frontend harness methodology and prepared-context/proxy estimates.
