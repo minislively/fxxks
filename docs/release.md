@@ -21,6 +21,14 @@ Before a public release, keep the public claim surface aligned to this matrix:
 | Claude | Manual/shared handoff prepared by `fooks setup` when possible | Automatic hooks, prompt interception, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 
+The opencode boundary is intentional. The current bridge may steer users toward
+`fooks_extract`, but it must not be described as automatic `read` interception.
+A future project-local `read` shadow would need to preserve opencode's native
+read behavior for directories, offset/limit ranges, binary/image/PDF handling,
+permissions, and metadata before it could support an automatic savings claim.
+Keep [`docs/opencode-read-interception.md`](opencode-read-interception.md)
+aligned with any future change to this boundary.
+
 Benchmark and language evidence for this boundary must be checked against:
 
 - `benchmarks/frontend-harness/README.md` — current frontend harness methodology and prepared-context/proxy estimates.

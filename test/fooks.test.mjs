@@ -1337,9 +1337,10 @@ test("install opencode-tool creates project-local fooks_extract tool and slash c
   assert.doesNotMatch(artifact, /exec\(/);
 
   const command = fs.readFileSync(result.commandPath, "utf8");
-  assert.match(command, /description: Use fooks_extract/);
+  assert.match(command, /description: Explicitly steer opencode to fooks_extract/);
   assert.match(command, /\$ARGUMENTS/);
   assert.match(command, /Call the `fooks_extract` custom tool/);
+  assert.match(command, /explicit tool-selection steering/);
   assert.match(command, /Do not claim automatic opencode read interception or runtime-token savings/);
 });
 
@@ -1446,13 +1447,17 @@ test("install rejects unknown targets with all supported install options", () =>
 test("docs describe opencode as manual custom-tool support without runtime savings claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
-  const combined = `${readme}\n${setup}`;
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const interception = fs.readFileSync(path.join(repoRoot, "docs", "opencode-read-interception.md"), "utf8");
+  const combined = `${readme}\n${setup}\n${release}\n${interception}`;
 
   assert.match(combined, /fooks install opencode-tool/);
   assert.match(combined, /\/fooks-extract/);
   assert.match(combined, /manual\/semi-automatic/);
   assert.match(combined, /custom-tool/);
+  assert.match(combined, /tool-selection steering/);
   assert.match(combined, /read interception|intercept opencode `read` calls/);
+  assert.match(combined, /project-local `read` shadow|project-local `read` override/);
   assert.match(combined, /runtime-token savings|runtime-token benchmark claim/);
   assert.match(combined, /Claude and opencode/);
 });

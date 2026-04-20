@@ -126,6 +126,14 @@ The generated slash command follows opencode's project command convention: markd
 
 Treat this as a usability bridge, not as a benchmark result. This setup guide does not claim opencode runtime-token savings unless a future benchmark explicitly measures them.
 
+Keep these distinct:
+
+- explicit `/fooks-extract ...` usage;
+- tool-selection steering toward `fooks_extract`;
+- true automatic `read` interception.
+
+Today, `fooks install opencode-tool` only covers the first two. It does not install a project-local `read` override. That omission is intentional: opencode's native `read` surface is broader than the current bridge and includes directory reads, `offset`/`limit` handling, binary/image/PDF behavior, permission gates, and reminder metadata. Shipping a generated `read` shadow without reproducing that contract would be a broader and riskier change than this MVP supports. See [`docs/opencode-read-interception.md`](opencode-read-interception.md).
+
 ## Advanced commands
 
 Mostly for debugging:

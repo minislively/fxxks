@@ -86,6 +86,14 @@ In opencode, run `/fooks-extract path/to/File.tsx` or ask the model to call `foo
 
 This custom tool and slash command do **not** intercept opencode `read` calls, do **not** install a `tool.execute.before` read replacement hook, and do **not** establish an opencode runtime-token benchmark claim. The slash command only reduces the small usability risk that the model might not choose the tool on its own. Automatic opencode context interception is a separate future project that needs its own quality and token measurements.
 
+Keep these three levels separate:
+
+- explicit use: the user runs `/fooks-extract path/to/File.tsx`
+- tool-selection steering: the generated slash command nudges opencode toward `fooks_extract`, but still does not replace normal `read`
+- automatic read interception: a separate bridge would need to substitute fooks output into normal opencode file reads without broad regressions
+
+fooks does **not** currently install a project-local `read` shadow for opencode. opencode's built-in `read` behavior is broader than this repo's current custom tool bridge: it covers directories, line offsets/limits, binary/image/PDF handling, permission checks, and reminder metadata. Replacing that safely is outside the narrow issue-59 scope and would need a dedicated compatibility and measurement project before any automatic savings claim. See [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md).
+
 ## Support boundaries
 
 | Environment | Current support | Runtime-token claim |

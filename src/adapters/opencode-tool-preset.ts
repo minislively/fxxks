@@ -103,14 +103,14 @@ export default tool({
 
 function renderOpenCodeCommand(): string {
   return `---
-description: Use fooks_extract to get a fooks payload for a React TSX/JSX file
+description: Explicitly steer opencode to fooks_extract for a React TSX/JSX file
 ---
 
 Call the \`fooks_extract\` custom tool with \`filePath\` set to \`$ARGUMENTS\`.
 
 Use this when the user wants a fooks model-facing payload for a project-relative \`.tsx\` or \`.jsx\` file. If \`$ARGUMENTS\` is empty, ask for a project-relative TSX/JSX file path before calling the tool.
 
-After the tool returns, summarize the payload and continue from that reduced context. Do not claim automatic opencode read interception or runtime-token savings. If the tool reports that the file is unsupported or outside the project, explain the error and ask for a supported in-project file.
+After the tool returns, summarize the payload and continue from that reduced context. This command is explicit tool-selection steering, not automatic opencode \`read\` interception. Do not claim automatic opencode read interception or runtime-token savings. If the tool reports that the file is unsupported or outside the project, explain the error and ask for a supported in-project file.
 `;
 }
 
@@ -153,7 +153,7 @@ export function installOpenCodeToolPreset(
     mode: "manual/semi-automatic",
     nextSteps: [
       "Open opencode in this project and run /fooks-extract path/to/File.tsx when you want a fooks model-facing payload.",
-      "The /fooks-extract command tells opencode to call fooks_extract, reducing tool-selection ambiguity without intercepting read calls.",
+      "The /fooks-extract command is explicit tool-selection steering toward fooks_extract; it does not replace normal read behavior.",
       "This custom tool and command are manual/semi-automatic; they do not prove automatic opencode runtime token savings.",
     ],
   };
