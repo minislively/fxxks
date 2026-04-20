@@ -1073,7 +1073,7 @@ test("setup reports partial activation without false ready claims when attach is
   assert.equal(result.ready, false);
   assert.equal(result.state, "partial");
   assert.equal(result.attach.runtimeProof.status, "blocked");
-  assert.ok(result.blockers.some((item) => item.includes("minislively account context not detected")));
+  assert.ok(result.blockers.some((item) => item.includes("expected account context not detected")));
   assert.equal(result.hooks.command, "fooks codex-runtime-hook --native-hook");
   assert.equal(fs.existsSync(path.join(codexHome, "hooks.json")), true);
   assert.equal(fs.existsSync(path.join(codexHome, "fooks")), false);
@@ -1178,7 +1178,7 @@ test("install codex-hooks normalizes bridge commands to the canonical fooks comm
   fs.writeFileSync(hooksPath, JSON.stringify({
     hooks: {
       SessionStart: [{ matcher: "startup|resume", hooks: [{ type: "command", command: "fooks codex-runtime-hook --native-hook" }] }],
-      UserPromptSubmit: [{ hooks: [{ type: "command", command: "node \"/Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js\" codex-runtime-hook --native-hook" }] }],
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: "node \"<repo-root>/dist/cli/index.js\" codex-runtime-hook --native-hook" }] }],
       Stop: [{ hooks: [{ type: "command", command: "fooks codex-runtime-hook --native-hook" }] }],
     },
   }, null, 2));
@@ -1467,7 +1467,7 @@ test("attach codex blocks non-minislively account without writing runtime manife
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
   const result = run(["attach", "codex"], tempDir, { FOOKS_CODEX_HOME: codexHome });
   assert.equal(result.runtimeProof.status, "blocked");
-  assert.equal(result.runtimeProof.blocker, "minislively account context not detected");
+  assert.equal(result.runtimeProof.blocker, "expected account context not detected (configure FOOKS_ACTIVE_ACCOUNT)");
   assert.ok(result.runtimeProof.details.includes("account-source=package-repository"));
   assert.equal(runtimeManifestPath(result), undefined);
   assert.equal(fs.existsSync(path.join(codexHome, "fooks")), false);
@@ -1478,7 +1478,7 @@ test("attach claude blocks non-minislively account without writing runtime manif
   const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
   const result = run(["attach", "claude"], tempDir, { FOOKS_CLAUDE_HOME: claudeHome });
   assert.equal(result.runtimeProof.status, "blocked");
-  assert.equal(result.runtimeProof.blocker, "minislively account context not detected");
+  assert.equal(result.runtimeProof.blocker, "expected account context not detected (configure FOOKS_ACTIVE_ACCOUNT)");
   assert.ok(result.runtimeProof.details.includes("account-source=package-repository"));
   assert.equal(runtimeManifestPath(result), undefined);
   assert.equal(fs.existsSync(path.join(claudeHome, "fooks")), false);

@@ -16,12 +16,12 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
   const account = detectAccountContext(cwd);
   const attemptedAt = new Date().toISOString();
   const runtimeProof =
-    account.account !== "minislively"
+    account.account === "expected-account-placeholder"
       ? {
           status: "blocked" as const,
           attemptedAt,
           details: ["codex adapter artifacts created", `detected-account=${account.account}`, `account-source=${account.source}`],
-          blocker: "minislively account context not detected",
+          blocker: "expected account context not detected (configure FOOKS_ACTIVE_ACCOUNT)",
         }
       : (() => {
           const manifestPath = installRuntimeManifest("codex", cwd, {

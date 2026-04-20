@@ -92,7 +92,7 @@ async function initializeProject(cwd = process.cwd()): Promise<{ config: string;
         {
           version: 1,
           createdAt: new Date().toISOString(),
-          targetAccount: process.env.FOOKS_TARGET_ACCOUNT ?? "minislively",
+          targetAccount: process.env.FOOKS_TARGET_ACCOUNT ?? "<your-github-org>",
         },
         null,
         2,

@@ -22,3 +22,16 @@ benchmarks/frontend-harness/.worktrees/
 
 # Public release: exclude internal benchmark reports
 benchmarks/frontend-harness/reports/
+# Internal benchmark results (detailed history)
+benchmarks/results/history/
+benchmarks/results/profiler-*.json
+benchmarks/results/warm-*.json
+
+# Internal tool configurations
+.omc/
+.clawhip/
+.workclaw/
+.codex
+
+# Internal development archive (historical dev docs with internal paths)
+docs/archive/
