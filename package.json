@@ -39,5 +39,6 @@
   "homepage": "https://github.com/minislively/fooks#readme",
   "dependencies": {
     "typescript": "^5.9.2"
-  }
+  },
+  "license": "MIT"
 }
