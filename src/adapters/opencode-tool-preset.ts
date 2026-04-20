@@ -2,16 +2,24 @@ import fs from "node:fs";
 import path from "node:path";
 
 const TOOL_RELATIVE_PATH = path.join(".opencode", "tools", "fooks_extract.ts");
+const COMMAND_RELATIVE_PATH = path.join(".opencode", "commands", "fooks-extract.md");
 const TOOL_NAME = "fooks_extract";
+const COMMAND_NAME = "fooks-extract";
 
 export interface OpenCodeToolPresetResult {
   command: "install opencode-tool";
   runtime: "opencode";
   artifactKind: "custom-tool";
   artifactPath: string;
+  commandPath: string;
   created: boolean;
   modified: boolean;
+  toolCreated: boolean;
+  toolModified: boolean;
+  commandCreated: boolean;
+  commandModified: boolean;
   toolName: typeof TOOL_NAME;
+  commandName: typeof COMMAND_NAME;
   mode: "manual/semi-automatic";
   nextSteps: string[];
 }
@@ -93,34 +101,60 @@ export default tool({
 `;
 }
 
+function renderOpenCodeCommand(): string {
+  return `---
+description: Use fooks_extract to get a fooks payload for a React TSX/JSX file
+---
+
+Call the \`fooks_extract\` custom tool with \`filePath\` set to \`$ARGUMENTS\`.
+
+Use this when the user wants a fooks model-facing payload for a project-relative \`.tsx\` or \`.jsx\` file. If \`$ARGUMENTS\` is empty, ask for a project-relative TSX/JSX file path before calling the tool.
+
+After the tool returns, summarize the payload and continue from that reduced context. Do not claim automatic opencode read interception or runtime-token savings. If the tool reports that the file is unsupported or outside the project, explain the error and ask for a supported in-project file.
+`;
+}
+
+function writeGeneratedArtifact(filePath: string, content: string): { created: boolean; modified: boolean } {
+  const created = !fs.existsSync(filePath);
+  const previous = created ? null : fs.readFileSync(filePath, "utf8");
+  const modified = previous !== content;
+
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  if (modified) {
+    fs.writeFileSync(filePath, content, "utf8");
+  }
+
+  return { created, modified };
+}
+
 export function installOpenCodeToolPreset(
   cwd = process.cwd(),
   displayCliName = "fooks",
 ): OpenCodeToolPresetResult {
   const artifactPath = path.join(cwd, TOOL_RELATIVE_PATH);
-  const artifactDir = path.dirname(artifactPath);
-  const content = renderOpenCodeTool(displayCliName);
-  const created = !fs.existsSync(artifactPath);
-  const previous = created ? null : fs.readFileSync(artifactPath, "utf8");
-  const modified = previous !== content;
-
-  fs.mkdirSync(artifactDir, { recursive: true });
-  if (modified) {
-    fs.writeFileSync(artifactPath, content, "utf8");
-  }
+  const commandPath = path.join(cwd, COMMAND_RELATIVE_PATH);
+  const toolArtifact = writeGeneratedArtifact(artifactPath, renderOpenCodeTool(displayCliName));
+  const commandArtifact = writeGeneratedArtifact(commandPath, renderOpenCodeCommand());
 
   return {
     command: "install opencode-tool",
     runtime: "opencode",
     artifactKind: "custom-tool",
     artifactPath,
-    created,
-    modified,
+    commandPath,
+    created: toolArtifact.created || commandArtifact.created,
+    modified: toolArtifact.modified || commandArtifact.modified,
+    toolCreated: toolArtifact.created,
+    toolModified: toolArtifact.modified,
+    commandCreated: commandArtifact.created,
+    commandModified: commandArtifact.modified,
     toolName: TOOL_NAME,
+    commandName: COMMAND_NAME,
     mode: "manual/semi-automatic",
     nextSteps: [
-      "Open opencode in this project and ask it to call fooks_extract for a .tsx/.jsx file when you want a fooks model-facing payload.",
-      "This custom tool is manual/semi-automatic; it does not intercept opencode read calls or prove automatic runtime token savings.",
+      "Open opencode in this project and run /fooks-extract path/to/File.tsx when you want a fooks model-facing payload.",
+      "The /fooks-extract command tells opencode to call fooks_extract, reducing tool-selection ambiguity without intercepting read calls.",
+      "This custom tool and command are manual/semi-automatic; they do not prove automatic opencode runtime token savings.",
     ],
   };
 }

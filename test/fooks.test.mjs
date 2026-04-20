@@ -1195,7 +1195,7 @@ test("install codex-hooks normalizes bridge commands to the canonical fooks comm
   assert.equal(normalized.hooks.Stop[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
 });
 
-test("install opencode-tool creates a project-local fooks_extract custom tool", () => {
+test("install opencode-tool creates project-local fooks_extract tool and slash command", () => {
   const tempDir = makeTempProject();
   const result = run(["install", "opencode-tool"], tempDir);
 
@@ -1203,10 +1203,16 @@ test("install opencode-tool creates a project-local fooks_extract custom tool", 
   assert.equal(result.runtime, "opencode");
   assert.equal(result.artifactKind, "custom-tool");
   assert.equal(result.toolName, "fooks_extract");
+  assert.equal(result.commandName, "fooks-extract");
   assert.equal(result.mode, "manual/semi-automatic");
   assert.equal(result.created, true);
   assert.equal(result.modified, true);
+  assert.equal(result.toolCreated, true);
+  assert.equal(result.toolModified, true);
+  assert.equal(result.commandCreated, true);
+  assert.equal(result.commandModified, true);
   assert.ok(result.artifactPath.endsWith(path.join(".opencode", "tools", "fooks_extract.ts")));
+  assert.ok(result.commandPath.endsWith(path.join(".opencode", "commands", "fooks-extract.md")));
 
   const artifact = fs.readFileSync(result.artifactPath, "utf8");
   assert.match(artifact, /export default tool\(/);
@@ -1224,19 +1230,35 @@ test("install opencode-tool creates a project-local fooks_extract custom tool", 
   assert.doesNotMatch(artifact, /tool\.execute\.before/);
   assert.doesNotMatch(artifact, /input\.tool\s*===\s*["']read["']/);
   assert.doesNotMatch(artifact, /exec\(/);
+
+  const command = fs.readFileSync(result.commandPath, "utf8");
+  assert.match(command, /description: Use fooks_extract/);
+  assert.match(command, /\$ARGUMENTS/);
+  assert.match(command, /Call the `fooks_extract` custom tool/);
+  assert.match(command, /Do not claim automatic opencode read interception or runtime-token savings/);
 });
 
 test("install opencode-tool is idempotent", () => {
   const tempDir = makeTempProject();
   const first = run(["install", "opencode-tool"], tempDir);
   const firstContent = fs.readFileSync(first.artifactPath, "utf8");
+  const firstCommandContent = fs.readFileSync(first.commandPath, "utf8");
   const second = run(["install", "opencode-tool"], tempDir);
 
   assert.equal(first.created, true);
   assert.equal(first.modified, true);
+  assert.equal(first.toolCreated, true);
+  assert.equal(first.toolModified, true);
+  assert.equal(first.commandCreated, true);
+  assert.equal(first.commandModified, true);
   assert.equal(second.created, false);
   assert.equal(second.modified, false);
+  assert.equal(second.toolCreated, false);
+  assert.equal(second.toolModified, false);
+  assert.equal(second.commandCreated, false);
+  assert.equal(second.commandModified, false);
   assert.equal(fs.readFileSync(second.artifactPath, "utf8"), firstContent);
+  assert.equal(fs.readFileSync(second.commandPath, "utf8"), firstCommandContent);
 });
 
 test("generated opencode tool executes fooks extract through a runtime-shaped harness", async () => {
@@ -1322,6 +1344,7 @@ test("docs describe opencode as manual custom-tool support without runtime savin
   const combined = `${readme}\n${setup}`;
 
   assert.match(combined, /fooks install opencode-tool/);
+  assert.match(combined, /\/fooks-extract/);
   assert.match(combined, /manual\/semi-automatic/);
   assert.match(combined, /custom-tool/);
   assert.match(combined, /read interception|intercept opencode `read` calls/);

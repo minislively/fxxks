@@ -84,27 +84,34 @@ Setup is idempotent: rerunning it should not duplicate fooks hook entries.
 
 ## opencode custom-tool
 
-opencode support is manual/semi-automatic. It is not automatic read interception and does not claim opencode runtime-token savings.
+opencode support is a manual/semi-automatic custom-tool bridge. It is intentionally separate from the Codex hook setup path and does not make an automatic runtime-token savings claim.
+
+From an opencode project root, run:
 
 ```bash
 fooks install opencode-tool
 ```
 
-This creates:
+This creates two project-local files:
 
-```text
-.opencode/tools/fooks_extract.ts
-```
+- `.opencode/tools/fooks_extract.ts` — the custom tool implementation.
+- `.opencode/commands/fooks-extract.md` — a slash command prompt for explicit `/fooks-extract path/to/File.tsx` use.
 
-The generated tool:
+After restarting or opening opencode for that project, run `/fooks-extract path/to/File.tsx` or ask opencode to call `fooks_extract` for a `.tsx` or `.jsx` file when you want a fooks model-facing payload. The slash command reduces tool-selection ambiguity; it is not automatic read interception.
+
+The generated custom tool:
 
 - calls `fooks extract <file> --model-payload`;
-- accepts `.tsx` and `.jsx` files;
-- validates that the file stays inside the current project/worktree;
+- validates that the requested file stays inside the current opencode project/worktree;
+- supports `.tsx` and `.jsx` files in this MVP;
+- does not edit `~/.config/opencode`;
 - does not edit Codex hooks;
-- does not edit global opencode config.
+- does not edit global opencode config;
+- does not install `tool.execute.before` or any opencode `read` interception hook.
 
-Claude and opencode can use fooks payloads through manual/shared handoff paths, but this repo does not claim automatic runtime-token savings for Claude and opencode.
+The generated slash command follows opencode's project command convention: markdown files under `.opencode/commands/` become `/command-name` entries, and `$ARGUMENTS` passes the text after the command into the prompt.
+
+Treat this as a usability bridge, not as a benchmark result. This setup guide does not claim opencode runtime-token savings unless a future benchmark explicitly measures them.
 
 ## Advanced commands
 
@@ -117,3 +124,13 @@ fooks codex-runtime-hook --native-hook
 fooks scan
 fooks extract <file> --model-payload
 ```
+
+Use them only when you are debugging a setup blocker or validating an adapter path directly.
+
+## Support boundaries
+
+- The primary supported automatic activation path today is Codex hook activation through `fooks setup`.
+- Package installation alone does not edit Codex hooks.
+- Claude support remains manual/shared handoff oriented unless a separate Claude-native hook installer is introduced in the future.
+- opencode support is manual/semi-automatic custom-tool and slash-command oriented unless a separate opencode read-interception bridge is introduced and measured in the future.
+- This setup guide does not make benchmark or marketing claims; it only explains installation, activation, verification, and recovery.

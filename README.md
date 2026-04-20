@@ -50,7 +50,7 @@ Latest published Codex-oriented benchmark snapshot (2026-04-14):
 | Large component payloads | full source | compressed payload | **7x-15x smaller** |
 | Success rate | 5/5 | 5/5 | no regression in sample |
 
-These are Codex-focused benchmark/proxy measurements, not Claude or opencode runtime-token savings claims. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md).
+These are Codex-focused benchmark/proxy measurements, not Claude or opencode runtime-token savings claims. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme).
 
 ## Everyday commands
 
@@ -71,17 +71,20 @@ fooks scan
 
 opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.
 
+Install the project-local opencode bridge from the project root:
+
 ```bash
 fooks install opencode-tool
 ```
 
-This creates a project-local custom-tool:
+This creates two project-local opencode artifacts:
 
-```text
-.opencode/tools/fooks_extract.ts
-```
+- `.opencode/tools/fooks_extract.ts` — the custom tool that runs fooks extraction.
+- `.opencode/commands/fooks-extract.md` — a slash command prompt so you can explicitly run `/fooks-extract path/to/File.tsx` instead of relying on model tool-selection heuristics.
 
-Use it when you want opencode to request a fooks payload for a `.tsx` or `.jsx` file.
+In opencode, run `/fooks-extract path/to/File.tsx` or ask the model to call `fooks_extract` for a `.tsx` or `.jsx` file when you want a fooks model-facing payload. The generated tool validates that the requested file stays inside the current opencode project/worktree and calls `fooks extract <file> --model-payload`.
+
+This custom tool and slash command do **not** intercept opencode `read` calls, do **not** install a `tool.execute.before` read replacement hook, and do **not** establish an opencode runtime-token benchmark claim. The slash command only reduces the small usability risk that the model might not choose the tool on its own. Automatic opencode context interception is a separate future project that needs its own quality and token measurements.
 
 ## Support boundaries
 
@@ -100,6 +103,17 @@ fooks setup
 fooks status codex
 fooks status cache
 ```
+
+Advanced direct install paths:
+
+```bash
+fooks install codex-hooks
+fooks install opencode-tool
+```
+
+The Codex hook installer is idempotent: it only adds the `fooks codex-runtime-hook --native-hook` command to `SessionStart`, `UserPromptSubmit`, and `Stop` when those entries are missing, and preserves other hooks already present in `~/.codex/hooks.json`.
+
+The opencode tool installer is also explicit and idempotent, but project-local: it creates `.opencode/tools/fooks_extract.ts` and `.opencode/commands/fooks-extract.md` for manual/semi-automatic use and does not edit Codex hooks or global opencode config.
 
 Common causes:
 
