@@ -1,5 +1,8 @@
 # Rename / Migration Notes
 
+> Archive note: this document predates the public npm package rename. Current public npm installs use `oh-my-fooks`, while the CLI/runtime/storage name remains `fooks`.
+
+
 ## Decision
 
 `fooks` does **not** implement rename-aware or migration-aware behavior in PHASE 1.
@@ -62,7 +65,7 @@ Current rule:
 
 - `.fooks` is the only supported internal project-state path
 - `FOOKS_*` is the only supported env prefix
-- `fooks` is the only supported CLI/package/runtime name
+- `fooks` is the historical CLI/runtime/storage name; current public npm package installs use `oh-my-fooks`
 - future rename work should stay on canonical `fooks` naming only
 
 For the completed removal record, see

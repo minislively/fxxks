@@ -1,6 +1,7 @@
 # fooks
 
-Product / package / primary CLI name: `fooks`
+Product / primary CLI name: `fooks`
+Public npm package name: `oh-my-fooks`
 Local frontend-only context compression engine for React/TSX files.
 
 ## Validation
@@ -24,10 +25,10 @@ Phase 1 is intentionally narrow:
 
 ## Quick start
 
-Regular Codex users should use the one-time setup path:
+Regular Codex users should use the one-time setup path. The public npm package is `oh-my-fooks`, and it installs the `fooks` CLI command:
 
 ```bash
-npm install -g fooks
+npm install -g oh-my-fooks
 fooks setup
 # then open Codex in this repo and work normally
 ```
@@ -41,7 +42,7 @@ fooks setup
 
 `fooks setup` initializes local `.fooks/` state, attaches the current repo to the Codex runtime, merges the fooks Codex hook preset into `~/.codex/hooks.json`, and reports whether the activation is `ready`, `partial`, or `blocked`. The setup command is explicit by design: package installation does **not** silently edit your Codex hooks. For setup output interpretation and troubleshooting, see [`docs/setup.md`](docs/setup.md).
 
-The shipping product name and all supported runtime/storage names are `fooks`.
+The shipping product name and all supported runtime/storage names are `fooks`. The npm package name is `oh-my-fooks` to avoid the already-occupied npm package name `fooks`; users who already have a global `fooks` binary should check for command conflicts before installing. For release-prep checks, see [`docs/release.md`](docs/release.md).
 
 ## Everyday commands
 
@@ -143,7 +144,7 @@ Current verification snapshot:
     - scan startup sub-buckets (`pathsModuleImportMs`, `scanModuleImportMs`, `ensureProjectDataDirsMs`, `commandDispatchResidualMs`)
     - benchmark-harness overhead (`stdoutParseMsByScenario`, `bareNodeProcessAvgMs`, `cliBootstrapNoCommandAvgMs`, `cliBootstrapResidualAvgMs`, `artifactWriteMs`)
 - current optimization read: unchanged-file rereads are under control, measured `scan` startup work is much smaller than before, and the next remaining startup cost is largely explained by bare Node process launch plus a smaller CLI bootstrap residual
-- optimization follow-up ranking: [`docs/benchmark-phase-2-optimization-candidates.md`](docs/benchmark-phase-2-optimization-candidates.md)
+- optimization follow-up ranking: [`docs/archive/benchmark-phase-2-optimization-candidates.md`](docs/archive/benchmark-phase-2-optimization-candidates.md)
 - adoption guardrail for future launcher/helper work: [`docs/performance-vs-operational-complexity.md`](docs/performance-vs-operational-complexity.md)
 - real-environment validation checklist for launcher/helper decisions: [`docs/real-environment-process-model-validation.md`](docs/real-environment-process-model-validation.md)
 
@@ -205,7 +206,7 @@ python3 quick-test.py     # 5-10 min single test
 python3 full-benchmark-suite.py  # 30-60 min full suite
 ```
 
-See [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md) for detailed setup and reproduction instructions.
+See [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/blob/main/benchmarks/frontend-harness/README.md) for detailed setup and reproduction instructions.
 
 ## Model-facing payload
 
@@ -318,7 +319,7 @@ This keeps the product UX quiet by default while still exposing the minimum trus
 
 For a real-world feedback loop after installation, use the checklist in [`docs/codex-live-feedback-checklist.md`](docs/codex-live-feedback-checklist.md).
 
-For the next Phase 2B step — validating remaining trust/refresh/source-of-truth risks in real usage — use [`docs/phase-2b-risk-validation-checklist.md`](docs/phase-2b-risk-validation-checklist.md).
+For the next Phase 2B step — validating remaining trust/refresh/source-of-truth risks in real usage — use the archived checklist in [`docs/archive/phase-2b-risk-validation-checklist.md`](docs/archive/phase-2b-risk-validation-checklist.md).
 
 If you prefer to edit the file manually, add this preset:
 
@@ -418,8 +419,9 @@ See `docs/real-repo-validation.md`.
 
 Canonical runtime/storage naming:
 
-- CLI / package name: `fooks`
+- CLI / runtime/storage name: `fooks`
+- npm package name: `oh-my-fooks`
 - project state dir: `.fooks/`
 - runtime-home manifest dir: `fooks/attachments`
 - supported env names: `FOOKS_*`
-- legacy removal record: [`docs/legacy-removal-checklist.md`](docs/legacy-removal-checklist.md)
+- legacy removal record: [`docs/archive/legacy-removal-checklist.md`](docs/archive/legacy-removal-checklist.md)

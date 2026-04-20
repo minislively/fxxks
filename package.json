@@ -1,7 +1,6 @@
 {
-  "name": "fooks",
+  "name": "oh-my-fooks",
   "version": "0.1.0",
-  "private": true,
   "type": "commonjs",
   "bin": {
     "fooks": "dist/cli/index.js"
@@ -22,13 +21,13 @@
     "lint": "npm run typecheck -- --pretty false"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
-    "typescript": "^5.9.2"
+    "@types/node": "^24.5.2"
   },
-  "description": "fooks repository containing the frontend context compression engine for React/TSX.",
+  "description": "Frontend context compression CLI for React/TSX projects; npm package oh-my-fooks installs the fooks command.",
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "docs"
   ],
   "repository": {
     "type": "git",
@@ -37,5 +36,8 @@
   "bugs": {
     "url": "https://github.com/minislively/fooks/issues"
   },
-  "homepage": "https://github.com/minislively/fooks#readme"
+  "homepage": "https://github.com/minislively/fooks#readme",
+  "dependencies": {
+    "typescript": "^5.9.2"
+  }
 }

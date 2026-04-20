@@ -127,7 +127,7 @@ compressed → hybrid → raw → error (no native degrade)
 - `docs/setup.md` - detailed setup output interpretation and troubleshooting
 
 **Acceptance Criteria**:
-- [ ] `npm install -g fooks` works
+- [ ] `npm install -g oh-my-fooks` works
 - [ ] README has a concise quick start and links to `docs/setup.md` for detailed setup guidance
 - [ ] `docs/setup.md` covers common setup blockers, verification, safe rerun, and manual rollback guidance
 
@@ -148,7 +148,7 @@ compressed → hybrid → raw → error (no native degrade)
 The current preferred Codex activation path is now:
 
 ```bash
-npm install -g fooks
+npm install -g oh-my-fooks
 fooks setup
 # then use Codex normally
 ```
@@ -157,7 +157,7 @@ fooks setup
 
 ## Summary
 
-**Goal**: `npm install -g fooks && fooks setup` one-time activation, followed by normal Codex usage. The older `fooks init && fooks run "task"` path remains useful as a handoff/validation flow, not the primary automatic activation path.
+**Goal**: `npm install -g oh-my-fooks && fooks setup` one-time activation, followed by normal Codex usage. The older `fooks init && fooks run "task"` path remains useful as a handoff/validation flow, not the primary automatic activation path.
 
 **Key Decisions**:
 - Orchestration-centered: scan → decide → extract → fallback → execute

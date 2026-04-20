@@ -158,7 +158,7 @@ The current safe activation contract is an explicit one-time setup command, not 
 
 ```bash
 # 1. Install
-npm install -g fooks
+npm install -g oh-my-fooks
 
 # 2. Activate in the project root
 fooks setup
@@ -171,7 +171,7 @@ fooks setup
 ### Historical first-time user flow
 ```bash
 # 1. Install
-npm install -g fooks
+npm install -g oh-my-fooks
 
 # 2. Initialize (in project root)
 fooks init
@@ -180,11 +180,9 @@ fooks init
 fooks run "Add loading spinner to login button"
 ```
 
-### npx Path (no install)
-```bash
-npx fooks init
-npx fooks run "Fix form validation"
-```
+### No bare npx path
+
+Do not use a bare npx invocation targeting the occupied `fooks` package in public docs. The unscoped npm package name `fooks` is occupied by another owner, so public no-install examples must be package-qualified and separately verified before they are documented.
 
 ---
 

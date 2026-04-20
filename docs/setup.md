@@ -4,10 +4,10 @@ This guide is the user-facing setup and recovery reference for enabling `fooks` 
 
 ## Normal path
 
-Install the CLI, then activate it explicitly in the project root:
+Install the public npm package, then activate the installed `fooks` CLI explicitly in the project root:
 
 ```bash
-npm install -g fooks
+npm install -g oh-my-fooks
 fooks setup
 # then open Codex in this repo and work normally
 ```
@@ -19,7 +19,16 @@ npm run build
 fooks setup
 ```
 
-`npm install -g fooks` installs the CLI only. It does not silently edit or mutate `~/.codex/hooks.json`; the Codex hook wiring happens only when you explicitly run `fooks setup`.
+`npm install -g oh-my-fooks` installs the `fooks` CLI only. It does not silently edit or mutate `~/.codex/hooks.json`; the Codex hook wiring happens only when you explicitly run `fooks setup`. The package name is `oh-my-fooks` because the unscoped npm package name `fooks` is already occupied by another owner.
+
+## Package name vs CLI command
+
+The package and command names intentionally differ:
+
+- install package: `oh-my-fooks`
+- run command: `fooks`
+
+If another tool already installed a global `fooks` binary, your shell may resolve that command first. Check `which fooks` and your global npm prefix if setup appears to run an unexpected binary.
 
 ## What `fooks setup` changes
 
