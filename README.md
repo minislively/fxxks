@@ -39,7 +39,7 @@ npm run build
 fooks setup
 ```
 
-`fooks setup` initializes local `.fooks/` state, attaches the current repo to the Codex runtime, merges the fooks Codex hook preset into `~/.codex/hooks.json`, and reports whether the activation is `ready`, `partial`, or `blocked`. The setup command is explicit by design: package installation does **not** silently edit your Codex hooks.
+`fooks setup` initializes local `.fooks/` state, attaches the current repo to the Codex runtime, merges the fooks Codex hook preset into `~/.codex/hooks.json`, and reports whether the activation is `ready`, `partial`, or `blocked`. The setup command is explicit by design: package installation does **not** silently edit your Codex hooks. For setup output interpretation and troubleshooting, see [`docs/setup.md`](docs/setup.md).
 
 The shipping product name and all supported runtime/storage names are `fooks`.
 
@@ -79,7 +79,7 @@ Current support boundary:
 - Codex-specific advanced surfaces today: `codex-pre-read`, `codex-runtime-hook`, `install codex-hooks`, `status codex`
 - Claude-specific status today: attach/runtime-manifest proof plus manual/shared handoff only; this repo does not yet ship a Claude-native hook installer, runtime bridge, `status claude`, or Claude runtime-token benchmark proof
 
-Claim boundary: Codex can use the in-repo runtime hook path for repeated-prompt context injection. Claude can consume reduced model-facing artifacts through manual/shared handoff, for example `fooks extract <file> --model-payload`, but this is **not** a claim of automatic Claude runtime token reduction.
+Claim boundary: Codex can use the in-repo runtime hook path for repeated-prompt context injection. Claude can consume reduced model-facing artifacts through manual/shared handoff, for example `fooks extract <file> --model-payload`, but this is **not** a claim that Claude receives automatic runtime savings.
 
 See [`docs/terminal-cli-validation-2026-04-19.md`](docs/terminal-cli-validation-2026-04-19.md) for the exact commands and current proof boundary on `main`.
 

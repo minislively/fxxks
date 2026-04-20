@@ -123,12 +123,13 @@ compressed → hybrid → raw → error (no native degrade)
 
 **Touched Files**:
 - `package.json` - Metadata, bin entry, dependencies
-- `README.md` - 3-step quick start, troubleshooting
+- `README.md` - concise first-success quick start
+- `docs/setup.md` - detailed setup output interpretation and troubleshooting
 
 **Acceptance Criteria**:
 - [ ] `npm install -g fooks` works
-- [ ] README has 3-step quick start without external docs
-- [ ] Troubleshooting covers common issues
+- [ ] README has a concise quick start and links to `docs/setup.md` for detailed setup guidance
+- [ ] `docs/setup.md` covers common setup blockers, verification, safe rerun, and manual rollback guidance
 
 **Risk**: Low
 
