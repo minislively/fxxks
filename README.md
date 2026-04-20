@@ -129,4 +129,4 @@ Useful internal docs:
 - Runtime bridge contract: [`docs/runtime-bridge-contract.md`](docs/runtime-bridge-contract.md)
 - Live feedback checklist: [`docs/codex-live-feedback-checklist.md`](docs/codex-live-feedback-checklist.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
-- Benchmark harness: [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md)
+- Benchmark harness: [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme)
