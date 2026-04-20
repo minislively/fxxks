@@ -500,6 +500,25 @@ test("cli run keeps exact-file prompts to one light context file", () => {
   assert.doesNotMatch(context, /## src\/components\/SimpleButton.tsx/);
 });
 
+test("cli run gives direct no-op guidance for new or missing exact-file targets", () => {
+  const tempDir = makeTempProject();
+  const output = runText(["run", "Please", "update", "src/components/NewPanel.tsx"], tempDir);
+  assert.match(output, /Shared Handoff Context/);
+  assert.match(output, /Context mode: no-op \(exact-file-new-or-missing-target\)/);
+  assert.match(output, /Files: 0, Size: 0\.0KB/);
+  assert.match(output, /No reusable source context was selected\./);
+  assert.match(output, /This usually means your prompt targets a new or missing file, so the temp context is metadata-only\./);
+  assert.match(output, /Use your original prompt directly in codex, claude, omx, or another runtime\./);
+  assert.match(output, /If you already ran `fooks setup` for Codex, open `codex` in this repo and work normally\./);
+  assert.match(output, /Metadata-only context file: .*temp-context\.md/);
+  assert.doesNotMatch(output, /Inspect the shared context: cat /);
+  assert.doesNotMatch(output, /then paste your prompt and the context from/);
+  assert.doesNotMatch(output, /preferred runtime \(codex, claude, omx, etc\.\)/);
+  const context = fs.readFileSync(path.join(tempDir, ".fooks", "temp-context.md"), "utf8");
+  assert.match(context, /"contextMode":"no-op"/);
+  assert.doesNotMatch(context, /## src\/components\/NewPanel\.tsx/);
+});
+
 test("runtime hook reuses payload only on repeated same-file prompts in one session", () => {
   const sessionId = `hook-repeat-${Date.now()}`;
   const start = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);

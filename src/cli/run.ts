@@ -31,6 +31,41 @@ function shellQuote(value: string): string {
   return JSON.stringify(value);
 }
 
+function printSharedHandoff(executionContext: {
+  contextPath: string;
+  fileCount: number;
+  totalSize: number;
+  contextMode: string;
+  contextModeReason: string;
+  prompt: string;
+}): void {
+  const quotedContextPath = shellQuote(executionContext.contextPath);
+  console.log("\n=== Shared Handoff Context ===");
+  console.log(`Context ready: ${executionContext.contextPath}`);
+  console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
+  console.log(`Context mode: ${executionContext.contextMode} (${executionContext.contextModeReason})`);
+  console.log(`Prompt: "${executionContext.prompt}"`);
+
+  if (executionContext.contextMode === "no-op" && executionContext.fileCount === 0) {
+    console.log("\nNo reusable source context was selected.");
+    console.log("This usually means your prompt targets a new or missing file, so the temp context is metadata-only.");
+    console.log("\nNext steps:");
+    console.log("Use your original prompt directly in codex, claude, omx, or another runtime.");
+    console.log("If you already ran `fooks setup` for Codex, open `codex` in this repo and work normally.");
+    console.log(`Metadata-only context file: ${executionContext.contextPath}`);
+    console.log("======================\n");
+    return;
+  }
+
+  console.log("\nManual next steps:");
+  console.log(`Inspect the shared context: cat ${quotedContextPath}`);
+  console.log(`Codex: start \`codex\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
+  console.log(`Claude: start \`claude\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
+  console.log("\nNext: Open this context with your preferred runtime (codex, claude, omx, etc.)");
+  console.log(`Context file: ${executionContext.contextPath}`);
+  console.log("======================\n");
+}
+
 export async function runTask(options: RunOptions): Promise<RunResult> {
   const startTime = Date.now();
   
@@ -77,19 +112,7 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     let executionContext;
     if (runner === "codex" || runner === "omx") {
       executionContext = await prepareExecutionContext(options.prompt, processedFiles, cwd, selection.policy);
-      const quotedContextPath = shellQuote(executionContext.contextPath);
-      console.log("\n=== Shared Handoff Context ===");
-      console.log(`Context ready: ${executionContext.contextPath}`);
-      console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
-      console.log(`Context mode: ${executionContext.contextMode} (${executionContext.contextModeReason})`);
-      console.log(`Prompt: "${executionContext.prompt}"`);
-      console.log("\nManual next steps:");
-      console.log(`Inspect the shared context: cat ${quotedContextPath}`);
-      console.log(`Codex: start \`codex\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
-      console.log(`Claude: start \`claude\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
-      console.log("\nNext: Open this context with your preferred runtime (codex, claude, omx, etc.)");
-      console.log(`Context file: ${executionContext.contextPath}`);
-      console.log("======================\n");
+      printSharedHandoff(executionContext);
     }
     
     // 5. Summary
