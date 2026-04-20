@@ -4,7 +4,7 @@
  */
 
 import { readFileSync, readdirSync } from 'fs';
-import { extname, resolve, relative } from 'path';
+import { resolve, relative } from 'path';
 import { ManifestLoader } from './manifest-loader.mjs';
 
 // Taxonomy buckets from TAXONOMY_AND_METRICS_FINAL.md
@@ -19,210 +19,103 @@ export const DEFAULT_BUCKETS = [
   { id: 'real-edit-task', name: 'Real Edit Task', targetSampleSize: 30, deficitThresholdPct: 30 }
 ];
 
-const DEFAULT_PRUNED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage']);
-const MAX_EXAMPLES_PER_REASON = 5;
-
-function normalizePath(path) {
-  return String(path)
-    .replace(/\\/g, '/')
-    .replace(/^\.\//, '')
-    .replace(/^\/+/, '');
-}
-
-function stripTrailingSlash(path) {
-  return normalizePath(path).replace(/\/+$/, '');
-}
-
-function pathBasename(path) {
-  return normalizePath(path).split('/').pop() || '';
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
-}
-
-function expandBracePattern(pattern) {
-  const match = pattern.match(/\{([^{}]+)\}/);
-  if (!match) return [pattern];
-
-  const [token, body] = match;
-  return body.split(',').flatMap(part => expandBracePattern(pattern.replace(token, part)));
-}
-
-function globToRegExp(pattern) {
-  const normalized = normalizePath(pattern);
-  let source = '^';
-
-  for (let idx = 0; idx < normalized.length; idx++) {
-    const char = normalized[idx];
-    const next = normalized[idx + 1];
-
-    if (char === '*') {
-      if (next === '*') {
-        const afterGlobstar = normalized[idx + 2];
-        if (afterGlobstar === '/') {
-          source += '(?:.*/)?';
-          idx += 2;
-        } else {
-          source += '.*';
-          idx += 1;
-        }
-      } else {
-        source += '[^/]*';
-      }
-      continue;
-    }
-
-    if (char === '?') {
-      source += '[^/]';
-      continue;
-    }
-
-    source += escapeRegExp(char);
+// Glob pattern matching with brace expansion support
+function matchesGlob(filePath, pattern) {
+  // If pattern doesn't contain /, match against basename only
+  if (!pattern.includes('/')) {
+    const basename = filePath.split('/').pop();
+    return matchesGlobPattern(basename, pattern);
   }
-
-  source += '$';
-  return new RegExp(source);
+  // Otherwise match against full path
+  return matchesGlobPattern(filePath, pattern);
 }
 
-function matchesGlob(path, pattern) {
-  const normalizedPath = normalizePath(path);
-  const normalizedPattern = normalizePath(pattern);
+function matchesGlobPattern(str, pattern) {
+  // Handle brace expansion: {ts,tsx} -> (ts|tsx)
+  let regexPattern = pattern;
 
-  if (!normalizedPattern) return false;
+  // Handle brace expansion first
+  regexPattern = regexPattern.replace(/\{([^}]+)\}/g, (match, content) => {
+    const options = content.split(',').map(s => s.trim());
+    return `(${options.join('|')})`;
+  });
 
-  const basenameOnly = !normalizedPattern.includes('/');
-  const pathToMatch = basenameOnly ? pathBasename(normalizedPath) : normalizedPath;
+  // Escape remaining dots
+  regexPattern = regexPattern.replace(/\./g, '\\.');
 
-  return expandBracePattern(normalizedPattern).some(expanded => globToRegExp(expanded).test(pathToMatch));
+  // Convert glob wildcards to regex
+  // ** matches any number of directory levels (including /)
+  regexPattern = regexPattern.replace(/\*\*/g, '<<<DOUBLESTAR>>>');
+  // * matches any chars except /
+  regexPattern = regexPattern.replace(/\*/g, '[^/]*');
+  // Restore ** as .*
+  regexPattern = regexPattern.replace(/<<<DOUBLESTAR>>>/g, '.*');
+
+  // Anchor to match full string
+  const regex = new RegExp(`^${regexPattern}$`);
+  return regex.test(str);
 }
 
-function matchesDirectoryPattern(path, pattern) {
-  const normalizedPath = normalizePath(path);
-  const normalizedPattern = normalizePath(pattern);
-  const barePattern = stripTrailingSlash(normalizedPattern);
-
-  if (!barePattern) return false;
-
-  if (!/[?*{}]/.test(barePattern)) {
-    return normalizedPath === barePattern || normalizedPath.startsWith(`${barePattern}/`);
+// Find which source root a path belongs to
+function sourceRootFor(filePath, roots) {
+  for (const root of roots) {
+    // Convert root pattern to regex prefix match
+    let regexPattern = root;
+    regexPattern = regexPattern.replace(/\*\*/g, '.*');
+    regexPattern = regexPattern.replace(/\*/g, '[^/]+');
+    const regex = new RegExp(`^${regexPattern}`);
+    if (regex.test(filePath)) return root;
   }
-
-  return expandBracePattern(`${barePattern}/**`).some(expanded => globToRegExp(expanded).test(normalizedPath));
+  return null;
 }
 
-function matchesPathPattern(path, pattern) {
-  const normalizedPattern = normalizePath(pattern);
-  if (!normalizedPattern) return false;
-
-  if (normalizedPattern.endsWith('/')) {
-    return matchesDirectoryPattern(path, normalizedPattern);
-  }
-
-  if (!normalizedPattern.includes('/') && /[*?{}]/.test(normalizedPattern)) {
-    return matchesGlob(path, normalizedPattern);
-  }
-
-  if (!/[?*{}]/.test(normalizedPattern)) {
-    const normalizedPath = normalizePath(path);
-    return normalizedPath === normalizedPattern || normalizedPath.startsWith(`${normalizedPattern}/`);
-  }
-
-  return matchesGlob(path, normalizedPattern) || matchesDirectoryPattern(path, normalizedPattern);
+// Check if path matches a directory prefix pattern
+function matchesPathPattern(filePath, pattern) {
+  return filePath.startsWith(pattern);
 }
 
-function firstMatchingPattern(path, patterns = [], matcher = matchesPathPattern) {
-  return patterns.find(pattern => matcher(path, pattern));
+// Normalize path separators
+function normalizePath(filePath) {
+  return filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
 }
 
-function matchesAnyGlob(path, patterns = []) {
-  return Boolean(firstMatchingPattern(path, patterns, matchesGlob));
-}
-
-function sourceRootFor(path, sourceRoots = []) {
-  return firstMatchingPattern(path, sourceRoots, matchesDirectoryPattern) || null;
-}
-
-function createDiscoveryStats(repo, manifest) {
-  return {
-    repo: repo.name,
-    sourceRoots: repo.sourceRoots || [],
-    discoveryGlobs: manifest?.discoveryGlobs || [],
-    traversedFileCount: 0,
-    candidateCount: 0,
-    includedCount: 0,
-    prunedDirectoryCount: 0,
-    excludedCounts: {},
-    examples: {
-      included: []
-    },
-    diagnostics: []
-  };
-}
-
-function pushBoundedExample(examples, key, example) {
-  if (!examples[key]) examples[key] = [];
-  if (examples[key].length < MAX_EXAMPLES_PER_REASON) examples[key].push(example);
-}
-
-function recordExclusion(stats, reason, relativePath, details = {}) {
-  stats.excludedCounts[reason] = (stats.excludedCounts[reason] || 0) + 1;
-  pushBoundedExample(stats.examples, reason, { path: relativePath, ...details });
-}
-
-function stripStringLiterals(content) {
-  return content.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, '');
-}
-
+// Check if file has React evidence (JSX or React imports)
 function hasReactEvidence(content) {
-  const sourceWithoutComments = content
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '');
-
-  const hasReactImport = [
-    /import\s+(?:type\s+)?[^;]+from\s+['"]react['"]/,
-    /import\s+React\b/,
-    /import\s+['"]react['"]/
-  ].some(pattern => pattern.test(sourceWithoutComments));
-  if (hasReactImport) return true;
-
-  const sourceWithoutCommentsOrStrings = stripStringLiterals(sourceWithoutComments);
-  return [
-    /React\./,
-    /\bJSX\.Element\b/
-  ].some(pattern => pattern.test(sourceWithoutCommentsOrStrings));
-}
-
-function isSourceSuitable(filePath, content, manifest) {
-  if (manifest?.countRule?.includeNonReact !== false) return true;
-
-  const extension = extname(filePath);
-  if (extension === '.tsx') return true;
-  if (extension === '.ts') return hasReactEvidence(content);
+  // Check for JSX patterns
+  if (/<[A-Z][a-zA-Z]*/.test(content)) return true;
+  if (/<[a-z]+[^>]*>/.test(content) && content.includes('return')) return true;
+  // Check for React imports
+  if (/import\s+.*React/.test(content)) return true;
+  if (/from\s+['"]react['"]/.test(content)) return true;
+  if (/ReactNode|React\.FC|React\.Component/.test(content)) return true;
   return false;
 }
 
-function walkDir(dir, onFile, stats) {
+// Walk directory and collect all files
+function walkDir(dir, baseDir = dir) {
+  const files = [];
+
   function walk(currentDir) {
     const entries = readdirSync(currentDir, { withFileTypes: true });
 
     for (const entry of entries) {
       const fullPath = resolve(currentDir, entry.name);
+      const relPath = relative(baseDir, fullPath);
 
       if (entry.isDirectory()) {
-        if (DEFAULT_PRUNED_DIRS.has(entry.name)) {
-          stats.prunedDirectoryCount += 1;
+        // Skip base excludes
+        if (['node_modules', '.git', 'dist', 'build', '.next', 'coverage'].includes(entry.name)) {
           continue;
         }
         walk(fullPath);
-      } else if (entry.isFile()) {
-        stats.traversedFileCount += 1;
-        onFile(fullPath);
+      } else if (entry.isFile() && /\.(tsx|ts|jsx|js)$/.test(entry.name)) {
+        files.push(relPath.replace(/\\/g, '/'));
       }
     }
   }
 
   walk(dir);
+  return files;
 }
 
 export class BucketClassifier {
@@ -231,79 +124,118 @@ export class BucketClassifier {
     this.buckets = buckets;
     this.manifest = manifest;
     this.lastDiscovery = null;
-    this.discoveryByPath = new Map();
   }
 
   discoverFiles() {
     const repoPath = resolve(this.repo.localPath);
     const discoveryGlobs = this.manifest?.discoveryGlobs || ['**/*.tsx', '**/*.ts'];
-    const globalExcludes = this.manifest?.excludeGlobs || [];
-    const repoExcludes = this.repo.excludedPaths || [];
-    const sourceRoots = this.repo.sourceRoots || [];
-    const stats = createDiscoveryStats(this.repo, this.manifest);
-    const files = [];
-    this.discoveryByPath = new Map();
+    const globalExcludeGlobs = this.manifest?.excludeGlobs || [];
+    const repoExcludePatterns = this.repo?.excludedPaths || [];
+    const sourceRoots = this.repo?.sourceRoots || [];
+    const includeNonReact = this.manifest?.countRule?.includeNonReact ?? false;
 
-    walkDir(repoPath, fullPath => {
-      const relativePath = normalizePath(relative(repoPath, fullPath));
+    // Get all candidate files
+    const allFiles = walkDir(repoPath);
+    const candidates = [];
+    const excluded = {
+      discoveryGlobMismatch: [],
+      outsideSourceRoots: [],
+      repoExcludedPath: [],
+      globalExclude: [],
+      nonReactSource: []
+    };
 
-      if (!matchesAnyGlob(relativePath, discoveryGlobs)) {
-        recordExclusion(stats, 'discoveryGlobMismatch', relativePath);
-        return;
+    for (const filePath of allFiles) {
+      let included = true;
+      let reason = null;
+
+      // Check 1: Must match discovery globs
+      const matchesDiscovery = discoveryGlobs.some(glob => matchesGlob(filePath, glob));
+      if (!matchesDiscovery) {
+        included = false;
+        reason = 'discoveryGlobMismatch';
       }
 
-      stats.candidateCount += 1;
-
-      const sourceRoot = sourceRootFor(relativePath, sourceRoots);
-      if (sourceRoots.length > 0 && !sourceRoot) {
-        recordExclusion(stats, 'outsideSourceRoots', relativePath);
-        return;
+      // Check 2: Must be within source roots (if defined)
+      if (included && sourceRoots.length > 0) {
+        const inSourceRoot = sourceRoots.some(root => sourceRootFor(filePath, [root]));
+        if (!inSourceRoot) {
+          included = false;
+          reason = 'outsideSourceRoots';
+        }
       }
 
-      const repoExclude = firstMatchingPattern(relativePath, repoExcludes, matchesPathPattern);
-      if (repoExclude) {
-        recordExclusion(stats, 'repoExcludedPath', relativePath, { pattern: repoExclude });
-        return;
+      // Check 3: Must not match repo excluded paths
+      if (included && repoExcludePatterns.length > 0) {
+        const matchesRepoExclude = repoExcludePatterns.some(pattern => {
+          // If pattern ends with /, treat as directory prefix
+          if (pattern.endsWith('/')) {
+            return filePath.startsWith(pattern);
+          }
+          // Otherwise treat as glob
+          return matchesGlob(filePath, pattern);
+        });
+        if (matchesRepoExclude) {
+          included = false;
+          reason = 'repoExcludedPath';
+        }
       }
 
-      const globalExclude = firstMatchingPattern(relativePath, globalExcludes, matchesPathPattern);
-      if (globalExclude) {
-        recordExclusion(stats, 'globalExclude', relativePath, { pattern: globalExclude });
-        return;
+      // Check 4: Must not match global excludes
+      if (included && globalExcludeGlobs.length > 0) {
+        const matchesGlobalExclude = globalExcludeGlobs.some(glob => matchesGlob(filePath, glob));
+        if (matchesGlobalExclude) {
+          included = false;
+          reason = 'globalExclude';
+        }
       }
 
-      let content;
-      try {
-        content = readFileSync(fullPath, 'utf-8');
-      } catch (err) {
-        recordExclusion(stats, 'readError', relativePath, { message: err.message });
-        return;
+      // Check 5: Must have React evidence (unless includeNonReact is true)
+      if (included && !includeNonReact) {
+        const fullPath = resolve(repoPath, filePath);
+        try {
+          const content = readFileSync(fullPath, 'utf-8');
+          if (!hasReactEvidence(content)) {
+            included = false;
+            reason = 'nonReactSource';
+          }
+        } catch {
+          included = false;
+          reason = 'nonReactSource';
+        }
       }
 
-      if (!isSourceSuitable(relativePath, content, this.manifest)) {
-        recordExclusion(stats, 'nonReactSource', relativePath);
-        return;
+      if (included) {
+        candidates.push(filePath);
+      } else if (reason) {
+        excluded[reason].push({ path: filePath, reason });
       }
+    }
 
-      const metadata = { relativePath, sourceRoot, inclusionReason: 'included' };
-      this.discoveryByPath.set(fullPath, metadata);
-      files.push(fullPath);
-      stats.includedCount += 1;
-      pushBoundedExample(stats.examples, 'included', metadata);
-    }, stats);
+    // Store discovery metadata
+    // candidateCount = files matching discoveryGlobs (not allFiles)
+    const discoveryMatches = allFiles.filter(f => discoveryGlobs.some(g => matchesGlob(f, g)));
+    this.lastDiscovery = {
+      candidateCount: discoveryMatches.length,
+      includedCount: candidates.length,
+      excludedCounts: {
+        discoveryGlobMismatch: excluded.discoveryGlobMismatch.length,
+        outsideSourceRoots: excluded.outsideSourceRoots.length,
+        repoExcludedPath: excluded.repoExcludedPath.length,
+        globalExclude: excluded.globalExclude.length,
+        nonReactSource: excluded.nonReactSource.length
+      },
+      examples: excluded
+    };
 
-    this.lastDiscovery = stats;
-    return [...new Set(files)];
+    // Return full paths
+    return candidates.map(f => resolve(repoPath, f));
   }
 
   classifyFile(filePath) {
     const content = readFileSync(filePath, 'utf-8');
     const rawBytes = Buffer.byteLength(content, 'utf-8');
     const signals = [];
-    const discoveryMetadata = this.discoveryByPath.get(filePath) || {
-      relativePath: normalizePath(relative(this.repo.localPath, filePath)),
-      sourceRoot: sourceRootFor(relative(this.repo.localPath, filePath), this.repo.sourceRoots || [])
-    };
 
     signals.push({ name: 'rawBytes', value: rawBytes, weight: rawBytes < 500 ? 0.4 : 0.2 });
 
@@ -325,16 +257,12 @@ export class BucketClassifier {
     const bucketId = this.determineBucket(signals, rawBytes, content);
     const confidence = this.calculateConfidence(signals);
 
-    return {
-      filePath,
-      bucketId,
-      confidence,
-      signals,
-      rawBytes,
-      mode: 'raw',
-      relativePath: discoveryMetadata.relativePath,
-      sourceRoot: discoveryMetadata.sourceRoot
-    };
+    // Determine source root for this file
+    const relPath = relative(this.repo.localPath, filePath).replace(/\\/g, '/');
+    const sourceRoots = this.repo?.sourceRoots || [];
+    const sourceRoot = sourceRootFor(relPath, sourceRoots);
+
+    return { filePath, bucketId, confidence, signals, rawBytes, mode: 'raw', sourceRoot };
   }
 
   determineBucket(signals, rawBytes, content) {
@@ -362,7 +290,7 @@ export class BucketClassifier {
 
   classifyAll() {
     const files = this.discoverFiles();
-    console.log(`Discovered ${files.length} eligible files in ${this.repo.name}`);
+    console.log(`Discovered ${files.length} files in ${this.repo.name}`);
 
     const classified = files.map(f => this.classifyFile(f));
     const bucketMap = new Map();
@@ -388,7 +316,6 @@ export class BucketClassifier {
     const report = {
       repo: this.repo.name,
       timestamp: new Date().toISOString(),
-      discovery: this.lastDiscovery,
       totalFiles: 0,
       buckets: {}
     };
@@ -409,7 +336,6 @@ export class BucketClassifier {
           .slice(0, 3)
           .map(f => ({
             path: relative(this.repo.localPath, f.filePath),
-            sourceRoot: f.sourceRoot,
             confidence: Math.round(f.confidence * 100) + '%',
             bytes: f.rawBytes
           }))
@@ -420,15 +346,12 @@ export class BucketClassifier {
   }
 }
 
+// Test exports
 export const _test = {
-  normalizePath,
-  expandBracePattern,
   matchesGlob,
-  matchesPathPattern,
-  matchesDirectoryPattern,
   sourceRootFor,
-  hasReactEvidence,
-  isSourceSuitable
+  matchesPathPattern,
+  normalizePath
 };
 
 // CLI

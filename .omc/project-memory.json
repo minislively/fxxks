@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776643562635,
+  "projectRoot": "/home/bellman/Workspace/fooks",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": null,
+    "scripts": {
+      "build": "tsc -p tsconfig.json",
+      "typecheck": "tsc -p tsconfig.json --noEmit",
+      "test": "npm run build && node --test test/*.test.mjs",
+      "test:integration": "npm run build && node --test test/*.test.mjs",
+      "bench:cache": "npm run build && node scripts/benchmark-cache.mjs",
+      "clean": "rm -rf dist",
+      "bench": "npm run build && node benchmarks/scripts/run-all.mjs",
+      "bench:scan": "npm run build && node benchmarks/scripts/scan-cache.mjs",
+      "bench:process-model": "npm run build && node benchmarks/scripts/process-model-probe.mjs",
+      "bench:extract": "npm run build && node benchmarks/scripts/extract.mjs",
+      "bench:stability": "npm run build && node benchmarks/scripts/stability.mjs",
+      "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs",
+      "lint": "npm run typecheck -- --pretty false"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "src",
+      "test"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "benchmarks": {
+      "path": "benchmarks",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1776643562627,
+      "keyFiles": [
+        "BENCHMARK_ARCHITECTURE.md",
+        "BENCHMARK_HISTORY.md",
+        "TWO_LAYER_SYSTEM_SUMMARY.md",
+        "v2-integration.mjs"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 3,
+      "lastAccessed": 1776643562628,
+      "keyFiles": [
+        "index.d.ts",
+        "index.js",
+        "index.js.map"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 9,
+      "lastAccessed": 1776643562631,
+      "keyFiles": [
+        "BENCHMARK_ENVIRONMENT_AUDIT.md",
+        "CODE_OF_CONDUCT.md",
+        "RISK_AND_MONITORING.md",
+        "codex-live-feedback-checklist.md",
+        "performance-vs-operational-complexity.md"
+      ]
+    },
+    "fixtures": {
+      "path": "fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1776643562632,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1776643562632,
+      "keyFiles": [
+        "benchmark-cache.mjs"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1776643562633,
+      "keyFiles": [
+        "index.ts"
+      ]
+    },
+    "test": {
+      "path": "test",
+      "purpose": "Test files",
+      "fileCount": 7,
+      "lastAccessed": 1776643562633,
+      "keyFiles": [
+        "benchmark-v2-large-mixed.test.mjs",
+        "benchmarks.test.mjs",
+        "cache-resilience.test.mjs",
+        "fooks.test.mjs",
+        "frontend-harness.test.mjs"
+      ]
+    },
+    "benchmarks/fixtures": {
+      "path": "benchmarks/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 1,
+      "lastAccessed": 1776643562633,
+      "keyFiles": [
+        "phase1-fixtures.json"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}
