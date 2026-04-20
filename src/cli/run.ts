@@ -27,6 +27,10 @@ export interface RunResult {
   error?: string;
 }
 
+function shellQuote(value: string): string {
+  return JSON.stringify(value);
+}
+
 export async function runTask(options: RunOptions): Promise<RunResult> {
   const startTime = Date.now();
   
@@ -73,12 +77,17 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     let executionContext;
     if (runner === "codex" || runner === "omx") {
       executionContext = await prepareExecutionContext(options.prompt, processedFiles, cwd, selection.policy);
+      const quotedContextPath = shellQuote(executionContext.contextPath);
       console.log("\n=== Shared Handoff Context ===");
       console.log(`Context ready: ${executionContext.contextPath}`);
       console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
       console.log(`Context mode: ${executionContext.contextMode} (${executionContext.contextModeReason})`);
       console.log(`Prompt: "${executionContext.prompt}"`);
-      console.log(`\nNext: Open this context with your preferred runtime (codex, claude, omx, etc.)`);
+      console.log("\nManual next steps:");
+      console.log(`Inspect the shared context: cat ${quotedContextPath}`);
+      console.log(`Codex: start \`codex\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
+      console.log(`Claude: start \`claude\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
+      console.log("\nNext: Open this context with your preferred runtime (codex, claude, omx, etc.)");
       console.log(`Context file: ${executionContext.contextPath}`);
       console.log("======================\n");
     }

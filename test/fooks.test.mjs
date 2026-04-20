@@ -462,8 +462,14 @@ test("cli run keeps exact-file prompts to one light context file", () => {
   assert.match(output, /Shared Handoff Context/);
   assert.match(output, /Context mode: light/);
   assert.match(output, /1 files/);
+  assert.match(output, /Manual next steps:/);
+  assert.match(output, /Inspect the shared context: cat /);
+  assert.match(output, /Codex: start `codex` in this repo, then paste your prompt and the context from .*temp-context\.md/);
+  assert.match(output, /Claude: start `claude` in this repo, then paste your prompt and the context from .*temp-context\.md/);
   assert.match(output, /preferred runtime \(codex, claude, omx, etc\.\)/);
   assert.doesNotMatch(output, /Detected runner:/);
+  assert.doesNotMatch(output, /--context/);
+  assert.doesNotMatch(output, /hook installer/i);
   const context = fs.readFileSync(path.join(tempDir, ".fooks", "temp-context.md"), "utf8");
   assert.match(context, /"contextMode":"light"/);
   assert.match(context, /## src\/components\/FormSection.tsx/);
