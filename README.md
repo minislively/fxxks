@@ -117,6 +117,13 @@ npm install
 npm test
 ```
 
+Repository layout:
+
+- `src/**/*.ts` is the source of truth for product code.
+- `dist/` is generated JavaScript, declarations, and source maps from `npm run build`.
+- `test/*.mjs` and benchmark `.mjs` files are small Node runners that exercise the built `dist` package.
+- Keep this split unless a TypeScript-runner refactor has a clear payoff; avoiding extra test/runtime tooling is intentional.
+
 Useful internal docs:
 
 - Runtime bridge contract: [`docs/runtime-bridge-contract.md`](docs/runtime-bridge-contract.md)
