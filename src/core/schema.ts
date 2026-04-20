@@ -64,7 +64,7 @@ export type ModelFacingPayload = {
   mode: OutputMode;
   filePath: string;
   useOriginal?: boolean;
-  rawText?: string;
+  rawText?: ExtractionResult["rawText"];
   componentName?: string;
   exports?: ExtractionResult["exports"];
   contract?: ExtractionResult["contract"];

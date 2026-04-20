@@ -62,6 +62,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
   return {
     mode: result.mode,
     filePath: toRelativePath(result.filePath, cwd),
+    ...(result.mode === "raw" && result.rawText ? { rawText: result.rawText } : {}),
     ...(result.componentName ? { componentName: result.componentName } : {}),
     ...(result.exports.length > 0 ? { exports: result.exports } : {}),
     ...(contract ? { contract } : {}),
