@@ -39,6 +39,19 @@ One more change in src/components/Form.tsx: add disabled state.
 
 If fooks cannot safely build a payload, it falls back to normal full-source behavior.
 
+## Benchmark snapshot
+
+Latest published Codex-oriented benchmark snapshot (2026-04-14):
+
+| Metric | Before | With fooks | Result |
+| --- | --- | --- | --- |
+| Estimated token use | ~2.1M | ~450K | **78.2% less** |
+| Average task time | 98.2s | 77.9s | **20.7% faster** |
+| Large component payloads | full source | compressed payload | **7x-15x smaller** |
+| Success rate | 5/5 | 5/5 | no regression in sample |
+
+These are Codex-focused benchmark/proxy measurements, not Claude or opencode runtime-token savings claims. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md).
+
 ## Everyday commands
 
 ```bash
