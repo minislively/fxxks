@@ -70,12 +70,12 @@
 ### Blocker Details
 **External Infrastructure Issue:**
 - All execution attempts (small control prompt, large prompt, vanilla, fooks, wrapper-less) fail with identical error
-- Error: `502 Bad Gateway` on `api.layofflabs.com/v1/responses`
+- Error: `502 Bad Gateway` on `<api-base-url>/v1/responses`
 - Pattern: SessionStart → UserPromptSubmit → Reconnecting 5/5 → 502
 - Root cause: **External gateway stability**, not fooks implementation
 
 ### One-line Verdict
-> **Layer 2 Task Definition/Spec is complete. Real execution is blocked by Codex→layofflabs gateway 502. Therefore Layer 2 real benchmark results do not exist yet.**
+> **Layer 2 Task Definition/Spec is complete. Real execution is blocked by Codex gateway 502. Therefore Layer 2 real benchmark results do not exist yet.**
 
 ---
 

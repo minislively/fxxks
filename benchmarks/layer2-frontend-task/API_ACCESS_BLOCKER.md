@@ -9,7 +9,7 @@
 | 항목 | 상태 | 상세 |
 |------|------|------|
 | **API Key** | ✅ 있음 | `OPENAI_API_KEY`, `ANTHROPIC_AUTH_TOKEN` 환경변수 확인됨 |
-| **API Base URL** | ✅ 설정됨 | `OPENAI_BASE_URL=https://api.layofflabs.com/v1` |
+| **API Base URL** | ✅ 설정됨 | `OPENAI_BASE_URL=<your-api-base-url>` |
 | **Codex CLI** | ✅ 설치됨 | `/mnt/offloading/.nvm/versions/node/v25.1.0/bin/codex` |
 | **Runner 구현** | ❌ 없음 | R4 task 자동 실행/측정/기록 스크립트 미구현 |
 | **Validation Hook** | ❌ 없음 | Codex 결과 → 성공/실패 자동 판정 로직 미구현 |
@@ -27,7 +27,7 @@
 | **API Key access** | ✅ 이미 있음 | 시스템 환경변수로 설정 완료 |
 | **Codex CLI 설정** | ⚠️ 확인 필요 | `~/.codex/config.json` 또는 환경변수 |
 | **Runner 개발** | ❌ 필요 | 에르가재 본인 구현 |
-| **shadcn-ui repo 접근** | ✅ 있음 | `/home/bellman/Workspace/fooks-test-repos/ui` |
+| **shadcn-ui repo 접근** | ✅ 있음 | `<test-repo-path>/ui` |
 
 **필요한 작업:**
 - Codex CLI auth 상태 확인 (`codex auth status`)
@@ -111,7 +111,7 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 |---|---------|--------|-----------|------|
 | 1 | **R4 Runner 미구현** | ⏸️ PARTIAL | runner.js, codex-wrapper.js 구현됐으나 실행은 502 blocked | 미해결 |
 | 2 | **Metric 수집 파이프라인 없음** | ⏸️ PARTIAL | 수집 로직 구현됐으나 실행 불가 | 미해결 |
-| 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | api.layofflabs.com 502 Bad Gateway | **현재 병목** |
+| 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | <api-base-url> 502 Bad Gateway | **현재 병목** |
 
 ---
 
@@ -148,7 +148,7 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 **현재 (정확):** `Codex gateway stability blocker (502)`
 
 ### 세부 사항
-- **증상:** `api.layofflabs.com/v1/...` 502 Bad Gateway
+- **증상:** `<api-base-url>/v1/...` 502 Bad Gateway
 - **재현:** 모든 prompt 크기에서 동일하게 발생
 - **소요:** ~43초 후 실패 (timeout과 무관)
 - **원인:** 외부 서비스 (Codex/게이트웨이) 안정성
@@ -162,7 +162,7 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 - 형수님 지시: **보류**
 
 ### 옵션 B: 게이트웨이 안정성 회복 대기 (현재)
-- `api.layofflabs.com` 안정화 또는 대체 경로 확인 필요
+- `<api-base-url>` 안정화 또는 대체 경로 확인 필요
 - **실제 우선순위**
 
 ### 옵션 C: Anthropic Claude 전환 (컷)

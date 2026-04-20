@@ -69,13 +69,13 @@ node compare.js results/vanilla-run-1.json results/fooks-run-1.json
 
 | Blocker | 상태 | 대응 |
 |---------|------|------|
-| **Codex→layofflabs gateway 502** | ⏸️ **Active** | Real-world benchmark 실행 불가 |
+| **Codex gateway 502** | ⏸️ **Active** | Real-world benchmark 실행 불가 |
 | **Gateway 회복 대기** | ⏸️ **Ongoing** | 주기적 재시도 (30분 간격) |
 | **Lab benchmark (HTTP client)** | ⏸️ **보류** | Real-world 우선, 나중에 구현 |
 
 ### Status Summary
 > **Real-world benchmark 설계는 완료됨.**
-> **실제 실행은 Codex→layofflabs gateway 502로 인해 현재 불가능.**
+> **실제 실행은 Codex gateway 502로 인해 현재 불가능.**
 > **Lab benchmark (HTTP client)는 보조 축으로 보류됨.**
 > **Gateway 회복 시 real-world benchmark 즉시 실행 가능.**
 
@@ -104,5 +104,5 @@ node compare.js results/vanilla-run-1.json results/fooks-run-1.json
 *Design: 에르가재*
 *Date: 2026-04-15*
 *Priority: Real-world benchmark 우선*
-*Blocker: Codex→layofflabs gateway 502 (현실 인정)*
+*Blocker: Codex gateway 502 (현실 인정)*
 *Lab benchmark: 보류*

@@ -70,9 +70,9 @@
 
 | Case | Vanilla Status | Fooks Status | Blocker |
 |------|---------------|--------------|---------|
-| Case 1: Refactor | ⏸️ Not executed | ⏸️ Not executed | Codex→layofflabs gateway 502 |
-| Case 2: Migration | ⏸️ Not executed | ⏸️ Not executed | Codex→layofflabs gateway 502 |
-| Case 3: Feature | ⏸️ Not executed | ⏸️ Not executed | Codex→layofflabs gateway 502 |
+| Case 1: Refactor | ⏸️ Not executed | ⏸️ Not executed | Codex gateway 502 |
+| Case 2: Migration | ⏸️ Not executed | ⏸️ Not executed | Codex gateway 502 |
+| Case 3: Feature | ⏸️ Not executed | ⏸️ Not executed | Codex gateway 502 |
 
 ---
 

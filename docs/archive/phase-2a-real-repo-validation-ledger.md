@@ -1,10 +1,13 @@
 # Phase 2A — Real Repo Validation Ledger
 
+> **Note**: This is a historical validation record. Local paths below are sanitized examples.
+> Original validation paths: `<user-home>/Workspace/ai-job-finder`, `<user-home>/Workspace/hyperflow`
+
 Updated: 2026-04-13 (Asia/Seoul)
 Repos under validation:
-- `/Users/veluga/Documents/Workspace_Minseol/ai-job-finder`
-- `/Users/veluga/Documents/Workspace_Minseol/hyperflow`
-Validation harness repo: `/Users/veluga/Documents/Workspace_Minseol/fooks` (historical captures may still refer to pre-rename paths or legacy compatibility names)
+- `<user-home>/Workspace/ai-job-finder`
+- `<user-home>/Workspace/hyperflow`
+Validation harness repo: `<user-home>/Workspace/fooks` (historical captures may still refer to pre-rename paths or legacy compatibility names)
 Current `fooks` commit at capture time: `4fc8140`
 
 ## Sign-off rule
@@ -134,16 +137,16 @@ Current `fooks` commit at capture time: `4fc8140`
 
 ### Task E — linked-context candidate discovery follow-up
 - Scope searched:
-  - `/Users/veluga/Documents/Workspace_Minseol/ai-job-finder`
-  - `/Users/veluga/Documents/Workspace_Minseol/ai-subsidy-job-finder`
-  - `/Users/veluga/Documents/Workspace_Minseol/portfolio`
-  - `/Users/veluga/Documents/Workspace_Minseol/hyperflow`
+  - `<user-home>/Workspace/ai-job-finder`
+  - `<user-home>/Workspace/ai-subsidy-job-finder`
+  - `<user-home>/Workspace/portfolio`
+  - `<user-home>/Workspace/hyperflow`
 - Search rule:
   - `.tsx/.jsx` importing same-folder `.ts` files that match the current allowlist (`.types/.props/.interface/.config/.util/.utils/.helper/.helpers` or `type`-only imports)
 - Result:
   - qualifying linked `.ts` candidates remain sparse in the active app repos
 - Additional probe:
-  - `/Users/veluga/Documents/Workspace_Minseol/hyperflow/packages/react/src/react.tsx` imports same-folder `./starter`
+  - `<user-home>/Workspace/hyperflow/packages/react/src/react.tsx` imports same-folder `./starter`
   - current `fooks scan` does **not** index `starter.ts` as linked context because it is outside the current bounded allowlist
 - Interpretation:
   - the bounded linked `.ts` policy remains conservative in practice

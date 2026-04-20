@@ -71,8 +71,8 @@ printf 'export function App(){ return <main>Hello</main>; }\n' > "$TMP_PROJECT/s
   HOME="$TMP_HOME/home" \
   XDG_CONFIG_HOME="$TMP_HOME/config" \
   FOOKS_CODEX_HOME="$TMP_HOME/codex" \
-  FOOKS_ACTIVE_ACCOUNT=minislively \
-  FOOKS_TARGET_ACCOUNT=minislively \
+  FOOKS_ACTIVE_ACCOUNT=<your-github-org> \
+  FOOKS_TARGET_ACCOUNT=<your-github-org> \
   "$TMP_PREFIX/bin/fooks" setup
 )
 ```

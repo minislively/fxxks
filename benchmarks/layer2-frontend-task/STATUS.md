@@ -10,13 +10,13 @@
 |-------|------|------|------|
 | **Layer 1: Extraction Benchmark** | 압축/추출/coverage/quality 측정 | ✅ **Active** | nextjs 4 + tailwindcss 5, Avg savings 85.3%, history/latest 체계 |
 | **Layer 2: Task Definition/Spec** | 프론트 작업 아이디어 정의/스펙화 | ✅ **Complete** | 7개 task inventory, R4 spec, validation, metric schema 완성 |
-| **Layer 2: Task Execution** | 실제 AI로 작업 실행/비교 | ⏸️ **Blocked** | Codex→layofflabs gateway 502 |
+| **Layer 2: Task Execution** | 실제 AI로 작업 실행/비교 | ⏸️ **Blocked** | Codex gateway 502 |
 | **Layer 2: Real Benchmark** | 실제 실행 결과 | ❌ **Not yet** | 실행 결과 없음 |
 
 ### 핵심 Canonical 문구
 
 > **Layer 2 Task Definition/Spec is complete.**
-> **Layer 2 real execution is blocked by Codex→layofflabs gateway 502.**
+> **Layer 2 real execution is blocked by Codex gateway 502.**
 > **Therefore Layer 2 real benchmark results do not exist yet.**
 
 ---
@@ -59,7 +59,7 @@
 ### 정확한 Blocker 분석 (최종)
 
 **이전 (부정확):** `API access pending` / `runner implementation pending` / `spec 부족`  
-**현재 (정확):** **`Codex→layofflabs gateway path stability (502)`**
+**현재 (정확):** **`Codex gateway path stability (502)`**
 
 ### 확정된 분리 실험
 
@@ -73,7 +73,7 @@
 **핵심 발견 (최종):**
 ```
 Wrapper-less direct Codex CLI call also fails with identical 502.
-Confirmed: bottleneck is Codex→layofflabs gateway path stability, 
+Confirmed: bottleneck is Codex gateway path stability, 
 NOT fooks wrapper or implementation.
 ```
 
@@ -87,12 +87,12 @@ NOT fooks wrapper or implementation.
 ```
 ERROR: unexpected status 502 Bad Gateway: 
   error code: 502, 
-  url: https://api.layofflabs.com/v1/responses
+  url: <api-base-url>/v1/responses
 ```
 
 ### 결론
 - **내부 구현 문제:** ❌ 아님 (runner, wrapper, spec 모두 완성)
-- **외부 인프라 문제:** ✅ 맞음 (Codex→layofflabs gateway 502)
+- **외부 인프라 문제:** ✅ 맞음 (Codex gateway 502)
 - **Layer 2 benchmark:** ⏸️ 외부 의존성 해결 전까지 보류
 
 ---

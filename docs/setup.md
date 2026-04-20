@@ -69,7 +69,7 @@ Run setup from the project root and confirm the repo has `.tsx` or `.jsx` compon
 If the repo account is ambiguous, set the target explicitly:
 
 ```bash
-FOOKS_TARGET_ACCOUNT=minislively fooks setup
+FOOKS_TARGET_ACCOUNT=<your-github-org> fooks setup
 ```
 
 ### Bad Codex hooks file
