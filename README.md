@@ -15,7 +15,7 @@ cd your-react-project
 fooks setup
 ```
 
-Then open Codex in that repo and work normally. The same setup command also prepares bounded Claude handoff artifacts and an opencode helper when their local runtime homes/tool files are available.
+Then open Codex in that repo and work normally.
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks.
 
@@ -45,17 +45,17 @@ Latest published Codex-oriented benchmark snapshot (2026-04-14):
 
 | Metric | Before | With fooks | Result |
 | --- | --- | --- | --- |
-| Prepared-context proxy estimate | ~2.1M | ~450K | **78.2% less** |
+| Estimated token use | ~2.1M | ~450K | **78.2% less** |
 | Average task time | 98.2s | 77.9s | **20.7% faster** |
 | Large component payloads | full source | compressed payload | **7x-15x smaller** |
 | Success rate | 5/5 | 5/5 | no regression in sample |
 
-These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme). Layer 2 real-runtime task execution is still blocked by an external configured Codex gateway 502, so those real-runtime results do not exist yet.
+These numbers are Codex-focused benchmark/proxy measurements, not Claude or opencode runtime-token savings claims. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md).
 
 ## Everyday commands
 
 ```bash
-fooks setup          # one-time readiness: Codex hooks + Claude handoff + opencode helper
+fooks setup          # one-time Codex activation for this repo
 fooks status codex   # check Codex attach/hook state
 fooks status cache   # check local fooks cache health
 ```
@@ -71,40 +71,25 @@ fooks scan
 
 opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.
 
-`fooks setup` installs the project-local opencode bridge when the project has a supported `.tsx` / `.jsx` component. You can also install or repair just that bridge from the project root:
-
 ```bash
 fooks install opencode-tool
 ```
 
-This creates two project-local opencode artifacts:
+This creates a project-local custom-tool:
 
-- `.opencode/tools/fooks_extract.ts` — the custom tool that runs fooks extraction.
-- `.opencode/commands/fooks-extract.md` — a slash command prompt so you can explicitly run `/fooks-extract path/to/File.tsx` instead of relying on model tool-selection heuristics.
+```text
+.opencode/tools/fooks_extract.ts
+```
 
-In opencode, run `/fooks-extract path/to/File.tsx` or ask the model to call `fooks_extract` for a `.tsx` or `.jsx` file when you want a fooks model-facing payload. The generated tool validates that the requested file stays inside the current opencode project/worktree and calls `fooks extract <file> --model-payload`.
-
-This custom tool and slash command do **not** intercept opencode `read` calls, do **not** install a `tool.execute.before` read replacement hook, and do **not** establish an opencode runtime-token benchmark claim. The slash command only reduces the small usability risk that the model might not choose the tool on its own. Automatic opencode context interception is a separate future project that needs its own quality and token measurements.
-
-Keep these three levels separate:
-
-- explicit use: the user runs `/fooks-extract path/to/File.tsx`
-- tool-selection steering: the generated slash command nudges opencode toward `fooks_extract`, but still does not replace normal `read`
-- automatic read interception: a separate bridge would need to substitute fooks output into normal opencode file reads without broad regressions
-
-fooks does **not** currently install a project-local `read` shadow for opencode. opencode's built-in `read` behavior is broader than this repo's current custom tool bridge: it covers directories, line offsets/limits, binary/image/PDF handling, permission checks, and reminder metadata. Replacing that safely is outside the narrow issue-59 scope and would need a dedicated compatibility and measurement project before any automatic savings claim. See [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md).
+Use it when you want opencode to request a fooks payload for a `.tsx` or `.jsx` file.
 
 ## Support boundaries
 
-| Environment | Current support | Runtime-token claim |
-| --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Codex-oriented benchmark/proxy evidence only |
-| Claude | Manual/shared handoff of fooks payloads | No automatic runtime-token savings claim |
-| opencode | Manual/semi-automatic project-local tool and slash command | No read interception and no automatic runtime-token savings claim |
-
-Claude and opencode do **not** currently have automatic runtime-token savings claims in this repo.
-
-`fooks` is not a universal file-read interceptor. Non-frontend files usually fall back to normal source reading.
+- Codex: automatic repeated-file hook path is supported.
+- Claude and opencode: can consume fooks payloads through manual/shared handoff paths.
+- Claude and opencode do **not** currently have automatic runtime-token savings claims in this repo.
+- fooks is not a universal file-read interceptor.
+- Non-frontend files usually fall back to normal source reading.
 
 ## Troubleshooting
 
@@ -116,23 +101,12 @@ fooks status codex
 fooks status cache
 ```
 
-Advanced direct install paths:
-
-```bash
-fooks install codex-hooks
-fooks install opencode-tool
-```
-
-The Codex hook installer is idempotent: it only adds the `fooks codex-runtime-hook --native-hook` command to `SessionStart`, `UserPromptSubmit`, and `Stop` when those entries are missing, and preserves other hooks already present in `~/.codex/hooks.json`.
-
-The opencode tool installer is also explicit and idempotent, but project-local: it creates `.opencode/tools/fooks_extract.ts` and `.opencode/commands/fooks-extract.md` for manual/semi-automatic use and does not edit Codex hooks or global opencode config.
-
 Common causes:
 
 - You are not in a React/TSX/JSX project root.
 - Another global `fooks` binary is earlier in your PATH.
 - `~/.codex/hooks.json` is invalid JSON or not writable.
-- Your Codex runtime home is missing or not writable; use `FOOKS_CODEX_HOME` for an isolated smoke test.
+- The repo/account context is not allowed for attach.
 
 More setup details: [`docs/setup.md`](docs/setup.md)
 
@@ -143,17 +117,9 @@ npm install
 npm test
 ```
 
-Repository layout:
-
-- `src/**/*.ts` is the source of truth for product code.
-- `dist/` is generated JavaScript, declarations, and source maps from `npm run build`.
-- `test/*.mjs` and benchmark `.mjs` files are small Node runners that exercise the built `dist` package.
-- Keep this split unless a TypeScript-runner refactor has a clear payoff; avoiding extra test/runtime tooling is intentional.
-
 Useful internal docs:
 
 - Runtime bridge contract: [`docs/runtime-bridge-contract.md`](docs/runtime-bridge-contract.md)
 - Live feedback checklist: [`docs/codex-live-feedback-checklist.md`](docs/codex-live-feedback-checklist.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
-- Benchmark harness: [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme)
-- Language/core strategy: [`docs/language-core-strategy.md`](docs/language-core-strategy.md)
+- Benchmark harness: [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md)
