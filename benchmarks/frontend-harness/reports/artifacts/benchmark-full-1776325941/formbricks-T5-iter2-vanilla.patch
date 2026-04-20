@@ -1,0 +1,61 @@
+diff --git a/apps/web/modules/account/components/DeleteAccountModal/index.tsx b/apps/web/modules/account/components/DeleteAccountModal/index.tsx
+index 2ac1335..045ba0f 100644
+--- a/apps/web/modules/account/components/DeleteAccountModal/index.tsx
++++ b/apps/web/modules/account/components/DeleteAccountModal/index.tsx
+@@ -28,12 +28,24 @@ export const DeleteAccountModal = ({
+   const { t } = useTranslation();
+   const [deleting, setDeleting] = useState(false);
+   const [inputValue, setInputValue] = useState("");
++  const [isEmailMalformed, setIsEmailMalformed] = useState(false);
+   const { signOut: signOutWithAudit } = useSignOut({ id: user.id, email: user.email });
++
++  const isConfirmationEmailValid = inputValue === user.email && !isEmailMalformed;
++  const showInputError = inputValue.length > 0 && !isConfirmationEmailValid;
++
+   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+-    setInputValue(e.target.value);
++    const value = e.target.value;
++
++    setInputValue(value);
++    setIsEmailMalformed(value.length > 0 && !e.target.validity.valid);
+   };
+ 
+   const deleteAccount = async () => {
++    if (!isConfirmationEmailValid || deleting) {
++      return;
++    }
++
+     try {
+       setDeleting(true);
+       await deleteUserAction();
+@@ -67,7 +79,7 @@ export const DeleteAccountModal = ({
+       onDelete={() => deleteAccount()}
+       text={t("environments.settings.profile.account_deletion_consequences_warning")}
+       isDeleting={deleting}
+-      disabled={inputValue !== user.email}>
++      disabled={!isConfirmationEmailValid || deleting}>
+       <div className="py-5">
+         <ul className="list-disc pb-6 pl-6">
+           <li>
+@@ -111,10 +123,20 @@ export const DeleteAccountModal = ({
+             onChange={handleInputChange}
+             placeholder={user.email}
+             className="mt-5"
+-            type="text"
++            type="email"
+             id="deleteAccountConfirmation"
+             name="deleteAccountConfirmation"
++            isInvalid={showInputError}
++            aria-invalid={showInputError}
++            aria-describedby={showInputError ? "deleteAccountConfirmation-error" : undefined}
+           />
++          {showInputError && (
++            <p className="mt-1 text-sm text-red-500" id="deleteAccountConfirmation-error">
++              {isEmailMalformed
++                ? t("auth.verification-requested.invalid_email_address")
++                : t("environments.actions.does_not_exactly_match")}
++            </p>
++          )}
+         </form>
+       </div>
+     </DeleteDialog>

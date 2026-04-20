@@ -1,0 +1,34 @@
+diff --git a/apps/web/modules/auth/login/components/login-form.tsx b/apps/web/modules/auth/login/components/login-form.tsx
+index ca7fe44..1759680 100644
+--- a/apps/web/modules/auth/login/components/login-form.tsx
++++ b/apps/web/modules/auth/login/components/login-form.tsx
+@@ -147,6 +147,7 @@ export const LoginForm = ({
+   const [totpBackup, setTotpBackup] = useState(false);
+   const formRef = useRef<HTMLFormElement>(null);
+   const [lastLoggedInWith, setLastLoggedInWith] = useState("");
++  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
+ 
+   useEffect(() => {
+     if (typeof window !== "undefined") {
+@@ -238,7 +239,21 @@ export const LoginForm = ({
+                             className="block w-full rounded-md border-slate-300 pr-8 shadow-sm focus:border-brand-dark focus:ring-brand-dark sm:text-sm"
+                             value={field.value}
+                             onChange={(password) => field.onChange(password)}
++                            onKeyDown={(event) => {
++                              setIsCapsLockOn(event.getModifierState("CapsLock"));
++                            }}
++                            onKeyUp={(event) => {
++                              setIsCapsLockOn(event.getModifierState("CapsLock"));
++                            }}
++                            onBlur={() => {
++                              setIsCapsLockOn(false);
++                            }}
+                           />
++                          {isCapsLockOn && (
++                            <p role="status" aria-live="polite" className="mt-1 text-left text-xs text-red-600">
++                              {t("auth.login.caps_lock_is_on", { defaultValue: "Caps Lock is on" })}
++                            </p>
++                          )}
+                           {error?.message && <FormError className="text-left">{error.message}</FormError>}
+                         </div>
+                       </FormControl>

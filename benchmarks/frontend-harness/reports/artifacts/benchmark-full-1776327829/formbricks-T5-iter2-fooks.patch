@@ -1,0 +1,46 @@
+diff --git a/apps/web/modules/auth/login/components/login-form.tsx b/apps/web/modules/auth/login/components/login-form.tsx
+index ca7fe44..ebdc383 100644
+--- a/apps/web/modules/auth/login/components/login-form.tsx
++++ b/apps/web/modules/auth/login/components/login-form.tsx
+@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
+ import Link from "next/link";
+ import { useRouter } from "next/navigation";
+ import { useEffect, useMemo, useRef, useState } from "react";
++import type { KeyboardEvent } from "react";
+ import { FormProvider, SubmitHandler, useForm } from "react-hook-form";
+ import { toast } from "react-hot-toast";
+ import { useTranslation } from "react-i18next";
+@@ -147,6 +148,11 @@ export const LoginForm = ({
+   const [totpBackup, setTotpBackup] = useState(false);
+   const formRef = useRef<HTMLFormElement>(null);
+   const [lastLoggedInWith, setLastLoggedInWith] = useState("");
++  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
++
++  const updateCapsLockState = (event: KeyboardEvent<HTMLInputElement>) => {
++    setIsCapsLockOn(event.getModifierState("CapsLock"));
++  };
+ 
+   useEffect(() => {
+     if (typeof window !== "undefined") {
+@@ -238,7 +244,21 @@ export const LoginForm = ({
+                             className="block w-full rounded-md border-slate-300 pr-8 shadow-sm focus:border-brand-dark focus:ring-brand-dark sm:text-sm"
+                             value={field.value}
+                             onChange={(password) => field.onChange(password)}
++                            onKeyDown={updateCapsLockState}
++                            onKeyUp={updateCapsLockState}
++                            onBlur={() => {
++                              setIsCapsLockOn(false);
++                              field.onBlur();
++                            }}
+                           />
++                          {isCapsLockOn && (
++                            <p
++                              role="status"
++                              aria-live="polite"
++                              className="mt-1 text-left text-xs font-medium text-red-600">
++                              {t("auth.login.caps_lock_warning", { defaultValue: "Caps Lock is on" })}
++                            </p>
++                          )}
+                           {error?.message && <FormError className="text-left">{error.message}</FormError>}
+                         </div>
+                       </FormControl>
