@@ -12,8 +12,8 @@ This benchmark validates AI editing task efficiency + outcome parity through:
 3. **Isolated environment** - Worktree-per-run with isolated `CODEX_HOME`, explicit auth/config sources
 4. **Verifiable output checks** - Modified file count, diff integrity, build/typecheck where applicable
 
-**Out of scope**: Browser runtime, live app execution, E2E verification. This benchmark measures
-code editing efficiency and outcome parity, not browser behavior correctness.
+**Out of scope**: Browser runtime, live app execution, E2E verification, and billing-grade runtime-token accounting. This benchmark measures
+code editing efficiency and outcome parity, plus prepared-context/proxy token estimates, not browser behavior correctness.
 
 ## Latest Results (2026-04-14)
 
@@ -21,8 +21,8 @@ code editing efficiency and outcome parity, not browser behavior correctness.
 |--------|---------|-------|-------------|
 | **Avg Execution Time** | 98,216ms | 77,929ms | **+20.7%** |
 | **Avg Total Time** | - | 82,969ms | **+15.5%** |
-| **Token Reduction** | ~2.1M tokens | ~450K tokens | **-78.2%** |
-| **Tokens Saved** | - | **~1.76M per session** | - |
+| **Prepared Context Reduction** | ~2.1M estimated context tokens | ~450K estimated context tokens | **-78.2%** |
+| **Prepared Context Avoided (proxy est.)** | - | **~1.76M per session** | - |
 | **Success Rate** | 100% (5/5) | 100% (5/5) | - |
 
 ### Tested Tasks
@@ -213,8 +213,8 @@ benchmarks/frontend-harness/
 
 1. **Execution Time**: Time spent in OMX/Codex (excluding fooks scan)
 2. **Total Time**: Including fooks scan for baseline comparison
-3. **Token Reduction**: Estimated via fooks extract compression ratio
-4. **Codex Tokens Used**: Parsed from OMX/Codex output when available
+3. **Prepared Context Reduction**: Estimated via fooks extract compression ratio
+4. **Codex Tokens Used**: Parsed from OMX/Codex output when available; do not treat prepared-context estimates as billing-grade runtime-token savings
 5. **Files Modified**: Number of files changed during task, plus file list
 6. **Success Rate**: Task completion without timeout/error
 
@@ -227,12 +227,12 @@ benchmarks/frontend-harness/
 5. Clean up worktrees
 6. Aggregate results across tasks/repos
 7. Attach risk levels for sample size, environment parity, cleanup,
-   wall-clock noise, and runtime-token claims
+   wall-clock noise, and runtime-token claims; runtime-token claims require direct runtime evidence, while compression-ratio rows remain prepared-context/proxy estimates
 
 ### Key Insights
 
-1. **Token Efficiency**: Fooks compresses codebase context by ~78%, saving ~1.76M tokens per session
-2. **Speed**: Average 20.7% faster execution on typical tasks
+1. **Prepared Context Efficiency**: Fooks reduced prepared context by ~78% in this sample, a proxy estimate of ~1.76M context tokens avoided per session
+2. **Speed**: Average 20.7% faster execution in the 5-task Codex-oriented sample
 3. **Scalability**: Works effectively on large repos (cal.com: 1,691 TSX files, next.js: 28,000+ files)
 4. **Framework Coverage**: Tests span UI libraries, apps, and frameworks (React, Next.js, TailwindCSS)
 5. **Isolation**: Each benchmark uses isolated `.codex` folders per worktree

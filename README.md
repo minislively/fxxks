@@ -45,12 +45,12 @@ Latest published Codex-oriented benchmark snapshot (2026-04-14):
 
 | Metric | Before | With fooks | Result |
 | --- | --- | --- | --- |
-| Estimated token use | ~2.1M | ~450K | **78.2% less** |
+| Prepared-context proxy estimate | ~2.1M | ~450K | **78.2% less** |
 | Average task time | 98.2s | 77.9s | **20.7% faster** |
 | Large component payloads | full source | compressed payload | **7x-15x smaller** |
 | Success rate | 5/5 | 5/5 | no regression in sample |
 
-These are Codex-focused benchmark/proxy measurements, not Claude or opencode runtime-token savings claims. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme).
+These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme). Layer 2 real-runtime task execution is still blocked by an external Codex→layofflabs gateway 502, so those real-runtime results do not exist yet.
 
 ## Everyday commands
 
@@ -88,11 +88,15 @@ This custom tool and slash command do **not** intercept opencode `read` calls, d
 
 ## Support boundaries
 
-- Codex: automatic repeated-file hook path is supported.
-- Claude and opencode: can consume fooks payloads through manual/shared handoff paths.
-- Claude and opencode do **not** currently have automatic runtime-token savings claims in this repo.
-- fooks is not a universal file-read interceptor.
-- Non-frontend files usually fall back to normal source reading.
+| Environment | Current support | Runtime-token claim |
+| --- | --- | --- |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Codex-oriented benchmark/proxy evidence only |
+| Claude | Manual/shared handoff of fooks payloads | No automatic runtime-token savings claim |
+| opencode | Manual/semi-automatic project-local tool and slash command | No read interception and no automatic runtime-token savings claim |
+
+Claude and opencode do **not** currently have automatic runtime-token savings claims in this repo.
+
+`fooks` is not a universal file-read interceptor. Non-frontend files usually fall back to normal source reading.
 
 ## Troubleshooting
 

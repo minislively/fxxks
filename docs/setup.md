@@ -36,7 +36,7 @@ The hook command is:
 fooks codex-runtime-hook --native-hook
 ```
 
-Package install alone does not edit Codex hooks. Activation only happens when you run `fooks setup`.
+Package install alone does not edit Codex hooks. Activation only happens when you run `fooks setup`. Benchmark harness commands are not required for normal use; they are only for maintainers measuring fooks behavior.
 
 ## 3. Check status
 
@@ -62,7 +62,7 @@ Good signs:
 
 ### No React component found
 
-Run setup from the project root and confirm the repo has `.tsx` or `.jsx` component files.
+Run setup from the project root and confirm the repo has `.tsx` or `.jsx` component files. The activation path is intentionally frontend-focused: repos without supported React component candidates should remain `blocked` instead of installing hooks for unrelated file types.
 
 ### Account mismatch
 
@@ -134,3 +134,4 @@ Use them only when you are debugging a setup blocker or validating an adapter pa
 - Claude support remains manual/shared handoff oriented unless a separate Claude-native hook installer is introduced in the future.
 - opencode support is manual/semi-automatic custom-tool and slash-command oriented unless a separate opencode read-interception bridge is introduced and measured in the future.
 - This setup guide does not make benchmark or marketing claims; it only explains installation, activation, verification, and recovery.
+- Benchmark harnesses, Python runners, and Layer 2 task-execution scaffolds are maintainer measurement tools, not required setup steps.

@@ -9,14 +9,14 @@
 | 항목 | 상태 | 상세 |
 |------|------|------|
 | **API Key** | ✅ 있음 | `OPENAI_API_KEY`, `ANTHROPIC_AUTH_TOKEN` 환경변수 확인됨 |
-| **API Base URL** | ✅ 설정됨 | `OPENAI_BASE_URL=<your-api-base-url>` |
+| **API Base URL** | ✅ 설정됨 | `OPENAI_BASE_URL=https://api.layofflabs.com/v1` |
 | **Codex CLI** | ✅ 설치됨 | `/mnt/offloading/.nvm/versions/node/v25.1.0/bin/codex` |
-| **Runner 구현** | ❌ 없음 | R4 task 자동 실행/측정/기록 스크립트 미구현 |
-| **Validation Hook** | ❌ 없음 | Codex 결과 → 성공/실패 자동 판정 로직 미구현 |
+| **Runner 구현** | ✅ 있음 | `runner.js`, `codex-wrapper.js` 구현 완료; 실행은 gateway 502로 blocked |
+| **Validation Hook** | ✅ 스캐폴드 있음 | metric/validation schema와 수집 로직 준비; 실제 Codex 결과는 gateway 502 때문에 미수집 |
 
-**실제 Blocker:**
-1. **Runner 미구현** - API는 있지만 R4 task를 자동으로 돌리는 runner 없음
-2. **Metric 수집 파이프라인** - token usage, latency, retry 자동 측정 미구현
+**실제 Blocker (현재 canonical):**
+1. **Codex Gateway Stability (502)** - minimal prompt부터 R4 prompt까지 동일하게 `api.layofflabs.com` 502 발생
+2. **Real runtime result 없음** - runner/scaffold는 준비됐지만 외부 gateway blocker 때문에 Layer 2 실행 결과가 없음
 
 ---
 
@@ -26,19 +26,19 @@
 |------|-----------|------|
 | **API Key access** | ✅ 이미 있음 | 시스템 환경변수로 설정 완료 |
 | **Codex CLI 설정** | ⚠️ 확인 필요 | `~/.codex/config.json` 또는 환경변수 |
-| **Runner 개발** | ❌ 필요 | 에르가재 본인 구현 |
-| **shadcn-ui repo 접근** | ✅ 있음 | `<test-repo-path>/ui` |
+| **Runner 개발** | ✅ 완료 | `runner.js`, `codex-wrapper.js` 구현됨; gateway 회복 시 실행 가능 |
+| **shadcn-ui repo 접근** | ✅ 있음 | `/home/bellman/Workspace/fooks-test-repos/ui` |
 
 **필요한 작업:**
 - Codex CLI auth 상태 확인 (`codex auth status`)
-- R4 runner 스크립트 개발 (Python/Node)
-- Metric 수집 파이프라인 구현
+- Gateway 502 회복 확인
+- 준비된 runner/metric 파이프라인으로 R4 vanilla/fooks 실행
 
 ---
 
-## 3. Access 생기면 바로 실행할 절차
+## 3. Gateway 회복 시 바로 실행할 절차
 
-### Runner 구현 후 실행 순서
+### Runner 실행 순서
 
 ```bash
 # 1. R4 Runner 실행 (Vanilla)
@@ -78,7 +78,7 @@ benchmarks/layer2-frontend-task/results/
 
 ## 4. 지금 당장 가능한 사전점검
 
-**API Key 없이도 가능:**
+**Gateway 회복 전에도 가능:**
 - ✅ R4 spec trio 검증 (runner-spec, validation-checklist, metric-schema)
 - ✅ Target file 존재 확인 (`combobox-example.tsx`)
 - ✅ Fooks extraction 동작 확인 (payload 생성)
@@ -89,7 +89,7 @@ benchmarks/layer2-frontend-task/results/
 - Layer 1: nextjs 4 + tailwindcss 5, Avg Savings 85.3%, real benchmark ✅
 - Layer 2: R4 Feature Module Split spec/scaffold ✅
 - API: Key 있음, Codex CLI 있음 ✅
-- Runner: 미구현 ❌
+- Runner: 구현됨 ✅, 실제 실행은 gateway 502 blocked ⏸️
 
 **즉시 가능한 작업:**
 ```bash
@@ -99,8 +99,8 @@ codex auth status
 # Fooks extraction 테스트
 node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile('./fooks-test-repos/ui/apps/v4/registry/bases/radix/examples/combobox-example.tsx'))"
 
-# R4 runner 스캐폴드 생성
-# (에르가재 본인 구현)
+# R4 runner/scaffold 확인
+ls benchmarks/layer2-frontend-task
 ```
 
 ---
@@ -109,9 +109,9 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 
 | # | Blocker | 심각도 | 해결 방법 | 상태 |
 |---|---------|--------|-----------|------|
-| 1 | **R4 Runner 미구현** | ⏸️ PARTIAL | runner.js, codex-wrapper.js 구현됐으나 실행은 502 blocked | 미해결 |
-| 2 | **Metric 수집 파이프라인 없음** | ⏸️ PARTIAL | 수집 로직 구현됐으나 실행 불가 | 미해결 |
-| 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | <api-base-url> 502 Bad Gateway | **현재 병목** |
+| 1 | **R4 Runner/Wrapper** | ✅ RESOLVED | runner.js, codex-wrapper.js 구현 완료 | gateway 회복 대기 |
+| 2 | **Metric 수집 파이프라인** | ✅ RESOLVED | 수집 로직 구현 완료 | 실제 결과는 502로 미수집 |
+| 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | api.layofflabs.com 502 Bad Gateway | **현재 병목** |
 
 ---
 
@@ -148,7 +148,7 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 **현재 (정확):** `Codex gateway stability blocker (502)`
 
 ### 세부 사항
-- **증상:** `<api-base-url>/v1/...` 502 Bad Gateway
+- **증상:** `api.layofflabs.com/v1/...` 502 Bad Gateway
 - **재현:** 모든 prompt 크기에서 동일하게 발생
 - **소요:** ~43초 후 실패 (timeout과 무관)
 - **원인:** 외부 서비스 (Codex/게이트웨이) 안정성
@@ -162,7 +162,7 @@ node -e "const fooks = require('./dist/index.js'); console.log(fooks.extractFile
 - 형수님 지시: **보류**
 
 ### 옵션 B: 게이트웨이 안정성 회복 대기 (현재)
-- `<api-base-url>` 안정화 또는 대체 경로 확인 필요
+- `api.layofflabs.com` 안정화 또는 대체 경로 확인 필요
 - **실제 우선순위**
 
 ### 옵션 C: Anthropic Claude 전환 (컷)

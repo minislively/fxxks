@@ -11,6 +11,25 @@ This checklist prepares `fooks` for public npm distribution without publishing i
 
 The npm package name intentionally differs from the CLI command because the unscoped npm package `fooks` is already occupied by another owner. Public docs must not tell users to globally install the occupied `fooks` npm package unless that ownership situation changes and a new release plan is approved.
 
+## Public support and evidence boundary
+
+Before a public release, keep the public claim surface aligned to this matrix:
+
+| Environment | Release-ready wording | Do not claim |
+| --- | --- | --- |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Universal file-read interception |
+| Claude | Manual/shared handoff unless a Claude-native installer exists | Automatic runtime-token savings |
+| opencode | Manual/semi-automatic custom tool and slash command | Read interception or automatic runtime-token savings |
+
+Benchmark and language evidence for this boundary must be checked against:
+
+- `benchmarks/frontend-harness/README.md` — current frontend harness methodology and prepared-context/proxy estimates.
+- `benchmarks/layer2-frontend-task/STATUS.md` — canonical Layer 2 state.
+- `benchmarks/layer2-frontend-task/API_ACCESS_BLOCKER.md` — gateway blocker analysis.
+- `docs/language-core-strategy.md` — Python harness benchmark-only and native-core non-goal constraints.
+
+Prepared-context or proxy estimates must not be worded as measured runtime-token billing savings. Layer 2 real-runtime benchmark results do not exist while the external Codex→layofflabs gateway 502 blocker remains active.
+
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
 ```bash
@@ -38,11 +57,19 @@ Before any real publish, confirm:
 
 ## Verification commands
 
-Run these before discussing publication:
+Use the current `package.json` scripts as the source of truth. For a release-readiness docs PR, run the normal local gates first:
 
 ```bash
 npm run lint
 npm test
+npm run bench:gate
+```
+
+`bench:gate` is a local benchmark gate; it is not the blocked external Layer 2 live benchmark.
+
+For an actual package publication review, also run the pack/install checks below before discussing publication:
+
+```bash
 npm pack --dry-run --json > /tmp/oh-my-fooks-pack.json
 rm -rf /tmp/fooks-pack
 mkdir -p /tmp/fooks-pack

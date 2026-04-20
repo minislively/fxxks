@@ -51,6 +51,11 @@ Poor first candidates:
 - runtime trust/status checks;
 - docs, release, or package glue.
 
+## Release-readiness invariant
+
+Public release docs may cite this file as the boundary for language/runtime claims:
+Python runners are benchmark-only tooling, not product runtime, and native-core work stays out of scope unless the native-core reopen gate below is satisfied.
+
 ## Python benchmark harness direction
 
 The Python benchmark harness is not part of the `fooks` product runtime. It is a
