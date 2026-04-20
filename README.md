@@ -144,3 +144,4 @@ Useful internal docs:
 - Live feedback checklist: [`docs/codex-live-feedback-checklist.md`](docs/codex-live-feedback-checklist.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
 - Benchmark harness: [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme)
+- Language/core strategy: [`docs/language-core-strategy.md`](docs/language-core-strategy.md)

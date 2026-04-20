@@ -52,6 +52,14 @@ code editing efficiency and outcome parity, not browser behavior correctness.
 
 **Results file:** `benchmarks/results/latest/nextjs-tailwindcss-expanded.json`
 
+## Harness language note
+
+The current real-repo harness is Python-based, but Python is not part of the
+`fooks` product runtime. Keep these scripts working while they are the proven
+benchmark path; when reducing Python dependency, prefer porting active runners to
+Node/MJS before adding a Rust toolchain. See
+[`../../docs/language-core-strategy.md`](../../docs/language-core-strategy.md).
+
 ## Quick Start (Local Reproduction)
 
 ### Prerequisites

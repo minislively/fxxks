@@ -116,3 +116,11 @@
 > **one-shot CLI를 안정적인 기본선으로 유지하면서, thinner launcher/helper를 엄격한 reopen 기준 아래 두는 단계**
 
 로 보는 것이 맞습니다.
+---
+
+## Related language strategy
+
+For language-boundary decisions, use the same conservatism: keep the TypeScript
+CLI/hook shell stable, reduce Python benchmark harness friction through MJS first,
+and consider Rust/Go only for measured core hot paths. See
+[`docs/language-core-strategy.md`](./language-core-strategy.md).
