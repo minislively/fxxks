@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Direct API Executor - Layofflabs-independent
+ * Direct API Executor - gateway-independent
  * Executes CASE-1 via direct OpenAI API
  */
 

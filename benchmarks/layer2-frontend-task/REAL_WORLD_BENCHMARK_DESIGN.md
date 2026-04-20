@@ -47,7 +47,7 @@
 ## Runner 구조 (Real-World)
 
 ### 기본 원칙
-- **실제 Codex CLI 사용** (Layofflabs gateway 의존)
+- **실제 Codex CLI 사용** (configured gateway 의존)
 - **Gateway 502 blocker는 현실로 인정** ⏸️
 - **Blocker 해결 시 즉시 실행 가능한 구조** 유지
 

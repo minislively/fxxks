@@ -85,7 +85,7 @@
 - Artifact links
 
 ### Internal (Not Public-Facing)
-- Execution lane: Codex/Layofflabs
+- Execution lane: Codex/configured gateway
 - Gateway stability management
 - Internal blocker tracking
 

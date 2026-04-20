@@ -18,8 +18,8 @@ Before a public release, keep the public claim surface aligned to this matrix:
 | Environment | Release-ready wording | Do not claim |
 | --- | --- | --- |
 | Codex | Automatic repeated-file hook path through `fooks setup` | Universal file-read interception |
-| Claude | Manual/shared handoff unless a Claude-native installer exists | Automatic runtime-token savings |
-| opencode | Manual/semi-automatic custom tool and slash command | Read interception or automatic runtime-token savings |
+| Claude | Manual/shared handoff prepared by `fooks setup` when possible | Automatic hooks, prompt interception, or runtime-token savings |
+| opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 
 Benchmark and language evidence for this boundary must be checked against:
 
@@ -28,7 +28,7 @@ Benchmark and language evidence for this boundary must be checked against:
 - `benchmarks/layer2-frontend-task/API_ACCESS_BLOCKER.md` — gateway blocker analysis.
 - `docs/language-core-strategy.md` — Python harness benchmark-only and native-core non-goal constraints.
 
-Prepared-context or proxy estimates must not be worded as measured runtime-token billing savings. Layer 2 real-runtime benchmark results do not exist while the external Codex→layofflabs gateway 502 blocker remains active.
+Prepared-context or proxy estimates must not be worded as measured runtime-token billing savings. Layer 2 real-runtime benchmark results do not exist while the external configured Codex gateway 502 blocker remains active.
 
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
@@ -54,6 +54,7 @@ Before any real publish, confirm:
 - [ ] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and linked docs.
 - [ ] temp-prefix global install smoke test passes.
 - [ ] isolated `fooks setup` smoke test passes without mutating the real user Codex config.
+- [ ] isolated `fooks setup` smoke test covers a fresh public-style repo without requiring `FOOKS_ACTIVE_ACCOUNT`.
 
 ## Verification commands
 
@@ -90,7 +91,7 @@ Finally, verify setup command routing from a disposable React/TSX-style project 
 ```bash
 TMP_HOME=$(mktemp -d)
 TMP_PROJECT=$(mktemp -d)
-mkdir -p "$TMP_HOME/codex" "$TMP_PROJECT/src"
+mkdir -p "$TMP_HOME/codex" "$TMP_HOME/claude" "$TMP_PROJECT/src"
 printf '{"scripts":{}}\n' > "$TMP_PROJECT/package.json"
 printf 'export function App(){ return <main>Hello</main>; }\n' > "$TMP_PROJECT/src/App.tsx"
 (
@@ -98,10 +99,13 @@ printf 'export function App(){ return <main>Hello</main>; }\n' > "$TMP_PROJECT/s
   HOME="$TMP_HOME/home" \
   XDG_CONFIG_HOME="$TMP_HOME/config" \
   FOOKS_CODEX_HOME="$TMP_HOME/codex" \
-  FOOKS_ACTIVE_ACCOUNT=<your-github-org> \
-  FOOKS_TARGET_ACCOUNT=<your-github-org> \
+  FOOKS_CLAUDE_HOME="$TMP_HOME/claude" \
+  FOOKS_ACTIVE_ACCOUNT= \
+  FOOKS_TARGET_ACCOUNT= \
   "$TMP_PREFIX/bin/fooks" setup
 )
 ```
+
+Expected shape: top-level `ready: true`, `runtimes.codex.state: "automatic-ready"`, `runtimes.claude.state: "handoff-ready"` when the Claude home exists, and `runtimes.opencode.state: "tool-ready"`. Claude/opencode blockers are non-fatal and must remain bounded to handoff/tool readiness wording.
 
 The release-prep PR must state that `npm publish` was not run.

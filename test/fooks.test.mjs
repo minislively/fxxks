@@ -53,6 +53,25 @@ function runTextWithInput(args, input, cwd = repoRoot, envOverrides = {}) {
   });
 }
 
+function collectStrings(value) {
+  const strings = [];
+  const visit = (item) => {
+    if (typeof item === "string") {
+      strings.push(item);
+      return;
+    }
+    if (Array.isArray(item)) {
+      for (const child of item) visit(child);
+      return;
+    }
+    if (item && typeof item === "object") {
+      for (const child of Object.values(item)) visit(child);
+    }
+  };
+  visit(value);
+  return strings;
+}
+
 function makeTempProject(repositoryUrl = "https://github.com/minislively/temp-project.git") {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-"));
   fs.mkdirSync(path.join(tempDir, "src", "components"), { recursive: true });
@@ -1001,10 +1020,12 @@ test("model-facing payload trim hits >=15% reduction on at least two compressed/
 test("setup prepares explicit one-time Codex activation", () => {
   const tempDir = makeTempProject();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
 
   const result = run(["setup"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "minislively",
     FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
   });
 
   assert.equal(result.command, "setup");
@@ -1019,7 +1040,17 @@ test("setup prepares explicit one-time Codex activation", () => {
   assert.deepEqual(result.hooks.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
   assert.equal(result.status.connectionState, "connected");
   assert.equal(result.status.lifecycleState, "ready");
+  assert.equal(result.runtimes.codex.state, "automatic-ready");
+  assert.equal(result.runtimes.codex.blocksOverall, true);
+  assert.equal(result.runtimes.claude.state, "handoff-ready");
+  assert.equal(result.runtimes.claude.blocksOverall, false);
+  assert.equal(result.runtimes.opencode.state, "tool-ready");
+  assert.equal(result.runtimes.opencode.blocksOverall, false);
+  assert.deepEqual(result.summary, ["codex:automatic-ready:ready", "claude:handoff-ready:ready", "opencode:tool-ready:ready"]);
+  assert.ok(result.claimBoundaries.some((item) => item.includes("Claude setup prepares manual/shared handoff artifacts only")));
   assert.ok(result.nextSteps.some((item) => item.includes("Codex")));
+  assert.ok(fs.existsSync(path.join(tempDir, ".opencode", "tools", "fooks_extract.ts")));
+  assert.ok(fs.existsSync(path.join(tempDir, ".opencode", "commands", "fooks-extract.md")));
 
   const hooks = JSON.parse(fs.readFileSync(path.join(codexHome, "hooks.json"), "utf8"));
   assert.equal(hooks.hooks.SessionStart[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
@@ -1027,9 +1058,31 @@ test("setup prepares explicit one-time Codex activation", () => {
   assert.equal(hooks.hooks.Stop[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
 });
 
+test("setup can become ready for a public repo without an active account override", () => {
+  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "",
+    FOOKS_TARGET_ACCOUNT: "",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  });
+
+  assert.equal(result.ready, true);
+  assert.equal(result.state, "ready");
+  assert.equal(result.runtimes.codex.state, "automatic-ready");
+  assert.equal(result.runtimes.claude.state, "handoff-ready");
+  assert.equal(result.runtimes.opencode.state, "tool-ready");
+  assert.ok(result.attach.runtimeProof.details.includes("account-source=package-repository"));
+  assert.ok(result.attach.runtimeProof.details.includes("account-context=example-org"));
+});
+
 test("setup is idempotent and preserves unrelated Codex hooks", () => {
   const tempDir = makeTempProject();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
   const hooksPath = path.join(codexHome, "hooks.json");
   fs.writeFileSync(hooksPath, JSON.stringify({
     hooks: {
@@ -1039,14 +1092,16 @@ test("setup is idempotent and preserves unrelated Codex hooks", () => {
     },
   }, null, 2));
 
-  const env = { FOOKS_ACTIVE_ACCOUNT: "minislively", FOOKS_CODEX_HOME: codexHome };
+  const env = { FOOKS_ACTIVE_ACCOUNT: "minislively", FOOKS_CODEX_HOME: codexHome, FOOKS_CLAUDE_HOME: claudeHome };
   const first = run(["setup"], tempDir, env);
   assert.equal(first.ready, true);
+  assert.equal(first.runtimes.opencode.state, "tool-ready");
   assert.equal(first.hooks.modified, true);
   assert.ok(first.hooks.backupPath);
 
   const second = run(["setup"], tempDir, env);
   assert.equal(second.ready, true);
+  assert.equal(second.runtimes.opencode.state, "tool-ready");
   assert.equal(second.hooks.modified, false);
   assert.deepEqual(second.hooks.skippedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
 
@@ -1067,12 +1122,19 @@ test("setup reports partial activation without false ready claims when attach is
 
   const result = run(["setup"], tempDir, {
     FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: path.join(tempDir, ".missing-claude-home"),
   });
 
   assert.equal(result.command, "setup");
   assert.equal(result.ready, false);
   assert.equal(result.state, "partial");
   assert.equal(result.attach.runtimeProof.status, "blocked");
+  assert.equal(result.runtimes.codex.state, "partial");
+  assert.equal(result.runtimes.codex.blocksOverall, true);
+  assert.equal(result.runtimes.claude.state, "blocked");
+  assert.equal(result.runtimes.claude.blocksOverall, false);
+  assert.equal(result.runtimes.opencode.state, "tool-ready");
+  assert.equal(result.runtimes.opencode.blocksOverall, false);
   assert.ok(result.blockers.some((item) => item.includes("Codex runtime home not detected")));
   assert.equal(fs.existsSync(path.join(codexHome, "fooks")), false);
   assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
@@ -1081,11 +1143,13 @@ test("setup reports partial activation without false ready claims when attach is
 test("setup reports partial activation when Codex hooks cannot be parsed", () => {
   const tempDir = makeTempProject();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
   fs.writeFileSync(path.join(codexHome, "hooks.json"), "{not-json");
 
   const result = run(["setup"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "minislively",
     FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
   });
 
   assert.equal(result.command, "setup");
@@ -1093,6 +1157,10 @@ test("setup reports partial activation when Codex hooks cannot be parsed", () =>
   assert.equal(result.state, "partial");
   assert.equal(result.attach.runtimeProof.status, "passed");
   assert.equal(result.hooks, null);
+  assert.equal(result.runtimes.codex.state, "partial");
+  assert.equal(result.runtimes.codex.blocksOverall, true);
+  assert.equal(result.runtimes.claude.state, "handoff-ready");
+  assert.equal(result.runtimes.opencode.state, "tool-ready");
   assert.ok(result.blockers.some((item) => item.includes("Codex hook preset install failed")));
   assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
   assert.equal(fs.readFileSync(path.join(codexHome, "hooks.json"), "utf8"), "{not-json");
@@ -1109,22 +1177,61 @@ test("setup reports blocked state for projects without React components", () => 
   assert.equal(result.state, "blocked");
   assert.equal(result.attach, null);
   assert.equal(result.hooks, null);
+  assert.equal(result.runtimes.codex.state, "blocked");
+  assert.equal(result.runtimes.codex.blocksOverall, true);
+  assert.equal(result.runtimes.claude.state, "blocked");
+  assert.equal(result.runtimes.claude.blocksOverall, false);
+  assert.equal(result.runtimes.opencode.state, "manual-step-required");
+  assert.equal(result.runtimes.opencode.blocksOverall, false);
+  assert.equal(fs.existsSync(path.join(tempDir, ".opencode")), false);
   assert.ok(result.blockers.some((item) => item.includes("No React/TSX component file found")));
   assert.ok(result.nextSteps.some((item) => item.includes("Add a React/TSX component")));
 });
 
-test("cli usage advertises setup and package install has no auto hook side effects", () => {
+test("cli help advertises setup and package install has no auto hook side effects", () => {
+  const help = runText(["--help"]);
+  assert.match(help, /fooks setup/);
+  assert.match(help, /Codex: automatic runtime hook path/);
+  assert.match(help, /Claude: manual\/shared handoff artifacts only/);
+  assert.match(help, /opencode: manual\/semi-automatic custom tool/);
+  assert.doesNotMatch(help, /Unknown command/);
+
   let usage = "";
   try {
     runText(["unknown-command"]);
   } catch (error) {
     usage = `${error.stdout ?? ""}${error.stderr ?? ""}`;
   }
-  assert.match(usage, /setup/);
+  assert.match(usage, /Unknown command: unknown-command/);
+  assert.match(usage, /fooks setup/);
 
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
+  assert.equal(pkg.scripts?.prepare, undefined);
+});
+
+
+test("setup runtime summary keeps Claude and opencode claims bounded", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  });
+  const text = collectStrings(result).join("\n");
+
+  assert.equal(result.runtimes.claude.blocksOverall, false);
+  assert.equal(result.runtimes.opencode.blocksOverall, false);
+  assert.match(text, /Claude automatic hooks are not enabled by fooks setup/);
+  assert.match(text, /opencode setup does not intercept read calls/);
+  assert.match(text, /opencode setup does not prove automatic runtime-token savings/);
+  assert.doesNotMatch(text, /Claude automatic hooks are enabled/i);
+  assert.doesNotMatch(text, /Claude prompt interception is enabled/i);
+  assert.doesNotMatch(text, /automatic opencode read interception is enabled/i);
+  assert.doesNotMatch(text, /automatic opencode runtime-token savings are enabled/i);
 });
 
 test("install codex-hooks creates a reusable hooks preset", () => {

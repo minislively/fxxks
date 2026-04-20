@@ -12,12 +12,12 @@
 - **Characteristics:** 
   - No specific gateway dependency
   - Local-compatible
-  - Reproducible without Layofflabs infrastructure
+  - Reproducible without private gateway infrastructure
   - Benchmark results are infrastructure-agnostic
   - Provider can be OpenAI, Anthropic, or other compatible APIs
 
 ### Internal Optional Path (Downgraded)
-- **Method:** Codex CLI via Layofflabs gateway
+- **Method:** Codex CLI via configured gateway
 - **Entry:** `runner-internal.js` (existing `runner.js` repurposed)
 - **Characteristics:**
   - Convenience for internal team
@@ -30,7 +30,7 @@
 
 | Aspect | Public/Default | Internal/Optional |
 |--------|---------------|-----------------|
-| **Execution** | Direct API calls | Codex CLI + Layofflabs |
+| **Execution** | Direct API calls | Codex CLI + configured gateway |
 | **Dependency** | API key only | Gateway stability |
 | **Status Impact** | Primary benchmark source | Internal convenience only |
 | **Reporting** | PUBLIC_REPORT.md | Internal logs only |
@@ -41,12 +41,12 @@
 ## 3. Removal / Downgrade List
 
 ### Downgraded
-- **Layofflabs gateway path:** From "mandatory default" → "internal optional lane"
+- **configured gateway path:** From "mandatory default" → "internal optional lane"
 - **Codex CLI wrapper:** From "primary runner" → "internal convenience tool"
 
 ### Removed from Critical Path
 - **"Layer 2 blocked by 502" narrative:** Remove from public status
-- **Gateway dependency in public harness:** Public benchmark must not depend on Layofflabs
+- **Gateway dependency in public harness:** Public benchmark must not depend on configured gateway
 
 ### Modified
 - **README/STATUS:** Update to show "Layer 2 public path redesigned, direct execution available"
@@ -67,7 +67,7 @@
 
 > **Layer 2 Task Definition/Spec: Complete**
 > **Layer 2 Execution Redesign Proposal: Ready**
-> **Layofflabs Lane: Downgraded to internal optional**
+> **Configured Gateway Lane: Downgraded to internal optional**
 > **New Default/Public Path: Provider-agnostic direct execution (not yet implemented/validated)**
 > **Layer 2 Real Benchmark: Requires implementation of new default path**
 

@@ -52,7 +52,7 @@ export function detectAccountContext(cwd = process.cwd()): AccountDetection {
   }
 
   const configuredAccount = configAccount(cwd);
-  if (configuredAccount) {
+  if (configuredAccount && !isPlaceholderAccount(configuredAccount)) {
     return { account: configuredAccount, source: "config" };
   }
 
@@ -67,6 +67,10 @@ export function detectAccountContext(cwd = process.cwd()): AccountDetection {
   }
 
   return { account: "unknown", source: "unknown" };
+}
+
+export function isPlaceholderAccount(account: string): boolean {
+  return account === "expected-account-placeholder" || account === "<your-github-org>";
 }
 
 export function accountContext(cwd = process.cwd()): string {

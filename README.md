@@ -15,7 +15,7 @@ cd your-react-project
 fooks setup
 ```
 
-Then open Codex in that repo and work normally.
+Then open Codex in that repo and work normally. The same setup command also prepares bounded Claude handoff artifacts and an opencode helper when their local runtime homes/tool files are available.
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks.
 
@@ -50,12 +50,12 @@ Latest published Codex-oriented benchmark snapshot (2026-04-14):
 | Large component payloads | full source | compressed payload | **7x-15x smaller** |
 | Success rate | 5/5 | 5/5 | no regression in sample |
 
-These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme). Layer 2 real-runtime task execution is still blocked by an external Codex→layofflabs gateway 502, so those real-runtime results do not exist yet.
+These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/tree/main/benchmarks/frontend-harness#readme). Layer 2 real-runtime task execution is still blocked by an external configured Codex gateway 502, so those real-runtime results do not exist yet.
 
 ## Everyday commands
 
 ```bash
-fooks setup          # one-time Codex activation for this repo
+fooks setup          # one-time readiness: Codex hooks + Claude handoff + opencode helper
 fooks status codex   # check Codex attach/hook state
 fooks status cache   # check local fooks cache health
 ```
@@ -71,7 +71,7 @@ fooks scan
 
 opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.
 
-Install the project-local opencode bridge from the project root:
+`fooks setup` installs the project-local opencode bridge when the project has a supported `.tsx` / `.jsx` component. You can also install or repair just that bridge from the project root:
 
 ```bash
 fooks install opencode-tool
@@ -124,7 +124,7 @@ Common causes:
 - You are not in a React/TSX/JSX project root.
 - Another global `fooks` binary is earlier in your PATH.
 - `~/.codex/hooks.json` is invalid JSON or not writable.
-- The repo/account context is not allowed for attach.
+- Your Codex runtime home is missing or not writable; use `FOOKS_CODEX_HOME` for an isolated smoke test.
 
 More setup details: [`docs/setup.md`](docs/setup.md)
 

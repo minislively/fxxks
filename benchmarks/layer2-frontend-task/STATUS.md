@@ -54,7 +54,7 @@
 | **Runner 미구현** | ✅ RESOLVED | runner.js, codex-wrapper.js 구현 완료 |
 | **Metric 파이프라인** | ✅ RESOLVED | 수집 로직 구현 완료 |
 | **Fooks 구현/설계** | ✅ RESOLVED | spec trio 완성, wrapper 동작 확인 |
-| **Codex→layofflabs Gateway (502)** | ⚠️ **ACTIVE** | 외부 인프라 문제, fooks无关 |
+| **Configured Codex Gateway (502)** | ⚠️ **ACTIVE** | 외부 인프라 문제, fooks无关 |
 
 ### 정확한 Blocker 분석 (최종)
 

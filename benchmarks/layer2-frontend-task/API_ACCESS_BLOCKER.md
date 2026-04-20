@@ -9,13 +9,13 @@
 | 항목 | 상태 | 상세 |
 |------|------|------|
 | **API Key** | ✅ 있음 | `OPENAI_API_KEY`, `ANTHROPIC_AUTH_TOKEN` 환경변수 확인됨 |
-| **API Base URL** | ✅ 설정됨 | `OPENAI_BASE_URL=https://api.layofflabs.com/v1` |
+| **API Base URL** | ✅ 설정됨 | `OPENAI_BASE_URL=<your-api-base-url>` |
 | **Codex CLI** | ✅ 설치됨 | `/mnt/offloading/.nvm/versions/node/v25.1.0/bin/codex` |
 | **Runner 구현** | ✅ 있음 | `runner.js`, `codex-wrapper.js` 구현 완료; 실행은 gateway 502로 blocked |
 | **Validation Hook** | ✅ 스캐폴드 있음 | metric/validation schema와 수집 로직 준비; 실제 Codex 결과는 gateway 502 때문에 미수집 |
 
 **실제 Blocker (현재 canonical):**
-1. **Codex Gateway Stability (502)** - minimal prompt부터 R4 prompt까지 동일하게 `api.layofflabs.com` 502 발생
+1. **Codex Gateway Stability (502)** - minimal prompt부터 R4 prompt까지 동일하게 `<api-base-url>` 502 발생
 2. **Real runtime result 없음** - runner/scaffold는 준비됐지만 외부 gateway blocker 때문에 Layer 2 실행 결과가 없음
 
 ---
@@ -27,7 +27,7 @@
 | **API Key access** | ✅ 이미 있음 | 시스템 환경변수로 설정 완료 |
 | **Codex CLI 설정** | ⚠️ 확인 필요 | `~/.codex/config.json` 또는 환경변수 |
 | **Runner 개발** | ✅ 완료 | `runner.js`, `codex-wrapper.js` 구현됨; gateway 회복 시 실행 가능 |
-| **shadcn-ui repo 접근** | ✅ 있음 | `/home/bellman/Workspace/fooks-test-repos/ui` |
+| **shadcn-ui repo 접근** | ✅ 있음 | `<test-repo-path>/ui` |
 
 **필요한 작업:**
 - Codex CLI auth 상태 확인 (`codex auth status`)
@@ -111,7 +111,7 @@ ls benchmarks/layer2-frontend-task
 |---|---------|--------|-----------|------|
 | 1 | **R4 Runner/Wrapper** | ✅ RESOLVED | runner.js, codex-wrapper.js 구현 완료 | gateway 회복 대기 |
 | 2 | **Metric 수집 파이프라인** | ✅ RESOLVED | 수집 로직 구현 완료 | 실제 결과는 502로 미수집 |
-| 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | api.layofflabs.com 502 Bad Gateway | **현재 병목** |
+| 3 | **Codex Gateway Stability (502)** | ⚠️ **CRITICAL** | `<api-base-url>` 502 Bad Gateway | **현재 병목** |
 
 ---
 
@@ -148,7 +148,7 @@ ls benchmarks/layer2-frontend-task
 **현재 (정확):** `Codex gateway stability blocker (502)`
 
 ### 세부 사항
-- **증상:** `api.layofflabs.com/v1/...` 502 Bad Gateway
+- **증상:** `<api-base-url>/v1/...` 502 Bad Gateway
 - **재현:** 모든 prompt 크기에서 동일하게 발생
 - **소요:** ~43초 후 실패 (timeout과 무관)
 - **원인:** 외부 서비스 (Codex/게이트웨이) 안정성
@@ -162,7 +162,7 @@ ls benchmarks/layer2-frontend-task
 - 형수님 지시: **보류**
 
 ### 옵션 B: 게이트웨이 안정성 회복 대기 (현재)
-- `api.layofflabs.com` 안정화 또는 대체 경로 확인 필요
+- `<api-base-url>` 안정화 또는 대체 경로 확인 필요
 - **실제 우선순위**
 
 ### 옵션 C: Anthropic Claude 전환 (컷)

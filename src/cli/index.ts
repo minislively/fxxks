@@ -103,6 +103,150 @@ async function initializeProject(cwd = process.cwd()): Promise<{ config: string;
 }
 
 type SetupState = "ready" | "partial" | "blocked";
+type RuntimeName = "codex" | "claude" | "opencode";
+type RuntimeSetupState = "automatic-ready" | "handoff-ready" | "tool-ready" | "manual-step-required" | "partial" | "blocked";
+
+type RuntimeReadiness = {
+  runtime: RuntimeName;
+  state: RuntimeSetupState;
+  mode: string;
+  ready: boolean;
+  blocksOverall: boolean;
+  details: unknown;
+  blockers: string[];
+  nextSteps: string[];
+  notes: string[];
+};
+
+function setupClaimBoundaries(): string[] {
+  return [
+    "Codex setup installs the automatic fooks hook path when Codex trust checks pass.",
+    "Claude setup prepares manual/shared handoff artifacts only; it does not enable automatic hooks or prompt interception.",
+    "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or prove runtime-token savings.",
+    "Projects without supported React .tsx/.jsx component candidates stay blocked for automatic setup instead of pretending unrelated files are ready.",
+  ];
+}
+
+function setupSummary(runtimes: Record<RuntimeName, RuntimeReadiness>): string[] {
+  return [
+    `codex:${runtimes.codex.state}${runtimes.codex.ready ? ":ready" : ":not-ready"}`,
+    `claude:${runtimes.claude.state}${runtimes.claude.ready ? ":ready" : ":not-ready"}`,
+    `opencode:${runtimes.opencode.state}${runtimes.opencode.ready ? ":ready" : ":not-ready"}`,
+  ];
+}
+
+function codexRuntimeReadiness(
+  state: SetupState,
+  ready: boolean,
+  attach: unknown,
+  hooks: unknown,
+  status: unknown,
+  blockers: string[],
+): RuntimeReadiness {
+  return {
+    runtime: "codex",
+    state: ready ? "automatic-ready" : state === "ready" ? "partial" : state,
+    mode: "automatic-runtime-hook",
+    ready,
+    blocksOverall: true,
+    details: { attach, hooks, status },
+    blockers,
+    nextSteps: ready
+      ? [
+          "Open Codex in this repo and work normally; fooks will run through the installed Codex hooks.",
+          "Use fooks status codex if you want to inspect the runtime trust state.",
+        ]
+      : [
+          "Fix Codex setup blockers, then run fooks setup again.",
+          "Use fooks status codex for current runtime state and inspect runtimes.codex.blockers above.",
+        ],
+    notes: ["Codex is the only runtime in this setup command with an automatic hook path today."],
+  };
+}
+
+function blockedClaudeReadiness(blockers: string[], details: unknown = null): RuntimeReadiness {
+  return {
+    runtime: "claude",
+    state: "blocked",
+    mode: "manual-shared-handoff",
+    ready: false,
+    blocksOverall: false,
+    details,
+    blockers,
+    nextSteps: [
+      "Fix the Claude handoff blocker if you want Claude-ready artifacts, then run fooks setup again.",
+      "Until then, use fooks extract <file> --model-payload for explicit manual handoff.",
+    ],
+    notes: [
+      "Claude automatic hooks are not enabled by fooks setup.",
+      "Claude support remains manual/shared handoff oriented; this is non-fatal for Codex readiness.",
+    ],
+  };
+}
+
+function claudeRuntimeReadiness(attach: { runtimeProof?: { status?: string; blocker?: string } }): RuntimeReadiness {
+  if (attach.runtimeProof?.status === "passed") {
+    return {
+      runtime: "claude",
+      state: "handoff-ready",
+      mode: "manual-shared-handoff",
+      ready: true,
+      blocksOverall: false,
+      details: { attach },
+      blockers: [],
+      nextSteps: [
+        "Use fooks extract <file> --model-payload or the generated Claude handoff artifacts when sharing reduced context with Claude.",
+        "Do not describe this as Claude prompt interception or automatic Claude token savings.",
+      ],
+      notes: [
+        "Claude automatic hooks are not enabled by fooks setup.",
+        "Claude readiness means manual/shared handoff artifacts were prepared successfully.",
+      ],
+    };
+  }
+
+  return blockedClaudeReadiness([attach.runtimeProof?.blocker ?? "Claude handoff proof blocked"], { attach });
+}
+
+function opencodeRuntimeReadiness(installResult: unknown): RuntimeReadiness {
+  return {
+    runtime: "opencode",
+    state: "tool-ready",
+    mode: "manual/semi-automatic-custom-tool",
+    ready: true,
+    blocksOverall: false,
+    details: { install: installResult },
+    blockers: [],
+    nextSteps: [
+      "Open opencode in this project and run /fooks-extract path/to/File.tsx when you want a fooks model-facing payload.",
+      "Use fooks install opencode-tool explicitly if you need to repair or refresh the opencode helper artifacts.",
+    ],
+    notes: [
+      "opencode setup does not intercept read calls.",
+      "opencode setup does not prove automatic runtime-token savings.",
+    ],
+  };
+}
+
+function manualOpenCodeReadiness(blockers: string[], details: unknown = null): RuntimeReadiness {
+  return {
+    runtime: "opencode",
+    state: "manual-step-required",
+    mode: "manual/semi-automatic-custom-tool",
+    ready: false,
+    blocksOverall: false,
+    details,
+    blockers,
+    nextSteps: [
+      "Add a supported React .tsx/.jsx component, then run fooks setup again or fooks install opencode-tool explicitly.",
+      "Use fooks extract <file> --model-payload manually for supported files if you do not want project-local opencode helper artifacts.",
+    ],
+    notes: [
+      "opencode setup does not intercept read calls.",
+      "opencode setup does not prove automatic runtime-token savings.",
+    ],
+  };
+}
 
 async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Record<string, unknown>> {
   const initialized = await initializeProject(cwd);
@@ -117,6 +261,13 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 
   if (!sampleFile) {
     const { readCodexTrustStatus } = await import("../adapters/codex-runtime-trust.js");
+    const status = readCodexTrustStatus(cwd);
+    const runtimes: Record<RuntimeName, RuntimeReadiness> = {
+      codex: codexRuntimeReadiness("blocked", false, null, null, status, blockers),
+      claude: blockedClaudeReadiness(["No React/TSX component file found for Claude handoff proof"]),
+      opencode: manualOpenCodeReadiness(["No React/TSX component file found for opencode helper proof"]),
+    };
+
     return {
       command: "setup",
       runtime: "codex",
@@ -125,7 +276,10 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
       initialized,
       attach: null,
       hooks: null,
-      status: readCodexTrustStatus(cwd),
+      status,
+      runtimes,
+      summary: setupSummary(runtimes),
+      claimBoundaries: setupClaimBoundaries(),
       blockers,
       nextSteps: [
         "Add a React/TSX component to this project, then run fooks setup again.",
@@ -134,9 +288,17 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
     };
   }
 
-  const [{ attachCodex }, { installCodexHookPreset }, { readCodexTrustStatus }] = await Promise.all([
+  const [
+    { attachCodex },
+    { attachClaude },
+    { installCodexHookPreset },
+    { installOpenCodeToolPreset },
+    { readCodexTrustStatus },
+  ] = await Promise.all([
     import("../adapters/codex.js"),
+    import("../adapters/claude.js"),
     import("../adapters/codex-hook-preset.js"),
+    import("../adapters/opencode-tool-preset.js"),
     import("../adapters/codex-runtime-trust.js"),
   ]);
 
@@ -162,6 +324,26 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
     status.lifecycleState === "ready";
   const state: SetupState = ready ? "ready" : "partial";
 
+  let claude: RuntimeReadiness;
+  try {
+    claude = claudeRuntimeReadiness(attachClaude(sampleFile, cwd));
+  } catch (error) {
+    claude = blockedClaudeReadiness([`Claude handoff setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+  }
+
+  let opencode: RuntimeReadiness;
+  try {
+    opencode = opencodeRuntimeReadiness(installOpenCodeToolPreset(cwd, displayCliName));
+  } catch (error) {
+    opencode = manualOpenCodeReadiness([`opencode helper setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+  }
+
+  const runtimes: Record<RuntimeName, RuntimeReadiness> = {
+    codex: codexRuntimeReadiness(state, ready, attach, hooks, status, blockers),
+    claude,
+    opencode,
+  };
+
   return {
     command: "setup",
     runtime: "codex",
@@ -171,17 +353,46 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
     attach,
     hooks,
     status,
+    runtimes,
+    summary: setupSummary(runtimes),
+    claimBoundaries: setupClaimBoundaries(),
     blockers,
     nextSteps: ready
       ? [
           "Open Codex in this repo and work normally; fooks will run through the installed Codex hooks.",
           "Use fooks status codex if you want to inspect the runtime trust state.",
+          "Claude and opencode entries under runtimes are non-fatal handoff/tool readiness summaries, not automatic hook claims.",
         ]
       : [
           "Fix setup blockers, then run fooks setup again.",
           "Use fooks status codex for current runtime state and inspect the blockers field above.",
+          "Claude and opencode entries under runtimes are non-fatal handoff/tool readiness summaries, not automatic hook claims.",
         ],
   };
+}
+
+function printHelp(displayCliName: string): void {
+  console.log(`Usage: ${displayCliName} <init|setup|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>
+
+Everyday commands:
+  ${displayCliName} setup
+      Prepare one-command readiness for supported runtimes:
+      - Codex: automatic runtime hook path when trust checks pass.
+      - Claude: manual/shared handoff artifacts only; no automatic hooks or prompt interception.
+      - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
+
+  ${displayCliName} run <prompt>
+  ${displayCliName} extract <file> [--model-payload] [--json]
+  ${displayCliName} install codex-hooks
+  ${displayCliName} install opencode-tool
+  ${displayCliName} codex-pre-read <file> [--json]
+  ${displayCliName} status codex
+  ${displayCliName} status cache
+  ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
+  ${displayCliName} codex-runtime-hook --native-hook
+
+Install: npm install -g oh-my-fooks
+CLI command: ${displayCliName}`);
 }
 
 function parseExtractArgs(args: string[]): { filePath: string; modelPayload: boolean } {
@@ -284,6 +495,11 @@ async function run(): Promise<void> {
   const invokedName = path.basename(process.argv[1] ?? "fooks");
   const cliName = isRecognizedCliName(invokedName) ? invokedName : "fooks";
   const displayCliName = cliName;
+  if (!command || command === "help" || command === "--help" || command === "-h") {
+    printHelp(displayCliName);
+    return;
+  }
+
   const commandStartedAt = performance.now();
 
   switch (command) {
@@ -435,18 +651,8 @@ async function run(): Promise<void> {
       return;
     }
     default:
-      console.error(`Unknown command: ${command ?? "<none>"}`);
-      console.error(`Usage: ${displayCliName} <init|setup|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>`);
-      console.error(`       ${displayCliName} setup`);
-      console.error(`       ${displayCliName} run <prompt>`);
-      console.error(`       ${displayCliName} extract <file> [--model-payload] [--json]`);
-      console.error(`       ${displayCliName} install codex-hooks`);
-      console.error(`       ${displayCliName} install opencode-tool`);
-      console.error(`       ${displayCliName} codex-pre-read <file> [--json]`);
-      console.error(`       ${displayCliName} status codex
-       ${displayCliName} status cache`);
-      console.error(`       ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]`);
-      console.error(`       ${displayCliName} codex-runtime-hook --native-hook`);
+      console.error(`Unknown command: ${command}`);
+      printHelp(displayCliName);
       process.exitCode = 1;
   }
 }

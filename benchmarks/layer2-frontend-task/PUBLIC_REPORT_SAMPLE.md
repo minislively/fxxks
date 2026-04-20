@@ -108,7 +108,7 @@
 - Artifact structure and methodology
 
 ### Internal (Not Detailed Here)
-- Codex/Layofflabs execution lane details
+- Codex/configured gateway execution lane details
 - Gateway stability troubleshooting
 - Internal retry attempts and logs
 
