@@ -34,7 +34,7 @@ claude --version
 
 ## Validation performed
 
-All commands below were run on 2026-04-19 from `/home/bellman/Workspace/fooks` after `npm run build`.
+All commands below were run on 2026-04-19 from `<repository-root>` after `npm run build`.
 
 ### 1. Codex attach path
 
