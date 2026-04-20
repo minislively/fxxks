@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import ts from "typescript";
 
 const repoRoot = process.cwd();
-const samplePath = "/home/bellman/Workspace/fooks-test-repos/cal.com/packages/app-store/hitpay/components/EventTypeAppSettingsInterface.tsx";
+const samplePath = path.join(repoRoot, "test/fixtures/cal.com/packages/app-store/hitpay/components/EventTypeAppSettingsInterface.tsx");
 const require = createRequire(import.meta.url);
 
 function loadTsModule(filePath, cache = new Map()) {
