@@ -19,3 +19,6 @@ benchmarks/frontend-harness/.worktrees/
 .worktrees/
 *.omx-worktrees/
 
+
+# Public release: exclude internal benchmark reports
+benchmarks/frontend-harness/reports/
