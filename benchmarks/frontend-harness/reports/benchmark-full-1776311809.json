@@ -1,0 +1,173 @@
+{
+  "timestamp": "2026-04-16T12:56:49.499448",
+  "summary": {
+    "total_benchmarks": 1,
+    "vanilla_success": 1,
+    "fooks_success": 1,
+    "avg_token_reduction": 67.5924542398207,
+    "avg_tokens_saved": 531978.0
+  },
+  "notes": {
+    "tokenEstimate": {
+      "scope": "tsx-only proxy",
+      "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+    },
+    "environmentParity": {
+      "runner": "Selected with --runner; vanilla and fooks variants use the same runner.",
+      "prompt": "Identical task text for vanilla and fooks variants.",
+      "codexHome": "Each variant uses an isolated CODEX_HOME with auth.json and config.toml symlinked from the same host account.",
+      "variantDifference": "The fooks variant runs fooks init/scan/attach before the same agent command; vanilla does not."
+    }
+  },
+  "riskAssessment": {
+    "overall": "high",
+    "scale": {
+      "low": "Safe to cite with caveat.",
+      "medium": "Useful but should be repeated.",
+      "high": "Round-1 directional evidence only.",
+      "critical": "Do not cite without fixing measurement."
+    },
+    "risks": [
+      {
+        "name": "sample_size",
+        "level": "high",
+        "evidence": "1 successful paired benchmark(s).",
+        "interpretation": "Use as round-1 proof only; repeat N>=3 before claiming stable performance."
+      },
+      {
+        "name": "environment_parity",
+        "level": "low",
+        "evidence": "same_prompt=True, same_files=True, same_runner=True, runner=codex exec --full-auto",
+        "interpretation": "Both variants use the same selected runner with isolated CODEX_HOME; fooks additionally prepares native fooks context."
+      },
+      {
+        "name": "orchestration_overhead",
+        "level": "low",
+        "evidence": "runner=codex exec --full-auto",
+        "interpretation": "Direct Codex is the cleaner product benchmark; OMX runner includes orchestration overhead and policy surface."
+      },
+      {
+        "name": "cleanup_reproducibility",
+        "level": "low",
+        "evidence": "cleanup_removed=True",
+        "interpretation": "Worktree residue can contaminate reruns if cleanup fails."
+      },
+      {
+        "name": "wall_clock_noise",
+        "level": "medium",
+        "evidence": "Single-run wall-clock timing includes model/service variability.",
+        "interpretation": "Prefer median and p95 over repeated identical tasks."
+      },
+      {
+        "name": "runtime_token_claim",
+        "level": "medium",
+        "evidence": "Actual OMX/Codex tokens available; fooks used fewer runtime tokens in 1/1 pair (29% less: 63435 -> 44970).",
+        "interpretation": "Runtime token reduction observed, but N=1 sample. Repeat N>=3 before claiming stable runtime token savings. Keep proxy compression and actual tokens separate in reporting."
+      }
+    ]
+  },
+  "results": [
+    {
+      "task": "T5",
+      "task_name": "Form Validation",
+      "repo": "formbricks",
+      "difficulty": "hard",
+      "timestamp": "2026-04-16T12:49:10.585889",
+      "tokens": {
+        "total_files": 882,
+        "raw_bytes": 3148152.0,
+        "compressed_bytes": 1020238.7999999999,
+        "raw_tokens": 787038.0,
+        "compressed_tokens": 255059.0,
+        "tokens_saved": 531978.0,
+        "reduction_pct": 67.5924542398207,
+        "scope": "tsx-only proxy",
+        "method": "Sample TSX files, run `fooks extract --model-payload`, scale sampled bytes to repo-level proxy."
+      },
+      "vanilla": {
+        "success": true,
+        "duration_ms": 230072,
+        "files": 1,
+        "files_list": [
+          "apps/web/modules/account/components/DeleteAccountModal/index.tsx"
+        ],
+        "tokens_used": 63435,
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776311358",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776311358/.codex",
+          "prompt_sha256": "920cc272ab8728825be4a2f4f96d868cb9a85bca7c59b0481da1bf2fa0b52a60",
+          "codex_bin": "/opt/homebrew/bin/codex"
+        },
+        "stdout_tail": "Implemented the account deletion confirmation validation in [apps/web/modules/account/components/DeleteAccountModal/index.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-vanilla-1776311358/apps/web/modules/account/components/DeleteAccountModal/index.tsx:32).\n\nChanges made:\n- Changed the confirmation input to `type=\"email\"`.\n- Added inline red validation text after the user starts typing:\n  - malformed email: existing `auth.verification-requested.invalid_email_address`\n  - non-matching email: existing `environments.actions.does_not_exactly_match`\n- Added invalid input styling and ARIA wiring.\n- Kept deletion disabled while the email is invalid or deletion is already running.\n- Added a guard in `deleteAccount()` so form submission cannot bypass the disabled state.\n\nVerification:\n- `git diff --check` passed.\n- `pnpm exec eslint ...` and `pnpm exec prettier ...` could not run because those binaries are not installed in this checkout (`Command \"eslint\" not found`, `Command \"prettier\" not found`).\n",
+        "stderr_tail": "led}>\n       <div className=\"py-5\">\n         <ul className=\"list-disc pb-6 pl-6\">\n           <li>\n@@ -111,10 +117,22 @@\n             onChange={handleInputChange}\n             placeholder={user.email}\n             className=\"mt-5\"\n-            type=\"text\"\n+            type=\"email\"\n             id=\"deleteAccountConfirmation\"\n             name=\"deleteAccountConfirmation\"\n+            isInvalid={showEmailError}\n+            aria-invalid={showEmailError}\n+            aria-describedby={showEmailError ? \"deleteAccountConfirmationError\" : undefined}\n           />\n+          {showEmailError && (\n+            <p id=\"deleteAccountConfirmationError\" className=\"mt-2 text-sm text-red-500\">\n+              {t(\n+                isEmailMalformed\n+                  ? \"auth.verification-requested.invalid_email_address\"\n+                  : \"environments.actions.does_not_exactly_match\"\n+              )}\n+            </p>\n+          )}\n         </form>\n       </div>\n     </DeleteDialog>\n\ntokens used\n63,435\n",
+        "error": null,
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "fooks": {
+        "success": true,
+        "duration_ms": 204761,
+        "scan_time": 3684,
+        "total_time": 208445,
+        "files": 1,
+        "files_list": [
+          "apps/web/modules/account/components/DeleteAccountModal/index.tsx"
+        ],
+        "tokens_used": 44970,
+        "prepare": {
+          "success": true,
+          "duration_ms": 3684,
+          "steps": [
+            {
+              "name": "init",
+              "success": true,
+              "duration_ms": 94,
+              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592/.fooks/cache\"}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "scan",
+              "success": true,
+              "duration_ms": 3049,
+              "stdout_tail": ": 782,\n      \"importResolveCacheHits\": 165\n    },\n    \"slowFiles\": [\n      {\n        \"filePath\": \"apps/web/modules/survey/follow-ups/components/follow-up-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 916.46\n      },\n      {\n        \"filePath\": \"apps/storybook/src/App.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 154.75\n      },\n      {\n        \"filePath\": \"apps/web/modules/survey/editor/components/styling-view.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 85.7\n      },\n      {\n        \"filePath\": \"apps/web/modules/organization/settings/api-keys/components/view-permission-modal.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 85.63\n      },\n      {\n        \"filePath\": \"apps/web/modules/survey/editor/components/block-card.tsx\",\n        \"kind\": \"component\",\n        \"action\": \"refreshed\",\n        \"totalMs\": 79.58\n      }\n    ]\n  }\n}\n",
+              "stderr_tail": ""
+            },
+            {
+              "name": "attach-codex",
+              "success": true,
+              "duration_ms": 541,
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-16T03:53:17.616Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592/.codex/fooks/attachments/bm-t5-fooks-1776311592.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592/.codex/fooks/attachments/bm-t5-fooks-1776311592.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-16T03:53:17.604Z\",\"attachedAt\":\"2026-04-16T03:53:17.601Z\",\"lastScanAt\":\"2026-04-16T03:53:17.601Z\",\"lastRefreshAt\":\"2026-04-16T03:53:17.601Z\"}}\n",
+              "stderr_tail": ""
+            }
+          ],
+          "error": null
+        },
+        "command": {
+          "runner": "codex exec --full-auto",
+          "runner_key": "codex",
+          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592",
+          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592/.codex",
+          "prompt_sha256": "920cc272ab8728825be4a2f4f96d868cb9a85bca7c59b0481da1bf2fa0b52a60",
+          "codex_bin": "/opt/homebrew/bin/codex"
+        },
+        "stdout_tail": "Implemented the account deletion confirmation validation in [index.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T5-fooks-1776311592/apps/web/modules/account/components/DeleteAccountModal/index.tsx).\n\nChanges made:\n- Switched the confirmation input to `type=\"email\"`.\n- Added inline red validation text under the input after the user types a malformed or non-matching email.\n- Reused existing translation keys.\n- Kept deletion disabled when the email is invalid or deletion is already running.\n- Added a guard so `deleteAccount()` returns early if invoked while invalid/disabled.\n\nVerification:\n- `git diff --check` passed.\n- Targeted `prettier`/`eslint` commands could not run because those binaries are not available in this checkout via `pnpm exec`.\n",
+        "stderr_tail": "ences_warning\")}\n       isDeleting={deleting}\n-      disabled={inputValue !== user.email}>\n+      disabled={isDeleteDisabled}>\n       <div className=\"py-5\">\n         <ul className=\"list-disc pb-6 pl-6\">\n           <li>\n@@ -111,10 +123,18 @@\n             onChange={handleInputChange}\n             placeholder={user.email}\n             className=\"mt-5\"\n-            type=\"text\"\n+            type=\"email\"\n             id=\"deleteAccountConfirmation\"\n             name=\"deleteAccountConfirmation\"\n+            isInvalid={Boolean(confirmationEmailError)}\n+            aria-invalid={Boolean(confirmationEmailError)}\n+            aria-describedby={confirmationEmailError ? \"deleteAccountConfirmationError\" : undefined}\n           />\n+          {confirmationEmailError && (\n+            <p id=\"deleteAccountConfirmationError\" className=\"mt-2 text-sm text-red-500\">\n+              {confirmationEmailError}\n+            </p>\n+          )}\n         </form>\n       </div>\n     </DeleteDialog>\n\ntokens used\n44,970\n",
+        "error": null,
+        "cleanup": {
+          "removed": true,
+          "branch_deleted": true,
+          "error": null
+        }
+      },
+      "improvement": {
+        "exec": 11.001338711359923,
+        "total": 9.40010083799854
+      }
+    }
+  ]
+}
