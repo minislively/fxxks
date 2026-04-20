@@ -375,12 +375,17 @@ async function run(): Promise<void> {
       return;
     }
     case "install": {
-      if (arg1 !== "codex-hooks") {
-        throw new Error("install expects 'codex-hooks'");
+      if (arg1 === "codex-hooks") {
+        const { installCodexHookPreset } = await import("../adapters/codex-hook-preset.js");
+        print(installCodexHookPreset(displayCliName));
+        return;
       }
-      const { installCodexHookPreset } = await import("../adapters/codex-hook-preset.js");
-      print(installCodexHookPreset(displayCliName));
-      return;
+      if (arg1 === "opencode-tool") {
+        const { installOpenCodeToolPreset } = await import("../adapters/opencode-tool-preset.js");
+        print(installOpenCodeToolPreset(process.cwd(), displayCliName));
+        return;
+      }
+      throw new Error("install expects 'codex-hooks' or 'opencode-tool'");
     }
     case "status": {
       if (arg1 === "codex") {
@@ -436,6 +441,7 @@ async function run(): Promise<void> {
       console.error(`       ${displayCliName} run <prompt>`);
       console.error(`       ${displayCliName} extract <file> [--model-payload] [--json]`);
       console.error(`       ${displayCliName} install codex-hooks`);
+      console.error(`       ${displayCliName} install opencode-tool`);
       console.error(`       ${displayCliName} codex-pre-read <file> [--json]`);
       console.error(`       ${displayCliName} status codex
        ${displayCliName} status cache`);

@@ -162,6 +162,7 @@ Normal users should start with `fooks setup`. These lower-level commands remain 
 ```bash
 fooks attach codex
 fooks install codex-hooks
+fooks install opencode-tool
 fooks codex-runtime-hook --native-hook
 fooks init
 fooks scan
@@ -170,9 +171,33 @@ fooks extract <file> --model-payload
 
 Use them only when you are debugging a setup blocker or validating an adapter path directly.
 
+## opencode custom tool support
+
+opencode support is a manual/semi-automatic custom-tool bridge. It is intentionally separate from the Codex hook setup path and does not make an automatic runtime-token savings claim.
+
+From an opencode project root, run:
+
+```bash
+fooks install opencode-tool
+```
+
+This creates a project-local `.opencode/tools/fooks_extract.ts` file. After restarting or opening opencode for that project, ask opencode to call `fooks_extract` for a `.tsx` or `.jsx` file when you want a fooks model-facing payload.
+
+The generated custom tool:
+
+- calls `fooks extract <file> --model-payload`;
+- validates that the requested file stays inside the current opencode project/worktree;
+- supports `.tsx` and `.jsx` files in this MVP;
+- does not edit `~/.config/opencode`;
+- does not edit Codex hooks;
+- does not install `tool.execute.before` or any opencode `read` interception hook.
+
+Treat this as a usability bridge, not as a benchmark result. This setup guide does not claim opencode runtime-token savings unless a future benchmark explicitly measures them.
+
 ## Support boundaries
 
 - The primary supported automatic activation path today is Codex hook activation through `fooks setup`.
 - Package installation alone does not edit Codex hooks.
 - Claude support remains manual/shared handoff oriented unless a separate Claude-native hook installer is introduced in the future.
+- opencode support is manual/semi-automatic custom-tool oriented unless a separate opencode read-interception bridge is introduced and measured in the future.
 - This setup guide does not make benchmark or marketing claims; it only explains installation, activation, verification, and recovery.

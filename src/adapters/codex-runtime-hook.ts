@@ -1,6 +1,6 @@
 import path from "node:path";
 import { decideCodexPreRead } from "./codex-pre-read";
-import { codexRuntimeEscapeHatches, hasFullReadEscapeHatch, resolvePromptFileContext } from "./codex-runtime-prompt";
+import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./codex-runtime-prompt";
 import { buildPreReadReuseStatus } from "./codex-runtime-status";
 import { clearCodexActiveFile, ensureFreshCodexContextForTarget, markCodexAttachPrepared, markCodexReady } from "./codex-runtime-trust";
 import {
@@ -17,7 +17,7 @@ function payloadContextMode(payload: ModelFacingPayload): ContextMode {
 
 function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, contextMode: ContextMode): string {
   return [
-    `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode} · use ${codexRuntimeEscapeHatches()[0]} for full source`,
+    `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode}`,
     "",
     JSON.stringify(payload, null, 2),
   ].join("\n");

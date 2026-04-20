@@ -69,6 +69,7 @@ fooks codex-pre-read <file>
 fooks codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop>
 fooks codex-runtime-hook --native-hook
 fooks install codex-hooks
+fooks install opencode-tool
 fooks attach codex
 fooks attach claude
 ```
@@ -79,8 +80,25 @@ Current support boundary:
 - Shared terminal CLI proof today: `init`, `scan`, `decide`, `extract`, `run` handoff context, `attach codex`, `attach claude`
 - Codex-specific advanced surfaces today: `codex-pre-read`, `codex-runtime-hook`, `install codex-hooks`, `status codex`
 - Claude-specific status today: attach/runtime-manifest proof plus manual/shared handoff only; this repo does not yet ship a Claude-native hook installer, runtime bridge, `status claude`, or Claude runtime-token benchmark proof
+- opencode-specific support today: `install opencode-tool` creates a project-local `.opencode/tools/fooks_extract.ts` custom tool for manual/semi-automatic extraction; this repo does not yet ship opencode read interception, automatic runtime-token savings, or opencode benchmark proof
 
-Claim boundary: Codex can use the in-repo runtime hook path for repeated-prompt context injection. Claude can consume reduced model-facing artifacts through manual/shared handoff, for example `fooks extract <file> --model-payload`, but this is **not** a claim that Claude receives automatic runtime savings.
+Claim boundary: Codex can use the in-repo runtime hook path for repeated-prompt context injection. Claude and opencode can consume reduced model-facing artifacts through manual/shared handoff, for example `fooks extract <file> --model-payload` or the generated `fooks_extract` opencode custom tool, but this is **not** a claim that Claude or opencode receives automatic runtime savings.
+
+## opencode custom tool support
+
+opencode support is intentionally manual/semi-automatic in this MVP. Install a project-local custom tool from the project root:
+
+```bash
+fooks install opencode-tool
+```
+
+This creates `.opencode/tools/fooks_extract.ts`. In opencode, ask the model to call `fooks_extract` for a `.tsx` or `.jsx` file when you want a fooks model-facing payload. The generated tool validates that the requested file stays inside the current opencode project/worktree and calls:
+
+```bash
+fooks extract <file> --model-payload
+```
+
+This custom tool does **not** intercept opencode `read` calls, does **not** install a `tool.execute.before` read replacement hook, and does **not** establish an opencode runtime-token benchmark claim. Automatic opencode context interception is a separate future project that needs its own quality and token measurements.
 
 See [`docs/terminal-cli-validation-2026-04-19.md`](docs/terminal-cli-validation-2026-04-19.md) for the exact commands and current proof boundary on `main`.
 
@@ -152,7 +170,7 @@ Current verification snapshot:
 
 Real-world benchmark comparing **vanilla Codex** vs **fooks-enabled Codex** on frontend tasks.
 
-Claim-safety note: the benchmark numbers below are historical Codex-oriented estimates/proxy measurements unless a row explicitly says it was measured as live runtime tokens. They should not be read as Claude runtime-token savings or Claude benchmark wins.
+Claim-safety note: the benchmark numbers below are historical Codex-oriented estimates/proxy measurements unless a row explicitly says it was measured as live runtime tokens. They should not be read as Claude or opencode runtime-token savings, nor as Claude/opencode benchmark wins.
 
 ### Latest Results (2026-04-14 Final Rerun)
 
@@ -189,7 +207,7 @@ Claim-safety note: the benchmark numbers below are historical Codex-oriented est
 
 - Expanded from 5 files to 20 files per repo (size-distributed sampling)
 - Raw mode overhead is expected (JSON metadata wrapper); actual delivery uses `useOriginal: true` for tiny files
-- Framework repos are **extraction-test-reference only** — not comparative gating, not task parity benchmark, and not runtime-token proof for Claude
+- Framework repos are **extraction-test-reference only** — not comparative gating, not task parity benchmark, and not runtime-token proof for Claude or opencode
 
 **Fixes applied since previous run:**
 - AST-based styleBranching detection (tiny files now raw correctly)
@@ -259,7 +277,7 @@ The v1 bridge is intentionally narrow:
 - `.tsx/.jsx` only
 - Repeated same-file work in one session
 - Quiet by default
-- Full-read escape hatch via `#fooks-full-read` or `#fooks-disable-pre-read`
+- Advanced full-read override for diagnostics
 - Only active inside repos that already ran `fooks setup` or `fooks attach codex`
 
 **Scope**: This is adapter-layer integration (CLI hooks), not browser/E2E runtime interception—those remain out of current Layer 2 scope.
@@ -276,7 +294,7 @@ Expected behavior:
 
 - first prompt mention records the file quietly
 - second prompt mention can reuse `fooks` pre-read payload and emits a one-line header like `fooks: reused pre-read (<mode>) · file: <path>`
-- override markers force immediate full-read fallback and emit `fooks: full read requested · file: <path> · Read the full source file for this turn.`
+- advanced override requests force immediate full-read fallback and emit `fooks: full read requested · file: <path> · Read the full source file for this turn.`
 - readiness fallback emits `fooks: fallback (<reason>) · file: <path> · Read the full source file for this turn.`
 
 This is a **prompt/session bridge**, not a claim that Codex already exposes a universal low-level file-read hook.
@@ -297,9 +315,12 @@ Advanced direct hook install path:
 
 ```bash
 fooks install codex-hooks
+fooks install opencode-tool
 ```
 
 The installer is idempotent: it only adds the `fooks codex-runtime-hook --native-hook` command to `SessionStart`, `UserPromptSubmit`, and `Stop` when those entries are missing, and preserves other hooks already present in `~/.codex/hooks.json`.
+
+The opencode tool installer is also explicit and idempotent, but project-local: it creates `.opencode/tools/fooks_extract.ts` for manual/semi-automatic custom-tool use and does not edit Codex hooks or global opencode config.
 
 For lightweight trust/debug surfaces after attach or before first scan, inspect runtime and cache status:
 

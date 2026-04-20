@@ -11,6 +11,7 @@ import path from "node:path";
 import os from "node:os";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
@@ -33,6 +34,7 @@ const { prepareExecutionContext } = require(path.join(repoRoot, "dist", "adapter
 const { attachClaude } = require(path.join(repoRoot, "dist", "adapters", "claude.js"));
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
 const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
+const ts = require("typescript");
 
 function run(args, cwd = repoRoot, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
@@ -515,7 +517,8 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
       `fooks: reused pre-read (compressed) · file: ${path.join("fixtures", "compressed", "FormSection.tsx")}`,
     ),
   );
-  assert.ok(second.additionalContext.includes("#fooks-full-read"));
+  assert.equal(second.additionalContext.includes("#fooks-full-read"), false);
+  assert.equal(second.additionalContext.includes("#fooks-disable-pre-read"), false);
   assert.equal(second.debug.repeatedFile, true);
 });
 
@@ -1190,6 +1193,140 @@ test("install codex-hooks normalizes bridge commands to the canonical fooks comm
   assert.equal(normalized.hooks.SessionStart[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
   assert.equal(normalized.hooks.UserPromptSubmit[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
   assert.equal(normalized.hooks.Stop[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
+});
+
+test("install opencode-tool creates a project-local fooks_extract custom tool", () => {
+  const tempDir = makeTempProject();
+  const result = run(["install", "opencode-tool"], tempDir);
+
+  assert.equal(result.command, "install opencode-tool");
+  assert.equal(result.runtime, "opencode");
+  assert.equal(result.artifactKind, "custom-tool");
+  assert.equal(result.toolName, "fooks_extract");
+  assert.equal(result.mode, "manual/semi-automatic");
+  assert.equal(result.created, true);
+  assert.equal(result.modified, true);
+  assert.ok(result.artifactPath.endsWith(path.join(".opencode", "tools", "fooks_extract.ts")));
+
+  const artifact = fs.readFileSync(result.artifactPath, "utf8");
+  assert.match(artifact, /export default tool\(/);
+  assert.match(artifact, /fooks_extract/);
+  assert.match(artifact, /filePath/);
+  assert.match(artifact, /execFile/);
+  assert.match(artifact, /"extract"/);
+  assert.match(artifact, /"--model-payload"/);
+  assert.match(artifact, /path\.resolve/);
+  assert.match(artifact, /path\.relative/);
+  assert.match(artifact, /fs\.realpath/);
+  assert.match(artifact, /resolvedBase/);
+  assert.match(artifact, /\.tsx/);
+  assert.match(artifact, /\.jsx/);
+  assert.doesNotMatch(artifact, /tool\.execute\.before/);
+  assert.doesNotMatch(artifact, /input\.tool\s*===\s*["']read["']/);
+  assert.doesNotMatch(artifact, /exec\(/);
+});
+
+test("install opencode-tool is idempotent", () => {
+  const tempDir = makeTempProject();
+  const first = run(["install", "opencode-tool"], tempDir);
+  const firstContent = fs.readFileSync(first.artifactPath, "utf8");
+  const second = run(["install", "opencode-tool"], tempDir);
+
+  assert.equal(first.created, true);
+  assert.equal(first.modified, true);
+  assert.equal(second.created, false);
+  assert.equal(second.modified, false);
+  assert.equal(fs.readFileSync(second.artifactPath, "utf8"), firstContent);
+});
+
+test("generated opencode tool executes fooks extract through a runtime-shaped harness", async () => {
+  const tempDir = makeTempProject();
+  const result = run(["install", "opencode-tool"], tempDir);
+  const harnessDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-opencode-harness-"));
+  const stubPath = path.join(harnessDir, "opencode-plugin-stub.mjs");
+  const transpiledPath = path.join(harnessDir, "fooks_extract.runtime.mjs");
+  const binDir = path.join(harnessDir, "bin");
+  const fooksBin = path.join(binDir, "fooks");
+
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    stubPath,
+    [
+      "export function tool(definition) { return definition }",
+      "tool.schema = { string() { return { describe() { return this } } } }",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.writeFileSync(
+    fooksBin,
+    `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(cli)} "$@"\n`,
+    "utf8",
+  );
+  fs.chmodSync(fooksBin, 0o755);
+
+  const source = fs
+    .readFileSync(result.artifactPath, "utf8")
+    .replace('from "@opencode-ai/plugin"', `from ${JSON.stringify(pathToFileURL(stubPath).href)}`);
+  const transpiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  fs.writeFileSync(transpiledPath, transpiled, "utf8");
+
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${binDir}${path.delimiter}${previousPath ?? ""}`;
+  try {
+    const toolModule = await import(`${pathToFileURL(transpiledPath).href}?${Date.now()}`);
+    const output = await toolModule.default.execute(
+      { filePath: "src/components/SimpleButton.tsx" },
+      { directory: tempDir, worktree: tempDir },
+    );
+
+    assert.match(output, /SimpleButton|button/i);
+    assert.doesNotMatch(output, /fooks_extract could not determine/);
+  } finally {
+    process.env.PATH = previousPath;
+  }
+});
+
+test("install opencode-tool does not touch Codex or Claude runtime state", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const result = run(["install", "opencode-tool"], tempDir, { FOOKS_CODEX_HOME: codexHome });
+
+  assert.equal(result.runtime, "opencode");
+  assert.equal(fs.existsSync(path.join(codexHome, "hooks.json")), false);
+  assert.equal(fs.existsSync(path.join(tempDir, ".fooks", "adapters", "codex")), false);
+  assert.equal(fs.existsSync(path.join(tempDir, ".fooks", "adapters", "claude")), false);
+});
+
+test("install rejects unknown targets with all supported install options", () => {
+  const tempDir = makeTempProject();
+  let stderr = "";
+  try {
+    run(["install", "unknown"], tempDir);
+  } catch (error) {
+    stderr = `${error.stderr ?? ""}${error.stdout ?? ""}`;
+  }
+
+  assert.match(stderr, /codex-hooks/);
+  assert.match(stderr, /opencode-tool/);
+});
+
+test("docs describe opencode as manual custom-tool support without runtime savings claims", () => {
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
+  const combined = `${readme}\n${setup}`;
+
+  assert.match(combined, /fooks install opencode-tool/);
+  assert.match(combined, /manual\/semi-automatic/);
+  assert.match(combined, /custom-tool/);
+  assert.match(combined, /read interception|intercept opencode `read` calls/);
+  assert.match(combined, /runtime-token savings|runtime-token benchmark claim/);
+  assert.match(combined, /Claude and opencode/);
 });
 
 test("status cache reports empty for a fresh project before any scan", () => {
