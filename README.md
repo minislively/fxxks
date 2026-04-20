@@ -22,11 +22,44 @@ Phase 1 is intentionally narrow:
 - local scan / extract / decide / attach flow
 - runtime-agnostic core schema with thin adapters
 
-## Commands
+## Quick start
+
+Regular Codex users should use the one-time setup path:
+
+```bash
+npm install -g fooks
+fooks setup
+# then open Codex in this repo and work normally
+```
+
+From a local checkout, build first and run the same explicit setup step:
+
+```bash
+npm run build
+fooks setup
+```
+
+`fooks setup` initializes local `.fooks/` state, attaches the current repo to the Codex runtime, merges the fooks Codex hook preset into `~/.codex/hooks.json`, and reports whether the activation is `ready`, `partial`, or `blocked`. The setup command is explicit by design: package installation does **not** silently edit your Codex hooks.
+
+The shipping product name and all supported runtime/storage names are `fooks`.
+
+## Everyday commands
+
+```bash
+fooks setup
+fooks run "<prompt>"
+fooks status codex
+fooks status cache
+```
+
+`fooks run` prepares a shared handoff context file, then leaves execution to the runtime you already use (`codex`, `claude`, `omx`, etc.).
+
+## Advanced / validation commands
+
+These remain available for maintainers, benchmark validation, and debugging, but regular users should not need them for the first-success path:
 
 ```bash
 fooks init
-fooks run "<prompt>"
 fooks scan
 fooks extract <file> --json
 fooks extract <file> --model-payload
@@ -35,30 +68,15 @@ fooks codex-pre-read <file>
 fooks codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop>
 fooks codex-runtime-hook --native-hook
 fooks install codex-hooks
-fooks status codex
-fooks status cache
 fooks attach codex
 fooks attach claude
 ```
 
-The shipping product name and all supported runtime/storage names are `fooks`.
-
-## First success
-
-Minimal shared path from a clean checkout:
-
-```bash
-npm run build
-fooks attach codex   # or: fooks attach claude
-fooks run "Update src/components/FormSection.tsx"
-```
-
-`fooks run` prepares a shared handoff context file, then leaves execution to the runtime you already use (`codex`, `claude`, `omx`, etc.).
-
 Current support boundary:
 
+- Primary Codex user path today: `fooks setup`, then normal Codex usage through the installed hook preset
 - Shared terminal CLI proof today: `init`, `scan`, `decide`, `extract`, `run` handoff context, `attach codex`, `attach claude`
-- Codex-specific extras today: `codex-pre-read`, `codex-runtime-hook`, `install codex-hooks`, `status codex`
+- Codex-specific advanced surfaces today: `codex-pre-read`, `codex-runtime-hook`, `install codex-hooks`, `status codex`
 - Claude-specific status today: attach/runtime-manifest proof plus manual/shared handoff only; this repo does not yet ship a Claude-native hook installer, runtime bridge, `status claude`, or Claude runtime-token benchmark proof
 
 Claim boundary: Codex can use the in-repo runtime hook path for repeated-prompt context injection. Claude can consume reduced model-facing artifacts through manual/shared handoff, for example `fooks extract <file> --model-payload`, but this is **not** a claim of automatic Claude runtime token reduction.
@@ -241,7 +259,7 @@ The v1 bridge is intentionally narrow:
 - Repeated same-file work in one session
 - Quiet by default
 - Full-read escape hatch via `#fooks-full-read` or `#fooks-disable-pre-read`
-- Only active inside repos that already ran `fooks attach codex`
+- Only active inside repos that already ran `fooks setup` or `fooks attach codex`
 
 **Scope**: This is adapter-layer integration (CLI hooks), not browser/E2E runtime interception—those remain out of current Layer 2 scope.
 
@@ -268,7 +286,13 @@ For Codex native hook wiring, the repo-side bridge can also read the hook payloa
 fooks codex-runtime-hook --native-hook
 ```
 
-Preferred install path (writes or merges the Codex hook preset into `~/.codex/hooks.json`):
+Preferred user setup path (initializes the repo, attaches Codex, and writes or merges the Codex hook preset into `~/.codex/hooks.json`):
+
+```bash
+fooks setup
+```
+
+Advanced direct hook install path:
 
 ```bash
 fooks install codex-hooks

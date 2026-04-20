@@ -152,7 +152,23 @@ Internal tooling exists for fooks vs vanilla comparison studies. Not exposed in 
 
 ## Quick Start Flow
 
-### First-Time User (3 steps)
+### Current preferred Codex setup flow
+
+The current safe activation contract is an explicit one-time setup command, not an npm install side effect:
+
+```bash
+# 1. Install
+npm install -g fooks
+
+# 2. Activate in the project root
+fooks setup
+
+# 3. Use Codex normally
+```
+
+`fooks setup` composes project initialization, Codex attach, hook preset install, and status-style reporting. Lower-level commands such as `init`, `attach codex`, and `install codex-hooks` remain available for validation/debugging.
+
+### Historical first-time user flow
 ```bash
 # 1. Install
 npm install -g fooks

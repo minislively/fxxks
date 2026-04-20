@@ -80,6 +80,110 @@ async function resolveAttachSampleFile(cwd = process.cwd()): Promise<string> {
   return target.filePath;
 }
 
+async function initializeProject(cwd = process.cwd()): Promise<{ config: string; cacheDir: string; created: boolean }> {
+  const { ensureProjectDataDirs, configPath } = await import("../core/paths.js");
+  ensureProjectDataDirs(cwd);
+  const config = configPath(cwd);
+  const created = !fs.existsSync(config);
+  if (created) {
+    fs.writeFileSync(
+      config,
+      JSON.stringify(
+        {
+          version: 1,
+          createdAt: new Date().toISOString(),
+          targetAccount: process.env.FOOKS_TARGET_ACCOUNT ?? "minislively",
+        },
+        null,
+        2,
+      ),
+    );
+  }
+  return { config, cacheDir: path.join(cwd, ".fooks", "cache"), created };
+}
+
+type SetupState = "ready" | "partial" | "blocked";
+
+async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Record<string, unknown>> {
+  const initialized = await initializeProject(cwd);
+  const blockers: string[] = [];
+
+  let sampleFile: string | null = null;
+  try {
+    sampleFile = await resolveAttachSampleFile(cwd);
+  } catch (error) {
+    blockers.push(error instanceof Error ? error.message : String(error));
+  }
+
+  if (!sampleFile) {
+    const { readCodexTrustStatus } = await import("../adapters/codex-runtime-trust.js");
+    return {
+      command: "setup",
+      runtime: "codex",
+      ready: false,
+      state: "blocked" satisfies SetupState,
+      initialized,
+      attach: null,
+      hooks: null,
+      status: readCodexTrustStatus(cwd),
+      blockers,
+      nextSteps: [
+        "Add a React/TSX component to this project, then run fooks setup again.",
+        "For non-React projects, use fooks extract/scan manually only if you know the files are supported.",
+      ],
+    };
+  }
+
+  const [{ attachCodex }, { installCodexHookPreset }, { readCodexTrustStatus }] = await Promise.all([
+    import("../adapters/codex.js"),
+    import("../adapters/codex-hook-preset.js"),
+    import("../adapters/codex-runtime-trust.js"),
+  ]);
+
+  const bridgeCommand = `${displayCliName} codex-runtime-hook --native-hook`;
+  const attach = attachCodex(sampleFile, cwd, bridgeCommand);
+  if (attach.runtimeProof.status === "blocked") {
+    blockers.push(attach.runtimeProof.blocker ?? "Codex attach blocked");
+  }
+
+  let hooks: ReturnType<typeof installCodexHookPreset> | null = null;
+  try {
+    hooks = installCodexHookPreset(displayCliName);
+  } catch (error) {
+    blockers.push(`Codex hook preset install failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const status = readCodexTrustStatus(cwd);
+  const allHookEventsReady = hooks ? hooks.installedEvents.length + hooks.skippedEvents.length === 3 : false;
+  const ready =
+    attach.runtimeProof.status === "passed" &&
+    allHookEventsReady &&
+    status.connectionState === "connected" &&
+    status.lifecycleState === "ready";
+  const state: SetupState = ready ? "ready" : "partial";
+
+  return {
+    command: "setup",
+    runtime: "codex",
+    ready,
+    state,
+    initialized,
+    attach,
+    hooks,
+    status,
+    blockers,
+    nextSteps: ready
+      ? [
+          "Open Codex in this repo and work normally; fooks will run through the installed Codex hooks.",
+          "Use fooks status codex if you want to inspect the runtime trust state.",
+        ]
+      : [
+          "Fix setup blockers, then run fooks setup again.",
+          "Use fooks status codex for current runtime state and inspect the blockers field above.",
+        ],
+  };
+}
+
 function parseExtractArgs(args: string[]): { filePath: string; modelPayload: boolean } {
   let filePath: string | undefined;
   let modelPayload = false;
@@ -184,24 +288,12 @@ async function run(): Promise<void> {
 
   switch (command) {
     case "init": {
-      const { ensureProjectDataDirs, configPath } = await import("../core/paths.js");
-      ensureProjectDataDirs();
-      const config = configPath();
-      if (!fs.existsSync(config)) {
-        fs.writeFileSync(
-          config,
-          JSON.stringify(
-            {
-              version: 1,
-              createdAt: new Date().toISOString(),
-              targetAccount: process.env.FOOKS_TARGET_ACCOUNT ?? "minislively",
-            },
-            null,
-            2,
-          ),
-        );
-      }
-      print({ config, cacheDir: path.join(process.cwd(), ".fooks", "cache") });
+      const { config, cacheDir } = await initializeProject(process.cwd());
+      print({ config, cacheDir });
+      return;
+    }
+    case "setup": {
+      print(await runSetup(displayCliName, process.cwd()));
       return;
     }
     case "run": {
@@ -339,7 +431,8 @@ async function run(): Promise<void> {
     }
     default:
       console.error(`Unknown command: ${command ?? "<none>"}`);
-      console.error(`Usage: ${displayCliName} <init|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>`);
+      console.error(`Usage: ${displayCliName} <init|setup|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>`);
+      console.error(`       ${displayCliName} setup`);
       console.error(`       ${displayCliName} run <prompt>`);
       console.error(`       ${displayCliName} extract <file> [--model-payload] [--json]`);
       console.error(`       ${displayCliName} install codex-hooks`);

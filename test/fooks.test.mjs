@@ -995,6 +995,137 @@ test("model-facing payload trim hits >=15% reduction on at least two compressed/
   }
 });
 
+test("setup prepares explicit one-time Codex activation", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+  });
+
+  assert.equal(result.command, "setup");
+  assert.equal(result.runtime, "codex");
+  assert.equal(result.ready, true);
+  assert.equal(result.state, "ready");
+  assert.ok(result.initialized.config.endsWith(path.join(".fooks", "config.json")));
+  assert.ok(fs.existsSync(path.join(tempDir, ".fooks", "config.json")));
+  assert.equal(result.attach.runtimeProof.status, "passed");
+  assert.ok(fs.existsSync(runtimeManifestPath(result.attach)));
+  assert.equal(result.hooks.command, "fooks codex-runtime-hook --native-hook");
+  assert.deepEqual(result.hooks.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
+  assert.equal(result.status.connectionState, "connected");
+  assert.equal(result.status.lifecycleState, "ready");
+  assert.ok(result.nextSteps.some((item) => item.includes("Codex")));
+
+  const hooks = JSON.parse(fs.readFileSync(path.join(codexHome, "hooks.json"), "utf8"));
+  assert.equal(hooks.hooks.SessionStart[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
+  assert.equal(hooks.hooks.UserPromptSubmit[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
+  assert.equal(hooks.hooks.Stop[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
+});
+
+test("setup is idempotent and preserves unrelated Codex hooks", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const hooksPath = path.join(codexHome, "hooks.json");
+  fs.writeFileSync(hooksPath, JSON.stringify({
+    hooks: {
+      SessionStart: [{ matcher: "startup|resume", hooks: [{ type: "command", command: "node /tmp/omx-start.js" }] }],
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: "node /tmp/omx.js" }] }],
+      Stop: [{ hooks: [{ type: "command", command: "node /tmp/omx-stop.js" }] }],
+    },
+  }, null, 2));
+
+  const env = { FOOKS_ACTIVE_ACCOUNT: "minislively", FOOKS_CODEX_HOME: codexHome };
+  const first = run(["setup"], tempDir, env);
+  assert.equal(first.ready, true);
+  assert.equal(first.hooks.modified, true);
+  assert.ok(first.hooks.backupPath);
+
+  const second = run(["setup"], tempDir, env);
+  assert.equal(second.ready, true);
+  assert.equal(second.hooks.modified, false);
+  assert.deepEqual(second.hooks.skippedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
+
+  const merged = JSON.parse(fs.readFileSync(hooksPath, "utf8"));
+  for (const event of ["SessionStart", "UserPromptSubmit", "Stop"]) {
+    const commands = merged.hooks[event].flatMap((matcher) => matcher.hooks.map((hook) => hook.command));
+    assert.equal(commands.filter((command) => command === "fooks codex-runtime-hook --native-hook").length, 1);
+  }
+  assert.ok(merged.hooks.SessionStart.some((matcher) => matcher.hooks.some((hook) => hook.command === "node /tmp/omx-start.js")));
+  assert.ok(merged.hooks.UserPromptSubmit.some((matcher) => matcher.hooks.some((hook) => hook.command === "node /tmp/omx.js")));
+  assert.ok(merged.hooks.Stop.some((matcher) => matcher.hooks.some((hook) => hook.command === "node /tmp/omx-stop.js")));
+});
+
+test("setup reports partial activation without false ready claims when attach is blocked", () => {
+  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "example-org",
+    FOOKS_CODEX_HOME: codexHome,
+  });
+
+  assert.equal(result.command, "setup");
+  assert.equal(result.ready, false);
+  assert.equal(result.state, "partial");
+  assert.equal(result.attach.runtimeProof.status, "blocked");
+  assert.ok(result.blockers.some((item) => item.includes("minislively account context not detected")));
+  assert.equal(result.hooks.command, "fooks codex-runtime-hook --native-hook");
+  assert.equal(fs.existsSync(path.join(codexHome, "hooks.json")), true);
+  assert.equal(fs.existsSync(path.join(codexHome, "fooks")), false);
+  assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
+});
+
+test("setup reports partial activation when Codex hooks cannot be parsed", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  fs.writeFileSync(path.join(codexHome, "hooks.json"), "{not-json");
+
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+  });
+
+  assert.equal(result.command, "setup");
+  assert.equal(result.ready, false);
+  assert.equal(result.state, "partial");
+  assert.equal(result.attach.runtimeProof.status, "passed");
+  assert.equal(result.hooks, null);
+  assert.ok(result.blockers.some((item) => item.includes("Codex hook preset install failed")));
+  assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
+  assert.equal(fs.readFileSync(path.join(codexHome, "hooks.json"), "utf8"), "{not-json");
+});
+
+test("setup reports blocked state for projects without React components", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-empty-"));
+  fs.writeFileSync(path.join(tempDir, "package.json"), JSON.stringify({ name: "empty", repository: { url: "https://github.com/minislively/empty.git" } }, null, 2));
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+
+  const result = run(["setup"], tempDir, { FOOKS_CODEX_HOME: codexHome });
+
+  assert.equal(result.ready, false);
+  assert.equal(result.state, "blocked");
+  assert.equal(result.attach, null);
+  assert.equal(result.hooks, null);
+  assert.ok(result.blockers.some((item) => item.includes("No React/TSX component file found")));
+  assert.ok(result.nextSteps.some((item) => item.includes("Add a React/TSX component")));
+});
+
+test("cli usage advertises setup and package install has no auto hook side effects", () => {
+  let usage = "";
+  try {
+    runText(["unknown-command"]);
+  } catch (error) {
+    usage = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  assert.match(usage, /setup/);
+
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  assert.equal(pkg.scripts?.postinstall, undefined);
+  assert.equal(pkg.scripts?.preinstall, undefined);
+});
+
 test("install codex-hooks creates a reusable hooks preset", () => {
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
   const result = run(["install", "codex-hooks"], repoRoot, { FOOKS_CODEX_HOME: codexHome });

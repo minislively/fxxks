@@ -142,9 +142,21 @@ compressed → hybrid → raw → error (no native degrade)
 
 ---
 
+## Current Setup Addendum
+
+The current preferred Codex activation path is now:
+
+```bash
+npm install -g fooks
+fooks setup
+# then use Codex normally
+```
+
+`fooks setup` is intentionally explicit and must not be replaced by an npm `postinstall` hook that silently edits `~/.codex/hooks.json`.
+
 ## Summary
 
-**Goal**: `npm install -g fooks && fooks init && fooks run "task"` first-success path
+**Goal**: `npm install -g fooks && fooks setup` one-time activation, followed by normal Codex usage. The older `fooks init && fooks run "task"` path remains useful as a handoff/validation flow, not the primary automatic activation path.
 
 **Key Decisions**:
 - Orchestration-centered: scan → decide → extract → fallback → execute
