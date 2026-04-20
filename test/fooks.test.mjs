@@ -145,7 +145,7 @@ test("init creates config and cache contract", () => {
   assert.ok(result.cacheDir.endsWith(path.join(".fooks", "cache")));
   assert.ok(fs.existsSync(path.join(tempDir, ".fooks", "config.json")));
   const config = JSON.parse(fs.readFileSync(path.join(tempDir, ".fooks", "config.json"), "utf8"));
-  assert.equal(config.targetAccount, "minislively");
+  assert.equal(config.targetAccount, "<your-github-org>");
 });
 
 test("init prefers FOOKS_TARGET_ACCOUNT for canonical config writes", () => {
@@ -1062,10 +1062,10 @@ test("setup is idempotent and preserves unrelated Codex hooks", () => {
 
 test("setup reports partial activation without false ready claims when attach is blocked", () => {
   const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  // Use invalid codex home to trigger actual blocking (not account-based)
+  const codexHome = path.join(tempDir, ".nonexistent-codex-home");
 
   const result = run(["setup"], tempDir, {
-    FOOKS_ACTIVE_ACCOUNT: "example-org",
     FOOKS_CODEX_HOME: codexHome,
   });
 
@@ -1073,9 +1073,7 @@ test("setup reports partial activation without false ready claims when attach is
   assert.equal(result.ready, false);
   assert.equal(result.state, "partial");
   assert.equal(result.attach.runtimeProof.status, "blocked");
-  assert.ok(result.blockers.some((item) => item.includes("expected account context not detected")));
-  assert.equal(result.hooks.command, "fooks codex-runtime-hook --native-hook");
-  assert.equal(fs.existsSync(path.join(codexHome, "hooks.json")), true);
+  assert.ok(result.blockers.some((item) => item.includes("Codex runtime home not detected")));
   assert.equal(fs.existsSync(path.join(codexHome, "fooks")), false);
   assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
 });
@@ -1460,26 +1458,4 @@ test("attach can use explicit active account override instead of repository meta
   });
   assert.equal(result.runtimeProof.status, "passed");
   assert.ok(result.runtimeProof.details.includes("account-source=env"));
-});
-
-test("attach codex blocks non-minislively account without writing runtime manifest", () => {
-  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
-  const result = run(["attach", "codex"], tempDir, { FOOKS_CODEX_HOME: codexHome });
-  assert.equal(result.runtimeProof.status, "blocked");
-  assert.equal(result.runtimeProof.blocker, "expected account context not detected (configure FOOKS_ACTIVE_ACCOUNT)");
-  assert.ok(result.runtimeProof.details.includes("account-source=package-repository"));
-  assert.equal(runtimeManifestPath(result), undefined);
-  assert.equal(fs.existsSync(path.join(codexHome, "fooks")), false);
-});
-
-test("attach claude blocks non-minislively account without writing runtime manifest", () => {
-  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
-  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
-  const result = run(["attach", "claude"], tempDir, { FOOKS_CLAUDE_HOME: claudeHome });
-  assert.equal(result.runtimeProof.status, "blocked");
-  assert.equal(result.runtimeProof.blocker, "expected account context not detected (configure FOOKS_ACTIVE_ACCOUNT)");
-  assert.ok(result.runtimeProof.details.includes("account-source=package-repository"));
-  assert.equal(runtimeManifestPath(result), undefined);
-  assert.equal(fs.existsSync(path.join(claudeHome, "fooks")), false);
 });
