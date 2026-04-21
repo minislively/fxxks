@@ -51,8 +51,11 @@ Layer 2 now has two proposal-only R4 paired smokes through the current
 both modes exited successfully, and a repeated proposal-smoke validation artifact
 checks success fields, output shape, prompt-size delta consistency, path-sanitization,
 and claim boundaries. This reduces the runner-path and repeated-smoke-validation
-blockers, but it is still not provider billing telemetry, not applied-code
-acceptance validation, and not enough for stable runtime-token/time win claims.
+blockers. An applied-code acceptance gate now exists and is self-tested for
+on-disk candidate trees, but live matched vanilla/fooks generated outputs have
+not passed it yet. Therefore the current evidence is still not provider billing
+telemetry, not an applied-code benchmark win, and not enough for stable
+runtime-token/time win claims.
 
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
@@ -67,7 +70,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | Risk | Current disposition | Release implication |
 | --- | --- | --- |
 | `npm publish` not run | Keep unresolved until explicit human approval; use `npm run release:smoke` and `npm publish --dry-run` only for proof. | Blocks real publication, not docs/code PR merge. |
-| Layer 2 applied-code / multi-task evidence absent | Runner path plus two repeated proposal-only smokes now exist, but applied-code validation and multi-task evidence do not. | Blocks only stable Layer 2 runtime-token/time win claims. |
+| Layer 2 applied-code / multi-task evidence absent | Runner path plus two repeated proposal-only smokes now exist. The applied acceptance gate is implemented/self-tested, but matched live generated outputs and multi-task evidence do not exist yet. | Blocks only stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
 | Claude/opencode automatic savings | Explicit non-goal unless new runtime bridges are designed and measured. | Keep handoff/tool wording only. |
 

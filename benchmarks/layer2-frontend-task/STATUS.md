@@ -11,6 +11,7 @@
 | Layer 2: Runner Path | AI runner wrapper execution path | ✅ Unblocked | Current `codex exec` wrapper completed tiny and R4 paired read-only smokes. |
 | Layer 2: R4 Paired Smoke | Vanilla-vs-fooks proposal-only R4 execution | ✅ Collected | Two matched pairs succeeded on `combobox-example.tsx`; summaries stored under `results/R4-current-exec-smoke-2026-04-21*.json`. |
 | Layer 2: Repeated Validated Smoke | Proposal-only R4 smoke validation | ✅ Collected | Validation artifact covers two matched pairs in `results/R4-current-exec-validation-2026-04-21.json`; applied-code/multi-task evidence remains out of scope. |
+| Layer 2: Applied-Code Acceptance Gate | Validate generated file trees after they are written to disk | ✅ Implemented | `validate-r4-applied.js` checks required files, line limits, barrel exports, local import cycles, and TypeScript acceptance; a fixture self-test artifact exists. Live matched vanilla/fooks applied runs remain pending. |
 
 ## 2. Canonical wording
 
@@ -18,6 +19,7 @@
 > The legacy configured gateway 502 path is no longer a current runner-path blocker.
 > Two current `codex exec` R4 paired smokes passed on 2026-04-21.
 > In both proposal-only pairs, the prompt supplied to Codex dropped from `11365` approx tokens in vanilla mode to `861` approx tokens in fooks mode (`92.4%` smaller).
+> The applied-code acceptance gate is now implemented and self-tested against a checked-in R4 candidate tree.
 > This is prompt-size smoke evidence, **not** provider billing telemetry, not an acceptance-validated code benchmark, and not enough for stable runtime-token/time win claims.
 
 ## 3. Completed assets
@@ -32,6 +34,8 @@
 | First candidate | ✅ Fixed | R4 Feature Module Split on `combobox-example.tsx`. |
 | R4 paired smoke summaries | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json` and `benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21-run-2.json`. |
 | R4 paired smoke validation | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-validation-2026-04-21.json`. |
+| R4 applied acceptance validator | ✅ Implemented | `validate-r4-applied.js` validates on-disk candidate trees; `run-r4-applied.js` creates isolated workspace-write Codex attempts. |
+| R4 applied validator self-test | ✅ Passed | `results/R4-applied-acceptance-validator-self-test-2026-04-21.json` proves the gate can pass/fail concrete file trees without provider telemetry claims. |
 
 ## 4. 2026-04-21 tiny runner smoke
 
@@ -105,7 +109,7 @@ Boundaries:
 | --- | --- | --- |
 | Stable runtime-token/time win | Out of scope for this PR | Applied-code validation plus a multi-task or larger repeated-run class. |
 | Provider billing-token savings | Out of scope for this PR | Provider billing-token telemetry, not local prompt-size accounting. |
-| Applied-code quality benchmark | Out of scope for this PR | Apply generated patches and run type/build/circular validation on the target project. |
+| Applied-code quality benchmark | Gate implemented; live matched evidence pending | Run `run-r4-applied.js` for matched vanilla/fooks attempts and require `validate-r4-applied.js` to pass on generated outputs, plus target-project build/test commands when available. |
 
 ## 7. Next execution path
 
@@ -120,6 +124,20 @@ node benchmarks/layer2-frontend-task/runner.js \
   --mode=fooks \
   --target=shadcn-ui/apps/v4/registry/bases/radix/examples/combobox-example.tsx \
   --output=benchmarks/layer2-frontend-task/results/R4-fooks-run-2.json
+
+# Applied-code attempt path: create files in an isolated temp workspace and validate them
+npm run build
+node benchmarks/layer2-frontend-task/run-r4-applied.js \
+  --mode=vanilla \
+  --target=<local combobox-example.tsx> \
+  --output=benchmarks/layer2-frontend-task/results/R4-vanilla-applied-run.json \
+  --keep-workdir
+
+node benchmarks/layer2-frontend-task/run-r4-applied.js \
+  --mode=fooks \
+  --target=<local combobox-example.tsx> \
+  --output=benchmarks/layer2-frontend-task/results/R4-fooks-applied-run.json \
+  --keep-workdir
 ```
 
 Do not call Layer 2 a stable runtime win until validated repeated outputs are
@@ -135,6 +153,7 @@ Allowed:
 - ✅ `runner path unblocked`
 - ✅ `two R4 paired proposal-only smokes`
 - ✅ `prompt supplied to Codex was smaller in the smoke`
+- ✅ `applied acceptance validator implemented/self-tested`
 
 Forbidden until applied-code validation and multi-task/statistical evidence exist:
 
@@ -142,6 +161,7 @@ Forbidden until applied-code validation and multi-task/statistical evidence exis
 - ❌ `stable Layer 2 win`
 - ❌ `runtime-token savings proven`
 - ❌ `billing-grade savings`
+- ❌ `applied-code benchmark passed` (until live generated vanilla/fooks candidate trees pass the acceptance gate)
 
 *Status date: 2026-04-21*
 *Runner: ✅ tiny + R4 paired smokes passed*
