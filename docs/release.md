@@ -45,10 +45,12 @@ context-compression mechanics and targeted-file behavior, but must not claim
 stable direct runtime-token/time wins until a future multi-task benchmark class
 proves them.
 
-Layer 2 real-runtime benchmark results do not exist while the external
-configured Codex gateway 502 blocker remains active. That blocker is a Layer 2
-claim blocker, not a blocker for shipping the current narrow Codex repeated-file
-hook path.
+Layer 2 now has a single proposal-only R4 paired smoke through the current
+`codex exec` runner. In that smoke, the prompt supplied to Codex dropped from
+`11365` approx tokens in vanilla mode to `861` in fooks mode (`92.4%` smaller),
+and both runs exited successfully. This reduces the runner-path blocker, but it
+is still not provider billing telemetry, not an acceptance-validated code
+benchmark, and not enough for stable runtime-token/time win claims.
 
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
@@ -63,7 +65,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | Risk | Current disposition | Release implication |
 | --- | --- | --- |
 | `npm publish` not run | Keep unresolved until explicit human approval; use `npm run release:smoke` and `npm publish --dry-run` only for proof. | Blocks real publication, not docs/code PR merge. |
-| Layer 2 configured Codex gateway 502 | External infrastructure blocker; runner/scaffold are ready, live Layer 2 results are absent. | Blocks Layer 2 runtime benchmark claims. |
+| Layer 2 validation/repetition absent | Runner path has tiny and single R4 paired `codex exec` smokes, but no validation artifact or repeated matched evidence. | Blocks stable Layer 2 runtime-token/time win claims. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
 | Claude/opencode automatic savings | Explicit non-goal unless new runtime bridges are designed and measured. | Keep handoff/tool wording only. |
 

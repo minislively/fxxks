@@ -40,7 +40,11 @@ async function main() {
     console.log(`[R4 Runner] Using fooks: ${fooksPath}`);
     const fooks = require(fooksPath);
     const extraction = fooks.extractFile(targetFile);
-    context = JSON.stringify(extraction, null, 2);
+    const promptSafeExtraction = {
+      ...extraction,
+      filePath: path.basename(targetFile),
+    };
+    context = JSON.stringify(promptSafeExtraction, null, 2);
   } else {
     // Vanilla mode: use full file
     console.log(`[R4 Runner] Vanilla mode: reading full file`);

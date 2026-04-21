@@ -119,6 +119,7 @@ ${context}
 3. Ensure no circular dependencies
 4. Keep each file under 200 lines
 5. Add proper barrel exports
+6. Use only the provided context; do not inspect the filesystem or target paths
 
 ## Output:
 Provide the proposed file tree and concise code skeleton for each new file. Do not edit files.`;
