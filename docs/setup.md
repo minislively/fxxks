@@ -1,6 +1,6 @@
 # Setup fooks
 
-Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary.
+Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, where the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary.
 
 ## 1. Install
 
@@ -29,7 +29,7 @@ fooks setup
 1. creates local `.fooks/` state;
 2. prepares Codex attachment metadata and runtime-home files;
 3. merges the fooks hook command into `~/.codex/hooks.json`;
-4. prepares Claude manual/shared handoff artifacts and project-local Claude context hooks when a Claude home is available;
+4. prepares Claude manual/shared handoff artifacts and project-local Claude context hooks when a Claude home is available; Claude records/prepares the first eligible explicit frontend-file prompt and may inject bounded context for repeated same-file prompts;
 5. installs the project-local opencode custom tool and slash command when a supported component exists.
 
 The Codex hook command is:
@@ -147,7 +147,7 @@ The generated tool:
 - does not edit Codex hooks;
 - does not edit global opencode config.
 
-Claude can receive bounded fooks context through project-local `SessionStart` / `UserPromptSubmit` hooks and manual/shared handoff paths. opencode can use fooks payloads through manual/semi-automatic tool paths. This repo does not claim Claude `Read` interception, opencode read interception, or automatic runtime-token savings for Claude and opencode.
+Claude can receive bounded fooks context through project-local `SessionStart` / `UserPromptSubmit` hooks after a first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt occurs; manual/shared handoff paths remain available. opencode can use fooks payloads through manual/semi-automatic tool paths. This repo does not claim Claude `Read` interception, opencode read interception, or automatic runtime-token savings for Claude and opencode.
 
 ## Release smoke check
 

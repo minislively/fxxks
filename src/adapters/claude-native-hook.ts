@@ -30,6 +30,10 @@ function readPrompt(payload: NativePayload): string {
   return "";
 }
 
+function readSessionId(payload: NativePayload): string | undefined {
+  return safeString(payload.session_id ?? payload.sessionId ?? payload.transcript_path ?? payload.transcriptPath).trim() || undefined;
+}
+
 function findAttachedProjectRoot(startCwd: string): string | null {
   let current = path.resolve(startCwd);
   while (true) {
@@ -62,7 +66,7 @@ export function handleClaudeNativeHookPayload(payload: NativePayload, fallbackCw
   const input: ClaudeRuntimeHookInput = {
     hookEventName,
     prompt: hookEventName === "UserPromptSubmit" ? readPrompt(payload) : undefined,
-    sessionId: safeString(payload.session_id ?? payload.sessionId) || undefined,
+    sessionId: readSessionId(payload),
     cwd: projectRoot,
   };
 

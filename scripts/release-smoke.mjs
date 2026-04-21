@@ -272,6 +272,44 @@ assert(
   claudeSettings.hooks?.UserPromptSubmit?.[0]?.hooks?.[0]?.command === "fooks claude-runtime-hook --native-hook",
   "Claude UserPromptSubmit smoke hook should use the canonical fooks command",
 );
+const claudeNativeEnv = {
+  ...process.env,
+  HOME: path.join(runtimeRoot, "home"),
+  XDG_CONFIG_HOME: path.join(runtimeRoot, "config"),
+  FOOKS_CODEX_HOME: codexHome,
+  FOOKS_CLAUDE_HOME: claudeHome,
+};
+const firstClaudePrompt = execFileSync(fooksBin, ["claude-runtime-hook", "--native-hook"], {
+  cwd: project,
+  encoding: "utf8",
+  input: JSON.stringify({
+    hook_event_name: "UserPromptSubmit",
+    cwd: project,
+    session_id: "release-smoke-claude",
+    prompt: "Explain src/App.tsx",
+  }),
+  env: claudeNativeEnv,
+});
+assert(firstClaudePrompt === "", "Claude first eligible native prompt should record without emitting context");
+const secondClaudePrompt = JSON.parse(execFileSync(fooksBin, ["claude-runtime-hook", "--native-hook"], {
+  cwd: project,
+  encoding: "utf8",
+  input: JSON.stringify({
+    hook_event_name: "UserPromptSubmit",
+    cwd: project,
+    session_id: "release-smoke-claude",
+    prompt: "Again, explain src/App.tsx",
+  }),
+  env: claudeNativeEnv,
+}));
+assert(
+  secondClaudePrompt.hookSpecificOutput?.hookEventName === "UserPromptSubmit",
+  "Claude repeated same-file native prompt should emit UserPromptSubmit context",
+);
+assert(
+  secondClaudePrompt.hookSpecificOutput?.additionalContext?.includes("src/App.tsx"),
+  "Claude repeated same-file native context should reference the target file",
+);
 assert(fs.existsSync(path.join(project, ".opencode", "tools", "fooks_extract.ts")), "opencode helper should be installed project-locally");
 assert(fs.existsSync(path.join(project, ".opencode", "commands", "fooks-extract.md")), "opencode slash command should be installed project-locally");
 

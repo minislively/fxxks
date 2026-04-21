@@ -244,7 +244,7 @@ function buildSetupScopeSummary(options: {
 function setupClaimBoundaries(): string[] {
   return [
     "Codex setup installs the automatic fooks hook path when Codex trust checks pass.",
-    "Claude setup installs project-local context hooks for SessionStart/UserPromptSubmit when handoff artifacts and local settings are valid; it does not intercept Read/tool calls or claim runtime-token savings.",
+    "Claude setup installs project-local context hooks for SessionStart/UserPromptSubmit when handoff artifacts and local settings are valid; first eligible frontend-file prompts are recorded/prepared and repeated same-file prompts may receive bounded context; it does not intercept Read/tool calls or claim runtime-token savings.",
     "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or prove runtime-token savings.",
     "Projects without supported React .tsx/.jsx component candidates stay blocked for automatic setup instead of pretending unrelated files are ready.",
   ];
@@ -283,7 +283,7 @@ function codexRuntimeReadiness(
           "Fix Codex setup blockers, then run fooks setup again.",
           "Use fooks status codex for current runtime state and inspect runtimes.codex.blockers above.",
         ],
-    notes: ["Codex has the automatic repeated-file hook path; Claude P0 has a project-local context hook path for explicit frontend prompts."],
+    notes: ["Codex has the automatic repeated-file hook path; Claude P0 mirrors the explicit frontend-file record-then-inject flow through project-local context hooks."],
   };
 }
 
@@ -326,7 +326,7 @@ function claudeRuntimeReadiness(
       nextSteps: ready
         ? state === "context-hook-ready"
           ? [
-              "Open Claude Code in this repo; fooks can add bounded context on SessionStart and explicit .tsx/.jsx UserPromptSubmit prompts.",
+              "Open Claude Code in this repo; fooks records/prepares the first explicit .tsx/.jsx prompt and may add bounded context on a repeated same-file UserPromptSubmit.",
               "Use fooks status claude to inspect project-local hook readiness.",
             ]
           : [
@@ -339,7 +339,7 @@ function claudeRuntimeReadiness(
           ],
       notes: [
         "Claude P0 context hooks are project-local only and do not mutate ~/.claude/settings.json.",
-        "Claude P0 does not intercept Read/tool calls and does not claim runtime-token savings.",
+        "Claude P0 records/prepares first eligible frontend-file prompts, may inject bounded context on repeated same-file prompts, and does not intercept Read/tool calls or claim runtime-token savings.",
       ],
     };
   }
@@ -509,12 +509,12 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
       ? [
           "Open Codex in this repo and work normally; fooks will run through the installed Codex hooks.",
           "Use fooks status codex if you want to inspect the runtime trust state.",
-          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 is context hooks only, not Read interception or token savings.",
+          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
         ]
       : [
           "Fix setup blockers, then run fooks setup again.",
           "Use fooks status codex for current runtime state and inspect the blockers field above.",
-          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 is context hooks only, not Read interception or token savings.",
+          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
         ],
   };
 }
@@ -526,7 +526,7 @@ Everyday commands:
   ${displayCliName} setup
       Prepare one-command readiness for supported runtimes:
       - Codex: automatic repeated-file runtime hook path when trust checks pass.
-      - Claude: project-local context hooks for SessionStart/UserPromptSubmit; no Read interception or runtime-token claim.
+      - Claude: project-local context hooks; first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may receive bounded context; no Read interception or runtime-token claim.
       - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
 
   ${displayCliName} run <prompt>

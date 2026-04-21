@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { decideCodexPreRead } from "./codex-pre-read";
+import { initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
 import { resolvePromptFileContext } from "./codex-runtime-prompt";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 
@@ -18,16 +19,18 @@ export type ClaudeRuntimeHookInput = {
 export type ClaudeRuntimeHookDecision = {
   runtime: "claude";
   hookEventName: ClaudeRuntimeHookEvent;
-  action: "noop" | "inject" | "fallback";
+  action: "noop" | "record" | "inject" | "fallback";
   filePath?: string;
   reasons: string[];
   additionalContext?: string;
+  statePath?: string;
   contextMode?: ContextMode;
   contextModeReason?: string;
   contextBudget?: ContextBudget;
   promptSpecificity?: PromptSpecificity;
   contextPolicyVersion?: "context-policy.v1";
   debug?: {
+    repeatedFile: boolean;
     eligible: boolean;
     bounded: boolean;
   };
@@ -65,7 +68,7 @@ function buildPayloadContext(filePath: string, payload: NonNullable<ReturnType<t
 function sessionStartContext(): string {
   return clampAdditionalContext([
     "fooks: Claude context hook is active for this project.",
-    "When the user explicitly prompts about an existing in-project .tsx or .jsx file, fooks may add bounded model-facing context through UserPromptSubmit.",
+    "When the user explicitly prompts about an existing in-project .tsx or .jsx file, fooks records/prepares the first same-session prompt; a repeated same-file prompt may add bounded model-facing context through UserPromptSubmit.",
     "P0 boundary: fooks does not intercept Claude Read/tool calls and does not claim Claude runtime-token savings.",
   ].join("\n"));
 }
@@ -82,6 +85,7 @@ function noopDecision(input: ClaudeRuntimeHookInput, reasons: string[], policy?:
     promptSpecificity: policy?.promptSpecificity,
     contextPolicyVersion: policy?.contextPolicyVersion,
     debug: {
+      repeatedFile: false,
       eligible: false,
       bounded: true,
     },
@@ -90,17 +94,21 @@ function noopDecision(input: ClaudeRuntimeHookInput, reasons: string[], policy?:
 
 export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = process.cwd()): ClaudeRuntimeHookDecision {
   const hookEventName = input.hookEventName;
+  const sessionKey = resolveClaudeRuntimeSessionKey(input.sessionId);
 
   if (hookEventName === "SessionStart") {
+    const statePath = initializeClaudeRuntimeSession(cwd, sessionKey);
     return {
       runtime: "claude",
       hookEventName,
       action: "inject",
       reasons: ["session-start-context"],
       additionalContext: sessionStartContext(),
+      statePath,
       contextMode: "light-minimal",
       contextModeReason: "claude-session-start-readiness",
       debug: {
+        repeatedFile: false,
         eligible: true,
         bounded: true,
       },
@@ -121,6 +129,30 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     return noopDecision(input, ["eligible-file-target-missing"], policy);
   }
 
+  const { statePath, seenCount } = markClaudeRuntimeSeenFile(cwd, sessionKey, target);
+  const repeatedFile = seenCount >= 2;
+
+  if (!repeatedFile) {
+    return {
+      runtime: "claude",
+      hookEventName,
+      action: "record",
+      filePath: target,
+      reasons: ["first-seen-file", "context-mode:no-op"],
+      statePath,
+      contextMode: "no-op",
+      contextModeReason: "first-turn-exact-file-record-only",
+      contextBudget: { ...policy.contextBudget, selectedFiles: 0, totalBytes: 0, skippedFiles: policy.contextBudget.selectedFiles },
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
+      debug: {
+        repeatedFile: false,
+        eligible: true,
+        bounded: true,
+      },
+    };
+  }
+
   let decision: ReturnType<typeof decideCodexPreRead>;
   try {
     decision = decideCodexPreRead(resolvedTarget, cwd);
@@ -130,14 +162,16 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       hookEventName,
       action: "fallback",
       filePath: target,
-      reasons: ["payload-build-failed"],
+      reasons: ["repeated-file", "payload-build-failed"],
       additionalContext: boundedFallbackContext(target, error instanceof Error ? error.message : String(error)),
+      statePath,
       contextMode: "full",
       contextModeReason: "payload-build-failed",
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
       debug: {
+        repeatedFile: true,
         eligible: true,
         bounded: true,
       },
@@ -155,14 +189,16 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       hookEventName,
       action: "inject",
       filePath: target,
-      reasons: ["first-eligible-file-prompt"],
+      reasons: ["repeated-file"],
       additionalContext: buildPayloadContext(target, decision.payload, contextMode),
+      statePath,
       contextMode,
-      contextModeReason: contextMode === "light-minimal" ? "first-exact-file-tiny-raw-original" : "first-exact-file-payload",
+      contextModeReason: contextMode === "light-minimal" ? "repeated-exact-file-tiny-raw-original" : "repeated-exact-file-payload",
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
       debug: {
+        repeatedFile: true,
         eligible: true,
         bounded: true,
       },
@@ -174,14 +210,16 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     hookEventName,
     action: "fallback",
     filePath: target,
-    reasons: decision.reasons,
+    reasons: decision.reasons.includes("repeated-file") ? decision.reasons : ["repeated-file", ...decision.reasons],
     additionalContext: boundedFallbackContext(target, decision.fallback?.reason ?? decision.reasons[0] ?? "full-read"),
+    statePath,
     contextMode: "full",
     contextModeReason: decision.fallback?.reason ?? decision.reasons[0] ?? "full-read",
     contextBudget: policy.contextBudget,
     promptSpecificity: policy.promptSpecificity,
     contextPolicyVersion: policy.contextPolicyVersion,
     debug: {
+      repeatedFile: true,
       eligible: decision.eligible,
       bounded: true,
     },
