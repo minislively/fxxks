@@ -83,7 +83,8 @@ Automated local checks now covered by `npm run release:smoke`:
 - [x] package/CLI boundary is documented: `oh-my-fooks` installs `fooks`.
 - [x] possible pre-existing global `fooks` binary conflict is documented.
 - [x] no install, pack, publish, or version lifecycle script mutates user machines or publishes implicitly.
-- [x] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and linked docs.
+- [x] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and the npm-package public docs allowlist.
+- [x] packed tarball excludes internal notes, benchmark corpora/results, and planning archives.
 - [x] temp-prefix global install smoke test passes.
 - [x] isolated `fooks setup` smoke test passes without mutating the real user Codex config.
 - [x] isolated `fooks setup` smoke test covers a fresh public-style repo without requiring `FOOKS_ACTIVE_ACCOUNT`.
@@ -107,7 +108,7 @@ npm run bench:gate
 
 `bench:gate` is a local benchmark gate; it is not the blocked external Layer 2 live benchmark.
 
-For an actual package publication review, also run the pack/install checks below before discussing publication:
+For an actual package publication review, also run the pack/install checks below before discussing publication. Keep the package `files` allowlist conservative until the final human-approved public-release step; do not add broad public-mode packaging changes just to make unpublished internal docs appear in the tarball:
 
 ```bash
 npm run release:smoke

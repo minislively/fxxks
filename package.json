@@ -29,7 +29,12 @@
   "main": "dist/index.js",
   "files": [
     "dist",
-    "docs"
+    "docs/CODE_OF_CONDUCT.md",
+    "docs/language-core-strategy.md",
+    "docs/opencode-read-interception.md",
+    "docs/release.md",
+    "docs/setup.md",
+    "docs/terminal-cli-validation-2026-04-19.md"
   ],
   "repository": {
     "type": "git",
