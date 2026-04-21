@@ -1541,6 +1541,7 @@ test("Layer 2 runner uses current Codex exec path instead of legacy configured g
   const status = fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "STATUS.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
   const r4Smoke = JSON.parse(fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "results", "R4-current-exec-smoke-2026-04-21.json"), "utf8"));
+  const r4SmokeRun2 = JSON.parse(fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "results", "R4-current-exec-smoke-2026-04-21-run-2.json"), "utf8"));
   const r4Validation = JSON.parse(fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "results", "R4-current-exec-validation-2026-04-21.json"), "utf8"));
 
   assert.match(wrapper, /codex exec/);
@@ -1557,10 +1558,16 @@ test("Layer 2 runner uses current Codex exec path instead of legacy configured g
   assert.equal(r4Smoke.results.vanilla.success, true);
   assert.equal(r4Smoke.results.fooks.success, true);
   assert.equal(r4Smoke.deltas.promptTokensApproxReductionPct, 92.4);
-  assert.equal(r4Validation.status, "validated-proposal-only-smoke");
+  assert.equal(r4SmokeRun2.status, "proposal-only-paired-smoke-validated");
+  assert.equal(r4SmokeRun2.validation.passed, true);
+  assert.equal(r4SmokeRun2.deltas.promptTokensApproxReductionPct, 92.4);
+  assert.equal(r4Validation.status, "validated-repeated-proposal-only-smoke");
+  assert.equal(r4Validation.pairCount, 2);
+  assert.equal(r4Validation.aggregate.allPairsPassed, true);
+  assert.equal(r4Validation.aggregate.promptTokensApproxReductionPct.median, 92.4);
   assert.ok(r4Validation.checks.every((check) => check.passed));
   assert.match(`${status}\n${release}`, /not provider billing telemetry|not enough for stable runtime-token\/time win claims/);
-  assert.match(status, /validation artifact/i);
+  assert.match(status, /two matched pairs|2\/2 matched pairs/i);
   assert.doesNotMatch(`${wrapper}\n${runner}`, /OPENAI_BASE_URL|api-base-url|gpt-4o|temperature|maxTokens/);
 });
 

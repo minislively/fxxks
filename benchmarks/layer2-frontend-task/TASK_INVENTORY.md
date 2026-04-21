@@ -185,12 +185,11 @@
 **첫 후보:** ✅ T4 (R4 Feature Module Split) 확정
 **Comparison mode:** ✅ Vanilla Codex vs Fooks-assisted Codex 정의
 
-**Not yet:**
-- API access 없음 (blocker)
-- 실제 benchmark 미실행
-- Runner 미구현
+**Current boundary:**
+- T4/R4 proposal-only matched smoke는 2회 실행 및 validation artifact 수집 완료
+- generated code 적용/acceptance benchmark와 provider billing telemetry는 아직 없음
 
-**Next:** API access 확보 시 T4 첫 real benchmark 실행
+**Next:** stable claim 전 applied-code validation 또는 multi-task evidence 수집
 
 ---
 

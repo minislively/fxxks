@@ -1,6 +1,6 @@
 # Layer 2 Frontend Task Benchmark - Public Report (Sample)
 
-> R4 Feature Module Split - 정직한 상태 보고 (single proposal-only smoke collected; validated benchmark pending)
+> R4 Feature Module Split - 정직한 상태 보고 (two proposal-only smokes collected; validated benchmark pending)
 
 ---
 
@@ -40,7 +40,7 @@
 | **Files Generated** | — | — | — | ⏸️ Pending |
 | **Validation Score** | —/6 | —/6 | — | ⏸️ Pending |
 
-**실제 실행 상태:** 🟡 **Single proposal-only smoke collected; validation/repeated benchmark pending**
+**실제 실행 상태:** 🟡 **Two proposal-only smokes collected; applied-code/multi-task benchmark pending**
 
 ---
 
@@ -53,30 +53,30 @@
 | 3 | Retry Reduction | vanilla - fooks | — | — | — | ⏸️ Pending |
 | 4 | Success Rate Diff | fooks - vanilla | — | — | — | ⏸️ Pending |
 
-**참고:** 위 수치는 proposal-only smoke의 local prompt-size/latency 관찰값이다. provider billing telemetry나 acceptance-validated 품질 결과가 아니며, 안정적인 runtime-token/time win claim은 validation + 반복 실행 전까지 금지.
+**참고:** 위 수치는 proposal-only smokes의 local prompt-size/latency 관찰값이다. provider billing telemetry나 acceptance-validated 품질 결과가 아니며, 안정적인 runtime-token/time win claim은 validation + 반복 실행 전까지 금지.
 
 ---
 
 ## 5. Interpretation
 
 ### Current Status
-> 🟡 **Single Proposal-Only R4 Smoke Collected**
+> 🟡 **Two Proposal-Only R4 Smokes Collected**
 
 ### Key Findings
 - **Task Definition/Spec:** ✅ Complete
 - **Runner/Wrapper:** ✅ Implemented and current `codex exec` smoke passed
-- **R4 Paired Smoke:** ✅ Vanilla/fooks proposal-only pair collected once
+- **R4 Paired Smoke:** ✅ Vanilla/fooks proposal-only pair collected twice
 - **Proposal-only Validation:** ✅ Validation artifact collected
 - **Stable Runtime Benchmark:** Out of scope until repeated/applied-code evidence exists
 
 ### Current Evidence
 - Tiny runner smoke: ✅ `success: true`, `exitCode: 0`
-- R4 paired smoke: ✅ vanilla and fooks both completed through current `codex exec`
+- R4 paired smokes: ✅ vanilla and fooks both completed through current `codex exec` in 2/2 matched pairs
 - Prompt-size smoke result: vanilla `11365` approx prompt tokens vs fooks `861` approx prompt tokens (`92.4%` smaller)
 - Historical 502 finding: retained as legacy gateway evidence, no longer the only runner route
 
 ### One-line Verdict
-> **Layer 2 Task Definition/Spec is complete, and the current runner can execute a single R4 paired smoke. Treat the 92.4% prompt-size reduction as smoke evidence only until validation and repeated runs exist.**
+> **Layer 2 Task Definition/Spec is complete, and the current runner can execute repeated R4 paired proposal-only smokes. Treat the 92.4% prompt-size reduction as smoke evidence only until applied-code validation and multi-task evidence exist.**
 
 ---
 
@@ -119,5 +119,5 @@
 
 *Sample Report: 에르가재*
 *Date: 2026-04-21*
-*Status: Single proposal-only smoke validated; repeated/applied-code evidence out of scope*
+*Status: Two proposal-only smokes validated; applied-code/multi-task evidence out of scope*
 *Next: Repeat matched R4 pairs and apply-code validation only if making stronger public win claims*

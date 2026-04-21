@@ -8,7 +8,7 @@
 
 **정확한 상태:**
 - ✅ **Layer 1 Extraction Benchmark:** nextjs/tailwindcss real benchmark result 있음
-- ❌ **Layer 2 Frontend Task Benchmark:** 없음  
+- ❌ **Layer 2 Frontend Task Benchmark:** 없음
 - ⚠️ **Layer 2 Task Runner Spec:** R4 Feature Module Split 확정
 
 ---
@@ -72,23 +72,23 @@ combobox-example.tsx (1,249 lines) → 분리 후:
 - ✅ 성공 기준 확정
 - ✅ 측정 metric 확정
 
-**지금 불가능:**
-- ❌ 실제 AI 코드 생성 (API access 없음)
-- ❌ 자동 success/fail 판정 (evaluator 미구현)
-- ❌ retry/latency 측정 (실행 환경 없음)
+**현재 경계:**
+- ✅ current `codex exec` proposal-only AI 실행 2회 완료
+- ✅ proposal-smoke validation artifact 수집 완료
+- ❌ generated code 적용 기반 acceptance validation은 아직 없음
 
 ---
 
 ## 명명 (Fixed)
 
 **정확한 표현:**
-- ✅ `R4 Feature Module Split task runner spec` (지금 상태)
-- ❌ `Layer 2 benchmark` (아님)
-- ❌ `Layer 2 result` (아님)
-- ❌ `완료` (아님)
+- ✅ `R4 Feature Module Split task runner spec`
+- ✅ `two R4 proposal-only smokes validated`
+- ❌ `stable Layer 2 benchmark win` (applied-code/multi-task evidence 전까지 금지)
+- ❌ `billing-grade token savings`
 
 ---
 
-*Spec 확정: 에르가재*  
-*상태: runner input 고정, 실행 대기*  
-*API access 시 즉시 실행 가능*
+*Spec 확정: 에르가재*
+*상태: proposal-only smoke 2회 검증, applied-code validation 대기*
+*stable claim 전 추가 evidence 필요*

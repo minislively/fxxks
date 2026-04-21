@@ -48,8 +48,8 @@
 
 ### 기본 원칙
 - **실제 Codex CLI 사용** (`codex exec` wrapper path)
-- **Tiny/R4 smoke와 validated benchmark를 분리**: smoke는 runner path proof, validated benchmark는 validation + 반복 실행 필요
-- **R4 vanilla/fooks paired output + validation artifact + 반복 증거가 있어야 validated benchmark 결과로 인정**
+- **Tiny/R4 proposal-only smokes와 applied-code benchmark를 분리**: smoke는 runner path proof, stable benchmark는 applied-code validation + multi-task evidence 필요
+- **R4 vanilla/fooks paired output을 실제 패치로 적용하고 validation artifact + multi-task evidence가 있어야 stable benchmark 결과로 인정**
 
 ### 실행 순서
 ```bash
@@ -75,17 +75,17 @@ node compare.js results/R4-vanilla-run-2.json results/R4-fooks-run-2.json
 
 | Blocker | 상태 | 대응 |
 |---------|------|------|
-| **Legacy configured gateway 502** | ✅ **Retired as sole blocker** | 현재 wrapper는 `codex exec` tiny + single R4 paired smoke 통과 |
-| **R4 paired smoke** | ✅ **Collected once** | 2026-04-21 proposal-only pair: 11365 → 861 approx prompt tokens |
-| **Validation/repeated evidence 없음** | ⏸️ **Active** | R4 결과마다 validation output 저장 + 반복 실행 필요 |
+| **Legacy configured gateway 502** | ✅ **Retired as sole blocker** | 현재 wrapper는 `codex exec` tiny + two R4 paired proposal-only smokes 통과 |
+| **R4 paired smokes** | ✅ **Collected twice** | 2026-04-21 proposal-only pairs: 11365 → 861 approx prompt tokens in both |
+| **Applied-code/multi-task evidence 없음** | ⏸️ **Active** | R4 결과마다 validation output 저장 + 반복 실행 필요 |
 | **Lab benchmark (HTTP client)** | ⏸️ **보류** | Real-world 우선, 나중에 구현 |
 
 ### Status Summary
 > **Real-world benchmark 설계는 완료됨.**
-> **Tiny `codex exec` smoke와 단일 R4 paired smoke는 통과했다.**
-> **단일 R4 smoke에서 promptTokensApprox는 11365 → 861로 92.4% 작아졌다.**
+> **Tiny `codex exec` smoke와 2회 R4 paired proposal-only smoke는 통과했다.**
+> **2회 R4 smoke 모두 promptTokensApprox는 11365 → 861로 92.4% 작아졌다.**
 > **Lab benchmark (HTTP client)는 보조 축으로 보류됨.**
-> **validation artifact + 반복 실행 전에는 runtime-token savings/win claim 금지.**
+> **applied-code validation + multi-task evidence 전에는 runtime-token savings/win claim 금지.**
 
 ---
 
@@ -112,5 +112,5 @@ node compare.js results/R4-vanilla-run-2.json results/R4-fooks-run-2.json
 *Design: 에르가재*
 *Date: 2026-04-15*
 *Priority: Real-world benchmark 우선*
-*Blocker: validation artifact + repeated evidence pending*
+*Blocker: applied-code validation + multi-task evidence pending*
 *Lab benchmark: 보류*
