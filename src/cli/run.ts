@@ -9,6 +9,7 @@ import { decideMode } from "../core/decide.js";
 import { discoverProjectFiles } from "../core/discover.js";
 import { discoverRelevantFilesByPolicy } from "../core/context-policy.js";
 import { prepareExecutionContext } from "../adapters/codex.js";
+import { readCodexTrustStatus } from "../adapters/codex-runtime-trust.js";
 
 export interface RunOptions {
   prompt: string;
@@ -40,6 +41,10 @@ function printSharedHandoff(executionContext: {
   prompt: string;
 }): void {
   const quotedContextPath = shellQuote(executionContext.contextPath);
+  const codexStatus = readCodexTrustStatus(process.cwd());
+  const codexSetupReady =
+    codexStatus.connectionState === "connected" &&
+    (codexStatus.lifecycleState === "ready" || codexStatus.lifecycleState === "attach-prepared");
   console.log("\n=== Shared Handoff Context ===");
   console.log(`Context ready: ${executionContext.contextPath}`);
   console.log(`Files: ${executionContext.fileCount}, Size: ${(executionContext.totalSize / 1024).toFixed(1)}KB`);
@@ -50,8 +55,15 @@ function printSharedHandoff(executionContext: {
     console.log("\nNo reusable source context was selected.");
     console.log("This usually means your prompt targets a new or missing file, so the temp context is metadata-only.");
     console.log("\nNext steps:");
-    console.log("Use your original prompt directly in codex, claude, omx, or another runtime.");
-    console.log("If you already ran `fooks setup` for Codex, open `codex` in this repo and work normally.");
+    if (codexSetupReady) {
+      console.log("Codex setup already looks ready for this repo.");
+      console.log("Open `codex` in this repo and use your original prompt directly.");
+    } else {
+      console.log("Reliable first success: run `fooks setup` in this repo first.");
+      console.log("When setup reports ready, open `codex` in this repo and use your original prompt directly.");
+      console.log("Optional check: `fooks status codex`");
+    }
+    console.log("If you intentionally want another runtime, use your original prompt there instead of the metadata-only temp context.");
     console.log(`Metadata-only context file: ${executionContext.contextPath}`);
     console.log("======================\n");
     return;
