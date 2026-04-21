@@ -17,6 +17,7 @@
     "bench:process-model": "npm run build && node benchmarks/scripts/process-model-probe.mjs",
     "bench:extract": "npm run build && node benchmarks/scripts/extract.mjs",
     "bench:stability": "npm run build && node benchmarks/scripts/stability.mjs",
+    "bench:layer2:applied:selftest": "npm run build && node benchmarks/layer2-frontend-task/validate-r4-applied.js --root=benchmarks/layer2-frontend-task/fixtures/r4-applied-pass/combobox --output=benchmarks/layer2-frontend-task/results/R4-applied-acceptance-validator-self-test-2026-04-21.json",
     "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs",
     "lint": "npm run typecheck -- --pretty false",
     "release:smoke": "npm run build && node scripts/release-smoke.mjs"

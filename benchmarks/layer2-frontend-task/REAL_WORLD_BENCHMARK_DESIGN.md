@@ -77,13 +77,15 @@ node compare.js results/R4-vanilla-run-2.json results/R4-fooks-run-2.json
 |---------|------|------|
 | **Legacy configured gateway 502** | ✅ **Retired as sole blocker** | 현재 wrapper는 `codex exec` tiny + two R4 paired proposal-only smokes 통과 |
 | **R4 paired smokes** | ✅ **Collected twice** | 2026-04-21 proposal-only pairs: 11365 → 861 approx prompt tokens in both |
-| **Applied-code/multi-task evidence 없음** | ⏸️ **Active** | R4 결과마다 validation output 저장 + 반복 실행 필요 |
+| **Applied-code gate 없음** | ✅ **Resolved** | `validate-r4-applied.js` + `run-r4-applied.js`로 on-disk candidate validation path 구현 |
+| **Applied-code/multi-task evidence 없음** | ⏸️ **Active** | Matched vanilla/fooks generated outputs를 acceptance gate에 통과시키고, multi-task 반복 실행 필요 |
 | **Lab benchmark (HTTP client)** | ⏸️ **보류** | Real-world 우선, 나중에 구현 |
 
 ### Status Summary
 > **Real-world benchmark 설계는 완료됨.**
 > **Tiny `codex exec` smoke와 2회 R4 paired proposal-only smoke는 통과했다.**
 > **2회 R4 smoke 모두 promptTokensApprox는 11365 → 861로 92.4% 작아졌다.**
+> **Applied-code acceptance gate는 구현/셀프테스트되었지만, live matched generated outputs evidence는 아직 없다.**
 > **Lab benchmark (HTTP client)는 보조 축으로 보류됨.**
 > **applied-code validation + multi-task evidence 전에는 runtime-token savings/win claim 금지.**
 

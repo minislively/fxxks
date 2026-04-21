@@ -165,5 +165,6 @@ FAIL인 경우에도 아래는 기록:
 
 **Current execution boundary**
 - proposal-only smoke validation은 2회 matched R4 pair에 대해 실행됨
-- generated code를 실제 repo에 적용한 acceptance validation은 아직 없음
-- stable win claim 전에는 applied-code validation 또는 multi-task evidence가 필요
+- applied-code acceptance gate는 `validate-r4-applied.js`로 구현/셀프테스트됨
+- generated code를 실제 repo에 적용한 matched vanilla/fooks acceptance evidence는 아직 없음
+- stable win claim 전에는 live applied-code validation 또는 multi-task evidence가 필요
