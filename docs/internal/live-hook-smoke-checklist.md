@@ -1,0 +1,95 @@
+# Internal live hook-smoke checklist
+
+This checklist is for maintainers who want to confirm the same fooks-owned hook and status paths in real Codex / Claude Code sessions after the deterministic release smoke passes.
+
+## Claim boundary
+
+- Treat this as hook-smoke evidence plus local estimated context-size telemetry only.
+- Do not describe it as reducing provider billing tokens or provider costs, replacing `ccusage`, intercepting Claude `Read`, or enabling automatic Claude token reductions.
+- Product evidence must come from `.fooks` artifacts and `fooks status`. `.omx` is an internal planning/development harness only, not fooks product runtime state.
+
+## Automated preflight
+
+Run this from a branch that contains the Claude project-local context hook path and runtime/source metric foundation:
+
+```bash
+npm run build
+npm run release:smoke
+```
+
+Expected observations:
+
+- `fooks setup` reports Codex `automatic-ready` when Codex hook prerequisites pass.
+- `fooks setup` reports Claude `context-hook-ready` when a Claude home exists and project-local hooks can be installed.
+- The smoke drives Codex and Claude `SessionStart` / `UserPromptSubmit` hook payloads against a frontend `.tsx` fixture.
+- Bare `fooks status` reports `metricTier: "estimated"`, runtime/source breakdown entries, and the provider-billing boundary.
+
+## Manual Codex check
+
+1. In a disposable React/TSX project, run:
+
+   ```bash
+   fooks setup
+   fooks status codex
+   ```
+
+2. Open Codex in that project.
+3. Prompt once about an existing `.tsx` / `.jsx` component, for example:
+
+   ```text
+   Explain src/components/Card.tsx
+   ```
+
+4. Prompt again about the same file in the same session:
+
+   ```text
+   Again, explain src/components/Card.tsx
+   ```
+
+5. Run:
+
+   ```bash
+   fooks status
+   ```
+
+Expected observations:
+
+- Codex hook state remains attached/ready.
+- Repeated same-file behavior is reflected through local `.fooks/sessions` estimated telemetry.
+- `fooks status` includes a Codex `automatic-hook` runtime/source breakdown.
+
+## Manual Claude Code check
+
+1. In a disposable React/TSX project with Claude Code available, run:
+
+   ```bash
+   fooks setup
+   fooks status claude
+   cat .claude/settings.local.json
+   ```
+
+2. Confirm `.claude/settings.local.json` contains only fooks `SessionStart` and `UserPromptSubmit` hook commands. It must not install Claude `Read`, `PreToolUse`, or `PostToolUse` interception.
+3. Open Claude Code in that project.
+4. Prompt once about an existing `.tsx` / `.jsx` component.
+5. Prompt again about the same file in the same session.
+6. Run:
+
+   ```bash
+   fooks status
+   ```
+
+Expected observations:
+
+- Claude status is `context-hook-ready`.
+- The first eligible frontend-file prompt is record/preparation only.
+- The repeated same-file prompt may receive bounded `additionalContext` through `UserPromptSubmit`.
+- `fooks status` includes a Claude `project-local-context-hook` runtime/source breakdown.
+
+## Evidence to attach to a PR
+
+Use sanitized excerpts only:
+
+- `npm run release:smoke` success summary.
+- `fooks status` fields showing `metricTier`, `claimBoundary`, and runtime/source keys.
+- Confirmation that provider billing-token/cost proof remains deferred.
+- Confirmation that `ccusage` replacement remains out of scope.

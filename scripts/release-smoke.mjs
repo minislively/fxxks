@@ -59,6 +59,57 @@ function assertPublicSurfaceClaimBoundaries(surfaces) {
   }
 }
 
+function runInstalledFooks(fooksBin, args, options = {}) {
+  return execFileSync(fooksBin, args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    input: options.input,
+    env: {
+      ...process.env,
+      ...(options.env ?? {}),
+    },
+  });
+}
+
+function parseOptionalJson(stdout, label) {
+  if (!stdout.trim()) return null;
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(`${label} should emit JSON when non-empty: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function runNativeHook(fooksBin, runtime, projectRoot, env, payload, label) {
+  return parseOptionalJson(
+    runInstalledFooks(fooksBin, [`${runtime}-runtime-hook`, "--native-hook"], {
+      cwd: projectRoot,
+      input: JSON.stringify(payload),
+      env,
+    }),
+    label,
+  );
+}
+
+function sanitizeDataKey(key) {
+  return key.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase() || "default-session";
+}
+
+function readMetricEvents(projectRoot) {
+  const sessionsDir = path.join(projectRoot, ".fooks", "sessions");
+  if (!fs.existsSync(sessionsDir)) return [];
+  return fs.readdirSync(sessionsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => {
+      const eventsPath = path.join(sessionsDir, entry.name, "events.jsonl");
+      if (!fs.existsSync(eventsPath)) return [];
+      return fs.readFileSync(eventsPath, "utf8")
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    });
+}
+
 function assertPackedFiles(packEntry) {
   const paths = new Set(packEntry.files.map((file) => file.path));
   const required = [
@@ -121,6 +172,9 @@ assertPublicSurfaceClaimBoundaries({
   "README.md": fs.readFileSync(path.join(repoRoot, "README.md"), "utf8"),
   "docs/setup.md": fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8"),
   "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
+  "docs/internal/live-hook-smoke-checklist.md": fs.existsSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"))
+    ? fs.readFileSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"), "utf8")
+    : "",
   "dist/cli/index.js": fs.readFileSync(path.join(repoRoot, "dist", "cli", "index.js"), "utf8"),
 });
 
@@ -188,8 +242,10 @@ assertPublicSurfaceClaimBoundaries({
   "fooks status claude output": claudeStatusStdout,
 });
 const status = JSON.parse(statusStdout);
+assert(status.metricTier === "estimated", `status should expose estimated metric tier, got ${status.metricTier}`);
 assert(status.claimBoundary?.includes("not provider billing tokens"), "status should keep provider billing boundary");
 assert(status.breakdown && typeof status.breakdown === "object", "status should expose runtime/source breakdown");
+assert(!Object.prototype.hasOwnProperty.call(status, "sessions"), "CLI status should omit per-session contribution details");
 assert(fs.existsSync(path.join(codexHome, "hooks.json")), "isolated Codex hooks file should be written under FOOKS_CODEX_HOME");
 const claudeLocalSettings = path.join(project, ".claude", "settings.local.json");
 assert(fs.existsSync(claudeLocalSettings), "Claude project-local hooks should be installed under the project");
@@ -206,36 +262,76 @@ assert(
   claudeSettings.hooks?.UserPromptSubmit?.[0]?.hooks?.[0]?.command === "fooks claude-runtime-hook --native-hook",
   "Claude UserPromptSubmit smoke hook should use the canonical fooks command",
 );
-const claudeNativeEnv = {
+const hookEnv = {
   ...process.env,
   HOME: path.join(runtimeRoot, "home"),
   XDG_CONFIG_HOME: path.join(runtimeRoot, "config"),
   FOOKS_CODEX_HOME: codexHome,
   FOOKS_CLAUDE_HOME: claudeHome,
 };
-const firstClaudePrompt = execFileSync(fooksBin, ["claude-runtime-hook", "--native-hook"], {
+const codexSessionId = "release-smoke-codex";
+const codexStart = runNativeHook(fooksBin, "codex", project, hookEnv, {
+  hook_event_name: "SessionStart",
   cwd: project,
-  encoding: "utf8",
-  input: JSON.stringify({
-    hook_event_name: "UserPromptSubmit",
-    cwd: project,
-    session_id: "release-smoke-claude",
-    prompt: "Explain src/App.tsx",
-  }),
-  env: claudeNativeEnv,
-});
-assert(firstClaudePrompt === "", "Claude first eligible native prompt should record without emitting context");
-const secondClaudePrompt = JSON.parse(execFileSync(fooksBin, ["claude-runtime-hook", "--native-hook"], {
+  session_id: codexSessionId,
+}, "Codex SessionStart");
+assert(codexStart === null, "Codex native SessionStart should initialize without emitting context");
+const firstCodexPrompt = runNativeHook(fooksBin, "codex", project, hookEnv, {
+  hook_event_name: "UserPromptSubmit",
   cwd: project,
-  encoding: "utf8",
-  input: JSON.stringify({
-    hook_event_name: "UserPromptSubmit",
-    cwd: project,
-    session_id: "release-smoke-claude",
-    prompt: "Again, explain src/App.tsx",
-  }),
-  env: claudeNativeEnv,
-}));
+  session_id: codexSessionId,
+  prompt: "Explain src/App.tsx",
+}, "Codex first prompt");
+assert(firstCodexPrompt === null, "Codex first eligible native prompt should record without emitting context");
+const secondCodexPrompt = runNativeHook(fooksBin, "codex", project, hookEnv, {
+  hook_event_name: "UserPromptSubmit",
+  cwd: project,
+  session_id: codexSessionId,
+  prompt: "Again, explain src/App.tsx",
+}, "Codex repeated prompt");
+assert(
+  secondCodexPrompt.hookSpecificOutput?.hookEventName === "UserPromptSubmit",
+  "Codex repeated same-file native prompt should emit UserPromptSubmit context",
+);
+assert(
+  secondCodexPrompt.hookSpecificOutput?.additionalContext?.includes("src/App.tsx"),
+  "Codex repeated same-file native context should reference the target file",
+);
+
+const codexFallbackSessionId = "release-smoke-codex-fallback";
+const codexFallback = runNativeHook(fooksBin, "codex", project, hookEnv, {
+  hook_event_name: "UserPromptSubmit",
+  cwd: project,
+  session_id: codexFallbackSessionId,
+  prompt: "Need exact source src/App.tsx #fooks-full-read",
+}, "Codex fallback prompt");
+assert(
+  codexFallback?.hookSpecificOutput?.additionalContext === "fooks: full read requested · file: src/App.tsx · Read the full source file for this turn.",
+  "Codex fallback hook should use bounded full-read status vocabulary",
+);
+
+const claudeStart = runNativeHook(fooksBin, "claude", project, hookEnv, {
+  hook_event_name: "SessionStart",
+  cwd: project,
+  session_id: "release-smoke-claude",
+}, "Claude SessionStart");
+assert(
+  claudeStart.hookSpecificOutput?.additionalContext?.includes("context hook is active"),
+  "Claude native SessionStart should emit bounded readiness context",
+);
+const firstClaudePrompt = runNativeHook(fooksBin, "claude", project, hookEnv, {
+  hook_event_name: "UserPromptSubmit",
+  cwd: project,
+  session_id: "release-smoke-claude",
+  prompt: "Explain src/App.tsx",
+}, "Claude first prompt");
+assert(firstClaudePrompt === null, "Claude first eligible native prompt should record without emitting context");
+const secondClaudePrompt = runNativeHook(fooksBin, "claude", project, hookEnv, {
+  hook_event_name: "UserPromptSubmit",
+  cwd: project,
+  session_id: "release-smoke-claude",
+  prompt: "Again, explain src/App.tsx",
+}, "Claude repeated prompt");
 assert(
   secondClaudePrompt.hookSpecificOutput?.hookEventName === "UserPromptSubmit",
   "Claude repeated same-file native prompt should emit UserPromptSubmit context",
@@ -244,6 +340,41 @@ assert(
   secondClaudePrompt.hookSpecificOutput?.additionalContext?.includes("src/App.tsx"),
   "Claude repeated same-file native context should reference the target file",
 );
+
+const postHookStatusStdout = runInstalledFooks(fooksBin, ["status"], {
+  cwd: project,
+  env: hookEnv,
+});
+assertPublicSurfaceClaimBoundaries({
+  "post-hook fooks status output": postHookStatusStdout,
+});
+const postHookStatus = JSON.parse(postHookStatusStdout);
+assert(postHookStatus.metricTier === "estimated", `post-hook status should expose estimated metric tier, got ${postHookStatus.metricTier}`);
+assert(postHookStatus.claimBoundary?.includes("not provider billing tokens"), "post-hook status should keep provider billing boundary");
+assert(!Object.prototype.hasOwnProperty.call(postHookStatus, "sessions"), "post-hook CLI status should omit per-session contribution details");
+assert(postHookStatus.breakdown?.byRuntime?.codex?.eventCount >= 2, "post-hook status should include Codex hook metric events");
+assert(postHookStatus.breakdown?.byRuntime?.claude?.eventCount >= 2, "post-hook status should include Claude hook metric events");
+assert(postHookStatus.breakdown?.byMeasurementSource?.["automatic-hook"]?.eventCount >= 2, "post-hook status should include automatic-hook source metrics");
+assert(postHookStatus.breakdown?.byMeasurementSource?.["project-local-context-hook"]?.eventCount >= 2, "post-hook status should include Claude project-local context-hook source metrics");
+assert(postHookStatus.breakdown?.byRuntimeAndSource?.["codex:automatic-hook"]?.injectCount >= 1, "post-hook status should include Codex repeated-file inject evidence");
+assert(postHookStatus.breakdown?.byRuntimeAndSource?.["claude:project-local-context-hook"]?.injectCount >= 1, "post-hook status should include Claude repeated-file inject evidence");
+
+const metricEvents = readMetricEvents(project);
+const codexFallbackMetricKey = `codex:automatic-hook:${codexFallbackSessionId}`;
+const fallbackEvent = metricEvents.find((event) => event.metricSessionKey === codexFallbackMetricKey && event.action === "fallback");
+assert(fallbackEvent, "Codex fallback smoke should record a fallback metric event");
+assert(fallbackEvent.estimated?.savedEstimatedBytes === 0, "fallback metric should not produce positive estimated byte savings");
+assert(fallbackEvent.estimated?.savedEstimatedTokens === 0, "fallback metric should not produce positive estimated token savings");
+const recordEvents = metricEvents.filter((event) => event.action === "record");
+assert(recordEvents.length >= 2, "Codex and Claude hook smokes should record first eligible prompts");
+assert(
+  recordEvents.every((event) => event.estimated?.savedEstimatedBytes === 0 && event.estimated?.savedEstimatedTokens === 0),
+  "record-only hook metrics should not produce positive estimated savings",
+);
+const codexSummaryDir = path.join(project, ".fooks", "sessions", sanitizeDataKey(`codex:automatic-hook:${codexSessionId}`));
+const claudeSummaryDir = path.join(project, ".fooks", "sessions", sanitizeDataKey("claude:project-local-context-hook:release-smoke-claude"));
+assert(fs.existsSync(path.join(codexSummaryDir, "summary.json")), "Codex hook-smoke session summary should be persisted");
+assert(fs.existsSync(path.join(claudeSummaryDir, "summary.json")), "Claude hook-smoke session summary should be persisted");
 assert(fs.existsSync(path.join(project, ".opencode", "tools", "fooks_extract.ts")), "opencode helper should be installed project-locally");
 assert(fs.existsSync(path.join(project, ".opencode", "commands", "fooks-extract.md")), "opencode slash command should be installed project-locally");
 
