@@ -1693,6 +1693,28 @@ test("docs describe opencode as manual custom-tool support without runtime savin
   assert.equal(releaseSmoke.includes('run("npm", ["publish"'), false);
 });
 
+test("package release surface keeps internal docs out of the npm tarball", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const releaseSmoke = fs.readFileSync(path.join(repoRoot, "scripts", "release-smoke.mjs"), "utf8");
+  const gitignore = fs.readFileSync(path.join(repoRoot, ".gitignore"), "utf8");
+
+  assert.ok(pkg.files.includes("dist"));
+  assert.ok(pkg.files.includes("docs/setup.md"));
+  assert.ok(pkg.files.includes("docs/release.md"));
+  assert.equal(pkg.files.includes("docs"), false);
+  assert.equal(pkg.files.some((entry) => entry.startsWith("docs/internal")), false);
+  assert.equal(pkg.files.some((entry) => entry.startsWith("benchmarks")), false);
+  assert.doesNotMatch(readme, /Useful internal docs/);
+  assert.doesNotMatch(readme, /benchmarks\/frontend-harness\/reports/);
+  assert.match(readme, /intentionally not part of the npm package payload/);
+  assert.match(release, /excludes internal notes, benchmark corpora\/results, and planning archives/);
+  assert.match(releaseSmoke, /docs\/internal\//);
+  assert.match(releaseSmoke, /packed tarball includes non-public path/);
+  assert.match(gitignore, /docs\/internal\//);
+});
+
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");

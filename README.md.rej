@@ -1,0 +1,17 @@
+--- README.md
++++ README.md
+@@ -122,9 +122,10 @@ npm install
+ npm test
+ ```
+ 
+-Useful internal docs:
++Useful public docs:
+ 
+-- Runtime bridge contract: [`docs/runtime-bridge-contract.md`](docs/runtime-bridge-contract.md)
+-- Live feedback checklist: [`docs/codex-live-feedback-checklist.md`](docs/codex-live-feedback-checklist.md)
++- Setup details: [`docs/setup.md`](docs/setup.md)
++- opencode support boundary: [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md)
+ - Release checklist: [`docs/release.md`](docs/release.md)
+-- Benchmark harness: [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md)
++
++Benchmark harness docs and internal development notes live in the source repository, but are intentionally not part of the npm package payload.

@@ -35,3 +35,6 @@ benchmarks/results/warm-*.json
 
 # Internal development archive (historical dev docs with internal paths)
 docs/archive/
+
+# Unpublished/internal release-review notes
+docs/internal/

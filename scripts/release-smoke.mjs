@@ -50,9 +50,27 @@ function assertPackedFiles(packEntry) {
     assert(paths.has(filePath), `packed tarball missing ${filePath}`);
   }
 
-  for (const file of packEntry.files) {
-    assert(!file.path.startsWith("docs/archive/"), `packed tarball should not include internal archive docs: ${file.path}`);
-    assert(!file.path.startsWith("benchmarks/frontend-harness/reports/"), `packed tarball should not include internal benchmark reports: ${file.path}`);
+  const forbiddenPrefixes = [
+    "benchmarks/",
+    "docs/archive/",
+    "docs/benchmarks/",
+    "docs/cli/",
+    "docs/internal/",
+  ];
+  const forbiddenFiles = new Set([
+    "docs/BENCHMARK_ENVIRONMENT_AUDIT.md",
+    "docs/RISK_AND_MONITORING.md",
+    "docs/codex-live-feedback-checklist.md",
+    "docs/performance-vs-operational-complexity.md",
+    "docs/real-environment-process-model-validation.md",
+    "docs/real-repo-validation.md",
+    "docs/runtime-bridge-contract.md",
+    "docs/today-execution-plan.md",
+  ]);
+
+  for (const filePath of paths) {
+    assert(!forbiddenFiles.has(filePath), `packed tarball includes internal doc ${filePath}`);
+    assert(!forbiddenPrefixes.some((prefix) => filePath.startsWith(prefix)), `packed tarball includes non-public path ${filePath}`);
   }
 }
 
