@@ -1,167 +1,136 @@
 # Layer 2 Frontend Task Benchmark - Status
 
-> 현재 상태 고정
+> Current canonical state for the Layer 2 R4 task benchmark.
 
----
+## 1. Current state
 
-## 1. 현재 상태 (정확한 용어)
+| Layer | Definition | Status | Detail |
+| --- | --- | --- | --- |
+| Layer 1: Extraction Benchmark | Compression / extraction / coverage / quality checks | ✅ Active | Existing proxy/prepared-context benchmark history remains valid as proxy evidence. |
+| Layer 2: Task Definition/Spec | Frontend task inventory and R4 spec | ✅ Complete | Task inventory, R4 spec, validation checklist, metric schema are ready. |
+| Layer 2: Runner Path | AI runner wrapper execution path | ✅ Unblocked | Current `codex exec` wrapper completed tiny and R4 paired read-only smokes. |
+| Layer 2: R4 Paired Smoke | Vanilla-vs-fooks proposal-only R4 execution | ✅ Collected | Single matched pair succeeded on `combobox-example.tsx`; summary stored in `results/R4-current-exec-smoke-2026-04-21.json`. |
+| Layer 2: Validated Benchmark | Acceptance/quality-validated R4 benchmark | 🟡 Pending | No validation artifact or repeated-run evidence yet. |
 
-| Layer | 정의 | 상태 | 상세 |
-|-------|------|------|------|
-| **Layer 1: Extraction Benchmark** | 압축/추출/coverage/quality 측정 | ✅ **Active** | nextjs 4 + tailwindcss 5, Avg savings 85.3%, history/latest 체계 |
-| **Layer 2: Task Definition/Spec** | 프론트 작업 아이디어 정의/스펙화 | ✅ **Complete** | 7개 task inventory, R4 spec, validation, metric schema 완성 |
-| **Layer 2: Task Execution** | 실제 AI로 작업 실행/비교 | ⏸️ **Blocked** | Codex gateway 502 |
-| **Layer 2: Real Benchmark** | 실제 실행 결과 | ❌ **Not yet** | 실행 결과 없음 |
+## 2. Canonical wording
 
-### 핵심 Canonical 문구
+> Layer 2 task definition/spec is complete.
+> The legacy configured gateway 502 path is no longer a current runner-path blocker.
+> A current `codex exec` R4 paired smoke passed on 2026-04-21.
+> In that single proposal-only pair, the prompt supplied to Codex dropped from `11365` approx tokens in vanilla mode to `861` approx tokens in fooks mode (`92.4%` smaller).
+> This is prompt-size smoke evidence, **not** provider billing telemetry, not an acceptance-validated code benchmark, and not enough for stable runtime-token/time win claims.
 
-> **Layer 2 Task Definition/Spec is complete.**
-> **Layer 2 real execution is blocked by Codex gateway 502.**
-> **Therefore Layer 2 real benchmark results do not exist yet.**
+## 3. Completed assets
 
----
+| Asset | Status | Notes |
+| --- | --- | --- |
+| Task inventory | ✅ Complete | 7 frontend high-token task definitions. |
+| R4 runner spec | ✅ Complete | Feature Module Split input/output/success criteria. |
+| Validation checklist | ✅ Complete | Function preservation, file sizing, types, import cycles, barrel exports. |
+| Metric schema | ✅ Complete | success/fail, token usage, retry count, latency, edit precision, operational overhead. |
+| Runner/wrapper | ✅ Smoke passed | `runner.js` and `codex-wrapper.js` now use current `codex exec` path. |
+| First candidate | ✅ Fixed | R4 Feature Module Split on `combobox-example.tsx`. |
+| R4 paired smoke summary | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json`. |
 
-## 2. Layer 2 Extraction 완료물 (Execution과 무관)
+## 4. 2026-04-21 tiny runner smoke
 
-| 산출물 | 상태 | 내용 |
-|--------|------|------|
-| **Task Inventory** | ✅ 완성 | 7개 프론트 토큰 고비용 task 정의 (T1-T7) |
-| **R4 Runner Spec** | ✅ 완성 | Feature Module Split 입력/출력/성공기준 |
-| **Validation Checklist** | ✅ 완성 | 6개 기준 검증 방법 |
-| **Metric Schema** | ✅ 완성 | 6개 metric 측정/로깅/비교 정의 |
-| **Runner/Wrapper** | ✅ 구현 | runner.js, codex-wrapper.js 구현, 테스트 대기 |
-| **First Candidate** | ✅ 고정 | R4 Feature Module Split (shadcn-ui combobox-example.tsx) |
+Command:
 
----
-
-## 2. 고정된 첫 후보
-
-| 항목 | 값 |
-|------|-----|
-| **Task ID** | R4 |
-| **Task Name** | Feature Module Split |
-| **Repo** | shadcn-ui |
-| **Target File** | `combobox-example.tsx` (1,249 lines) |
-| **분리 목표** | components/ hooks/ utils/ types/ |
-| **성공 기준** | 기능유지/파일≤200라인/type0/순환import0/barrel |
-
----
-
-## 3. Blocker (정확한 정의 - 2026-04-15 최종)
-
-| Blocker | 상태 | 세부 사항 |
-|---------|------|-----------|
-| **Runner 미구현** | ✅ RESOLVED | runner.js, codex-wrapper.js 구현 완료 |
-| **Metric 파이프라인** | ✅ RESOLVED | 수집 로직 구현 완료 |
-| **Fooks 구현/설계** | ✅ RESOLVED | spec trio 완성, wrapper 동작 확인 |
-| **Configured Codex Gateway (502)** | ⚠️ **ACTIVE** | 외부 인프라 문제, fooks无关 |
-
-### 정확한 Blocker 분석 (최종)
-
-**이전 (부정확):** `API access pending` / `runner implementation pending` / `spec 부족`  
-**현재 (정확):** **`Codex gateway path stability (502)`**
-
-### 확정된 분리 실험
-
-| 테스트 | 조건 | 결과 | 병목 분리 |
-|--------|------|------|-----------|
-| **Minimal + wrapper** | 34 chars, with wrapper | ❌ 502 | wrapper无关 |
-| **Minimal + wrapper-less** | 34 chars, direct CLI | ❌ 502 | **wrapper无关 확정** |
-| **R4 vanilla** | 39,209 bytes | ❌ 502 | context size无关 |
-| **R4 fooks** | ~3,000 bytes | ❌ 502 | context size无关 |
-
-**핵심 발견 (최종):**
-```
-Wrapper-less direct Codex CLI call also fails with identical 502.
-Confirmed: bottleneck is Codex gateway path stability, 
-NOT fooks wrapper or implementation.
+```bash
+CODEX_TIMEOUT_MS=90000 node benchmarks/layer2-frontend-task/runner.js \
+  --mode=vanilla \
+  --target=fixtures/raw/SimpleButton.tsx \
+  --output=/tmp/fooks-layer2-smoke.json \
+  --model=gpt-5.4-mini
 ```
 
-**패턴 (모든 테스트 동일, 모든 조건 동일):**
-1. SessionStart 성공
-2. UserPromptSubmit 성공  
-3. Reconnecting... 5/5 반복
-4. 502 Bad Gateway 최종 실패
+Observed result:
 
-**에러 상세:**
+| Field | Value |
+| --- | ---: |
+| `success` | `true` |
+| `exitCode` | `0` |
+| `promptTokensApprox` | `236` |
+| `outputChars` | `2610` |
+| `latencyMs` | `44388` |
+
+This proves the wrapper can complete a tiny read-only Codex task without the old
+502 path.
+
+## 5. 2026-04-21 R4 paired smoke
+
+Target: `apps/v4/registry/bases/radix/examples/combobox-example.tsx` from
+`shadcn-ui/ui`, fetched to a temporary file for the run. Runner command shape:
+
+```bash
+CODEX_MODEL=gpt-5.4-mini CODEX_TIMEOUT_MS=300000 \
+  node benchmarks/layer2-frontend-task/runner.js \
+  --mode=<vanilla|fooks> \
+  --target=/tmp/combobox-example.tsx \
+  --output=/tmp/R4-<mode>-current-exec.json
 ```
-ERROR: unexpected status 502 Bad Gateway: 
-  error code: 502, 
-  url: <api-base-url>/v1/responses
+
+Observed summary:
+
+| Metric | Vanilla | Fooks | Delta |
+| --- | ---: | ---: | ---: |
+| `success` | `true` | `true` | equal |
+| `exitCode` | `0` | `0` | equal |
+| `promptTokensApprox` | `11365` | `861` | `92.4%` smaller prompt |
+| `latencyMs` | `85822` | `57545` | `32.9%` lower in this smoke |
+| `outputChars` | `7976` | `9967` | fooks output longer |
+
+Boundaries:
+
+- The runner is read-only and asks for proposed file trees/code skeletons only.
+- `promptTokensApprox` is local prompt-size accounting, not provider billing telemetry.
+- This is a single pair, so it does not override the older unstable direct-runtime follow-up.
+- Acceptance/quality validation is still missing; do not publish this as a stable Layer 2 win.
+
+## 6. Remaining blockers
+
+| Blocker | Status | What resolves it |
+| --- | --- | --- |
+| Quality validation artifact absent | 🟡 Pending | Save validation output alongside each R4 result. |
+| Repeated R4 / multi-task evidence absent | 🟡 Pending | Collect multiple matched pairs before public runtime-token/time claims. |
+| Runtime-token claim instability | ⚠️ Active | Require repeated R4 or multi-task evidence before making any runtime-token/time win claim. |
+
+## 7. Next execution path
+
+```bash
+# Repeated vanilla/fooks R4 pair, then validation
+node benchmarks/layer2-frontend-task/runner.js \
+  --mode=vanilla \
+  --target=shadcn-ui/apps/v4/registry/bases/radix/examples/combobox-example.tsx \
+  --output=benchmarks/layer2-frontend-task/results/R4-vanilla-run-2.json
+
+node benchmarks/layer2-frontend-task/runner.js \
+  --mode=fooks \
+  --target=shadcn-ui/apps/v4/registry/bases/radix/examples/combobox-example.tsx \
+  --output=benchmarks/layer2-frontend-task/results/R4-fooks-run-2.json
 ```
 
-### 결론
-- **내부 구현 문제:** ❌ 아님 (runner, wrapper, spec 모두 완성)
-- **외부 인프라 문제:** ✅ 맞음 (Codex gateway 502)
-- **Layer 2 benchmark:** ⏸️ 외부 의존성 해결 전까지 보류
+Do not call Layer 2 “complete” until paired outputs and validation artifacts are
+repeated enough to support the claim being made.
 
----
+## 8. Naming rules
 
-## 4. 실행 가능 시 즉시 측정 (준비됨, 대기 중)
+Allowed:
 
-API access 확보 시 바로 측정할 4개 metric (이미 구현됨):
-
-| Metric | Vanilla | Fooks |
-|--------|---------|-------|
-| **success/fail** | boolean | boolean |
-| **token usage** | input tokens | input tokens |
-| **retry count** | N회 | N회 |
-| **completion latency** | ms | ms |
-
-**측정 구현 상태:** ✅ 준비 완료 (Gateway 회복 대기 중)
-
----
-
-## 명명 규칙 (고정)
-
-**허용:**
 - ✅ `spec`
 - ✅ `scaffold`
-- ✅ `trio complete`
-- ✅ `runner implemented`
+- ✅ `runner smoke`
+- ✅ `runner path unblocked`
+- ✅ `single R4 paired smoke`
+- ✅ `prompt supplied to Codex was smaller in the smoke`
 
-**금지:**
-- ❌ `benchmark` (실제 실행 없음)
-- ❌ `result` (측정 데이터 없음)
-- ❌ `완료` (Gateway blocker 존재)
+Forbidden until validation and repeated evidence exist:
 
----
+- ❌ `Layer 2 benchmark complete`
+- ❌ `stable Layer 2 win`
+- ❌ `runtime-token savings proven`
+- ❌ `billing-grade savings`
 
-## 현재 Blocker Canonical 문구
-
-> **Runner implemented.  
-> Real blocker is Codex gateway stability (502) across all prompt sizes.  
-> Layer 2 real benchmark blocked by gateway, not by context size.**
-
----
-
-## 다음 단계
-
-**현재 가능:**
-- ✅ Layer 1 benchmark 유지 및 확장
-- ✅ R4 spec/scaffold 문서 유지
-- ✅ Gateway 회복 모니터링
-
-**대기 필요:**
-- ⚠️ Codex gateway 안정성 회복
-- ⚠️ 또는 안정적인 대체 경로 확보
-
-**복구 확인 방법:**
-```bash
-# 주기적 재시도 (30분 간격)
-echo 'test' | codex exec -m gpt-4o --full-auto
-# 502 사라지면 benchmark 재개
-```
-
-**대체 경로 검토 (형수님 판단 대기):**
-- 옵션 A: Direct OpenAI API (보류 중 - Codex 환경 의미 흐려짐)
-- 옵션 B: Gateway 안정화 대기 (현재)
-- 옵션 C: Anthropic Claude (컷 - Codex 축 benchmark 목표)
-
----
-
-*Status: 에르가재*  
-*Date: 2026-04-15*  
-*Runner: ✅ Implemented*  
-*Gateway: ⚠️ 502 Blocker*  
-*Benchmark: ⏸️ On Hold (External Service Issue)*
+*Status date: 2026-04-21*
+*Runner: ✅ tiny + R4 paired smokes passed*
+*Benchmark: 🟡 validation and repeated evidence pending*

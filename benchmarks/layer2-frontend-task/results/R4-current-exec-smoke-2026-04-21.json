@@ -1,0 +1,38 @@
+{
+  "status": "proposal-only-paired-smoke",
+  "date": "2026-04-21",
+  "target": "shadcn-ui apps/v4/registry/bases/radix/examples/combobox-example.tsx",
+  "runner": "benchmarks/layer2-frontend-task/runner.js",
+  "wrapper": "benchmarks/layer2-frontend-task/codex-wrapper.js",
+  "model": "gpt-5.4-mini",
+  "codexCli": "codex-cli 0.121.0",
+  "sandbox": "read-only",
+  "modeBoundary": "fooks mode sanitizes the source file path before prompt construction and instructs Codex to use only provided context.",
+  "results": {
+    "vanilla": {
+      "success": true,
+      "exitCode": 0,
+      "promptTokensApprox": 11365,
+      "latencyMs": 85822,
+      "outputChars": 7976
+    },
+    "fooks": {
+      "success": true,
+      "exitCode": 0,
+      "promptTokensApprox": 861,
+      "latencyMs": 57545,
+      "outputChars": 9967
+    }
+  },
+  "deltas": {
+    "promptTokensApproxReductionPct": 92.4,
+    "latencyReductionPct": 32.9
+  },
+  "claimBoundary": [
+    "single paired smoke only",
+    "proposal/skeleton output only",
+    "promptTokensApprox is prompt-size accounting, not provider billing telemetry",
+    "no acceptance/quality validation artifact yet",
+    "not enough evidence for stable runtime-token or latency claims"
+  ]
+}

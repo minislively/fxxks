@@ -70,12 +70,12 @@
 
 | Case | Vanilla Status | Fooks Status | Blocker |
 |------|---------------|--------------|---------|
-| Case 1: Refactor | ⏸️ Not executed | ⏸️ Not executed | Codex gateway 502 |
-| Case 2: Migration | ⏸️ Not executed | ⏸️ Not executed | Codex gateway 502 |
-| Case 3: Feature | ⏸️ Not executed | ⏸️ Not executed | Codex gateway 502 |
+| Case 1: Refactor | ✅ Single proposal-only smoke | ✅ Single proposal-only smoke | Validation/repeated evidence pending |
+| Case 2: Migration | ⏸️ Not executed | ⏸️ Not executed | Not selected for current R4 round |
+| Case 3: Feature | ⏸️ Not executed | ⏸️ Not executed | Not selected for current R4 round |
 
 ---
 
 *Cases: 에르가재*
-*Date: 2026-04-15*
-*Status: Cases defined, execution blocked by external gateway*
+*Date: 2026-04-21*
+*Status: Case 1 proposal-only smoke collected; validation/repeated evidence pending*

@@ -2,6 +2,8 @@
 
 > 실제 benchmark 시도 결과: vanilla/fooks 모두 실행했으나 각각 다른 실패 유형
 
+> Historical note: this captures the old configured gateway path failure. Current canonical status is in `STATUS.md`; current runner smoke uses `codex exec` and no longer treats this gateway path as the sole active blocker.
+
 ---
 
 ## 실행 개요

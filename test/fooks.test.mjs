@@ -1228,6 +1228,8 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
+  assert.match(pkg.scripts?.["release:smoke"], /scripts\/release-smoke\.mjs/);
+  assert.doesNotMatch(pkg.scripts?.["release:smoke"], /publish|version|tag/);
 });
 
 
@@ -1479,6 +1481,55 @@ test("docs describe opencode as manual custom-tool support without runtime savin
   assert.match(combined, /project-local `read` shadow|project-local `read` override/);
   assert.match(combined, /runtime-token savings|runtime-token benchmark claim/);
   assert.match(combined, /Claude and opencode/);
+  assert.match(release, /npm run release:smoke/);
+  assert.match(release, /FOOKS_ACTIVE_ACCOUNT/);
+  assert.match(setup, /runtimes\.claude\.state/);
+  assert.match(setup, /runtimes\.opencode\.state/);
+
+  const releaseSmoke = fs.readFileSync(path.join(repoRoot, "scripts", "release-smoke.mjs"), "utf8");
+  assert.ok(releaseSmoke.includes('run("npm", ["pack", "--dry-run", "--json"])'));
+  assert.match(releaseSmoke, /FOOKS_CODEX_HOME/);
+  assert.match(releaseSmoke, /FOOKS_CLAUDE_HOME/);
+  assert.match(releaseSmoke, /account-source=package-repository/);
+  assert.equal(releaseSmoke.includes('run("npm", ["publish"'), false);
+});
+
+test("docs keep direct runtime benchmark regressions out of public win claims", () => {
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const followup = fs.readFileSync(path.join(repoRoot, "benchmarks", "frontend-harness", "reports", "round1-risk-followup-1776327829.md"), "utf8");
+  const combined = `${readme}\n${release}\n${followup}`;
+
+  assert.match(combined, /not stable yet|does \*\*not\*\* support a stable direct-Codex speed or runtime-token reduction claim/);
+  assert.match(combined, /fooks used more runtime tokens in 3\/6 pairs/);
+  assert.match(combined, /median runtime-token reduction was -5\.35%|Median runtime-token reduction: -5\.35%/);
+  assert.match(release, /Blocks stable runtime-token\/time win claims/);
+  assert.doesNotMatch(readme, /billing-grade runtime-token savings claims/i);
+});
+
+test("Layer 2 runner uses current Codex exec path instead of legacy configured gateway", () => {
+  const wrapper = fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "codex-wrapper.js"), "utf8");
+  const runner = fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "runner.js"), "utf8");
+  const status = fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "STATUS.md"), "utf8");
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const r4Smoke = JSON.parse(fs.readFileSync(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "results", "R4-current-exec-smoke-2026-04-21.json"), "utf8"));
+
+  assert.match(wrapper, /codex exec/);
+  assert.match(wrapper, /--ephemeral/);
+  assert.match(wrapper, /--sandbox/);
+  assert.match(wrapper, /read-only/);
+  assert.match(wrapper, /last-message\.txt/);
+  assert.match(runner, /CODEX_MODEL/);
+  assert.match(runner, /promptSafeExtraction/);
+  assert.match(runner, /path\.basename\(targetFile\)/);
+  assert.match(wrapper, /Use only the provided context/);
+  assert.equal(r4Smoke.status, "proposal-only-paired-smoke");
+  assert.equal(r4Smoke.results.vanilla.success, true);
+  assert.equal(r4Smoke.results.fooks.success, true);
+  assert.equal(r4Smoke.deltas.promptTokensApproxReductionPct, 92.4);
+  assert.match(`${status}\n${release}`, /not provider billing telemetry|not enough for stable runtime-token\/time win claims/);
+  assert.match(status, /validation artifact/i);
+  assert.doesNotMatch(`${wrapper}\n${runner}`, /OPENAI_BASE_URL|api-base-url|gpt-4o|temperature|maxTokens/);
 });
 
 test("status cache reports empty for a fresh project before any scan", () => {

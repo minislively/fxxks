@@ -47,20 +47,26 @@
 ## Runner 구조 (Real-World)
 
 ### 기본 원칙
-- **실제 Codex CLI 사용** (configured gateway 의존)
-- **Gateway 502 blocker는 현실로 인정** ⏸️
-- **Blocker 해결 시 즉시 실행 가능한 구조** 유지
+- **실제 Codex CLI 사용** (`codex exec` wrapper path)
+- **Tiny/R4 smoke와 validated benchmark를 분리**: smoke는 runner path proof, validated benchmark는 validation + 반복 실행 필요
+- **R4 vanilla/fooks paired output + validation artifact + 반복 증거가 있어야 validated benchmark 결과로 인정**
 
 ### 실행 순서
 ```bash
 # 1. Vanilla run
-npx codex exec --mode=vanilla --target=<file> --output=results/vanilla-run-1.json
+node benchmarks/layer2-frontend-task/runner.js \
+  --mode=vanilla \
+  --target=<file> \
+  --output=benchmarks/layer2-frontend-task/results/R4-vanilla-run-2.json
 
 # 2. Fooks run
-npx codex exec --mode=fooks --fooks-path=dist/index.js --target=<file> --output=results/fooks-run-1.json
+node benchmarks/layer2-frontend-task/runner.js \
+  --mode=fooks \
+  --target=<file> \
+  --output=benchmarks/layer2-frontend-task/results/R4-fooks-run-2.json
 
-# 3. 비교
-node compare.js results/vanilla-run-1.json results/fooks-run-1.json
+# 3. Validation/비교 artifact 저장
+node compare.js results/R4-vanilla-run-2.json results/R4-fooks-run-2.json
 ```
 
 ---
@@ -69,15 +75,17 @@ node compare.js results/vanilla-run-1.json results/fooks-run-1.json
 
 | Blocker | 상태 | 대응 |
 |---------|------|------|
-| **Codex gateway 502** | ⏸️ **Active** | Real-world benchmark 실행 불가 |
-| **Gateway 회복 대기** | ⏸️ **Ongoing** | 주기적 재시도 (30분 간격) |
+| **Legacy configured gateway 502** | ✅ **Retired as sole blocker** | 현재 wrapper는 `codex exec` tiny + single R4 paired smoke 통과 |
+| **R4 paired smoke** | ✅ **Collected once** | 2026-04-21 proposal-only pair: 11365 → 861 approx prompt tokens |
+| **Validation/repeated evidence 없음** | ⏸️ **Active** | R4 결과마다 validation output 저장 + 반복 실행 필요 |
 | **Lab benchmark (HTTP client)** | ⏸️ **보류** | Real-world 우선, 나중에 구현 |
 
 ### Status Summary
 > **Real-world benchmark 설계는 완료됨.**
-> **실제 실행은 Codex gateway 502로 인해 현재 불가능.**
+> **Tiny `codex exec` smoke와 단일 R4 paired smoke는 통과했다.**
+> **단일 R4 smoke에서 promptTokensApprox는 11365 → 861로 92.4% 작아졌다.**
 > **Lab benchmark (HTTP client)는 보조 축으로 보류됨.**
-> **Gateway 회복 시 real-world benchmark 즉시 실행 가능.**
+> **validation artifact + 반복 실행 전에는 runtime-token savings/win claim 금지.**
 
 ---
 
@@ -104,5 +112,5 @@ node compare.js results/vanilla-run-1.json results/fooks-run-1.json
 *Design: 에르가재*
 *Date: 2026-04-15*
 *Priority: Real-world benchmark 우선*
-*Blocker: Codex gateway 502 (현실 인정)*
+*Blocker: validation artifact + repeated evidence pending*
 *Lab benchmark: 보류*
