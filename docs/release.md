@@ -26,24 +26,26 @@ The opencode boundary is intentional. The current bridge may steer users toward
 A future project-local `read` shadow would need to preserve opencode's native
 read behavior for directories, offset/limit ranges, binary/image/PDF handling,
 permissions, and metadata before it could support an automatic savings claim.
-Keep [`docs/opencode-read-interception.md`](https://github.com/minislively/fooks/blob/main/docs/opencode-read-interception.md)
+Keep [`docs/opencode-read-interception.md`](opencode-read-interception.md)
 aligned with any future change to this boundary.
 
 Benchmark and language evidence for this boundary must be checked against:
 
-- `docs/benchmark-evidence.md` — curated public evidence and claim boundaries.
-- `benchmarks/frontend-harness/README.md` — reproducible frontend harness methodology and prepared-context/proxy estimates.
-- `benchmarks/layer2-frontend-task/STATUS.md` — canonical Layer 2 state.
-- `benchmarks/layer2-frontend-task/API_ACCESS_BLOCKER.md` — gateway blocker analysis.
+- [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/blob/main/benchmarks/frontend-harness/README.md) — current frontend harness methodology and prepared-context/proxy estimates.
+- [`benchmarks/layer2-frontend-task/STATUS.md`](https://github.com/minislively/fooks/blob/main/benchmarks/layer2-frontend-task/STATUS.md) — canonical Layer 2 state.
+- [`benchmarks/layer2-frontend-task/API_ACCESS_BLOCKER.md`](https://github.com/minislively/fooks/blob/main/benchmarks/layer2-frontend-task/API_ACCESS_BLOCKER.md) — gateway blocker analysis.
 - `docs/language-core-strategy.md` — Python harness benchmark-only and native-core non-goal constraints.
 
 Prepared-context or proxy estimates must not be worded as measured runtime-token
-billing savings. The direct-Codex Formbricks follow-up summarized in
-`docs/benchmark-evidence.md` is also not a win claim: fooks used more runtime
-tokens in 3/6 pairs and median runtime-token reduction was -5.35%. Public
-wording may say fooks has context-compression mechanics and targeted-file
-behavior, but must not claim stable direct runtime-token/time wins until a
-future multi-task benchmark class proves them.
+billing savings. The direct-Codex Formbricks N=3 follow-up in
+[`benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md`](https://github.com/minislively/fooks/blob/main/benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md) is
+also not a win claim: fooks used more runtime tokens in 3/6 pairs and median
+runtime-token reduction was -5.35%. Public wording may say fooks has
+context-compression mechanics and targeted-file behavior, but must not claim
+stable direct runtime-token/time wins until a future multi-task benchmark class
+proves them.
+
+Bare `fooks status` reports local estimated context-size telemetry from `.fooks/sessions`. Its CLI output omits per-session details, is for maintainer/user inspection only, and must not be treated as provider billing tokens, provider costs, or a `ccusage` replacement.
 
 Layer 2 now has two proposal-only R4 paired smokes through the current
 `codex exec` runner. In both pairs, the prompt supplied to Codex dropped from
@@ -72,6 +74,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | `npm publish` not run | Keep unresolved until explicit human approval; use `npm run release:smoke` and `npm publish --dry-run` only for proof. | Blocks real publication, not docs/code PR merge. |
 | Layer 2 applied-code / multi-task evidence absent | Runner path plus two repeated proposal-only smokes now exist. The applied acceptance gate is implemented/self-tested, but matched live generated outputs and multi-task evidence do not exist yet. | Blocks only stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
+| Local `fooks status` estimates | Bare status is documented as local context-size telemetry only. | Blocks billing-token, provider-cost, or `ccusage` replacement wording. |
 | Claude/opencode automatic savings | Explicit non-goal unless new runtime bridges are designed and measured. | Keep handoff/tool wording only. |
 
 ## Pre-publish blockers
@@ -83,8 +86,8 @@ Automated local checks now covered by `npm run release:smoke`:
 - [x] package/CLI boundary is documented: `oh-my-fooks` installs `fooks`.
 - [x] possible pre-existing global `fooks` binary conflict is documented.
 - [x] no install, pack, publish, or version lifecycle script mutates user machines or publishes implicitly.
-- [x] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and selected public docs.
-- [x] raw generated benchmark reports/results and internal local docs are excluded from the packed tarball.
+- [x] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and linked docs.
+- [x] package source and built `dist/` are generated from tracked source before pack/smoke verification.
 - [x] temp-prefix global install smoke test passes.
 - [x] isolated `fooks setup` smoke test passes without mutating the real user Codex config.
 - [x] isolated `fooks setup` smoke test covers a fresh public-style repo without requiring `FOOKS_ACTIVE_ACCOUNT`.

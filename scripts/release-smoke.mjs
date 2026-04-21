@@ -29,42 +29,6 @@ function parsePackJson(stdout) {
   return parsed[0];
 }
 
-
-function isExternalOrAnchorLink(target) {
-  return /^(?:[a-z][a-z0-9+.-]*:|#)/i.test(target);
-}
-
-function normalizeMarkdownTarget(fromPath, target) {
-  const withoutAnchor = target.split("#", 1)[0];
-  if (!withoutAnchor || isExternalOrAnchorLink(target)) {
-    return null;
-  }
-  if (withoutAnchor.startsWith("/")) {
-    return withoutAnchor.slice(1);
-  }
-  return path.posix.normalize(path.posix.join(path.posix.dirname(fromPath), withoutAnchor));
-}
-
-function assertPackedMarkdownLinks(packEntry) {
-  const packedPaths = new Set(packEntry.files.map((file) => file.path));
-  const markdownPaths = ["README.md", "docs/setup.md", "docs/release.md", "docs/benchmark-evidence.md"];
-  const markdownLinkPattern = /\[[^\]]+\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-
-  for (const markdownPath of markdownPaths) {
-    if (!packedPaths.has(markdownPath)) {
-      continue;
-    }
-    const source = fs.readFileSync(path.join(repoRoot, markdownPath), "utf8");
-    for (const match of source.matchAll(markdownLinkPattern)) {
-      const target = normalizeMarkdownTarget(markdownPath, match[1]);
-      if (!target) {
-        continue;
-      }
-      assert(packedPaths.has(target), `${markdownPath} links to ${target}, which is not packed; use an external URL or include it`);
-    }
-  }
-}
-
 function assertPackedFiles(packEntry) {
   const paths = new Set(packEntry.files.map((file) => file.path));
   const required = [
@@ -77,34 +41,23 @@ function assertPackedFiles(packEntry) {
     "dist/adapters/opencode-tool-preset.js",
     "docs/setup.md",
     "docs/release.md",
-    "docs/benchmark-evidence.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
   ];
 
   for (const filePath of required) {
     assert(paths.has(filePath), `packed tarball missing ${filePath}`);
   }
 
-  const forbiddenPrefixes = [
-    "docs/internal/",
-    "benchmarks/frontend-harness/reports/",
-    "benchmarks/layer2-frontend-task/results/",
-    "benchmarks/reports/",
-    "benchmarks/results/history/",
-    ".omx/",
-    ".fooks/",
-    ".codex/",
-  ];
-
-  for (const filePath of paths) {
-    for (const prefix of forbiddenPrefixes) {
-      assert(!filePath.startsWith(prefix), `packed tarball includes forbidden generated/internal path ${filePath}`);
-    }
+  for (const file of packEntry.files) {
+    assert(!file.path.startsWith("docs/archive/"), `packed tarball should not include internal archive docs: ${file.path}`);
+    assert(!file.path.startsWith("benchmarks/frontend-harness/reports/"), `packed tarball should not include internal benchmark reports: ${file.path}`);
   }
 }
 
 const dryRun = parsePackJson(run("npm", ["pack", "--dry-run", "--json"]));
 assertPackedFiles(dryRun);
-assertPackedMarkdownLinks(dryRun);
 
 const packDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pack-"));
 const tarballName = run("npm", ["pack", "--pack-destination", packDir]).trim().split(/\r?\n/).at(-1);

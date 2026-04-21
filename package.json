@@ -28,10 +28,17 @@
   "description": "Frontend context compression CLI for React/TSX projects; npm package oh-my-fooks installs the fooks command.",
   "main": "dist/index.js",
   "files": [
-    "dist/",
+    "dist",
     "docs/setup.md",
     "docs/release.md",
-    "docs/benchmark-evidence.md"
+    "docs/runtime-bridge-contract.md",
+    "docs/codex-live-feedback-checklist.md",
+    "docs/opencode-read-interception.md",
+    "docs/language-core-strategy.md",
+    "docs/CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md"
   ],
   "repository": {
     "type": "git",
@@ -44,13 +51,5 @@
   "dependencies": {
     "typescript": "^5.9.2"
   },
-  "license": "MIT",
-  "keywords": [
-    "ai",
-    "codex",
-    "react",
-    "tsx",
-    "context-compression",
-    "tokens"
-  ]
+  "license": "MIT"
 }
