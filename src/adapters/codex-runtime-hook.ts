@@ -10,6 +10,13 @@ import {
   resolveCodexRuntimeSessionKey,
 } from "./codex-runtime-session";
 import type { CodexRuntimeHookDecision, CodexRuntimeHookInput, ContextMode, ModelFacingPayload } from "../core/schema";
+import {
+  estimateFileBytes,
+  estimateTextBytes,
+  finalizeSessionMetricSummarySafe,
+  initializeSessionMetricSummarySafe,
+  recordFooksSessionMetricEventSafe,
+} from "../core/session-metrics";
 
 function payloadContextMode(payload: ModelFacingPayload): ContextMode {
   return payload.useOriginal ? "light-minimal" : "light";
@@ -21,6 +28,37 @@ function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, c
     "",
     JSON.stringify(payload, null, 2),
   ].join("\n");
+}
+
+function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
+  return estimateFileBytes(path.join(cwd, filePath));
+}
+
+function recordRuntimeDecisionMetric(
+  cwd: string,
+  sessionKey: string,
+  decision: CodexRuntimeHookDecision,
+  options: {
+    originalEstimatedBytes?: number;
+    actualEstimatedBytes?: number;
+    comparableForSavings?: boolean;
+    observedOriginalEstimatedBytes?: number;
+  } = {},
+): void {
+  recordFooksSessionMetricEventSafe(cwd, sessionKey, {
+    runtime: "codex",
+    hookEventName: decision.hookEventName,
+    action: decision.action,
+    filePath: decision.filePath,
+    reasons: decision.reasons,
+    contextMode: decision.contextMode,
+    contextModeReason: decision.contextModeReason,
+    fallbackReason: decision.fallback?.reason,
+    originalEstimatedBytes: options.originalEstimatedBytes,
+    actualEstimatedBytes: options.actualEstimatedBytes,
+    comparableForSavings: options.comparableForSavings,
+    observedOriginalEstimatedBytes: options.observedOriginalEstimatedBytes,
+  });
 }
 
 function fallbackDecision(
@@ -67,6 +105,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   if (hookEventName === "SessionStart") {
     const statePath = initializeCodexRuntimeSession(cwd, sessionKey);
     markCodexReady(cwd);
+    initializeSessionMetricSummarySafe(cwd, sessionKey);
     return {
       runtime: "codex",
       hookEventName,
@@ -86,6 +125,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   if (hookEventName === "Stop") {
     const statePath = clearCodexRuntimeSession(cwd, sessionKey);
     clearCodexActiveFile(cwd);
+    finalizeSessionMetricSummarySafe(cwd, sessionKey);
     return {
       runtime: "codex",
       hookEventName,
@@ -109,7 +149,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   const escapeHatchUsed = hasFullReadEscapeHatch(prompt);
 
   if (!target) {
-    return {
+    const runtimeDecision: CodexRuntimeHookDecision = {
       runtime: "codex",
       hookEventName,
       action: "noop",
@@ -125,11 +165,14 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         escapeHatchUsed,
       },
     };
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision);
+    return runtimeDecision;
   }
 
   if (escapeHatchUsed) {
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-    return fallbackDecision(
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const runtimeDecision = fallbackDecision(
       hookEventName,
       target,
       undefined,
@@ -140,6 +183,12 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       "escape-hatch-full-read",
       policy,
     );
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: originalEstimatedBytes,
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return runtimeDecision;
   }
 
   const freshness = ensureFreshCodexContextForTarget(target, cwd);
@@ -148,7 +197,8 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
   if (!repeatedFile) {
     markCodexReady(cwd);
-    return {
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const runtimeDecision: CodexRuntimeHookDecision = {
       runtime: "codex",
       hookEventName,
       action: "record",
@@ -166,20 +216,26 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         escapeHatchUsed: false,
       },
     };
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
+      observedOriginalEstimatedBytes: originalEstimatedBytes,
+    });
+    return runtimeDecision;
   }
 
   const decision = decideCodexPreRead(path.join(cwd, target), cwd);
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
+    const additionalContext = buildAdditionalContext(target, decision.payload, contextMode);
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-    return {
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const runtimeDecision: CodexRuntimeHookDecision = {
       runtime: "codex",
       hookEventName,
       action: "inject",
       filePath: target,
       reasons: freshness.refreshed ? ["repeated-file", "refreshed-before-attach"] : ["repeated-file"],
       statePath,
-      additionalContext: buildAdditionalContext(target, decision.payload, contextMode),
+      additionalContext,
       contextMode,
       contextModeReason: contextMode === "light-minimal" ? "repeated-exact-file-tiny-raw-original" : "repeated-exact-file-payload",
       contextBudget: policy.contextBudget,
@@ -192,10 +248,17 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         decision,
       },
     };
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: estimateTextBytes(additionalContext),
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return runtimeDecision;
   }
 
   markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-  return fallbackDecision(
+  const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+  const runtimeDecision = fallbackDecision(
     hookEventName,
     target,
     statePath,
@@ -207,4 +270,10 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     policy,
     decision,
   );
+  recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
+    originalEstimatedBytes,
+    actualEstimatedBytes: originalEstimatedBytes,
+    comparableForSavings: originalEstimatedBytes !== undefined,
+  });
+  return runtimeDecision;
 }

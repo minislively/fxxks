@@ -29,7 +29,16 @@
   "main": "dist/index.js",
   "files": [
     "dist",
-    "docs"
+    "docs/setup.md",
+    "docs/release.md",
+    "docs/runtime-bridge-contract.md",
+    "docs/codex-live-feedback-checklist.md",
+    "docs/opencode-read-interception.md",
+    "docs/language-core-strategy.md",
+    "docs/CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md"
   ],
   "repository": {
     "type": "git",

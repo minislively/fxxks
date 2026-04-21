@@ -50,12 +50,13 @@ Latest published Codex-oriented benchmark snapshot (2026-04-14):
 | Large component payloads | full source | compressed payload | **7x-15x smaller** |
 | Success rate | 5/5 | 5/5 | no regression in sample |
 
-These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. A later direct-Codex Formbricks N=3 follow-up found that runtime-token/time wins are **not stable yet**: across 6 paired runs, fooks used more runtime tokens in 3/6 pairs and median runtime-token reduction was -5.35%. Treat that as a regression signal, not a marketing win. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md) and [`benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md`](benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md). Layer 2 now has two proposal-only R4 paired smokes through the current `codex exec` runner: in both pairs, the prompt supplied to Codex dropped from 11,365 approx tokens in vanilla mode to 861 in fooks mode (92.4% smaller). Those proposal-only smokes are validated for runner success, output shape, path-sanitization, and claim boundaries. An applied-code acceptance gate now exists and is self-tested, but matched generated vanilla/fooks outputs have not passed it yet; the current evidence is still not provider billing telemetry, an applied-code benchmark win, or a stable runtime-token/time win claim.
+These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. A later direct-Codex Formbricks N=3 follow-up found that runtime-token/time wins are **not stable yet**: across 6 paired runs, fooks used more runtime tokens in 3/6 pairs and median runtime-token reduction was -5.35%. Treat that as a regression signal, not a marketing win. Full benchmark details live in the GitHub benchmark docs: [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/blob/main/benchmarks/frontend-harness/README.md) and [`benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md`](https://github.com/minislively/fooks/blob/main/benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md). Layer 2 now has two proposal-only R4 paired smokes through the current `codex exec` runner: in both pairs, the prompt supplied to Codex dropped from 11,365 approx tokens in vanilla mode to 861 in fooks mode (92.4% smaller). Those proposal-only smokes are validated for runner success, output shape, path-sanitization, and claim boundaries. An applied-code acceptance gate now exists and is self-tested, but matched generated vanilla/fooks outputs have not passed it yet; the current evidence is still not provider billing telemetry, an applied-code benchmark win, or a stable runtime-token/time win claim.
 
 ## Everyday commands
 
 ```bash
 fooks setup          # one-time readiness: Codex hooks + Claude handoff + opencode helper
+fooks status          # local estimated context-size telemetry for this repo
 fooks status codex   # check Codex attach/hook state
 fooks status cache   # check local fooks cache health
 ```
@@ -66,6 +67,8 @@ For manual inspection:
 fooks extract src/components/Button.tsx --model-payload
 fooks scan
 ```
+
+`fooks status` reads local `.fooks/sessions` summaries produced by the Codex hook path. The values are approximate context-size estimates only; the CLI status output omits per-session details and is not provider billing tokens, provider costs, or a `ccusage` replacement.
 
 ## opencode support
 
@@ -127,4 +130,4 @@ Useful internal docs:
 - Runtime bridge contract: [`docs/runtime-bridge-contract.md`](docs/runtime-bridge-contract.md)
 - Live feedback checklist: [`docs/codex-live-feedback-checklist.md`](docs/codex-live-feedback-checklist.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
-- Benchmark harness: [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md)
+- Benchmark harness: [`benchmarks/frontend-harness/README.md`](https://github.com/minislively/fooks/blob/main/benchmarks/frontend-harness/README.md)
