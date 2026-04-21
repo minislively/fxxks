@@ -1,37 +1,45 @@
-.omx/
+# Dependencies and build output
 node_modules/
 dist/
-.fooks/
-benchmarks/results/**/*.json
 
-# Benchmark harness artifacts
+# Environment, local secrets, and logs
+.env
+.env.*
+!.env.example
+*.log
+logs/
+
+# Runtime state and local tool configuration
+.omx/
+.fooks/
+.omc/
+.codex
+.clawhip/
+.workclaw/
+.claw/
+.worktrees/
+*.omx-worktrees/
+
+# Benchmark harness local runtime artifacts
 benchmarks/frontend-harness/runners/__pycache__/
 benchmarks/frontend-harness/runners/.omx/
 benchmarks/frontend-harness/runners/.clawhip/
 benchmarks/frontend-harness/runners/.claude/
 benchmarks/frontend-harness/.worktrees/
 
-# Clawhip / worktrees / temporary
-.clawhip/
-.workclaw/
-.claw/
-.omx/
-.worktrees/
-*.omx-worktrees/
-
-
-# Public release: exclude internal benchmark reports
+# Generated benchmark reports/results
 benchmarks/frontend-harness/reports/
-# Internal benchmark results (detailed history)
+benchmarks/layer2-frontend-task/results/
+benchmarks/reports/
+benchmarks/results/**/*.json
+benchmarks/results/latest/
 benchmarks/results/history/
 benchmarks/results/profiler-*.json
 benchmarks/results/warm-*.json
 
-# Internal tool configurations
-.omc/
-.clawhip/
-.workclaw/
-.codex
+# Internal-only local documentation copies
+# Keep curated public summaries in docs/, but do not publish local working notes.
+docs/internal/
 
-# Internal development archive (historical dev docs with internal paths)
+# Historical dev docs with internal paths
 docs/archive/

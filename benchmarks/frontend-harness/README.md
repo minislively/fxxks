@@ -50,7 +50,7 @@ code editing efficiency and outcome parity, plus prepared-context/proxy token es
 - Actual delivery uses `useOriginal: true` for tiny files (<500 bytes)
 - Not included in comparative gating (different bucket coverage)
 
-**Results file:** `benchmarks/results/latest/nextjs-tailwindcss-expanded.json`
+Generated result files are local artifacts and are intentionally ignored for public release hygiene. Curate public conclusions in `docs/benchmark-evidence.md` instead of committing raw result JSON.
 
 ## Harness language note
 
@@ -124,7 +124,7 @@ cd benchmarks/frontend-harness/runners
 python3 full-benchmark-suite.py
 ```
 
-Results will be saved to `../reports/benchmark-{timestamp}.json`
+Results will be saved to `../reports/benchmark-{timestamp}.json`. The reports directory is a local generated-artifact location and should not be committed.
 
 #### Option 3: Single External-App Proof
 Run one repo/task pair when the goal is a first credible external benchmark
@@ -185,7 +185,7 @@ benchmarks/frontend-harness/
 │   ├── quick-test.py      # Single task test
 │   ├── full-benchmark-suite.py  # Complete benchmark
 │   └── test-setup.py      # Basic environment validation
-└── reports/               # Generated benchmark results
+└── reports/               # Generated benchmark results (ignored)
 ```
 
 ## Test Repositories
