@@ -16,7 +16,7 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
   const account = detectAccountContext(cwd);
   const attemptedAt = new Date().toISOString();
   const runtimeProof = (() => {
-    const manifestPath = installRuntimeManifest("codex", cwd, {
+    const manifest = installRuntimeManifest("codex", cwd, {
       runtimeBridge: {
         command: runtimeBridgeCommand,
         supportedHookEvents: ["SessionStart", "UserPromptSubmit", "Stop"],
@@ -27,20 +27,38 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
         escapeHatches: [...codexRuntimeEscapeHatches()],
       },
     });
-    if (!manifestPath) {
+
+    if (manifest.status === "passed") {
+      return {
+        status: "passed" as const,
+        attemptedAt,
+        artifactPath: manifest.manifestPath,
+        details: [`account-context=${account.account}`, `account-source=${account.source}`, `runtime-manifest=${manifest.manifestPath}`, "codex adapter artifacts created"],
+      };
+    }
+
+    if (manifest.status === "blocked") {
       return {
         status: "blocked" as const,
         attemptedAt,
-        details: ["codex adapter artifacts created", `account-source=${account.source}`, "runtime-manifest-write-attempted=false"],
-        blocker: "Codex runtime home not detected",
+        artifactPath: manifest.manifestPath,
+        details: [
+          "codex adapter artifacts created",
+          `account-source=${account.source}`,
+          `runtime-manifest=${manifest.manifestPath}`,
+          "runtime-manifest-write-attempted=true",
+          `runtime-manifest-error=${manifest.errorMessage}`,
+        ],
+        blocker: `Codex runtime manifest install failed: ${manifest.errorMessage}`,
       };
     }
 
     return {
-      status: "passed" as const,
+      status: "blocked" as const,
       attemptedAt,
-      artifactPath: manifestPath,
-      details: [`account-context=${account.account}`, `account-source=${account.source}`, `runtime-manifest=${manifestPath}`, "codex adapter artifacts created"],
+      artifactPath: manifest.manifestPath,
+      details: ["codex adapter artifacts created", `account-source=${account.source}`, "runtime-manifest-write-attempted=false"],
+      blocker: "Codex runtime home not detected",
     };
   })();
   return finalizeAttach("codex", sample, runtimeProof, cwd, trustStatus);
