@@ -106,9 +106,9 @@ Success Rate Diff: fooks_success_rate - vanilla_success_rate
 - 성공 판정: 고정
 - 측정 schema: 고정
 
-**Not benchmark**
-- API access 없음 (blocker)
-- Runner 미구현
-- 실제 실행 없음
+**Current benchmark boundary**
+- Runner/API path는 current `codex exec` proposal-only smoke로 확인됨
+- 2회 matched proposal-only smoke + validation artifact 존재
+- provider billing-token telemetry와 applied-code acceptance benchmark는 아직 없음
 
-**Next:** API access 확보 시 즉시 실행 가능
+**Next:** stable claim 전 applied-code validation 또는 multi-task evidence 수집

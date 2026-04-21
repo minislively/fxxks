@@ -163,7 +163,7 @@ FAIL인 경우에도 아래는 기록:
 - 파일 구조 검증: 체크리스트 정의됨
 - 실패 조건: PASS/FAIL 기준 명확
 
-**Not executed**
-- 검증 명령어는 정의됐지만 실제 실행 없음
-- API access blocker 여전히 유효
-- R4-runner-spec.md와 함께 API access 시 즉시 사용 가능
+**Current execution boundary**
+- proposal-only smoke validation은 2회 matched R4 pair에 대해 실행됨
+- generated code를 실제 repo에 적용한 acceptance validation은 아직 없음
+- stable win claim 전에는 applied-code validation 또는 multi-task evidence가 필요

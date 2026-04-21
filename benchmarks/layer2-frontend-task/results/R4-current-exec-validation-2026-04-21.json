@@ -1,0 +1,100 @@
+{
+  "status": "validated-repeated-proposal-only-smoke",
+  "date": "2026-04-21",
+  "validates": [
+    "benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json",
+    "benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21-run-2.json"
+  ],
+  "validationScope": [
+    "runner exit/success fields across two matched proposal-only pairs",
+    "local prompt-size delta consistency",
+    "presence of proposed module split buckets in retained raw local outputs",
+    "source-level guard against fooks-mode absolute path leakage",
+    "claim-boundary guardrails"
+  ],
+  "pairCount": 2,
+  "aggregate": {
+    "allPairsPassed": true,
+    "promptTokensApproxReductionPct": {
+      "min": 92.4,
+      "median": 92.4,
+      "max": 92.4
+    },
+    "latencyReductionPct": {
+      "min": 32.9,
+      "median": 41,
+      "max": 49
+    },
+    "vanillaSuccess": "2/2",
+    "fooksSuccess": "2/2"
+  },
+  "pairs": [
+    {
+      "pairId": "R4-current-exec-smoke-2026-04-21",
+      "summary": "benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json",
+      "validationPassed": true,
+      "vanilla": {
+        "success": true,
+        "promptTokensApprox": 11365,
+        "latencyMs": 85822
+      },
+      "fooks": {
+        "success": true,
+        "promptTokensApprox": 861,
+        "latencyMs": 57545
+      },
+      "deltas": {
+        "promptTokensApproxReductionPct": 92.4,
+        "latencyReductionPct": 32.9
+      }
+    },
+    {
+      "pairId": "R4-current-exec-smoke-2026-04-21-run-2",
+      "summary": "benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21-run-2.json",
+      "validationPassed": true,
+      "vanilla": {
+        "success": true,
+        "promptTokensApprox": 11365,
+        "latencyMs": 55610
+      },
+      "fooks": {
+        "success": true,
+        "promptTokensApprox": 861,
+        "latencyMs": 28355
+      },
+      "deltas": {
+        "promptTokensApproxReductionPct": 92.4,
+        "latencyReductionPct": 49
+      }
+    }
+  ],
+  "checks": [
+    {
+      "name": "two matched proposal-only R4 pairs completed",
+      "passed": true
+    },
+    {
+      "name": "all proposal-smoke validations passed",
+      "passed": true
+    },
+    {
+      "name": "fooks prompt is at least 80% smaller in every pair",
+      "passed": true,
+      "actual": [
+        92.4,
+        92.4
+      ],
+      "expected": "each >= 80"
+    },
+    {
+      "name": "claim boundary excludes billing/stable runtime claims",
+      "passed": true
+    }
+  ],
+  "verdict": "The R4 runner risk is reduced through two matched proposal-only smokes and validation of output shape/boundaries. This remains insufficient for billing-token, applied-code quality, or stable runtime/time claims.",
+  "remainingOutOfScope": [
+    "provider billing-token telemetry",
+    "acceptance testing of generated code changes",
+    "multi-task statistical claim support"
+  ]
+}
