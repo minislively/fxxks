@@ -17,8 +17,8 @@ Before a public release, keep the public claim surface aligned to this matrix:
 
 | Environment | Release-ready wording | Do not claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup`; prepared-context/proxy evidence only | Universal file-read interception or measured runtime-token savings without Codex telemetry |
-| Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | `Read` interception, full prompt interception parity, or runtime-token savings |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Universal file-read interception |
+| Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit` plus manual/shared handoff fallback prepared by `fooks setup` when possible | `Read` interception, full prompt interception parity, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 
 The opencode boundary is intentional. The current bridge may steer users toward
@@ -77,7 +77,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | Layer 2 stable applied-code / multi-task evidence absent | Applied repeated diagnostic exists but accepted only 4/7 pairs and regressed on CLI runtime/time medians. Multi-task evidence still does not exist. | Blocks stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
 | Local `fooks status` estimates | Bare status is documented as local context-size telemetry only. | Blocks billing-token, provider-cost, or `ccusage` replacement wording. |
-| Claude/opencode automatic savings | Claude now has bounded project-local context hooks that record/prepare the first eligible frontend-file prompt, then add repeated same-file context, but no measured runtime-token savings and no `Read` interception. opencode remains a manual/semi-automatic tool bridge. | Keep Claude context-hook wording and opencode tool wording only. |
+| Claude/opencode automatic savings | Claude now has bounded project-local context hooks, but no measured runtime-token savings and no `Read` interception. opencode remains a manual/semi-automatic tool bridge. | Keep Claude context-hook wording and opencode tool wording only. |
 
 ## Pre-publish blockers
 

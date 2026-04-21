@@ -254,7 +254,7 @@ export function readClaudeRuntimeStatus(cwd = process.cwd()): ClaudeRuntimeStatu
     hooks,
     nextSteps: state === "context-hook-ready"
       ? [
-          "Open Claude Code in this repo; fooks records/prepares the first explicit .tsx/.jsx prompt and may add bounded context on a repeated same-file UserPromptSubmit.",
+          "Open Claude Code in this repo; fooks can add bounded context on SessionStart and explicit .tsx/.jsx UserPromptSubmit prompts.",
           "Use fooks status claude to inspect project-local hook readiness.",
         ]
       : handoffReady
@@ -268,7 +268,7 @@ export function readClaudeRuntimeStatus(cwd = process.cwd()): ClaudeRuntimeStatu
           ],
     notes: [
       "Claude P0 uses project-local context hooks in .claude/settings.local.json only; fooks does not mutate ~/.claude/settings.json.",
-      "Claude P0 supports project-local SessionStart/UserPromptSubmit context hooks only: first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may inject bounded context, and fooks does not intercept Read/tool calls or claim runtime-token savings.",
+      "Claude P0 supports SessionStart/UserPromptSubmit context injection only; it does not intercept Read/tool calls or claim runtime-token savings.",
     ],
   };
 }

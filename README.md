@@ -15,7 +15,7 @@ cd your-react-project
 fooks setup
 ```
 
-Then open Codex in that repo and work normally. The same setup command also prepares Claude project-local context hooks plus handoff artifacts and the project-local opencode helper when those local runtime/tool paths are available; Claude records/prepares the first explicit frontend-file prompt and may add bounded context on a repeated same-file prompt.
+Then open Codex in that repo and work normally. The same setup command also prepares Claude project-local context hooks plus handoff artifacts and the project-local opencode helper when those local runtime/tool paths are available.
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
 
@@ -106,8 +106,8 @@ Use `/fooks-extract path/to/File.tsx` or ask opencode to call `fooks_extract` wh
 
 | Environment | Current support | Runtime-token claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Prepared-context/proxy evidence only; no runtime-token proof until measured telemetry exists |
-| Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared, and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | No `Read` interception and no automatic runtime-token savings claim |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Codex-oriented benchmark/proxy evidence only |
+| Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit` plus manual/shared handoff fallback prepared by `fooks setup` when possible | No `Read` interception and no automatic runtime-token savings claim |
 | opencode | Manual/semi-automatic project-local tool and slash command prepared by `fooks setup` when possible | No read interception and no automatic runtime-token savings claim |
 
 `fooks` is not a universal file-read interceptor. Non-frontend files usually fall back to normal source reading.

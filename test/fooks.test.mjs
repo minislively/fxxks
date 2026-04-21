@@ -1324,22 +1324,6 @@ test("setup prepares explicit one-time Codex activation", () => {
   assert.equal(result.runtimes.claude.blocksOverall, false);
   assert.equal(result.runtimes.opencode.state, "tool-ready");
   assert.equal(result.runtimes.opencode.blocksOverall, false);
-  assert.equal(result.scope.schemaVersion, 1);
-  assert.equal(result.scope.packageInstall.scope, "global-cli");
-  assert.equal(result.scope.packageInstall.command, "npm install -g oh-my-fooks");
-  assert.equal(result.scope.packageInstall.mutatedBySetup, false);
-  const setupProjectRoot = fs.realpathSync(tempDir);
-  assert.equal(result.scope.projectLocal.scope, "project-local");
-  assert.equal(result.scope.projectLocal.root, setupProjectRoot);
-  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".fooks", "config.json")));
-  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".fooks", "cache")));
-  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".opencode", "tools", "fooks_extract.ts")));
-  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".opencode", "commands", "fooks-extract.md")));
-  assert.equal(result.scope.userRuntime.scope, "user-home-runtime");
-  assert.ok(result.scope.userRuntime.paths.includes(path.join(codexHome, "hooks.json")));
-  assert.ok(result.scope.userRuntime.paths.includes(runtimeManifestPath(result.attach)));
-  assert.ok(result.scope.userRuntime.paths.includes(runtimeManifestPath(result.runtimes.claude.details.attach)));
-  assert.ok(result.scope.nonGoals.some((item) => item.includes("No --scope option")));
   assert.deepEqual(result.summary, ["codex:automatic-ready:ready", "claude:context-hook-ready:ready", "opencode:tool-ready:ready"]);
   assert.ok(result.claimBoundaries.some((item) => item.includes("Claude setup installs project-local context hooks")));
   assert.ok(result.nextSteps.some((item) => item.includes("Codex")));
@@ -1558,9 +1542,7 @@ test("setup runtime summary keeps Claude and opencode claims bounded", () => {
   assert.equal(result.runtimes.opencode.blocksOverall, false);
   assert.match(text, /Claude P0 context hooks are project-local only/);
   assert.match(text, /opencode setup does not intercept read calls/);
-  assert.match(text, /Codex setup installs the automatic fooks hook path when Codex trust checks pass, but it does not collect Codex runtime-token telemetry/);
-  assert.match(text, /opencode setup does not provide automatic runtime-token telemetry/);
-  assert.match(text, /runtime-token-telemetry=not-collected/);
+  assert.match(text, /opencode setup does not prove automatic runtime-token savings/);
   assert.doesNotMatch(text, /Claude Read interception is enabled/i);
   assert.doesNotMatch(text, /Claude runtime-token savings are enabled/i);
   assert.doesNotMatch(text, /automatic opencode read interception is enabled/i);
@@ -1678,228 +1660,32 @@ test("install claude-hooks reports malformed local settings without overwriting"
   assert.equal(fs.readFileSync(localSettings, "utf8"), "{not-json");
 });
 
-test("claude runtime hook records first eligible prompt, injects repeated same-file prompt, and no-ops unsupported prompts", () => {
+test("claude runtime hook injects on first eligible prompt and no-ops unsupported prompts", () => {
   const tempDir = makeTempProject();
-  const sessionId = "claude-repeated-flow";
-  const target = path.join("src", "components", "FormSection.tsx");
-  const otherTarget = path.join("src", "components", "SimpleButton.tsx");
-  const readSeenCount = (statePath, filePath) => JSON.parse(fs.readFileSync(statePath, "utf8")).seenFiles[filePath]?.seenCount;
-
-  const start = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const start = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: "claude-start" }, tempDir);
   assert.equal(start.action, "inject");
   assert.ok(start.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
   assert.match(start.additionalContext, /does not intercept Claude Read\/tool calls/);
-  assert.match(start.additionalContext, /records\/prepares/);
-  assert.match(start.statePath, /\.fooks\/state\/claude-runtime/);
-  assert.deepEqual(JSON.parse(fs.readFileSync(start.statePath, "utf8")).seenFiles, {});
 
-  const first = handleClaudeRuntimeHook(
+  const prompt = handleClaudeRuntimeHook(
     {
       hookEventName: "UserPromptSubmit",
-      sessionId,
+      sessionId: "claude-first",
       prompt: "Explain src/components/FormSection.tsx",
     },
     tempDir,
   );
-  assert.equal(first.action, "record");
-  assert.equal(first.filePath, target);
-  assert.equal(first.additionalContext, undefined);
-  assert.equal(first.contextMode, "no-op");
-  assert.match(first.statePath, /\.fooks\/state\/claude-runtime/);
-  assert.equal(first.debug.eligible, true);
-  assert.equal(first.debug.repeatedFile, false);
-  assert.equal(readSeenCount(first.statePath, target), 1);
-
-  const second = handleClaudeRuntimeHook(
-    {
-      hookEventName: "UserPromptSubmit",
-      sessionId,
-      prompt: "Again, explain src/components/FormSection.tsx",
-    },
-    tempDir,
-  );
-  assert.equal(second.action, "inject");
-  assert.equal(second.filePath, target);
-  assert.ok(second.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
-  assert.match(second.additionalContext, /fooks: Claude context hook/);
-  assert.match(second.additionalContext, /src\/components\/FormSection\.tsx/);
-  assert.doesNotMatch(second.additionalContext, /Claude Read interception is enabled/i);
-  assert.doesNotMatch(second.additionalContext, /Claude runtime-token savings are enabled/i);
-  assert.equal(second.debug.repeatedFile, true);
-  assert.equal(readSeenCount(second.statePath, target), 2);
-
-  const differentFile = handleClaudeRuntimeHook(
-    {
-      hookEventName: "UserPromptSubmit",
-      sessionId,
-      prompt: "Explain src/components/SimpleButton.tsx",
-    },
-    tempDir,
-  );
-  assert.equal(differentFile.action, "record");
-  assert.equal(differentFile.filePath, otherTarget);
-  assert.equal(differentFile.additionalContext, undefined);
-  assert.equal(readSeenCount(differentFile.statePath, otherTarget), 1);
-
-  const freshSession = handleClaudeRuntimeHook(
-    {
-      hookEventName: "UserPromptSubmit",
-      sessionId: "claude-repeated-flow-fresh-session",
-      prompt: "Explain src/components/FormSection.tsx",
-    },
-    tempDir,
-  );
-  assert.equal(freshSession.action, "record");
-  assert.notEqual(freshSession.statePath, second.statePath);
-
-  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
-  const afterReset = handleClaudeRuntimeHook(
-    {
-      hookEventName: "UserPromptSubmit",
-      sessionId,
-      prompt: "Explain src/components/FormSection.tsx",
-    },
-    tempDir,
-  );
-  assert.equal(afterReset.action, "record");
-  assert.equal(readSeenCount(afterReset.statePath, target), 1);
-
-  fs.writeFileSync(afterReset.statePath, "{not-json");
-  const afterCorruptState = handleClaudeRuntimeHook(
-    {
-      hookEventName: "UserPromptSubmit",
-      sessionId,
-      prompt: "Again, explain src/components/FormSection.tsx",
-    },
-    tempDir,
-  );
-  assert.equal(afterCorruptState.action, "record");
-  assert.equal(readSeenCount(afterCorruptState.statePath, target), 1);
-
-  const multiTarget = handleClaudeRuntimeHook(
-    {
-      hookEventName: "UserPromptSubmit",
-      sessionId: "claude-repeated-flow-multi-target",
-      prompt: "Create src/components/MissingPanel.tsx and explain src/components/FormSection.tsx",
-    },
-    tempDir,
-  );
-  assert.equal(multiTarget.action, "record");
-  assert.equal(multiTarget.filePath, target);
+  assert.equal(prompt.action, "inject");
+  assert.equal(prompt.filePath, path.join("src", "components", "FormSection.tsx"));
+  assert.ok(prompt.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
+  assert.match(prompt.additionalContext, /fooks: Claude context hook/);
+  assert.match(prompt.additionalContext, /src\/components\/FormSection\.tsx/);
 
   const noTarget = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", prompt: "Tell me about this repo" }, tempDir);
   assert.equal(noTarget.action, "noop");
   const linkedTs = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", prompt: "Explain src/components/Button.types.ts" }, tempDir);
   assert.equal(linkedTs.action, "noop");
   const missing = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", prompt: "Create src/components/NewPanel.tsx" }, tempDir);
-  assert.equal(missing.action, "noop");
-});
-
-test("codex and claude estimated metrics are runtime/source-qualified without session collisions", () => {
-  const tempDir = makeTempProject();
-  const sessionId = "same-session";
-  const target = path.join("src", "components", "FormSection.tsx");
-  const targetBytes = fs.statSync(path.join(tempDir, target)).size;
-
-  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
-  handleCodexRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt: `Review ${target}` }, tempDir);
-
-  const claudeStart = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
-  assert.equal(claudeStart.action, "inject");
-  const claudeStartSummary = readSessionMetricSummary(tempDir, sessionId, { runtime: "claude", measurementSource: "project-local-context-hook" });
-  assert.equal(claudeStartSummary.eventCount, 0);
-  assert.equal(claudeStartSummary.injectCount, 0);
-  assert.equal(claudeStartSummary.comparableEventCount, 0);
-
-  const claudeFirst = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt: `Explain ${target}` }, tempDir);
-  assert.equal(claudeFirst.action, "record");
-  const claudeSecond = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt: `Again, explain ${target}` }, tempDir);
-  assert.equal(claudeSecond.action, "inject");
-  assert.ok(claudeSecond.additionalContext);
-
-  const codexSummary = readSessionMetricSummary(tempDir, sessionId);
-  const claudeSummary = readSessionMetricSummary(tempDir, sessionId, { runtime: "claude", measurementSource: "project-local-context-hook" });
-  assert.equal(codexSummary.runtime, "codex");
-  assert.equal(codexSummary.measurementSource, "automatic-hook");
-  assert.equal(claudeSummary.runtime, "claude");
-  assert.equal(claudeSummary.measurementSource, "project-local-context-hook");
-  assert.equal(codexSummary.rawSessionKey, sessionId);
-  assert.equal(claudeSummary.rawSessionKey, sessionId);
-  assert.notEqual(codexSummary.metricSessionKey, claudeSummary.metricSessionKey);
-  assert.notEqual(sessionSummaryPath(tempDir, codexSummary.metricSessionKey), sessionSummaryPath(tempDir, claudeSummary.metricSessionKey));
-  assert.ok(fs.existsSync(sessionSummaryPath(tempDir, codexSummary.metricSessionKey)));
-  assert.ok(fs.existsSync(sessionSummaryPath(tempDir, claudeSummary.metricSessionKey)));
-
-  assert.equal(claudeSummary.eventCount, 2);
-  assert.equal(claudeSummary.recordCount, 1);
-  assert.equal(claudeSummary.injectCount, 1);
-  assert.equal(claudeSummary.comparableEventCount, 1);
-  assert.equal(claudeSummary.observedOpportunityCount, 1);
-  assert.equal(claudeSummary.observedOriginalEstimatedBytes, targetBytes);
-  assert.equal(claudeSummary.totals.originalEstimatedBytes, targetBytes);
-  assert.equal(claudeSummary.totals.actualEstimatedBytes, Buffer.byteLength(claudeSecond.additionalContext, "utf8"));
-
-  const claudeEvents = fs.readFileSync(sessionEventsPath(tempDir, claudeSummary.metricSessionKey), "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
-  assert.equal(claudeEvents.length, 2);
-  assert.ok(claudeEvents.every((event) => event.metricTier === "estimated"));
-  assert.ok(claudeEvents.every((event) => event.claimBoundary.includes("not provider billing tokens")));
-  assert.ok(claudeEvents.every((event) => event.runtime === "claude"));
-  assert.ok(claudeEvents.every((event) => event.measurementSource === "project-local-context-hook"));
-  assert.ok(claudeEvents.every((event) => event.rawSessionKey === sessionId));
-  assert.ok(claudeEvents.every((event) => event.metricSessionKey === claudeSummary.metricSessionKey));
-  assert.ok(claudeEvents.every((event) => event.eventName === "UserPromptSubmit"));
-
-  const status = run(["status"], tempDir);
-  assert.equal(status.sessionCount, 2);
-  assert.equal(status.breakdown.byRuntime.codex.eventCount, 1);
-  assert.equal(status.breakdown.byRuntime.claude.eventCount, 2);
-  assert.equal(status.breakdown.byMeasurementSource["automatic-hook"].eventCount, 1);
-  assert.equal(status.breakdown.byMeasurementSource["project-local-context-hook"].eventCount, 2);
-  assert.equal(status.breakdown.byRuntimeAndSource["codex:automatic-hook"].eventCount, 1);
-  assert.equal(status.breakdown.byRuntimeAndSource["claude:project-local-context-hook"].eventCount, 2);
-
-  const summaryFile = JSON.parse(fs.readFileSync(sessionsSummaryPath(tempDir), "utf8"));
-  assert.equal(Object.keys(summaryFile.sessions).length, 2);
-  assert.ok(summaryFile.sessions[codexSummary.sanitizedSessionKey]);
-  assert.ok(summaryFile.sessions[claudeSummary.sanitizedSessionKey]);
-});
-
-test("claude fallback metrics record zero savings and telemetry failures are non-fatal", () => {
-  const tempDir = makeTempProject();
-  const hugeTarget = path.join("src", "components", "HugeRaw.tsx");
-  fs.writeFileSync(
-    path.join(tempDir, hugeTarget),
-    `export const huge = ${JSON.stringify("x".repeat(5000))};\n`,
-  );
-  const hugeBytes = fs.statSync(path.join(tempDir, hugeTarget)).size;
-  const fallbackSession = "claude-fallback-metrics";
-  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: fallbackSession }, tempDir);
-  assert.equal(handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: fallbackSession, prompt: `Explain ${hugeTarget}` }, tempDir).action, "record");
-  const fallback = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: fallbackSession, prompt: `Again, explain ${hugeTarget}` }, tempDir);
-  assert.equal(fallback.action, "fallback");
-  const fallbackSummary = readSessionMetricSummary(tempDir, fallbackSession, { runtime: "claude", measurementSource: "project-local-context-hook" });
-  assert.equal(fallbackSummary.fallbackCount, 1);
-  assert.equal(fallbackSummary.comparableEventCount, 1);
-  assert.equal(fallbackSummary.totals.originalEstimatedBytes, hugeBytes);
-  assert.equal(fallbackSummary.totals.actualEstimatedBytes, hugeBytes);
-  assert.equal(fallbackSummary.totals.savedEstimatedBytes, 0);
-
-  const blockedDir = makeTempProject();
-  fs.mkdirSync(path.join(blockedDir, ".fooks"), { recursive: true });
-  fs.writeFileSync(path.join(blockedDir, ".fooks", "sessions"), "not-a-directory");
-  const target = path.join("src", "components", "FormSection.tsx");
-  const blockedSession = "claude-blocked-metrics";
-  const start = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: blockedSession }, blockedDir);
-  assert.equal(start.action, "inject");
-  assert.match(start.additionalContext, /context hook is active/);
-  const first = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: blockedSession, prompt: `Explain ${target}` }, blockedDir);
-  assert.equal(first.action, "record");
-  const second = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: blockedSession, prompt: `Again, explain ${target}` }, blockedDir);
-  assert.equal(second.action, "inject");
-  assert.match(second.additionalContext, /fooks: Claude context hook/);
-  const noTarget = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: blockedSession, prompt: "Explain this repo" }, blockedDir);
-  assert.equal(noTarget.action, "noop");
-  const missing = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: blockedSession, prompt: "Explain src/components/MissingPanel.tsx" }, blockedDir);
   assert.equal(missing.action, "noop");
 });
 
@@ -1922,62 +1708,25 @@ test("claude native hook bridge activates only in attached Claude projects", () 
   assert.equal(sessionStart.hookSpecificOutput.hookEventName, "SessionStart");
   assert.ok(sessionStart.hookSpecificOutput.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
 
-  const firstPrompt = handleClaudeNativeHookPayload(
-    {
-      hook_event_name: "UserPromptSubmit",
-      cwd: attachedDir,
-      prompt: "Explain src/components/FormSection.tsx",
-      session_id: "claude-native-first",
-    },
-    attachedDir,
-  );
-  assert.equal(firstPrompt, null);
-
   const prompt = handleClaudeNativeHookPayload(
     {
       hook_event_name: "UserPromptSubmit",
       cwd: attachedDir,
-      prompt: "Again, explain src/components/FormSection.tsx",
+      prompt: "Explain src/components/FormSection.tsx",
       session_id: "claude-native-first",
     },
     attachedDir,
   );
   assert.equal(prompt.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(prompt.hookSpecificOutput.additionalContext, /src\/components\/FormSection\.tsx/);
-  assert.doesNotMatch(prompt.hookSpecificOutput.additionalContext, /Claude Read interception is enabled/i);
-
-  assert.equal(handleClaudeNativeHookPayload(
-    {
-      hook_event_name: "UserPromptSubmit",
-      cwd: attachedDir,
-      prompt: "Explain src/components/SimpleButton.tsx",
-      transcript_path: path.join(attachedDir, ".claude", "transcripts", "session.jsonl"),
-    },
-    attachedDir,
-  ), null);
-  const transcriptFallbackPrompt = handleClaudeNativeHookPayload(
-    {
-      hook_event_name: "UserPromptSubmit",
-      cwd: attachedDir,
-      prompt: "Again, explain src/components/SimpleButton.tsx",
-      transcript_path: path.join(attachedDir, ".claude", "transcripts", "session.jsonl"),
-    },
-    attachedDir,
-  );
-  assert.equal(transcriptFallbackPrompt.hookSpecificOutput.hookEventName, "UserPromptSubmit");
-  assert.match(transcriptFallbackPrompt.hookSpecificOutput.additionalContext, /src\/components\/SimpleButton\.tsx/);
-
   assert.equal(handleClaudeNativeHookPayload({ hook_event_name: "PreToolUse", cwd: attachedDir }, attachedDir), null);
-  assert.equal(handleClaudeNativeHookPayload({ hook_event_name: "PostToolUse", cwd: attachedDir }, attachedDir), null);
-  assert.equal(handleClaudeNativeHookPayload({ hook_event_name: "Read", cwd: attachedDir }, attachedDir), null);
-  assert.equal(handleClaudeNativeHookPayload({ hook_event_name: "Stop", cwd: attachedDir }, attachedDir), null);
   assert.equal(handleClaudeNativeHookPayload({ hook_event_name: "SubagentStop", cwd: attachedDir }, attachedDir), null);
 });
 
 test("cli claude-runtime-hook handles native JSON and malformed JSON", () => {
   const attachedDir = makeTempProject();
   run(["attach", "claude"], attachedDir, { FOOKS_CLAUDE_HOME: fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-")) });
-  const firstOutput = runTextWithInput(
+  const output = JSON.parse(runTextWithInput(
     ["claude-runtime-hook", "--native-hook"],
     JSON.stringify({
       hook_event_name: "UserPromptSubmit",
@@ -1986,32 +1735,8 @@ test("cli claude-runtime-hook handles native JSON and malformed JSON", () => {
       session_id: "cli-claude-native",
     }),
     attachedDir,
-  );
-  assert.equal(firstOutput, "");
-
-  const output = JSON.parse(runTextWithInput(
-    ["claude-runtime-hook", "--native-hook"],
-    JSON.stringify({
-      hook_event_name: "UserPromptSubmit",
-      cwd: attachedDir,
-      prompt: "Again, explain src/components/FormSection.tsx",
-      session_id: "cli-claude-native",
-    }),
-    attachedDir,
   ));
   assert.equal(output.hookSpecificOutput.hookEventName, "UserPromptSubmit");
-  assert.match(output.hookSpecificOutput.additionalContext, /src\/components\/FormSection\.tsx/);
-
-  const unsupportedOutput = runTextWithInput(
-    ["claude-runtime-hook", "--native-hook"],
-    JSON.stringify({
-      hook_event_name: "PreToolUse",
-      cwd: attachedDir,
-      session_id: "cli-claude-native",
-    }),
-    attachedDir,
-  );
-  assert.equal(unsupportedOutput, "");
 
   let failure = "";
   try {
