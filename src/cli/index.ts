@@ -118,6 +118,122 @@ type RuntimeReadiness = {
   notes: string[];
 };
 
+
+type SetupScopeSummary = {
+  schemaVersion: 1;
+  command: "setup";
+  projectRoot: string;
+  packageInstall: {
+    scope: "global-cli";
+    command: "npm install -g oh-my-fooks";
+    installsCommand: string;
+    mutatedBySetup: false;
+    note: string;
+  };
+  projectLocal: {
+    scope: "project-local";
+    root: string;
+    paths: string[];
+    note: string;
+  };
+  userRuntime: {
+    scope: "user-home-runtime";
+    paths: string[];
+    note: string;
+  };
+  nonGoals: string[];
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function stringProperty(value: unknown, key: string): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const property = value[key];
+  return typeof property === "string" ? property : undefined;
+}
+
+function objectProperty(value: unknown, key: string): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const property = value[key];
+  return isRecord(property) ? property : undefined;
+}
+
+function addUniquePath(paths: string[], maybePath: string | undefined): void {
+  if (maybePath && !paths.includes(maybePath)) {
+    paths.push(maybePath);
+  }
+}
+
+function runtimeInstallPaths(runtimeReadiness: RuntimeReadiness | undefined): string[] {
+  const paths: string[] = [];
+  const details = objectProperty(runtimeReadiness, "details");
+  const install = objectProperty(details, "install");
+  addUniquePath(paths, stringProperty(install, "artifactPath"));
+  addUniquePath(paths, stringProperty(install, "commandPath"));
+  return paths;
+}
+
+function runtimeManifestPathFromAttach(attach: unknown): string | undefined {
+  return stringProperty(objectProperty(attach, "runtimeProof"), "artifactPath");
+}
+
+function runtimeManifestPathFromReadiness(runtimeReadiness: RuntimeReadiness | undefined): string | undefined {
+  const details = objectProperty(runtimeReadiness, "details");
+  const attach = objectProperty(details, "attach");
+  return runtimeManifestPathFromAttach(attach);
+}
+
+function buildSetupScopeSummary(options: {
+  cwd: string;
+  displayCliName: string;
+  initialized: { config: string; cacheDir: string };
+  attach?: unknown;
+  hooks?: unknown;
+  claude?: RuntimeReadiness;
+  opencode?: RuntimeReadiness;
+}): SetupScopeSummary {
+  const projectLocalPaths = [options.initialized.config, options.initialized.cacheDir];
+  for (const opencodePath of runtimeInstallPaths(options.opencode)) {
+    addUniquePath(projectLocalPaths, opencodePath);
+  }
+
+  const userRuntimePaths: string[] = [];
+  addUniquePath(userRuntimePaths, stringProperty(options.hooks, "hooksPath"));
+  addUniquePath(userRuntimePaths, runtimeManifestPathFromAttach(options.attach));
+  addUniquePath(userRuntimePaths, runtimeManifestPathFromReadiness(options.claude));
+
+  return {
+    schemaVersion: 1,
+    command: "setup",
+    projectRoot: options.cwd,
+    packageInstall: {
+      scope: "global-cli",
+      command: "npm install -g oh-my-fooks",
+      installsCommand: options.displayCliName,
+      mutatedBySetup: false,
+      note: "The npm package install makes the fooks command available globally; fooks setup does not install or update the npm package.",
+    },
+    projectLocal: {
+      scope: "project-local",
+      root: options.cwd,
+      paths: projectLocalPaths,
+      note: "fooks setup is run from one project root and may create or update only this project's .fooks/.opencode artifacts for project-local state.",
+    },
+    userRuntime: {
+      scope: "user-home-runtime",
+      paths: userRuntimePaths,
+      note: "fooks setup may create or update runtime-home files such as Codex hooks/manifests and Claude handoff manifests; tests can isolate these homes with FOOKS_CODEX_HOME/FOOKS_CLAUDE_HOME.",
+    },
+    nonGoals: [
+      "No --scope option is required for setup.",
+      "No interactive setup prompt is required.",
+      "Setup behavior is unchanged; this object only documents where the existing setup flow writes.",
+    ],
+  };
+}
+
 function setupClaimBoundaries(): string[] {
   return [
     "Codex setup installs the automatic fooks hook path when Codex trust checks pass.",
@@ -278,6 +394,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
       hooks: null,
       status,
       runtimes,
+      scope: buildSetupScopeSummary({ cwd, displayCliName, initialized, attach: null, hooks: null, claude: runtimes.claude, opencode: runtimes.opencode }),
       summary: setupSummary(runtimes),
       claimBoundaries: setupClaimBoundaries(),
       blockers,
@@ -354,6 +471,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
     hooks,
     status,
     runtimes,
+    scope: buildSetupScopeSummary({ cwd, displayCliName, initialized, attach, hooks, claude, opencode }),
     summary: setupSummary(runtimes),
     claimBoundaries: setupClaimBoundaries(),
     blockers,
