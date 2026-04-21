@@ -1357,6 +1357,33 @@ test("setup reports partial activation when Codex hooks cannot be parsed", () =>
   assert.equal(fs.readFileSync(path.join(codexHome, "hooks.json"), "utf8"), "{not-json");
 });
 
+test("setup reports partial activation when the Codex runtime manifest path cannot be written", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const blockedAttachmentsPath = path.join(codexHome, "fooks", "attachments");
+  fs.mkdirSync(path.dirname(blockedAttachmentsPath), { recursive: true });
+  fs.writeFileSync(blockedAttachmentsPath, "blocked");
+
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  });
+
+  assert.equal(result.ready, false);
+  assert.equal(result.state, "partial");
+  assert.equal(result.attach.runtimeProof.status, "blocked");
+  assert.equal(result.runtimes.codex.state, "partial");
+  assert.equal(result.runtimes.claude.state, "handoff-ready");
+  assert.ok(result.attach.runtimeProof.blocker.includes("Codex runtime manifest install failed"));
+  assert.ok(result.attach.runtimeProof.blocker.match(/EEXIST|ENOTDIR/));
+  assert.ok(result.blockers.some((item) => item.includes("Codex runtime manifest install failed")));
+  assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
+  assert.ok(result.attach.runtimeProof.details.some((item) => item.includes("runtime-manifest-write-attempted=true")));
+  assert.ok(result.attach.runtimeProof.details.some((item) => item.includes("runtime-manifest-error=")));
+});
+
 test("setup reports blocked state for projects without React components", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-empty-"));
   fs.writeFileSync(path.join(tempDir, "package.json"), JSON.stringify({ name: "empty", repository: { url: "https://github.com/minislively/empty.git" } }, null, 2));
