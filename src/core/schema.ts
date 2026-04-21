@@ -273,6 +273,8 @@ export type AttachResult = {
     passed: boolean;
     details: string[];
   };
+  // Local attach/readiness check only. A passed status means fooks wrote the
+  // expected runtime artifact; it is not Codex runtime-token telemetry.
   runtimeProof: {
     status: "passed" | "blocked";
     details: string[];

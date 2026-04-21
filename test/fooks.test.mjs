@@ -1471,11 +1471,14 @@ test("setup runtime summary keeps Claude and opencode claims bounded", () => {
   assert.equal(result.runtimes.opencode.blocksOverall, false);
   assert.match(text, /Claude automatic hooks are not enabled by fooks setup/);
   assert.match(text, /opencode setup does not intercept read calls/);
-  assert.match(text, /opencode setup does not prove automatic runtime-token savings/);
+  assert.match(text, /Codex setup installs the automatic fooks hook path when Codex trust checks pass, but it does not collect Codex runtime-token telemetry/);
+  assert.match(text, /opencode setup does not provide automatic runtime-token telemetry/);
+  assert.match(text, /runtime-token-telemetry=not-collected/);
   assert.doesNotMatch(text, /Claude automatic hooks are enabled/i);
   assert.doesNotMatch(text, /Claude prompt interception is enabled/i);
   assert.doesNotMatch(text, /automatic opencode read interception is enabled/i);
   assert.doesNotMatch(text, /automatic opencode runtime-token savings are enabled/i);
+  assert.doesNotMatch(text, /Codex runtime-token savings proof/i);
 });
 
 test("status claude reports handoff-ready artifacts without automatic runtime claims", () => {

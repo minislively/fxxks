@@ -17,7 +17,7 @@ Before a public release, keep the public claim surface aligned to this matrix:
 
 | Environment | Release-ready wording | Do not claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Universal file-read interception |
+| Codex | Automatic repeated-file hook path through `fooks setup`; prepared-context/proxy evidence only | Universal file-read interception or measured runtime-token savings without Codex telemetry |
 | Claude | Manual/shared handoff prepared by `fooks setup` when possible | Automatic hooks, prompt interception, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 
@@ -46,6 +46,11 @@ stable direct runtime-token/time wins until a future multi-task benchmark class
 proves them.
 
 Bare `fooks status` reports local estimated context-size telemetry from `.fooks/sessions`. Its CLI output omits per-session details, is for maintainer/user inspection only, and must not be treated as provider billing tokens, provider costs, or a `ccusage` replacement.
+
+Codex setup/attach/status readiness is also local state only. It may show that
+Codex hooks, manifests, and trust metadata were prepared, but it is not live
+Codex runtime telemetry and must not be described as proof of runtime-token
+savings.
 
 Layer 2 now has two proposal-only R4 paired smokes through the current
 `codex exec` runner. In both pairs, the prompt supplied to Codex dropped from

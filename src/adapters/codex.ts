@@ -15,6 +15,9 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
   const sample = extractFile(sampleFile);
   const account = detectAccountContext(cwd);
   const attemptedAt = new Date().toISOString();
+  // This is a local artifact/readiness check only. A passed result means the
+  // manifest and adapter files were written; it does not mean Codex runtime
+  // telemetry was collected or that runtime-token savings were measured.
   const runtimeProof = (() => {
     const manifest = installRuntimeManifest("codex", cwd, {
       runtimeBridge: {
@@ -33,7 +36,13 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
         status: "passed" as const,
         attemptedAt,
         artifactPath: manifest.manifestPath,
-        details: [`account-context=${account.account}`, `account-source=${account.source}`, `runtime-manifest=${manifest.manifestPath}`, "codex adapter artifacts created"],
+        details: [
+          `account-context=${account.account}`,
+          `account-source=${account.source}`,
+          `runtime-manifest=${manifest.manifestPath}`,
+          "codex adapter artifacts created",
+          "runtime-token-telemetry=not-collected",
+        ],
       };
     }
 
@@ -44,6 +53,7 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
         artifactPath: manifest.manifestPath,
         details: [
           "codex adapter artifacts created",
+          "runtime-token-telemetry=not-collected",
           `account-source=${account.source}`,
           `runtime-manifest=${manifest.manifestPath}`,
           "runtime-manifest-write-attempted=true",
@@ -57,7 +67,7 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
       status: "blocked" as const,
       attemptedAt,
       artifactPath: manifest.manifestPath,
-      details: ["codex adapter artifacts created", `account-source=${account.source}`, "runtime-manifest-write-attempted=false"],
+      details: ["codex adapter artifacts created", "runtime-token-telemetry=not-collected", `account-source=${account.source}`, "runtime-manifest-write-attempted=false"],
       blocker: "Codex runtime home not detected",
     };
   })();

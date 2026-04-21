@@ -27,7 +27,7 @@ fooks setup
 `fooks setup` does five things:
 
 1. creates local `.fooks/` state;
-2. attaches the repo to the Codex runtime;
+2. prepares Codex attachment metadata and runtime-home files;
 3. merges the fooks hook command into `~/.codex/hooks.json`;
 4. prepares Claude manual/shared handoff artifacts when a Claude home is available;
 5. installs the project-local opencode custom tool and slash command when a supported component exists.
@@ -70,6 +70,8 @@ Good signs:
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex hook path, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 
+Likewise, `fooks status codex` and the Codex-ready portions of `fooks setup` report local attach/trust readiness only. They do not prove live Codex runtime-token savings, because this repo does not yet collect Codex runtime telemetry for that claim.
+
 ## What the setup result means
 
 | State | Meaning |
@@ -84,7 +86,7 @@ Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summarie
 
 | Runtime field | Ready state | Meaning |
 | --- | --- | --- |
-| `runtimes.codex.state` | `automatic-ready` | Codex attach, trust status, and hook preset are ready. This is the only automatic runtime hook path in the setup command. |
+| `runtimes.codex.state` | `automatic-ready` | Codex attach metadata, trust status, and hook preset are ready. This confirms local setup/readiness only; it is not runtime-token telemetry. |
 | `runtimes.claude.state` | `handoff-ready` or `blocked` | Claude manual/shared handoff artifacts were prepared, or a non-fatal Claude blocker was reported. This does not mean Claude prompt interception is enabled. |
 | `runtimes.opencode.state` | `tool-ready`, `manual-step-required`, or `blocked` | The project-local opencode helper is installed, needs an explicit/manual step, or hit a non-fatal blocker. This does not mean opencode read interception or automatic runtime-token savings are enabled. |
 | `blocksOverall` | `true` only for Codex today | Claude/opencode blockers should not make Codex setup look failed when Codex itself is ready. |

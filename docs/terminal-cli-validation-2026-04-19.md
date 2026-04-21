@@ -1,12 +1,14 @@
 # Terminal CLI Validation - 2026-04-19
 
-This note records the concrete proof passes run on 2026-04-19 to verify that `fooks` supports both Codex and Claude Code as a terminal CLI integration surface, plus the follow-up first-success wording pass reopened from clean `main`.
+This note records the local validation checks run on 2026-04-19 to verify that `fooks` prepares both Codex and Claude Code terminal CLI integration artifacts, plus the follow-up first-success wording pass reopened from clean `main`.
 
-## Previous proof context
+Claim boundary: these checks verify setup artifacts, manifests, and handoff payloads only. They are not Codex runtime-token telemetry and must not be described as proof of Codex runtime-token savings.
 
-- PR #35, `docs: agent-neutral CLI workflow for Codex/Claude`, was closed on 2026-04-19 without merge because it mixed a broader docs package into what should have been a narrower proof track.
-- PR #37, `docs: record concrete Codex and Claude CLI validation`, merged on 2026-04-19 and established the first small proof artifact on `main`.
-- This rerun keeps the proof track narrow: verify current `main`, make the first-success path more retention-safe, and avoid inventing Claude parity that the repo does not ship.
+## Previous validation context
+
+- PR #35, `docs: agent-neutral CLI workflow for Codex/Claude`, was closed on 2026-04-19 without merge because it mixed a broader docs package into what should have been a narrower validation track.
+- PR #37, `docs: record concrete Codex and Claude CLI validation`, merged on 2026-04-19 and established the first small local validation artifact on `main`.
+- This rerun keeps the validation track narrow: verify current `main`, make the first-success path more retention-safe, and avoid inventing Claude parity that the repo does not ship.
 
 ## Current rerun starting point
 
@@ -20,7 +22,7 @@ This note records the concrete proof passes run on 2026-04-19 to verify that `fo
 - Hermes note:
   - no Hermes-specific integration surface was found in this repo during this pass
 
-## Local environment proof
+## Local environment check
 
 Both target CLIs are installed in this environment:
 
@@ -52,7 +54,7 @@ Observed result:
 - temporary runtime manifest written under `.../fooks/attachments/fooks.json`
 - returned trust status with `connectionState: "connected"` and `lifecycleState: "ready"`
 
-This proves the current repo ships a working Codex attach path with runtime-manifest output and Codex-specific trust/runtime metadata.
+This validates that the current repo can write the expected Codex attach manifest and Codex-specific trust/readiness metadata. It does not prove Codex consumed the artifact during a live session or used fewer runtime tokens.
 
 ### 2. Claude attach path
 
@@ -69,7 +71,7 @@ Observed result:
 - `runtimeProof.status: "passed"`
 - temporary runtime manifest written under `.../fooks/attachments/fooks.json`
 
-This proves the current repo ships a working Claude attach path when a Claude home is present.
+This validates that the current repo ships a Claude handoff manifest path when a Claude home is present.
 
 ### 3. Shared agent-neutral prep path
 
@@ -85,7 +87,7 @@ Observed result:
 - `decide` returned `mode: "compressed"`
 - `extract --model-payload` returned a valid compressed payload for the same file
 
-This proves the shared prep surface works independently of Codex-only hook wiring.
+This validates that the shared prep surface works independently of Codex-only hook wiring.
 
 ### 4. Shared first-success handoff path
 
@@ -102,9 +104,9 @@ Observed result after the first-success wording pass:
 - next-step text says `Open this context with your preferred runtime (codex, claude, omx, etc.)`
 - context file still contains the same light exact-file selection for `fixtures/compressed/FormSection.tsx`
 
-This keeps the value proof intact while making the first-success path honest about the product surface: `fooks run` prepares a reusable context handoff and does not claim Claude-native runtime automation.
+This keeps the local value check intact while making the first-success path honest about the product surface: `fooks run` prepares a reusable context handoff and does not claim Claude-native runtime automation.
 
-Follow-up claim-safety note: a Claude attach proof plus `extract --model-payload` proof should be described as a **Claude manual handoff-compatible reduced artifact proof**. It is not evidence of Claude automatic runtime hooks, Claude live runtime-token savings, or Claude benchmark wins.
+Follow-up claim-safety note: a Claude attach check plus `extract --model-payload` check should be described as a **Claude manual handoff-compatible reduced artifact check**. It is not evidence of Claude automatic runtime hooks, Claude live runtime-token savings, or Claude benchmark wins. Likewise, Codex attach readiness is not Codex runtime-token telemetry.
 
 ## Current support boundary
 
@@ -119,7 +121,8 @@ Current gap, still present after validation:
 
 - this repo does not currently ship a Claude-native hook installer or a Claude-specific runtime execution bridge comparable to the Codex hook path
 - internal `run` prep still uses the Codex execution-context helper under the hood, even though the user-facing handoff copy is now runtime-neutral
-- this repo does not currently ship `status claude` or Claude runtime-token benchmark proof
+- this repo does not currently ship `status claude` or Claude runtime-token benchmark evidence
+- this repo does not currently collect Codex runtime-token telemetry, so Codex setup/attach checks must not be called runtime-token savings proof
 
 ## Verification
 

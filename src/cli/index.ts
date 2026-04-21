@@ -75,7 +75,7 @@ async function resolveAttachSampleFile(cwd = process.cwd()): Promise<string> {
   const { discoverProjectFiles } = await import("../core/discover.js");
   const target = discoverProjectFiles(cwd).find((item) => item.kind === "component");
   if (!target) {
-    throw new Error("No React/TSX component file found for attach contract proof");
+    throw new Error("No React/TSX component file found for attach contract check");
   }
   return target.filePath;
 }
@@ -236,9 +236,9 @@ function buildSetupScopeSummary(options: {
 
 function setupClaimBoundaries(): string[] {
   return [
-    "Codex setup installs the automatic fooks hook path when Codex trust checks pass.",
+    "Codex setup installs the automatic fooks hook path when Codex trust checks pass, but it does not collect Codex runtime-token telemetry.",
     "Claude setup prepares manual/shared handoff artifacts only; it does not enable automatic hooks or prompt interception.",
-    "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or prove runtime-token savings.",
+    "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or provide runtime-token telemetry.",
     "Projects without supported React .tsx/.jsx component candidates stay blocked for automatic setup instead of pretending unrelated files are ready.",
   ];
 }
@@ -339,7 +339,7 @@ function opencodeRuntimeReadiness(installResult: unknown): RuntimeReadiness {
     ],
     notes: [
       "opencode setup does not intercept read calls.",
-      "opencode setup does not prove automatic runtime-token savings.",
+      "opencode setup does not provide automatic runtime-token telemetry.",
     ],
   };
 }
@@ -359,7 +359,7 @@ function manualOpenCodeReadiness(blockers: string[], details: unknown = null): R
     ],
     notes: [
       "opencode setup does not intercept read calls.",
-      "opencode setup does not prove automatic runtime-token savings.",
+      "opencode setup does not provide automatic runtime-token telemetry.",
     ],
   };
 }
@@ -380,8 +380,8 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
     const status = readCodexTrustStatus(cwd);
     const runtimes: Record<RuntimeName, RuntimeReadiness> = {
       codex: codexRuntimeReadiness("blocked", false, null, null, status, blockers),
-      claude: blockedClaudeReadiness(["No React/TSX component file found for Claude handoff proof"]),
-      opencode: manualOpenCodeReadiness(["No React/TSX component file found for opencode helper proof"]),
+      claude: blockedClaudeReadiness(["No React/TSX component file found for Claude handoff check"]),
+      opencode: manualOpenCodeReadiness(["No React/TSX component file found for opencode helper check"]),
     };
 
     return {
@@ -497,7 +497,7 @@ Everyday commands:
       Prepare one-command readiness for supported runtimes:
       - Codex: automatic runtime hook path when trust checks pass.
       - Claude: manual/shared handoff artifacts only; no automatic hooks or prompt interception.
-      - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
+      - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token telemetry claim.
 
   ${displayCliName} run <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
