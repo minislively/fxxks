@@ -207,13 +207,15 @@ combobox-example.tsx (1,249 lines)
 - ✅ 분리 계획 수립
 - ✅ 성공 기준 정의
 - ✅ 측정 metric 정의
+- ✅ `codex exec` 기반 proposal-only smoke runner 실행
+- ✅ R4 기준 2회 matched vanilla/fooks proposal-only smoke validation
 
-**현재 불가:**
-- ❌ 실제 AI 코드 생성 (API access 없음)
-- ❌ 생성 코드 검증 (runner 미구현)
-- ❌ 자동 성공/실패 판정 (evaluator 미구현)
+**현재 불가 / non-goal:**
+- ❌ provider billing-token telemetry 확보
+- ❌ 생성 코드 적용 후 unit/type/e2e acceptance 판정
+- ❌ multi-task 반복 실행 기반 stable runtime/time win 주장
 
-**명명:** `Layer 2 task runner spec` (benchmark result 아님)
+**명명:** `Layer 2 R4 proposal-only smoke evidence` (billing-grade benchmark result 아님)
 
 ---
 
