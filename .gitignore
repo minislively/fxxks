@@ -12,6 +12,7 @@ logs/
 # Runtime state and local tool configuration
 .omx/
 .fooks/
+.opencode/
 .omc/
 .codex
 .clawhip/

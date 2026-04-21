@@ -1798,6 +1798,7 @@ test("package release surface keeps internal docs out of the npm tarball", () =>
   assert.match(releaseSmoke, /docs\/internal\//);
   assert.match(releaseSmoke, /packed tarball includes non-public path/);
   assert.match(gitignore, /docs\/internal\//);
+  assert.match(gitignore, /\.opencode\//);
 });
 
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {
