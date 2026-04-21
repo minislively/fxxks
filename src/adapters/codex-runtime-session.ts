@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { sanitizeDataKey } from "../core/paths";
 
 type SeenFileState = {
   firstSeenAt: string;
@@ -17,7 +18,7 @@ function stateRoot(cwd: string): string {
 }
 
 function sanitizeKey(sessionKey: string): string {
-  return sessionKey.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
+  return sanitizeDataKey(sessionKey);
 }
 
 export function resolveCodexRuntimeSessionKey(sessionId?: string, threadId?: string): string {

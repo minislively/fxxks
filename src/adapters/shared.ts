@@ -10,6 +10,24 @@ type AccountDetection = {
   source: "env" | "config" | "git-remote" | "package-repository" | "unknown";
 };
 
+export type RuntimeManifestInstallResult =
+  | {
+      status: "missing";
+      home: string;
+      manifestPath: string;
+    }
+  | {
+      status: "blocked";
+      home: string;
+      manifestPath: string;
+      errorMessage: string;
+    }
+  | {
+      status: "passed";
+      home: string;
+      manifestPath: string;
+    };
+
 function extractGithubOwner(value: string | undefined): string | null {
   if (!value) return null;
   const normalized = value.trim();
@@ -108,29 +126,42 @@ function runtimeHome(runtime: "codex" | "claude"): string {
   return path.join(os.homedir(), runtime === "codex" ? ".codex" : ".claude");
 }
 
-export function installRuntimeManifest(runtime: "codex" | "claude", cwd = process.cwd(), metadata: Record<string, unknown> = {}): string | null {
+export function installRuntimeManifest(
+  runtime: "codex" | "claude",
+  cwd = process.cwd(),
+  metadata: Record<string, unknown> = {},
+): RuntimeManifestInstallResult {
   const home = runtimeHome(runtime);
-  if (!fs.existsSync(home)) {
-    return null;
-  }
-
   const projectName = path.basename(cwd).replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
   const manifestPath = path.join(home, "fooks", "attachments", `${projectName}.json`);
-  fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-  fs.writeFileSync(
-    manifestPath,
-    JSON.stringify(
-      {
-        runtime,
-        projectRoot: cwd,
-        installedAt: new Date().toISOString(),
-        ...metadata,
-      },
-      null,
-      2,
-    ),
+
+  if (!fs.existsSync(home)) {
+    return { status: "missing", home, manifestPath };
+  }
+
+  const manifestBody = JSON.stringify(
+    {
+      runtime,
+      projectRoot: cwd,
+      installedAt: new Date().toISOString(),
+      ...metadata,
+    },
+    null,
+    2,
   );
-  return manifestPath;
+
+  try {
+    fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+    fs.writeFileSync(manifestPath, manifestBody);
+    return { status: "passed", home, manifestPath };
+  } catch (error) {
+    return {
+      status: "blocked",
+      home,
+      manifestPath,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export function finalizeAttach(

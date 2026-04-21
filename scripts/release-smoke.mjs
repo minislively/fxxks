@@ -41,6 +41,9 @@ function assertPackedFiles(packEntry) {
     "dist/adapters/opencode-tool-preset.js",
     "docs/setup.md",
     "docs/release.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
   ];
 
   for (const filePath of required) {

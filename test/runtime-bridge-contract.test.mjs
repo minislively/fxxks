@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { cleanupMetricSessions } from "./metric-cleanup.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const { handleCodexRuntimeHook } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+test.after(() => cleanupMetricSessions(repoRoot, ["bridge-contract-"]));
 
 test("runtime bridge contract keeps repeated-read inject and fallback semantics stable", () => {
   const injectSession = `bridge-contract-inject-${Date.now()}`;

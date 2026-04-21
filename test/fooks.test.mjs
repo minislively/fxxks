@@ -12,6 +12,7 @@ import os from "node:os";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { cleanupMetricSessions } from "./metric-cleanup.mjs";
 
 const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
@@ -29,12 +30,24 @@ const {
   codexRuntimeSessionPath,
 } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-session.js"));
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const {
+  readProjectMetricSummary,
+  readSessionMetricSummary,
+  refreshProjectMetricSummaryFromSession,
+} = require(path.join(repoRoot, "dist", "core", "session-metrics.js"));
+const {
+  sessionEventsPath,
+  sessionsSummaryPath,
+} = require(path.join(repoRoot, "dist", "core", "paths.js"));
 const { classifyPromptContext, discoverRelevantFilesByPolicy } = require(path.join(repoRoot, "dist", "core", "context-policy.js"));
 const { prepareExecutionContext } = require(path.join(repoRoot, "dist", "adapters", "codex.js"));
 const { attachClaude } = require(path.join(repoRoot, "dist", "adapters", "claude.js"));
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
 const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
 const ts = require("typescript");
+
+const repoMetricTestSessionPrefixes = ["hook-", "cli-hook-", "bridge-contract-"];
+test.after(() => cleanupMetricSessions(repoRoot, repoMetricTestSessionPrefixes));
 
 function run(args, cwd = repoRoot, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
@@ -586,6 +599,137 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(second.additionalContext.includes("#fooks-full-read"), false);
   assert.equal(second.additionalContext.includes("#fooks-disable-pre-read"), false);
   assert.equal(second.debug.repeatedFile, true);
+});
+
+test("bare status reports fast estimated session savings without exposing session contribution internals", () => {
+  const tempDir = makeTempProject();
+  const empty = run(["status"], tempDir);
+  assert.equal(empty.schemaVersion, 1);
+  assert.equal(empty.metricTier, "estimated");
+  assert.equal(empty.sessionCount, 0);
+  assert.equal(empty.latestSessionCount, 0);
+  assert.equal(empty.eventCount, 0);
+  assert.equal(empty.totals.savedEstimatedBytes, 0);
+  assert.equal("sessions" in empty, false);
+  assert.equal("latestSessionKeys" in empty, false);
+  assert.match(empty.claimBoundary, /not provider billing tokens/);
+});
+
+test("runtime hook stores redacted estimated metrics for record, inject, fallback, and stop", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `metrics-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  const targetBytes = fs.statSync(path.join(tempDir, target)).size;
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const started = run(["status"], tempDir);
+  assert.equal(started.sessionCount, 1);
+  assert.equal(started.eventCount, 0);
+
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, update ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(second.action, "inject");
+  assert.ok(second.additionalContext);
+
+  const sessionSummary = readSessionMetricSummary(tempDir, sessionId);
+  assert.equal(sessionSummary.eventCount, 2);
+  assert.equal(sessionSummary.recordCount, 1);
+  assert.equal(sessionSummary.injectCount, 1);
+  assert.equal(sessionSummary.comparableEventCount, 1);
+  assert.equal(sessionSummary.observedOpportunityCount, 1);
+  assert.equal(sessionSummary.observedOriginalEstimatedBytes, targetBytes);
+  assert.equal(sessionSummary.totals.originalEstimatedBytes, targetBytes);
+  assert.equal(sessionSummary.totals.actualEstimatedBytes, Buffer.byteLength(second.additionalContext, "utf8"));
+  assert.equal(
+    sessionSummary.totals.savedEstimatedBytes,
+    Math.max(0, sessionSummary.totals.originalEstimatedBytes - sessionSummary.totals.actualEstimatedBytes),
+  );
+
+  const eventLog = fs.readFileSync(sessionEventsPath(tempDir, sessionId), "utf8");
+  assert.doesNotMatch(eventLog, /Again, update/);
+  assert.doesNotMatch(eventLog, /additionalContext/);
+  assert.doesNotMatch(eventLog, /rawText/);
+  assert.doesNotMatch(eventLog, /"debug"/);
+  assert.doesNotMatch(eventLog, /"decision"/);
+
+  const fallbackSession = `${sessionId}-fallback`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: fallbackSession }, tempDir);
+  const fallback = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: fallbackSession,
+      prompt: `Need exact source ${target} #fooks-full-read`,
+    },
+    tempDir,
+  );
+  assert.equal(fallback.action, "fallback");
+  const fallbackSummary = readSessionMetricSummary(tempDir, fallbackSession);
+  assert.equal(fallbackSummary.fallbackCount, 1);
+  assert.equal(fallbackSummary.comparableEventCount, 1);
+  assert.equal(fallbackSummary.totals.originalEstimatedBytes, targetBytes);
+  assert.equal(fallbackSummary.totals.actualEstimatedBytes, targetBytes);
+  assert.equal(fallbackSummary.totals.savedEstimatedBytes, 0);
+
+  handleCodexRuntimeHook({ hookEventName: "Stop", sessionId }, tempDir);
+  const stopped = readSessionMetricSummary(tempDir, sessionId);
+  assert.ok(stopped.stoppedAt);
+
+  const beforeRefresh = readProjectMetricSummary(tempDir);
+  refreshProjectMetricSummaryFromSession(tempDir, sessionId);
+  refreshProjectMetricSummaryFromSession(tempDir, sessionId);
+  const afterRefresh = readProjectMetricSummary(tempDir);
+  assert.equal(afterRefresh.eventCount, beforeRefresh.eventCount);
+  assert.deepEqual(afterRefresh.totals, beforeRefresh.totals);
+
+  const status = run(["status"], tempDir);
+  assert.equal(status.sessionCount, 2);
+  assert.equal(status.eventCount, 3);
+  assert.equal(status.injectCount, 1);
+  assert.equal(status.fallbackCount, 1);
+  assert.equal(status.recordCount, 1);
+  assert.equal(status.latestSessionCount, 2);
+  assert.equal("latestSessionKeys" in status, false);
+  assert.equal("sessions" in status, false);
+
+  const summaryFile = JSON.parse(fs.readFileSync(sessionsSummaryPath(tempDir), "utf8"));
+  assert.equal(Object.keys(summaryFile.sessions).length, 2);
+});
+
+test("runtime metric write failures are non-fatal to hook decisions", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, ".fooks", "sessions"), "not-a-directory");
+
+  const sessionId = `metrics-blocked-${Date.now()}`;
+  const start = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  assert.equal(start.action, "noop");
+
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "Please update src/components/FormSection.tsx",
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+  assert.equal(first.filePath, path.join("src", "components", "FormSection.tsx"));
 });
 
 test("runtime hook injects tiny raw originals and still honors escape hatch fallbacks", () => {
@@ -1211,6 +1355,33 @@ test("setup reports partial activation when Codex hooks cannot be parsed", () =>
   assert.ok(result.blockers.some((item) => item.includes("Codex hook preset install failed")));
   assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
   assert.equal(fs.readFileSync(path.join(codexHome, "hooks.json"), "utf8"), "{not-json");
+});
+
+test("setup reports partial activation when the Codex runtime manifest path cannot be written", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const blockedAttachmentsPath = path.join(codexHome, "fooks", "attachments");
+  fs.mkdirSync(path.dirname(blockedAttachmentsPath), { recursive: true });
+  fs.writeFileSync(blockedAttachmentsPath, "blocked");
+
+  const result = run(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  });
+
+  assert.equal(result.ready, false);
+  assert.equal(result.state, "partial");
+  assert.equal(result.attach.runtimeProof.status, "blocked");
+  assert.equal(result.runtimes.codex.state, "partial");
+  assert.equal(result.runtimes.claude.state, "handoff-ready");
+  assert.ok(result.attach.runtimeProof.blocker.includes("Codex runtime manifest install failed"));
+  assert.ok(result.attach.runtimeProof.blocker.match(/EEXIST|ENOTDIR/));
+  assert.ok(result.blockers.some((item) => item.includes("Codex runtime manifest install failed")));
+  assert.ok(result.nextSteps.some((item) => item.includes("Fix setup blockers")));
+  assert.ok(result.attach.runtimeProof.details.some((item) => item.includes("runtime-manifest-write-attempted=true")));
+  assert.ok(result.attach.runtimeProof.details.some((item) => item.includes("runtime-manifest-error=")));
 });
 
 test("setup reports blocked state for projects without React components", () => {
