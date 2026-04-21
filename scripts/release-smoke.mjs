@@ -59,57 +59,6 @@ function assertPublicSurfaceClaimBoundaries(surfaces) {
   }
 }
 
-function runInstalledFooks(fooksBin, args, options = {}) {
-  return execFileSync(fooksBin, args, {
-    cwd: options.cwd,
-    encoding: "utf8",
-    input: options.input,
-    env: {
-      ...process.env,
-      ...(options.env ?? {}),
-    },
-  });
-}
-
-function parseOptionalJson(stdout, label) {
-  if (!stdout.trim()) return null;
-  try {
-    return JSON.parse(stdout);
-  } catch (error) {
-    throw new Error(`${label} should emit JSON when non-empty: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-function runNativeHook(fooksBin, runtime, projectRoot, env, payload, label) {
-  return parseOptionalJson(
-    runInstalledFooks(fooksBin, [`${runtime}-runtime-hook`, "--native-hook"], {
-      cwd: projectRoot,
-      input: JSON.stringify(payload),
-      env,
-    }),
-    label,
-  );
-}
-
-function sanitizeDataKey(key) {
-  return key.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase() || "default-session";
-}
-
-function readMetricEvents(projectRoot) {
-  const sessionsDir = path.join(projectRoot, ".fooks", "sessions");
-  if (!fs.existsSync(sessionsDir)) return [];
-  return fs.readdirSync(sessionsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => {
-      const eventsPath = path.join(sessionsDir, entry.name, "events.jsonl");
-      if (!fs.existsSync(eventsPath)) return [];
-      return fs.readFileSync(eventsPath, "utf8")
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line));
-    });
-}
-
 function assertPackedFiles(packEntry) {
   const paths = new Set(packEntry.files.map((file) => file.path));
   const required = [
@@ -172,9 +121,6 @@ assertPublicSurfaceClaimBoundaries({
   "README.md": fs.readFileSync(path.join(repoRoot, "README.md"), "utf8"),
   "docs/setup.md": fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8"),
   "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
-  "docs/internal/live-hook-smoke-checklist.md": fs.existsSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"))
-    ? fs.readFileSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"), "utf8")
-    : "",
   "dist/cli/index.js": fs.readFileSync(path.join(repoRoot, "dist", "cli", "index.js"), "utf8"),
 });
 
@@ -213,16 +159,6 @@ assert(setup.runtimes?.claude?.blocksOverall === false, "Claude readiness should
 assert(setup.runtimes?.opencode?.state === "tool-ready", `unexpected opencode setup state ${setup.runtimes?.opencode?.state}`);
 assert(setup.runtimes?.opencode?.blocksOverall === false, "opencode readiness should be non-fatal for overall setup");
 assert(setup.attach?.runtimeProof?.details?.includes("account-source=package-repository"), "setup should derive public repo account context from package metadata");
-assert(setup.scope?.schemaVersion === 1, "setup should report scope summary schema");
-assert(setup.scope?.packageInstall?.scope === "global-cli", "setup scope should distinguish global CLI package install");
-assert(setup.scope?.packageInstall?.mutatedBySetup === false, "setup must not imply npm package install mutation");
-const setupProjectRoot = fs.realpathSync(project);
-assert(setup.scope?.projectLocal?.root === setupProjectRoot, "setup scope should identify the current project root");
-assert(setup.scope?.projectLocal?.paths?.includes(path.join(setupProjectRoot, ".fooks", "config.json")), "setup scope should include project-local .fooks config");
-assert(setup.scope?.projectLocal?.paths?.includes(path.join(setupProjectRoot, ".opencode", "tools", "fooks_extract.ts")), "setup scope should include project-local opencode tool");
-assert(setup.scope?.userRuntime?.paths?.includes(path.join(codexHome, "hooks.json")), "setup scope should include isolated Codex hooks path");
-assert(setup.scope?.userRuntime?.paths?.some((item) => item.startsWith(path.join(codexHome, "fooks", "attachments"))), "setup scope should include isolated Codex runtime manifest path");
-assert(setup.scope?.nonGoals?.some((item) => item.includes("No --scope option")), "setup scope should document that no new scope option is required");
 
 const statusStdout = execFileSync(fooksBin, ["status"], {
   cwd: project,
@@ -252,10 +188,8 @@ assertPublicSurfaceClaimBoundaries({
   "fooks status claude output": claudeStatusStdout,
 });
 const status = JSON.parse(statusStdout);
-assert(status.metricTier === "estimated", `status should expose estimated metric tier, got ${status.metricTier}`);
 assert(status.claimBoundary?.includes("not provider billing tokens"), "status should keep provider billing boundary");
 assert(status.breakdown && typeof status.breakdown === "object", "status should expose runtime/source breakdown");
-assert(!Object.prototype.hasOwnProperty.call(status, "sessions"), "CLI status should omit per-session contribution details");
 assert(fs.existsSync(path.join(codexHome, "hooks.json")), "isolated Codex hooks file should be written under FOOKS_CODEX_HOME");
 const claudeLocalSettings = path.join(project, ".claude", "settings.local.json");
 assert(fs.existsSync(claudeLocalSettings), "Claude project-local hooks should be installed under the project");

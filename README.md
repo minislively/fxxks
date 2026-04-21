@@ -81,8 +81,6 @@ fooks scan
 
 `fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider billing tokens, provider costs, or a `ccusage` replacement.
 
-`fooks status codex` is also only a local attach/trust readiness check. It does not prove Codex runtime-token savings, because this repo does not yet collect Codex runtime telemetry for that claim.
-
 ## opencode support
 
 opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.

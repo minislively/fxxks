@@ -4,6 +4,12 @@ import { decideCodexPreRead } from "./codex-pre-read";
 import { initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
 import { resolvePromptFileContext } from "./codex-runtime-prompt";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
+import {
+  estimateFileBytes,
+  estimateTextBytes,
+  initializeSessionMetricSummarySafe,
+  recordFooksSessionMetricEventSafe,
+} from "../core/session-metrics";
 
 export const CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS = 9000;
 
@@ -65,6 +71,39 @@ function buildPayloadContext(filePath: string, payload: NonNullable<ReturnType<t
   ].join("\n"));
 }
 
+function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
+  return estimateFileBytes(path.join(cwd, filePath));
+}
+
+function recordClaudeMetric(
+  cwd: string,
+  sessionKey: string,
+  decision: ClaudeRuntimeHookDecision,
+  options: {
+    originalEstimatedBytes?: number;
+    actualEstimatedBytes?: number;
+    comparableForSavings?: boolean;
+    observedOriginalEstimatedBytes?: number;
+  } = {},
+): void {
+  recordFooksSessionMetricEventSafe(cwd, sessionKey, {
+    runtime: "claude",
+    measurementSource: "project-local-context-hook",
+    eventName: decision.hookEventName,
+    hookEventName: decision.hookEventName,
+    action: decision.action,
+    filePath: decision.filePath,
+    reasons: decision.reasons,
+    contextMode: decision.contextMode,
+    contextModeReason: decision.contextModeReason,
+    fallbackReason: decision.fallback?.reason,
+    originalEstimatedBytes: options.originalEstimatedBytes,
+    actualEstimatedBytes: options.actualEstimatedBytes,
+    comparableForSavings: options.comparableForSavings,
+    observedOriginalEstimatedBytes: options.observedOriginalEstimatedBytes,
+  });
+}
+
 function sessionStartContext(): string {
   return clampAdditionalContext([
     "fooks: Claude context hook is active for this project.",
@@ -98,6 +137,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
 
   if (hookEventName === "SessionStart") {
     const statePath = initializeClaudeRuntimeSession(cwd, sessionKey);
+    initializeSessionMetricSummarySafe(cwd, sessionKey, { runtime: "claude", measurementSource: "project-local-context-hook" });
     return {
       runtime: "claude",
       hookEventName,
@@ -121,19 +161,23 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
   const policy = promptContext.policy;
 
   if (!target) {
-    return noopDecision(input, ["no-eligible-file-in-prompt"], policy);
+    const decision = noopDecision(input, ["no-eligible-file-in-prompt"], policy);
+    recordClaudeMetric(cwd, sessionKey, decision);
+    return decision;
   }
 
   const resolvedTarget = path.join(cwd, target);
   if (!fs.existsSync(resolvedTarget)) {
-    return noopDecision(input, ["eligible-file-target-missing"], policy);
+    const decision = noopDecision(input, ["eligible-file-target-missing"], policy);
+    recordClaudeMetric(cwd, sessionKey, decision);
+    return decision;
   }
 
   const { statePath, seenCount } = markClaudeRuntimeSeenFile(cwd, sessionKey, target);
   const repeatedFile = seenCount >= 2;
 
   if (!repeatedFile) {
-    return {
+    const decision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
       hookEventName,
       action: "record",
@@ -151,13 +195,18 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         bounded: true,
       },
     };
+    recordClaudeMetric(cwd, sessionKey, decision, {
+      observedOriginalEstimatedBytes: targetEstimatedBytes(cwd, target),
+    });
+    return decision;
   }
 
   let decision: ReturnType<typeof decideCodexPreRead>;
   try {
     decision = decideCodexPreRead(resolvedTarget, cwd);
   } catch (error) {
-    return {
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const runtimeDecision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
       hookEventName,
       action: "fallback",
@@ -180,17 +229,24 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         reason: "payload-build-failed",
       },
     };
+    recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: originalEstimatedBytes,
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return runtimeDecision;
   }
 
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
-    return {
+    const additionalContext = buildPayloadContext(target, decision.payload, contextMode);
+    const runtimeDecision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
       hookEventName,
       action: "inject",
       filePath: target,
       reasons: ["repeated-file"],
-      additionalContext: buildPayloadContext(target, decision.payload, contextMode),
+      additionalContext,
       statePath,
       contextMode,
       contextModeReason: contextMode === "light-minimal" ? "repeated-exact-file-tiny-raw-original" : "repeated-exact-file-payload",
@@ -203,9 +259,17 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         bounded: true,
       },
     };
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: estimateTextBytes(additionalContext),
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return runtimeDecision;
   }
 
-  return {
+  const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+  const runtimeDecision: ClaudeRuntimeHookDecision = {
     runtime: "claude",
     hookEventName,
     action: "fallback",
@@ -228,4 +292,10 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       reason: decision.fallback?.reason ?? decision.reasons[0] ?? "full-read",
     },
   };
+  recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
+    originalEstimatedBytes,
+    actualEstimatedBytes: originalEstimatedBytes,
+    comparableForSavings: originalEstimatedBytes !== undefined,
+  });
+  return runtimeDecision;
 }

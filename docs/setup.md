@@ -76,8 +76,6 @@ Good signs:
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 
-Likewise, `fooks status codex` and the Codex-ready portions of `fooks setup` report local attach/trust readiness only. They do not prove live Codex runtime-token savings, because this repo does not yet collect Codex runtime telemetry for that claim.
-
 ## What the setup result means
 
 | State | Meaning |
