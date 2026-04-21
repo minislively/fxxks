@@ -388,6 +388,7 @@ Everyday commands:
   ${displayCliName} codex-pre-read <file> [--json]
   ${displayCliName} status
   ${displayCliName} status codex
+  ${displayCliName} status claude
   ${displayCliName} status cache
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
@@ -615,6 +616,11 @@ async function run(): Promise<void> {
         print(readCodexTrustStatus(process.cwd()));
         return;
       }
+      if (arg1 === "claude") {
+        const { readClaudeRuntimeStatus } = await import("../adapters/claude-status.js");
+        print(readClaudeRuntimeStatus(process.cwd()));
+        return;
+      }
       if (arg1 === "cache") {
         const { canonicalProjectDataDir } = await import("../core/paths.js");
         const { CacheMonitor } = await import("../core/cache-monitor.js");
@@ -622,7 +628,7 @@ async function run(): Promise<void> {
         print(monitor.healthReport());
         return;
       }
-      throw new Error("status expects no argument, 'codex', or 'cache'");
+      throw new Error("status expects no argument, 'codex', 'claude', or 'cache'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");

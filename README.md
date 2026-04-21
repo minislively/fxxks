@@ -58,6 +58,7 @@ These are Codex-focused benchmark/proxy measurements from a 5-task sample. The t
 fooks setup          # one-time readiness: Codex hooks + Claude handoff + opencode helper
 fooks status          # local estimated context-size telemetry for this repo
 fooks status codex   # check Codex attach/hook state
+fooks status claude  # check Claude manual handoff artifact health
 fooks status cache   # check local fooks cache health
 ```
 
@@ -106,6 +107,7 @@ If setup does not report ready:
 ```bash
 fooks setup
 fooks status codex
+fooks status claude
 fooks status cache
 ```
 

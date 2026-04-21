@@ -45,6 +45,7 @@ Package install alone does not edit Codex hooks, Claude files, or opencode proje
 ```bash
 fooks status
 fooks status codex
+fooks status claude
 fooks status cache
 ```
 
@@ -52,6 +53,7 @@ Good signs:
 
 - Bare `fooks status` returns `metricTier: "estimated"` and no error. A fresh repo may show zero sessions/events.
 - Codex status is connected/ready-style.
+- Claude status is `handoff-ready` when the local adapter files and Claude attachment manifest are present. This is a manual handoff health check, not an automatic Claude hook claim.
 - Cache status is `empty` for a fresh repo or `healthy` after scan/use.
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex hook path, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.

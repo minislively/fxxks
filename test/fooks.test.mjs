@@ -1409,6 +1409,7 @@ test("setup reports blocked state for projects without React components", () => 
 test("cli help advertises setup and package install has no auto hook side effects", () => {
   const help = runText(["--help"]);
   assert.match(help, /fooks setup/);
+  assert.match(help, /fooks status claude/);
   assert.match(help, /Codex: automatic runtime hook path/);
   assert.match(help, /Claude: manual\/shared handoff artifacts only/);
   assert.match(help, /opencode: manual\/semi-automatic custom tool/);
@@ -1452,6 +1453,67 @@ test("setup runtime summary keeps Claude and opencode claims bounded", () => {
   assert.doesNotMatch(text, /Claude prompt interception is enabled/i);
   assert.doesNotMatch(text, /automatic opencode read interception is enabled/i);
   assert.doesNotMatch(text, /automatic opencode runtime-token savings are enabled/i);
+});
+
+test("status claude reports handoff-ready artifacts without automatic runtime claims", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const env = {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  };
+
+  const setup = run(["setup"], tempDir, env);
+  assert.equal(setup.runtimes.claude.state, "handoff-ready");
+
+  const status = run(["status", "claude"], tempDir, env);
+  assert.equal(status.runtime, "claude");
+  assert.equal(status.state, "handoff-ready");
+  assert.equal(status.ready, true);
+  assert.equal(status.mode, "manual-shared-handoff");
+  assert.deepEqual(status.blockers, []);
+  assert.equal(status.adapter.installed, true);
+  assert.equal(status.adapter.adapterJson.exists, true);
+  assert.equal(status.adapter.adapterJson.valid, true);
+  assert.equal(status.adapter.contextTemplate.exists, true);
+  assert.equal(status.adapter.contextTemplate.valid, true);
+  assert.equal(status.manifest.home, claudeHome);
+  assert.equal(status.manifest.exists, true);
+  assert.equal(status.manifest.valid, true);
+  assert.equal(status.manifest.runtimeMatches, true);
+  assert.equal(status.manifest.projectRootMatches, true);
+  assert.equal(fs.existsSync(status.manifest.path), true);
+
+  const text = collectStrings(status).join("\n");
+  assert.match(text, /manual-shared-handoff/);
+  assert.match(text, /Claude automatic hooks are not enabled by fooks/);
+  assert.match(text, /read-only handoff-artifact health check/);
+  assert.doesNotMatch(text, /Claude prompt interception is enabled/i);
+  assert.doesNotMatch(text, /automatic Claude token savings are enabled/i);
+});
+
+test("status claude reports blocked state without creating artifacts", () => {
+  const tempDir = makeTempProject();
+  const claudeHome = path.join(tempDir, ".missing-claude-home");
+
+  const beforeFooks = fs.existsSync(path.join(tempDir, ".fooks"));
+  const status = run(["status", "claude"], tempDir, { FOOKS_CLAUDE_HOME: claudeHome });
+  const afterFooks = fs.existsSync(path.join(tempDir, ".fooks"));
+
+  assert.equal(status.runtime, "claude");
+  assert.equal(status.state, "blocked");
+  assert.equal(status.ready, false);
+  assert.equal(status.adapter.installed, false);
+  assert.equal(status.adapter.adapterJson.exists, false);
+  assert.equal(status.adapter.contextTemplate.exists, false);
+  assert.equal(status.manifest.homeExists, false);
+  assert.equal(status.manifest.exists, false);
+  assert.ok(status.blockers.some((item) => item.includes("Claude adapter metadata is missing")));
+  assert.ok(status.blockers.some((item) => item.includes("Claude context template is missing")));
+  assert.ok(status.blockers.some((item) => item.includes("Claude runtime home not detected")));
+  assert.equal(afterFooks, beforeFooks);
 });
 
 test("install codex-hooks creates a reusable hooks preset", () => {

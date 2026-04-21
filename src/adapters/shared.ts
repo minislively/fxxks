@@ -118,7 +118,7 @@ export function writeAdapterFiles(runtime: "codex" | "claude", cwd = process.cwd
   return files;
 }
 
-function runtimeHome(runtime: "codex" | "claude"): string {
+export function runtimeHome(runtime: "codex" | "claude"): string {
   const override = runtime === "codex" ? process.env.FOOKS_CODEX_HOME : process.env.FOOKS_CLAUDE_HOME;
   if (override) {
     return override;
@@ -126,14 +126,21 @@ function runtimeHome(runtime: "codex" | "claude"): string {
   return path.join(os.homedir(), runtime === "codex" ? ".codex" : ".claude");
 }
 
+export function runtimeManifestPath(runtime: "codex" | "claude", cwd = process.cwd()): { home: string; manifestPath: string } {
+  const home = runtimeHome(runtime);
+  const projectName = path.basename(cwd).replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
+  return {
+    home,
+    manifestPath: path.join(home, "fooks", "attachments", `${projectName}.json`),
+  };
+}
+
 export function installRuntimeManifest(
   runtime: "codex" | "claude",
   cwd = process.cwd(),
   metadata: Record<string, unknown> = {},
 ): RuntimeManifestInstallResult {
-  const home = runtimeHome(runtime);
-  const projectName = path.basename(cwd).replace(/[^a-z0-9._-]+/gi, "-").toLowerCase();
-  const manifestPath = path.join(home, "fooks", "attachments", `${projectName}.json`);
+  const { home, manifestPath } = runtimeManifestPath(runtime, cwd);
 
   if (!fs.existsSync(home)) {
     return { status: "missing", home, manifestPath };
