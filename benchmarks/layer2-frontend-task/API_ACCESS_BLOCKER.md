@@ -15,8 +15,8 @@ Current disposition:
 
 1. the legacy configured gateway 502 path is bypassed for the current runner;
 2. the R4 proposal-only pair has been collected once;
-3. validation artifacts and repeated runs are still missing;
-4. therefore stable Layer 2 runtime-token/time claims remain blocked.
+3. a proposal-only validation artifact now exists;
+4. repeated/applied-code evidence remains out of scope for stable runtime-token/time claims.
 
 ## 2. Current blocker table
 
@@ -26,8 +26,8 @@ Current disposition:
 | Codex CLI | ✅ Installed | Smoke used `codex exec --ephemeral --sandbox read-only`. |
 | Runner implementation | ✅ Smoke passed | `runner.js` + `codex-wrapper.js` captured structured output. |
 | R4 paired smoke | ✅ Collected once | Vanilla and fooks R4 proposal-only outputs succeeded. |
-| Validation hook/schema | ✅ Scaffolded | Needs to be run against R4 outputs. |
-| Repeated/validated benchmark | 🟡 Missing | Required before public stable win claims. |
+| Proposal-only validation artifact | ✅ Collected | `results/R4-current-exec-validation-2026-04-21.json`. |
+| Repeated/applied-code benchmark | Out of scope | Required only before public stable runtime win claims. |
 
 ## 3. R4 paired smoke evidence
 
@@ -67,9 +67,10 @@ Observed summary:
 ```
 
 Interpretation: this resolves the previous “can the current runner execute at
-all?” risk and shows the fooks prompt was much smaller for this smoke. It does
-**not** prove billing-grade savings or stable runtime wins because it is a
-single proposal-only pair without acceptance validation.
+all?” risk and shows the fooks prompt was much smaller for this smoke. The
+paired smoke also has a proposal-only validation artifact. It does **not** prove
+billing-grade savings or stable runtime wins because it is a single read-only
+proposal pair without applied-code acceptance testing.
 
 ## 4. Tiny smoke evidence
 
@@ -102,10 +103,10 @@ minimal, small, vanilla R4, and fooks R4 prompt sizes. The conclusion at that
 time was correct: the failure was not caused by fooks context size. The current
 wrapper avoids relying on that path.
 
-## 6. Required next run
+## 6. Optional next run for stronger claims
 
 ```bash
-# Repeat R4 pairs and attach validation artifacts.
+# Repeat R4 pairs and attach applied-code validation artifacts.
 node benchmarks/layer2-frontend-task/runner.js \
   --mode=vanilla \
   --target=shadcn-ui/apps/v4/registry/bases/radix/examples/combobox-example.tsx \
@@ -135,7 +136,7 @@ Allowed wording:
 - “Layer 2 runner path is unblocked through current `codex exec`.”
 - “A single R4 paired smoke succeeded.”
 - “The prompt supplied to Codex was 92.4% smaller in that smoke.”
-- “Validation and repeated evidence are still pending.”
+- “Proposal-only validation exists; repeated/applied-code evidence remains out of scope.”
 
 Forbidden wording until validated repeated outputs exist:
 
@@ -146,4 +147,4 @@ Forbidden wording until validated repeated outputs exist:
 
 *Status date: 2026-04-21*
 *Runner path: ✅ current `codex exec` smokes passed*
-*R4 benchmark: 🟡 single proposal-only pair collected; validation/repetition pending*
+*R4 benchmark: ✅ proposal-only pair validated; repeated/applied-code evidence out of scope*

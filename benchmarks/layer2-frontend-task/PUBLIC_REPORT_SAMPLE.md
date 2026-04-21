@@ -66,7 +66,8 @@
 - **Task Definition/Spec:** ✅ Complete
 - **Runner/Wrapper:** ✅ Implemented and current `codex exec` smoke passed
 - **R4 Paired Smoke:** ✅ Vanilla/fooks proposal-only pair collected once
-- **Validated Benchmark:** 🟡 Validation and repeated evidence pending
+- **Proposal-only Validation:** ✅ Validation artifact collected
+- **Stable Runtime Benchmark:** Out of scope until repeated/applied-code evidence exists
 
 ### Current Evidence
 - Tiny runner smoke: ✅ `success: true`, `exitCode: 0`
@@ -94,9 +95,10 @@
 | Artifact | Location | Status |
 |----------|----------|--------|
 | **R4 Paired Smoke Summary** | `results/R4-current-exec-smoke-2026-04-21.json` | ✅ Collected |
-| **Validated Vanilla Result** | `results/R4-vanilla-run-2.json` | ⏸️ Pending |
-| **Validated Fooks Result** | `results/R4-fooks-run-2.json` | ⏸️ Pending |
-| **Validated Comparison Report** | `results/R4-comparison.json` | ⏸️ Pending |
+| **R4 Smoke Validation** | `results/R4-current-exec-validation-2026-04-21.json` | ✅ Collected |
+| **Repeated Vanilla Result** | `results/R4-vanilla-run-2.json` | Optional for stronger claims |
+| **Repeated Fooks Result** | `results/R4-fooks-run-2.json` | Optional for stronger claims |
+| **Applied-Code Comparison Report** | `results/R4-comparison.json` | Optional for stronger claims |
 
 ---
 
@@ -117,5 +119,5 @@
 
 *Sample Report: 에르가재*
 *Date: 2026-04-21*
-*Status: Single proposal-only smoke collected; validation/repeated evidence pending*
-*Next: Attach validation artifact and repeat matched R4 pairs before public win claims*
+*Status: Single proposal-only smoke validated; repeated/applied-code evidence out of scope*
+*Next: Repeat matched R4 pairs and apply-code validation only if making stronger public win claims*

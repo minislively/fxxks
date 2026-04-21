@@ -10,7 +10,7 @@
 | Layer 2: Task Definition/Spec | Frontend task inventory and R4 spec | ✅ Complete | Task inventory, R4 spec, validation checklist, metric schema are ready. |
 | Layer 2: Runner Path | AI runner wrapper execution path | ✅ Unblocked | Current `codex exec` wrapper completed tiny and R4 paired read-only smokes. |
 | Layer 2: R4 Paired Smoke | Vanilla-vs-fooks proposal-only R4 execution | ✅ Collected | Single matched pair succeeded on `combobox-example.tsx`; summary stored in `results/R4-current-exec-smoke-2026-04-21.json`. |
-| Layer 2: Validated Benchmark | Acceptance/quality-validated R4 benchmark | 🟡 Pending | No validation artifact or repeated-run evidence yet. |
+| Layer 2: Validated Smoke | Proposal-only R4 smoke validation | ✅ Collected | Validation artifact stored in `results/R4-current-exec-validation-2026-04-21.json`; repeated/statistical evidence remains out of scope. |
 
 ## 2. Canonical wording
 
@@ -31,6 +31,7 @@
 | Runner/wrapper | ✅ Smoke passed | `runner.js` and `codex-wrapper.js` now use current `codex exec` path. |
 | First candidate | ✅ Fixed | R4 Feature Module Split on `combobox-example.tsx`. |
 | R4 paired smoke summary | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json`. |
+| R4 paired smoke validation | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-validation-2026-04-21.json`. |
 
 ## 4. 2026-04-21 tiny runner smoke
 
@@ -80,20 +81,30 @@ Observed summary:
 | `latencyMs` | `85822` | `57545` | `32.9%` lower in this smoke |
 | `outputChars` | `7976` | `9967` | fooks output longer |
 
+Validation artifact: `results/R4-current-exec-validation-2026-04-21.json`.
+
+Validated smoke checks:
+
+- both vanilla and fooks runs exited successfully;
+- fooks prompt was at least 80% smaller than vanilla (`92.4%` observed);
+- retained local raw outputs contain the expected module split buckets;
+- fooks-mode prompt construction strips the absolute target path;
+- docs/artifacts keep billing/stable-runtime claim boundaries explicit.
+
 Boundaries:
 
 - The runner is read-only and asks for proposed file trees/code skeletons only.
 - `promptTokensApprox` is local prompt-size accounting, not provider billing telemetry.
 - This is a single pair, so it does not override the older unstable direct-runtime follow-up.
-- Acceptance/quality validation is still missing; do not publish this as a stable Layer 2 win.
+- Generated code was not applied and acceptance-tested; do not publish this as a stable Layer 2 win.
 
-## 6. Remaining blockers
+## 6. Remaining out-of-scope claims
 
-| Blocker | Status | What resolves it |
+| Claim/risk | Status | What would be required |
 | --- | --- | --- |
-| Quality validation artifact absent | 🟡 Pending | Save validation output alongside each R4 result. |
-| Repeated R4 / multi-task evidence absent | 🟡 Pending | Collect multiple matched pairs before public runtime-token/time claims. |
-| Runtime-token claim instability | ⚠️ Active | Require repeated R4 or multi-task evidence before making any runtime-token/time win claim. |
+| Stable runtime-token/time win | Out of scope for this PR | Repeated matched R4 or multi-task runs with acceptance validation. |
+| Provider billing-token savings | Out of scope for this PR | Provider billing-token telemetry, not local prompt-size accounting. |
+| Applied-code quality benchmark | Out of scope for this PR | Apply generated patches and run type/build/circular validation on the target project. |
 
 ## 7. Next execution path
 
@@ -110,8 +121,8 @@ node benchmarks/layer2-frontend-task/runner.js \
   --output=benchmarks/layer2-frontend-task/results/R4-fooks-run-2.json
 ```
 
-Do not call Layer 2 “complete” until paired outputs and validation artifacts are
-repeated enough to support the claim being made.
+Do not call Layer 2 a stable runtime win until validated repeated outputs are
+strong enough to support that stronger claim.
 
 ## 8. Naming rules
 
@@ -124,7 +135,7 @@ Allowed:
 - ✅ `single R4 paired smoke`
 - ✅ `prompt supplied to Codex was smaller in the smoke`
 
-Forbidden until validation and repeated evidence exist:
+Forbidden until applied-code validation and repeated evidence exist:
 
 - ❌ `Layer 2 benchmark complete`
 - ❌ `stable Layer 2 win`
@@ -133,4 +144,4 @@ Forbidden until validation and repeated evidence exist:
 
 *Status date: 2026-04-21*
 *Runner: ✅ tiny + R4 paired smokes passed*
-*Benchmark: 🟡 validation and repeated evidence pending*
+*Benchmark: ✅ proposal-only smoke validated; stable runtime claims out of scope*

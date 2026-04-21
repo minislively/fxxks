@@ -78,4 +78,4 @@
 
 *Cases: 에르가재*
 *Date: 2026-04-21*
-*Status: Case 1 proposal-only smoke collected; validation/repeated evidence pending*
+*Status: Case 1 proposal-only smoke validated; repeated/applied-code evidence out of scope*

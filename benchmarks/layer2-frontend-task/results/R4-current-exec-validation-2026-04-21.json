@@ -1,0 +1,74 @@
+{
+  "status": "validated-proposal-only-smoke",
+  "date": "2026-04-21",
+  "validates": "benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json",
+  "validationScope": [
+    "runner exit/success fields",
+    "local prompt-size delta",
+    "presence of proposed module split buckets in retained raw local outputs",
+    "source-level guard against fooks-mode absolute path leakage",
+    "claim-boundary guardrails"
+  ],
+  "checks": [
+    {
+      "name": "vanilla smoke succeeded",
+      "passed": true
+    },
+    {
+      "name": "fooks smoke succeeded",
+      "passed": true
+    },
+    {
+      "name": "fooks prompt is at least 80% smaller than vanilla",
+      "passed": true,
+      "actual": 92.4,
+      "expected": ">= 80"
+    },
+    {
+      "name": "both outputs include proposed module split buckets",
+      "passed": true,
+      "details": {
+        "vanilla": {
+          "hasOutput": true,
+          "outputChars": 7976,
+          "requiredBuckets": {
+            "components": true,
+            "hooks": true,
+            "utils": true,
+            "types": true
+          },
+          "hasProposedTree": true
+        },
+        "fooks": {
+          "hasOutput": true,
+          "outputChars": 9967,
+          "requiredBuckets": {
+            "components": true,
+            "hooks": true,
+            "utils": true,
+            "types": true
+          },
+          "hasProposedTree": true
+        }
+      }
+    },
+    {
+      "name": "claim boundary excludes billing/stable runtime claims",
+      "passed": true
+    },
+    {
+      "name": "fooks context path is sanitized by runner source",
+      "passed": true
+    },
+    {
+      "name": "wrapper instructs no filesystem target inspection",
+      "passed": true
+    }
+  ],
+  "verdict": "The R4 pair is validated as a proposal-only smoke and runner-risk reducer. It remains insufficient for billing-token or stable runtime/time claims.",
+  "remainingOutOfScope": [
+    "provider billing-token telemetry",
+    "acceptance testing of generated code changes",
+    "multi-task or repeated-run statistical claim support"
+  ]
+}
