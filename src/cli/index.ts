@@ -386,6 +386,7 @@ Everyday commands:
   ${displayCliName} install codex-hooks
   ${displayCliName} install opencode-tool
   ${displayCliName} codex-pre-read <file> [--json]
+  ${displayCliName} status
   ${displayCliName} status codex
   ${displayCliName} status cache
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -604,6 +605,11 @@ async function run(): Promise<void> {
       throw new Error("install expects 'codex-hooks' or 'opencode-tool'");
     }
     case "status": {
+      if (!arg1) {
+        const { readProjectMetricSummary } = await import("../core/session-metrics.js");
+        print(readProjectMetricSummary(process.cwd()));
+        return;
+      }
       if (arg1 === "codex") {
         const { readCodexTrustStatus } = await import("../adapters/codex-runtime-trust.js");
         print(readCodexTrustStatus(process.cwd()));
@@ -616,7 +622,7 @@ async function run(): Promise<void> {
         print(monitor.healthReport());
         return;
       }
-      throw new Error("status expects 'codex' or 'cache'");
+      throw new Error("status expects no argument, 'codex', or 'cache'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");

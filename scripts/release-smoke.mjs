@@ -41,10 +41,18 @@ function assertPackedFiles(packEntry) {
     "dist/adapters/opencode-tool-preset.js",
     "docs/setup.md",
     "docs/release.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
   ];
 
   for (const filePath of required) {
     assert(paths.has(filePath), `packed tarball missing ${filePath}`);
+  }
+
+  for (const file of packEntry.files) {
+    assert(!file.path.startsWith("docs/archive/"), `packed tarball should not include internal archive docs: ${file.path}`);
+    assert(!file.path.startsWith("benchmarks/frontend-harness/reports/"), `packed tarball should not include internal benchmark reports: ${file.path}`);
   }
 }
 
