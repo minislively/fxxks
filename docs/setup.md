@@ -8,7 +8,7 @@ Use this when you want one explicit command to prepare fooks for a supported fro
 npm install -g oh-my-fooks
 ```
 
-The package is named `oh-my-fooks`; it installs the `fooks` command.
+The package is named `oh-my-fooks`; it installs the `fooks` command. This is a **global CLI install** step: it changes which command is available from your npm global prefix/PATH, but it does not activate any repository by itself.
 
 If setup seems to run the wrong binary, check:
 
@@ -40,6 +40,18 @@ fooks codex-runtime-hook --native-hook
 
 Package install alone does not edit Codex hooks, Claude files, or opencode project files. Activation only happens when you run `fooks setup`.
 
+### Scope boundaries
+
+`fooks setup` is intentionally a one-command activation flow, but its writes have different scopes:
+
+| Scope | Examples | Notes |
+| --- | --- | --- |
+| Global CLI install | `npm install -g oh-my-fooks`, `fooks` on PATH | This happens before setup. `fooks setup` does not install or update the npm package. |
+| Project-local | `.fooks/config.json`, `.fooks/cache/`, `.opencode/tools/fooks_extract.ts`, `.opencode/commands/fooks-extract.md` | These apply to the current project root where you run `fooks setup`. |
+| User runtime/home | `~/.codex/hooks.json`, Codex attachment manifests, Claude handoff manifests | These are runtime integration files. Tests and smoke checks can isolate them with `FOOKS_CODEX_HOME` and `FOOKS_CLAUDE_HOME`. |
+
+The setup JSON includes an additive `scope` object with `packageInstall`, `projectLocal`, `userRuntime`, and `nonGoals` sections so issue reports can show exactly which paths were considered. There is no separate `--scope` option today, and setup does not ask interactive scope questions.
+
 ## 3. Check status
 
 ```bash
@@ -65,6 +77,8 @@ Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summarie
 | `ready` | Attach and hook setup completed. Open Codex and work normally. |
 | `partial` | Some setup work succeeded, but a blocker remains. Read `blockers` / `nextSteps`, fix, then rerun `fooks setup`. |
 | `blocked` | fooks could not activate this repo, usually because no supported React component was found. |
+
+`fooks setup` also returns a `scope` object that summarizes global CLI install boundaries, current-project paths, and user-runtime/home paths. The `scope.packageInstall.mutatedBySetup` flag is `false` because `setup` does not run `npm install`; project-local paths are under the current repo, while runtime-home paths identify files such as Codex hooks/manifests.
 
 `fooks setup` also returns a `runtimes` object:
 

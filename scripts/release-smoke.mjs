@@ -122,6 +122,16 @@ assert(setup.runtimes?.claude?.blocksOverall === false, "Claude readiness should
 assert(setup.runtimes?.opencode?.state === "tool-ready", `unexpected opencode setup state ${setup.runtimes?.opencode?.state}`);
 assert(setup.runtimes?.opencode?.blocksOverall === false, "opencode readiness should be non-fatal for overall setup");
 assert(setup.attach?.runtimeProof?.details?.includes("account-source=package-repository"), "setup should derive public repo account context from package metadata");
+assert(setup.scope?.schemaVersion === 1, "setup should report scope summary schema");
+assert(setup.scope?.packageInstall?.scope === "global-cli", "setup scope should distinguish global CLI package install");
+assert(setup.scope?.packageInstall?.mutatedBySetup === false, "setup must not imply npm package install mutation");
+const setupProjectRoot = fs.realpathSync(project);
+assert(setup.scope?.projectLocal?.root === setupProjectRoot, "setup scope should identify the current project root");
+assert(setup.scope?.projectLocal?.paths?.includes(path.join(setupProjectRoot, ".fooks", "config.json")), "setup scope should include project-local .fooks config");
+assert(setup.scope?.projectLocal?.paths?.includes(path.join(setupProjectRoot, ".opencode", "tools", "fooks_extract.ts")), "setup scope should include project-local opencode tool");
+assert(setup.scope?.userRuntime?.paths?.includes(path.join(codexHome, "hooks.json")), "setup scope should include isolated Codex hooks path");
+assert(setup.scope?.userRuntime?.paths?.some((item) => item.startsWith(path.join(codexHome, "fooks", "attachments"))), "setup scope should include isolated Codex runtime manifest path");
+assert(setup.scope?.nonGoals?.some((item) => item.includes("No --scope option")), "setup scope should document that no new scope option is required");
 assert(fs.existsSync(path.join(codexHome, "hooks.json")), "isolated Codex hooks file should be written under FOOKS_CODEX_HOME");
 assert(fs.existsSync(path.join(project, ".opencode", "tools", "fooks_extract.ts")), "opencode helper should be installed project-locally");
 assert(fs.existsSync(path.join(project, ".opencode", "commands", "fooks-extract.md")), "opencode slash command should be installed project-locally");

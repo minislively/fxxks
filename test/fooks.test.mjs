@@ -1237,6 +1237,22 @@ test("setup prepares explicit one-time Codex activation", () => {
   assert.equal(result.runtimes.claude.blocksOverall, false);
   assert.equal(result.runtimes.opencode.state, "tool-ready");
   assert.equal(result.runtimes.opencode.blocksOverall, false);
+  assert.equal(result.scope.schemaVersion, 1);
+  assert.equal(result.scope.packageInstall.scope, "global-cli");
+  assert.equal(result.scope.packageInstall.command, "npm install -g oh-my-fooks");
+  assert.equal(result.scope.packageInstall.mutatedBySetup, false);
+  const setupProjectRoot = fs.realpathSync(tempDir);
+  assert.equal(result.scope.projectLocal.scope, "project-local");
+  assert.equal(result.scope.projectLocal.root, setupProjectRoot);
+  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".fooks", "config.json")));
+  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".fooks", "cache")));
+  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".opencode", "tools", "fooks_extract.ts")));
+  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".opencode", "commands", "fooks-extract.md")));
+  assert.equal(result.scope.userRuntime.scope, "user-home-runtime");
+  assert.ok(result.scope.userRuntime.paths.includes(path.join(codexHome, "hooks.json")));
+  assert.ok(result.scope.userRuntime.paths.includes(runtimeManifestPath(result.attach)));
+  assert.ok(result.scope.userRuntime.paths.includes(runtimeManifestPath(result.runtimes.claude.details.attach)));
+  assert.ok(result.scope.nonGoals.some((item) => item.includes("No --scope option")));
   assert.deepEqual(result.summary, ["codex:automatic-ready:ready", "claude:handoff-ready:ready", "opencode:tool-ready:ready"]);
   assert.ok(result.claimBoundaries.some((item) => item.includes("Claude setup prepares manual/shared handoff artifacts only")));
   assert.ok(result.nextSteps.some((item) => item.includes("Codex")));
@@ -1402,6 +1418,12 @@ test("setup reports blocked state for projects without React components", () => 
   assert.equal(result.runtimes.opencode.state, "manual-step-required");
   assert.equal(result.runtimes.opencode.blocksOverall, false);
   assert.equal(fs.existsSync(path.join(tempDir, ".opencode")), false);
+  const setupProjectRoot = fs.realpathSync(tempDir);
+  assert.equal(result.scope.projectRoot, setupProjectRoot);
+  assert.equal(result.scope.packageInstall.mutatedBySetup, false);
+  assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".fooks", "config.json")));
+  assert.deepEqual(result.scope.userRuntime.paths, []);
+  assert.ok(result.scope.nonGoals.some((item) => item.includes("No interactive setup prompt")));
   assert.ok(result.blockers.some((item) => item.includes("No React/TSX component file found")));
   assert.ok(result.nextSteps.some((item) => item.includes("Add a React/TSX component")));
 });
@@ -1413,6 +1435,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /Codex: automatic runtime hook path/);
   assert.match(help, /Claude: manual\/shared handoff artifacts only/);
   assert.match(help, /opencode: manual\/semi-automatic custom tool/);
+  assert.doesNotMatch(help, /--scope/);
   assert.doesNotMatch(help, /Unknown command/);
 
   let usage = "";

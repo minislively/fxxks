@@ -19,6 +19,16 @@ Then open Codex in that repo and work normally. The same setup command also prep
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
 
+### Install/setup scope at a glance
+
+| Step | Scope | What can change |
+| --- | --- | --- |
+| `npm install -g oh-my-fooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
+| `fooks setup` | current project + runtime homes | Creates project-local `.fooks/` state, may add project-local `.opencode/` helper files, and may update runtime-home files such as Codex hooks/manifests or Claude handoff manifests. |
+| `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
+
+The `fooks setup` JSON includes a `scope` object so support/debug logs can show which paths are project-local and which are user-runtime/home scoped.
+
 ## What gets optimized
 
 Current automatic optimization is intentionally narrow:
