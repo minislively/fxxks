@@ -17,24 +17,7 @@ function run(command, args, options = {}) {
     input: options.input,
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
     env: { ...process.env, ...(options.env ?? {}) },
-    timeout: options.timeout,
   });
-}
-
-function runResult(command, args, options = {}) {
-  try {
-    return { status: 0, stdout: run(command, args, options), stderr: "" };
-  } catch (error) {
-    return {
-      status: typeof error?.status === "number" ? error.status : 1,
-      stdout: String(error?.stdout ?? error?.output?.[1] ?? ""),
-      stderr: String(error?.stderr ?? error?.output?.[2] ?? ""),
-      signal: error?.signal ?? null,
-      code: error?.code ?? null,
-      killed: Boolean(error?.killed),
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
 }
 
 function commandVersion(command, args = ["--version"]) {
@@ -128,125 +111,40 @@ function summarizeHookEvents(events) {
   });
 }
 
-function summarizeProviderErrors(events, stderr) {
-  const eventErrors = events.filter((event) => (
-    event?.type === "result" && event?.is_error
-  ) || event?.subtype === "api_retry" || event?.error || event?.api_error_status).slice(-5).map((event) => {
-    const text = JSON.stringify(event);
-    return text.length > 600 ? `${text.slice(0, 600)}…` : text;
-  });
-  if (stderr) eventErrors.push(stderr.length > 600 ? `${stderr.slice(0, 600)}…` : stderr);
-  return eventErrors;
-}
-
-function classifyProviderFailure(result, events, providerOutput) {
-  if (result.status === 0) return null;
-  const text = [
-    providerOutput,
-    result.stderr,
-    result.error,
-    result.signal,
-    result.code,
-    ...events.map((event) => JSON.stringify(event)),
-  ].filter(Boolean).join("\n");
-  if (/PERMISSION_DENIED|service has been disabled|disabled in this account|violation of Terms of Service|\b403\b/i.test(text)) {
-    return "auth-denied";
-  }
-  if (/auth_unavailable|no auth available|Failed to authenticate/i.test(text)) {
-    return "auth-unavailable";
-  }
-  if (/rate_limit|\b429\b/i.test(text)) {
-    return "rate-limited";
-  }
-  if (/server_error|\b503\b/i.test(text)) {
-    return "server-error";
-  }
-  if (/ETIMEDOUT|SIGTERM|timeout|timed out/i.test(text)) {
-    return "timeout";
-  }
-  return "provider-error";
-}
-
-function commandJsonResult(command, args, options = {}) {
-  const result = runResult(command, args, options);
-  if (result.status !== 0) {
-    return {
-      ok: false,
-      exitCode: result.status,
-      error: result.stderr || result.error || result.stdout,
-    };
-  }
-  try {
-    return { ok: true, value: JSON.parse(result.stdout) };
-  } catch {
-    return { ok: true, value: result.stdout.trim() };
-  }
-}
-
 function runCodexProviderSmoke(project, env) {
   const outputPath = path.join(project, ".fooks", "live-codex-last-message.txt");
-  const result = runResult("codex", [
+  const stdout = run("codex", [
     "exec",
-    "--skip-git-repo-check",
     "--cd", project,
     "--sandbox", "read-only",
     "--ephemeral",
     "--json",
     "--output-last-message", outputPath,
     "Reply with exactly FOOKS_CODEX_LIVE_OK after considering src/components/Card.tsx. Do not edit files.",
-  ], { cwd: project, env, timeout: Number(process.env.FOOKS_LIVE_CODEX_TIMEOUT_MS ?? "60000") });
-  const events = parseJsonLines(result.stdout);
-  const hookEventHints = summarizeHookEvents(events);
-  const providerOutput = `${result.stdout}\n${result.stderr}`;
-  const providerErrors = summarizeProviderErrors(events, result.stderr);
-  const hookEvidenceObserved = hookEventHints.length > 0 || /hook|fooks/i.test(providerOutput);
-  const providerFailureKind = classifyProviderFailure(result, events, providerOutput);
-  if (result.status !== 0 && !hookEvidenceObserved) {
-    throw new Error(`Codex provider smoke failed before hook evidence: ${result.stderr || result.error || result.stdout}`);
-  }
+  ], { cwd: project, env });
+  const events = parseJsonLines(stdout);
   return {
-    command: "codex exec --skip-git-repo-check --json --ephemeral",
-    exitCode: result.status,
-    providerCompleted: result.status === 0,
+    command: "codex exec --json --ephemeral",
     outputPath,
     lastMessageExists: fs.existsSync(outputPath),
-    hookEvidenceObserved,
-    providerFailureKind,
-    hookEventHints,
-    providerErrors,
+    hookEventHints: summarizeHookEvents(events),
   };
 }
 
 function runClaudeProviderSmoke(project, env) {
-  const result = runResult("claude", [
+  const stdout = run("claude", [
     "--print",
-    "--verbose",
     "--output-format=stream-json",
     "--include-hook-events",
     "--max-budget-usd", process.env.FOOKS_LIVE_CLAUDE_MAX_BUDGET_USD ?? "0.05",
     "--tools", "",
     "--no-session-persistence",
     "Reply with exactly FOOKS_CLAUDE_LIVE_OK after considering src/components/Card.tsx. Do not edit files.",
-  ], { cwd: project, env, timeout: Number(process.env.FOOKS_LIVE_CLAUDE_TIMEOUT_MS ?? "60000") });
-  const events = parseJsonLines(result.stdout);
-  const hookEventHints = summarizeHookEvents(events);
-  const providerOutput = `${result.stdout}\n${result.stderr}`;
-  const providerErrors = summarizeProviderErrors(events, result.stderr);
-  const hookEvidenceObserved = /fooks: Claude context hook|UserPromptSubmit|SessionStart/i.test(providerOutput);
-  const providerFailureKind = classifyProviderFailure(result, events, providerOutput);
-  const authStatus = commandJsonResult("claude", ["auth", "status"], { cwd: project, env, timeout: 10000 });
-  if (result.status !== 0 && !hookEvidenceObserved) {
-    throw new Error(`Claude provider smoke failed before hook evidence: ${result.stderr || result.error || result.stdout}`);
-  }
+  ], { cwd: project, env });
+  const events = parseJsonLines(stdout);
   return {
-    command: "claude --print --verbose --output-format=stream-json --include-hook-events",
-    exitCode: result.status,
-    providerCompleted: result.status === 0,
-    hookEvidenceObserved,
-    providerFailureKind,
-    authStatus,
-    hookEventHints,
-    providerErrors,
+    command: "claude --print --output-format=stream-json --include-hook-events",
+    hookEventHints: summarizeHookEvents(events),
     eventCount: events.length,
   };
 }

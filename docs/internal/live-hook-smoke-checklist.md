@@ -93,3 +93,28 @@ Use sanitized excerpts only:
 - `fooks status` fields showing `metricTier`, `claimBoundary`, and runtime/source keys.
 - Confirmation that provider billing-token/cost proof remains deferred.
 - Confirmation that `ccusage` replacement remains out of scope.
+
+## Opt-in provider-backed live smoke
+
+The deterministic release smoke is the default proof gate. If a maintainer wants to reduce the remaining interactive-runtime risk with real installed CLI invocations, run the opt-in provider smoke:
+
+```bash
+node scripts/live-provider-hook-smoke.mjs
+FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider
+```
+
+The first command is safe and only reports installed CLI versions plus the exact opt-in command. The second command may use the local Codex / Claude Code account and can spend provider tokens, so run it only when that is intentional.
+
+Optional flags:
+
+```bash
+FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider --skip-codex
+FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider --skip-claude
+```
+
+Expected observations:
+
+- The script creates a disposable frontend project and installs the packed local `fooks` CLI.
+- `fooks setup` must report Codex `automatic-ready` and Claude `context-hook-ready`.
+- Provider-backed CLI invocations must leave `fooks status` at `metricTier: "estimated"` with the provider-billing boundary intact.
+- Any captured evidence remains hook activation / local status evidence only; it is still not provider billing-token or provider-cost proof.
