@@ -1,2 +1,0 @@
- .../components/DeleteAccountModal/index.tsx        | 30 ++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
