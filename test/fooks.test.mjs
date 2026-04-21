@@ -508,8 +508,10 @@ test("cli run gives direct no-op guidance for new or missing exact-file targets"
   assert.match(output, /Files: 0, Size: 0\.0KB/);
   assert.match(output, /No reusable source context was selected\./);
   assert.match(output, /This usually means your prompt targets a new or missing file, so the temp context is metadata-only\./);
-  assert.match(output, /Use your original prompt directly in codex, claude, omx, or another runtime\./);
-  assert.match(output, /If you already ran `fooks setup` for Codex, open `codex` in this repo and work normally\./);
+  assert.match(output, /Reliable first success: run `fooks setup` in this repo first\./);
+  assert.match(output, /When setup reports ready, open `codex` in this repo and use your original prompt directly\./);
+  assert.match(output, /Optional check: `fooks status codex`/);
+  assert.match(output, /If you intentionally want another runtime, use your original prompt there instead of the metadata-only temp context\./);
   assert.match(output, /Metadata-only context file: .*temp-context\.md/);
   assert.doesNotMatch(output, /Inspect the shared context: cat /);
   assert.doesNotMatch(output, /then paste your prompt and the context from/);
@@ -517,6 +519,32 @@ test("cli run gives direct no-op guidance for new or missing exact-file targets"
   const context = fs.readFileSync(path.join(tempDir, ".fooks", "temp-context.md"), "utf8");
   assert.match(context, /"contextMode":"no-op"/);
   assert.doesNotMatch(context, /## src\/components\/NewPanel\.tsx/);
+});
+
+test("cli run prefers direct Codex prompt guidance when setup is already ready on the no-op branch", () => {
+  const tempDir = makeTempProject();
+  const codexStatusDir = path.join(tempDir, ".fooks", "adapters", "codex");
+  fs.mkdirSync(codexStatusDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(codexStatusDir, "status.json"),
+    JSON.stringify(
+      {
+        runtime: "codex",
+        connectionState: "connected",
+        lifecycleState: "ready",
+        updatedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+  );
+
+  const output = runText(["run", "Please", "update", "src/components/NewPanel.tsx"], tempDir);
+  assert.match(output, /Codex setup already looks ready for this repo\./);
+  assert.match(output, /Open `codex` in this repo and use your original prompt directly\./);
+  assert.match(output, /If you intentionally want another runtime, use your original prompt there instead of the metadata-only temp context\./);
+  assert.doesNotMatch(output, /Reliable first success: run `fooks setup` in this repo first\./);
+  assert.doesNotMatch(output, /Optional check: `fooks status codex`/);
 });
 
 test("runtime hook reuses payload only on repeated same-file prompts in one session", () => {
