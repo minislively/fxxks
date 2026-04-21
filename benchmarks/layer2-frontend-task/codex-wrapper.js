@@ -1,16 +1,18 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 /**
  * Codex CLI Wrapper
- * 프로그래밍 방식으로 Codex 호출
+ *
+ * Uses the current `codex exec` interface and captures a structured artifact
+ * without requiring the configured gateway path that previously returned 502.
  */
 class CodexWrapper {
   constructor(options = {}) {
-    this.model = options.model || 'gpt-4o';
-    this.temperature = options.temperature || 0.1;
-    this.maxTokens = options.maxTokens || 8192;
+    this.model = options.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
+    this.timeoutMs = Number(options.timeoutMs || process.env.CODEX_TIMEOUT_MS || 300000);
   }
 
   /**
@@ -22,95 +24,89 @@ class CodexWrapper {
   async run(context, taskPrompt) {
     const startTime = Date.now();
     const timestamp = new Date().toISOString();
-    
-    // 프롬프트 구성
     const fullPrompt = this.buildPrompt(context, taskPrompt);
-    
-    // 임시 파일에 프롬프트 저장
-    const tempPromptFile = `/tmp/codex-prompt-${Date.now()}.txt`;
-    fs.writeFileSync(tempPromptFile, fullPrompt);
-    
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fooks-codex-r4-'));
+    const lastMessagePath = path.join(tempDir, 'last-message.txt');
+
     return new Promise((resolve, reject) => {
-      // Codex CLI exec 호출
       const args = [
         'exec',
-        '-m', this.model,
-        '--full-auto'
+        '--ephemeral',
+        '--skip-git-repo-check',
+        '--sandbox',
+        'read-only',
+        '-C',
+        tempDir,
+        '-m',
+        this.model,
+        '-o',
+        lastMessagePath,
+        '-',
       ];
-      
-      // 프롬프트를 stdin으로 전달
-      const promptContent = fs.readFileSync(tempPromptFile, 'utf-8');
-      
-      console.log(`[CodexWrapper] Executing: codex exec -m ${this.model}`);
-      
+
+      console.log(`[CodexWrapper] Executing: codex ${args.slice(0, -1).join(' ')} -`);
+
       const codex = spawn('codex', args, {
-        env: { ...process.env, OPENAI_API_KEY: process.env.OPENAI_API_KEY },
-        timeout: 300000 // 5분 타임아웃
+        env: { ...process.env },
+        timeout: this.timeoutMs,
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
-      
-      // stdin으로 프롬프트 전달
-      codex.stdin.write(promptContent);
+
+      codex.stdin.write(fullPrompt);
       codex.stdin.end();
-      
+
       let stdout = '';
       let stderr = '';
-      
+
       codex.stdout.on('data', (data) => {
         stdout += data.toString();
-        process.stdout.write(data); // 실시간 출력
+        process.stdout.write(data);
       });
-      
+
       codex.stderr.on('data', (data) => {
         stderr += data.toString();
-        process.stderr.write(data); // 실시간 에러 출력
+        process.stderr.write(data);
       });
-      
-      codex.on('close', (exitCode) => {
-        const endTime = Date.now();
-        const latencyMs = endTime - startTime;
-        
-        // 임시 파일 삭제
-        try {
-          fs.unlinkSync(tempPromptFile);
-        } catch (e) {
-          // 무시
-        }
-        
-        const result = {
+
+      codex.on('close', (exitCode, signal) => {
+        const latencyMs = Date.now() - startTime;
+        const lastMessage = fs.existsSync(lastMessagePath)
+          ? fs.readFileSync(lastMessagePath, 'utf8')
+          : '';
+
+        fs.rmSync(tempDir, { recursive: true, force: true });
+
+        resolve({
           exitCode,
+          signal,
           success: exitCode === 0,
           stdout,
           stderr,
+          lastMessage,
           latencyMs,
           timestamp,
           metadata: {
             model: this.model,
-            temperature: this.temperature,
-            maxTokens: this.maxTokens,
+            timeoutMs: this.timeoutMs,
             promptLength: fullPrompt.length,
-            promptTokens: Math.ceil(fullPrompt.length / 3.5) // 대략적인 토큰 수
-          }
-        };
-        
-        if (exitCode === 0) {
-          resolve(result);
-        } else {
-          resolve(result); // 실패해도 결과 반환 (retry 위해)
-        }
+            promptTokens: Math.ceil(fullPrompt.length / 3.5),
+          },
+        });
       });
-      
+
       codex.on('error', (error) => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
         reject({
           exitCode: -1,
           success: false,
           error: error.message,
           latencyMs: Date.now() - startTime,
-          timestamp
+          timestamp,
         });
       });
     });
   }
-  
+
   buildPrompt(context, taskPrompt) {
     return `# Task: ${taskPrompt}
 
@@ -125,7 +121,7 @@ ${context}
 5. Add proper barrel exports
 
 ## Output:
-Provide the complete refactored code for each new file.`;
+Provide the proposed file tree and concise code skeleton for each new file. Do not edit files.`;
   }
 }
 

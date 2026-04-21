@@ -19,6 +19,7 @@ const args = process.argv.slice(2).reduce((acc, arg) => {
 const mode = args.mode || 'vanilla';
 const targetFile = args.target;
 const outputPath = args.output;
+const model = args.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
 
 if (!targetFile || !outputPath) {
   console.error('Usage: node runner.js --mode=vanilla|fooks --target=<file> --output=<json>');
@@ -48,9 +49,7 @@ async function main() {
   
   // Initialize Codex wrapper
   const codex = new CodexWrapper({
-    model: 'gpt-4o',
-    temperature: 0.1,
-    maxTokens: 8192
+    model
   });
   
   // Execute Codex
@@ -69,7 +68,12 @@ async function main() {
     targetFile,
     timestamp: result.timestamp,
     codexResult: result,
-    // TODO: validation, metrics
+    metrics: {
+      promptTokensApprox: result.metadata.promptTokens,
+      latencyMs: result.latencyMs,
+      retryCount: 0,
+      outputChars: result.lastMessage?.length || result.stdout.length,
+    }
   };
   
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });

@@ -15,9 +15,9 @@ cd your-react-project
 fooks setup
 ```
 
-Then open Codex in that repo and work normally.
+Then open Codex in that repo and work normally. The same setup command also prepares bounded Claude handoff artifacts and the project-local opencode helper when those local runtime/tool paths are available.
 
-`fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks.
+`fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
 
 ## What gets optimized
 
@@ -45,17 +45,17 @@ Latest published Codex-oriented benchmark snapshot (2026-04-14):
 
 | Metric | Before | With fooks | Result |
 | --- | --- | --- | --- |
-| Estimated token use | ~2.1M | ~450K | **78.2% less** |
+| Prepared-context proxy estimate | ~2.1M | ~450K | **78.2% less** |
 | Average task time | 98.2s | 77.9s | **20.7% faster** |
 | Large component payloads | full source | compressed payload | **7x-15x smaller** |
 | Success rate | 5/5 | 5/5 | no regression in sample |
 
-These numbers are Codex-focused benchmark/proxy measurements, not Claude or opencode runtime-token savings claims. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md).
+These are Codex-focused benchmark/proxy measurements from a 5-task sample. The token row is a prepared-context estimate from the benchmark harness, not a measured runtime-token billing claim and not a Claude or opencode savings claim. A later direct-Codex Formbricks N=3 follow-up found that runtime-token/time wins are **not stable yet**: across 6 paired runs, fooks used more runtime tokens in 3/6 pairs and median runtime-token reduction was -5.35%. Treat that as a regression signal, not a marketing win. Full benchmark details live in [`benchmarks/frontend-harness/README.md`](benchmarks/frontend-harness/README.md) and [`benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md`](benchmarks/frontend-harness/reports/round1-risk-followup-1776327829.md). Layer 2 real-runtime task execution is still blocked by an external configured Codex gateway 502, so those real-runtime results do not exist yet.
 
 ## Everyday commands
 
 ```bash
-fooks setup          # one-time Codex activation for this repo
+fooks setup          # one-time readiness: Codex hooks + Claude handoff + opencode helper
 fooks status codex   # check Codex attach/hook state
 fooks status cache   # check local fooks cache health
 ```
@@ -71,25 +71,30 @@ fooks scan
 
 opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.
 
+`fooks setup` installs the project-local opencode bridge when the project has a supported `.tsx` / `.jsx` component. You can also install or repair just that bridge from the project root:
+
 ```bash
 fooks install opencode-tool
 ```
 
-This creates a project-local custom-tool:
+This creates two project-local opencode artifacts:
 
 ```text
 .opencode/tools/fooks_extract.ts
+.opencode/commands/fooks-extract.md
 ```
 
-Use it when you want opencode to request a fooks payload for a `.tsx` or `.jsx` file.
+Use `/fooks-extract path/to/File.tsx` or ask opencode to call `fooks_extract` when you want a fooks model-facing payload for a `.tsx` or `.jsx` file. This bridge steers tool selection; it does **not** intercept opencode `read` calls.
 
 ## Support boundaries
 
-- Codex: automatic repeated-file hook path is supported.
-- Claude and opencode: can consume fooks payloads through manual/shared handoff paths.
-- Claude and opencode do **not** currently have automatic runtime-token savings claims in this repo.
-- fooks is not a universal file-read interceptor.
-- Non-frontend files usually fall back to normal source reading.
+| Environment | Current support | Runtime-token claim |
+| --- | --- | --- |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Codex-oriented benchmark/proxy evidence only |
+| Claude | Manual/shared handoff prepared by `fooks setup` when possible | No automatic runtime-token savings claim |
+| opencode | Manual/semi-automatic project-local tool and slash command prepared by `fooks setup` when possible | No read interception and no automatic runtime-token savings claim |
+
+`fooks` is not a universal file-read interceptor. Non-frontend files usually fall back to normal source reading.
 
 ## Troubleshooting
 
@@ -106,7 +111,7 @@ Common causes:
 - You are not in a React/TSX/JSX project root.
 - Another global `fooks` binary is earlier in your PATH.
 - `~/.codex/hooks.json` is invalid JSON or not writable.
-- The repo/account context is not allowed for attach.
+- Your Codex runtime home is missing or not writable; use `FOOKS_CODEX_HOME` for an isolated smoke test.
 
 More setup details: [`docs/setup.md`](docs/setup.md)
 

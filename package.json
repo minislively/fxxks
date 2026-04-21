@@ -18,7 +18,8 @@
     "bench:extract": "npm run build && node benchmarks/scripts/extract.mjs",
     "bench:stability": "npm run build && node benchmarks/scripts/stability.mjs",
     "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs",
-    "lint": "npm run typecheck -- --pretty false"
+    "lint": "npm run typecheck -- --pretty false",
+    "release:smoke": "npm run build && node scripts/release-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
