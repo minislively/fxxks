@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { adapterDir } from "../core/paths";
+import { claudeLocalSettingsPath, CLAUDE_HOOK_EVENTS, defaultClaudeHookCommand, isCompatibleClaudeHookCommand, type ClaudeHookEvent } from "./claude-hook-preset";
 import { runtimeManifestPath } from "./shared";
 
-type ClaudeStatusState = "handoff-ready" | "blocked";
+type ClaudeStatusState = "context-hook-ready" | "handoff-ready" | "blocked";
+type ClaudeStatusMode = "automatic-context-hook" | "manual-shared-handoff";
 
 type FileStatus = {
   path: string;
@@ -23,10 +25,37 @@ type ClaudeManifestStatus = {
   blocker?: string;
 };
 
+type HookCommand = {
+  type?: unknown;
+  command?: unknown;
+};
+
+type HookMatcher = {
+  hooks?: unknown;
+};
+
+type ClaudeSettingsFile = {
+  hooks?: Record<string, HookMatcher[]>;
+  disableAllHooks?: unknown;
+};
+
+export type ClaudeHookStatus = {
+  path: string;
+  exists: boolean;
+  ready: boolean;
+  valid?: boolean;
+  installedEvents: ClaudeHookEvent[];
+  missingEvents: ClaudeHookEvent[];
+  unexpectedFooksEvents: string[];
+  commandMatches?: boolean;
+  disabledByLocalSettings?: boolean;
+  blocker?: string;
+};
+
 export type ClaudeRuntimeStatus = {
   runtime: "claude";
   state: ClaudeStatusState;
-  mode: "manual-shared-handoff";
+  mode: ClaudeStatusMode;
   ready: boolean;
   blockers: string[];
   adapter: {
@@ -36,6 +65,7 @@ export type ClaudeRuntimeStatus = {
     contextTemplate: FileStatus;
   };
   manifest: ClaudeManifestStatus;
+  hooks: ClaudeHookStatus;
   nextSteps: string[];
   notes: string[];
 };
@@ -122,7 +152,77 @@ function manifestStatus(cwd: string): ClaudeManifestStatus {
   }
 }
 
-function blockersFrom(...items: Array<FileStatus | ClaudeManifestStatus>): string[] {
+function hookCommandsForEvent(settings: ClaudeSettingsFile, event: string): string[] {
+  const matchers = settings.hooks?.[event] ?? [];
+  if (!Array.isArray(matchers)) return [];
+  return matchers.flatMap((matcher) => {
+    if (!Array.isArray(matcher?.hooks)) return [];
+    return (matcher.hooks as HookCommand[])
+      .filter((hook) => hook?.type === "command" && typeof hook.command === "string")
+      .map((hook) => hook.command as string);
+  });
+}
+
+function hookStatus(cwd: string): ClaudeHookStatus {
+  const filePath = claudeLocalSettingsPath(cwd);
+  if (!fs.existsSync(filePath)) {
+    return {
+      path: filePath,
+      exists: false,
+      ready: false,
+      installedEvents: [],
+      missingEvents: [...CLAUDE_HOOK_EVENTS],
+      unexpectedFooksEvents: [],
+      commandMatches: false,
+    };
+  }
+
+  let settings: ClaudeSettingsFile;
+  try {
+    settings = readJson(filePath) as ClaudeSettingsFile;
+  } catch (error) {
+    return {
+      path: filePath,
+      exists: true,
+      ready: false,
+      valid: false,
+      installedEvents: [],
+      missingEvents: [...CLAUDE_HOOK_EVENTS],
+      unexpectedFooksEvents: [],
+      commandMatches: false,
+      blocker: `Claude local settings are not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const command = defaultClaudeHookCommand("fooks");
+  const installedEvents = CLAUDE_HOOK_EVENTS.filter((event) => hookCommandsForEvent(settings, event).some((item) => isCompatibleClaudeHookCommand(item, "fooks"))) as ClaudeHookEvent[];
+  const missingEvents = CLAUDE_HOOK_EVENTS.filter((event) => !installedEvents.includes(event)) as ClaudeHookEvent[];
+  const unexpectedFooksEvents = Object.keys(settings.hooks ?? {}).filter(
+    (event) => !CLAUDE_HOOK_EVENTS.includes(event as ClaudeHookEvent) && hookCommandsForEvent(settings, event).some((item) => isCompatibleClaudeHookCommand(item, "fooks")),
+  );
+  const disabledByLocalSettings = settings.disableAllHooks === true;
+  const commandMatches = installedEvents.every((event) => hookCommandsForEvent(settings, event).some((item) => item === command));
+  const blocker = disabledByLocalSettings
+    ? "Claude hooks are disabled by local settings"
+    : unexpectedFooksEvents.length > 0
+      ? `Unsupported fooks Claude hook events are installed: ${unexpectedFooksEvents.join(", ")}`
+      : undefined;
+
+  return {
+    path: filePath,
+    exists: true,
+    ready: missingEvents.length === 0 && unexpectedFooksEvents.length === 0 && !disabledByLocalSettings,
+    valid: true,
+    installedEvents,
+    missingEvents,
+    unexpectedFooksEvents,
+    commandMatches,
+    disabledByLocalSettings,
+    blocker,
+  };
+}
+
+function blockersFrom(...items: Array<FileStatus | ClaudeManifestStatus | ClaudeHookStatus>): string[] {
   return items.flatMap((item) => (item.blocker ? [item.blocker] : []));
 }
 
@@ -131,13 +231,17 @@ export function readClaudeRuntimeStatus(cwd = process.cwd()): ClaudeRuntimeStatu
   const adapterJson = adapterJsonStatus(path.join(directory, "adapter.json"));
   const contextTemplate = contextTemplateStatus(path.join(directory, "context-template.md"));
   const manifest = manifestStatus(cwd);
-  const blockers = blockersFrom(adapterJson, contextTemplate, manifest);
-  const ready = blockers.length === 0;
+  const hooks = hookStatus(cwd);
+  const baseBlockers = blockersFrom(adapterJson, contextTemplate, manifest);
+  const blockers = blockersFrom(adapterJson, contextTemplate, manifest, hooks);
+  const handoffReady = baseBlockers.length === 0;
+  const state: ClaudeStatusState = handoffReady ? (hooks.ready ? "context-hook-ready" : hooks.blocker ? "blocked" : "handoff-ready") : "blocked";
+  const ready = state === "context-hook-ready" || state === "handoff-ready";
 
   return {
     runtime: "claude",
-    state: ready ? "handoff-ready" : "blocked",
-    mode: "manual-shared-handoff",
+    state,
+    mode: state === "context-hook-ready" ? "automatic-context-hook" : "manual-shared-handoff",
     ready,
     blockers,
     adapter: {
@@ -147,18 +251,24 @@ export function readClaudeRuntimeStatus(cwd = process.cwd()): ClaudeRuntimeStatu
       contextTemplate,
     },
     manifest,
-    nextSteps: ready
+    hooks,
+    nextSteps: state === "context-hook-ready"
       ? [
-          "Use fooks extract <file> --model-payload or the generated Claude handoff artifacts when sharing reduced context with Claude.",
-          "Do not describe this as Claude prompt interception or automatic Claude token savings.",
+          "Open Claude Code in this repo; fooks records/prepares the first explicit .tsx/.jsx prompt and may add bounded context on a repeated same-file UserPromptSubmit.",
+          "Use fooks status claude to inspect project-local hook readiness.",
         ]
-      : [
-          "Run fooks attach claude or fooks setup after ensuring the Claude runtime home exists.",
-          "Use fooks extract <file> --model-payload for explicit manual handoff until Claude status becomes handoff-ready.",
-        ],
+      : handoffReady
+        ? [
+            "Run fooks install claude-hooks to enable project-local Claude context hooks.",
+            "Manual/shared handoff remains available with fooks extract <file> --model-payload.",
+          ]
+        : [
+            "Run fooks attach claude or fooks setup after ensuring the Claude runtime home exists.",
+            "Use fooks extract <file> --model-payload for explicit manual handoff until Claude status becomes ready.",
+          ],
     notes: [
-      "Claude automatic hooks are not enabled by fooks.",
-      "Claude status is a read-only handoff-artifact health check, not a runtime interception or token-savings claim.",
+      "Claude P0 uses project-local context hooks in .claude/settings.local.json only; fooks does not mutate ~/.claude/settings.json.",
+      "Claude P0 supports project-local SessionStart/UserPromptSubmit context hooks only: first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may inject bounded context, and fooks does not intercept Read/tool calls or claim runtime-token savings.",
     ],
   };
 }

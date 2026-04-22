@@ -104,7 +104,14 @@ async function initializeProject(cwd = process.cwd()): Promise<{ config: string;
 
 type SetupState = "ready" | "partial" | "blocked";
 type RuntimeName = "codex" | "claude" | "opencode";
-type RuntimeSetupState = "automatic-ready" | "handoff-ready" | "tool-ready" | "manual-step-required" | "partial" | "blocked";
+type RuntimeSetupState =
+  | "automatic-ready"
+  | "context-hook-ready"
+  | "handoff-ready"
+  | "tool-ready"
+  | "manual-step-required"
+  | "partial"
+  | "blocked";
 
 type RuntimeReadiness = {
   runtime: RuntimeName;
@@ -237,7 +244,7 @@ function buildSetupScopeSummary(options: {
 function setupClaimBoundaries(): string[] {
   return [
     "Codex setup installs the automatic fooks hook path when Codex trust checks pass, but it does not collect Codex runtime-token telemetry.",
-    "Claude setup prepares manual/shared handoff artifacts only; it does not enable automatic hooks or prompt interception.",
+    "Claude setup installs project-local context hooks for SessionStart/UserPromptSubmit when handoff artifacts and local settings are valid; first eligible frontend-file prompts are recorded/prepared and repeated same-file prompts may receive bounded context; it does not intercept Read/tool calls or claim runtime-token savings.",
     "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or provide runtime-token telemetry.",
     "Projects without supported React .tsx/.jsx component candidates stay blocked for automatic setup instead of pretending unrelated files are ready.",
   ];
@@ -276,7 +283,7 @@ function codexRuntimeReadiness(
           "Fix Codex setup blockers, then run fooks setup again.",
           "Use fooks status codex for current runtime state and inspect runtimes.codex.blockers above.",
         ],
-    notes: ["Codex is the only runtime in this setup command with an automatic hook path today."],
+    notes: ["Codex has the automatic repeated-file hook path; Claude P0 mirrors the explicit frontend-file record-then-inject flow through project-local context hooks."],
   };
 }
 
@@ -294,34 +301,50 @@ function blockedClaudeReadiness(blockers: string[], details: unknown = null): Ru
       "Until then, use fooks extract <file> --model-payload for explicit manual handoff.",
     ],
     notes: [
-      "Claude automatic hooks are not enabled by fooks setup.",
-      "Claude support remains manual/shared handoff oriented; this is non-fatal for Codex readiness.",
+      "Claude context hooks are project-local only when installed; no user-global Claude settings are mutated.",
+      "Claude support remains non-fatal for Codex readiness and does not claim Read interception or runtime-token savings.",
     ],
   };
 }
 
-function claudeRuntimeReadiness(attach: { runtimeProof?: { status?: string; blocker?: string } }): RuntimeReadiness {
-  if (attach.runtimeProof?.status === "passed") {
+function claudeRuntimeReadiness(
+  attach: { runtimeProof?: { status?: string; blocker?: string } } | null,
+  hooks: unknown,
+  status: { state?: RuntimeSetupState; ready?: boolean; blockers?: string[]; mode?: string } | null,
+): RuntimeReadiness {
+  if (status) {
+    const state = status.state === "context-hook-ready" || status.state === "handoff-ready" || status.state === "blocked" ? status.state : "blocked";
+    const ready = status.ready === true;
     return {
       runtime: "claude",
-      state: "handoff-ready",
-      mode: "manual-shared-handoff",
-      ready: true,
+      state,
+      mode: status.mode ?? (state === "context-hook-ready" ? "automatic-context-hook" : "manual-shared-handoff"),
+      ready,
       blocksOverall: false,
-      details: { attach },
-      blockers: [],
-      nextSteps: [
-        "Use fooks extract <file> --model-payload or the generated Claude handoff artifacts when sharing reduced context with Claude.",
-        "Do not describe this as Claude prompt interception or automatic Claude token savings.",
-      ],
+      details: { attach, hooks, status },
+      blockers: status.blockers ?? [],
+      nextSteps: ready
+        ? state === "context-hook-ready"
+          ? [
+              "Open Claude Code in this repo; fooks records/prepares the first explicit .tsx/.jsx prompt and may add bounded context on a repeated same-file UserPromptSubmit.",
+              "Use fooks status claude to inspect project-local hook readiness.",
+            ]
+          : [
+              "Run fooks install claude-hooks to enable project-local Claude context hooks.",
+              "Manual/shared Claude handoff artifacts remain available through fooks extract <file> --model-payload.",
+            ]
+        : [
+            "Fix the Claude blockers, then run fooks setup or fooks install claude-hooks again.",
+            "Until then, use fooks extract <file> --model-payload for explicit manual handoff if adapter artifacts are available.",
+          ],
       notes: [
-        "Claude automatic hooks are not enabled by fooks setup.",
-        "Claude readiness means manual/shared handoff artifacts were prepared successfully.",
+        "Claude P0 context hooks are project-local only and do not mutate ~/.claude/settings.json.",
+        "Claude P0 records/prepares first eligible frontend-file prompts, may inject bounded context on repeated same-file prompts, and does not intercept Read/tool calls or claim runtime-token savings.",
       ],
     };
   }
 
-  return blockedClaudeReadiness([attach.runtimeProof?.blocker ?? "Claude handoff proof blocked"], { attach });
+  return blockedClaudeReadiness([attach?.runtimeProof?.blocker ?? "Claude handoff proof blocked"], { attach, hooks });
 }
 
 function opencodeRuntimeReadiness(installResult: unknown): RuntimeReadiness {
@@ -409,14 +432,18 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
     { attachCodex },
     { attachClaude },
     { installCodexHookPreset },
+    { installClaudeHookPreset },
     { installOpenCodeToolPreset },
     { readCodexTrustStatus },
+    { readClaudeRuntimeStatus },
   ] = await Promise.all([
     import("../adapters/codex.js"),
     import("../adapters/claude.js"),
     import("../adapters/codex-hook-preset.js"),
+    import("../adapters/claude-hook-preset.js"),
     import("../adapters/opencode-tool-preset.js"),
     import("../adapters/codex-runtime-trust.js"),
+    import("../adapters/claude-status.js"),
   ]);
 
   const bridgeCommand = `${displayCliName} codex-runtime-hook --native-hook`;
@@ -443,9 +470,12 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 
   let claude: RuntimeReadiness;
   try {
-    claude = claudeRuntimeReadiness(attachClaude(sampleFile, cwd));
+    const claudeAttach = attachClaude(sampleFile, cwd);
+    const claudeHooks = installClaudeHookPreset(cwd, displayCliName);
+    const claudeStatus = readClaudeRuntimeStatus(cwd);
+    claude = claudeRuntimeReadiness(claudeAttach, claudeHooks, claudeStatus);
   } catch (error) {
-    claude = blockedClaudeReadiness([`Claude handoff setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+    claude = blockedClaudeReadiness([`Claude setup failed: ${error instanceof Error ? error.message : String(error)}`]);
   }
 
   let opencode: RuntimeReadiness;
@@ -479,29 +509,30 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
       ? [
           "Open Codex in this repo and work normally; fooks will run through the installed Codex hooks.",
           "Use fooks status codex if you want to inspect the runtime trust state.",
-          "Claude and opencode entries under runtimes are non-fatal handoff/tool readiness summaries, not automatic hook claims.",
+          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
         ]
       : [
           "Fix setup blockers, then run fooks setup again.",
           "Use fooks status codex for current runtime state and inspect the blockers field above.",
-          "Claude and opencode entries under runtimes are non-fatal handoff/tool readiness summaries, not automatic hook claims.",
+          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
         ],
   };
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
       Prepare one-command readiness for supported runtimes:
-      - Codex: automatic runtime hook path when trust checks pass.
-      - Claude: manual/shared handoff artifacts only; no automatic hooks or prompt interception.
-      - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token telemetry claim.
+      - Codex: automatic repeated-file runtime hook path when trust checks pass; no runtime-token telemetry claim.
+      - Claude: project-local context hooks; first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may receive bounded context; no Read interception or runtime-token claim.
+      - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
 
   ${displayCliName} run <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} install codex-hooks
+  ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
   ${displayCliName} codex-pre-read <file> [--json]
   ${displayCliName} status
@@ -510,6 +541,8 @@ Everyday commands:
   ${displayCliName} status cache
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
+  ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit> [--session-id <id>] [--prompt <text>] [--json]
+  ${displayCliName} claude-runtime-hook --native-hook
 
 Install: npm install -g oh-my-fooks
 CLI command: ${displayCliName}`);
@@ -596,12 +629,63 @@ function parseCodexRuntimeHookArgs(args: string[]): {
   return { nativeHook, event, prompt, sessionId, threadId, turnId };
 }
 
-async function readStdinJson(): Promise<Record<string, unknown>> {
+function parseClaudeRuntimeHookArgs(args: string[]): {
+  nativeHook: boolean;
+  event: "SessionStart" | "UserPromptSubmit";
+  prompt?: string;
+  sessionId?: string;
+} {
+  let nativeHook = false;
+  let event: "SessionStart" | "UserPromptSubmit" | undefined;
+  let prompt: string | undefined;
+  let sessionId: string | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    switch (arg) {
+      case "--json":
+        break;
+      case "--native-hook":
+        nativeHook = true;
+        break;
+      case "--event":
+        event = args[index + 1] as typeof event;
+        index += 1;
+        break;
+      case "--prompt":
+        prompt = args[index + 1];
+        index += 1;
+        break;
+      case "--session-id":
+        sessionId = args[index + 1];
+        index += 1;
+        break;
+      default:
+        throw new Error(`Unexpected claude-runtime-hook argument: ${arg}`);
+    }
+  }
+
+  if (nativeHook) {
+    return { nativeHook, event: "SessionStart", prompt, sessionId };
+  }
+
+  if (event !== "SessionStart" && event !== "UserPromptSubmit") {
+    throw new Error("claude-runtime-hook requires --event <SessionStart|UserPromptSubmit>");
+  }
+
+  return { nativeHook, event, prompt, sessionId };
+}
+
+async function readStdinText(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
   }
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  return Buffer.concat(chunks).toString("utf8").trim();
+}
+
+async function readStdinJson(): Promise<Record<string, unknown>> {
+  const raw = await readStdinText();
   return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 }
 
@@ -716,12 +800,17 @@ async function run(): Promise<void> {
         print(installCodexHookPreset(displayCliName));
         return;
       }
+      if (arg1 === "claude-hooks") {
+        const { installClaudeHookPreset } = await import("../adapters/claude-hook-preset.js");
+        print({ ...installClaudeHookPreset(process.cwd(), displayCliName), command: "install claude-hooks", runtime: "claude" });
+        return;
+      }
       if (arg1 === "opencode-tool") {
         const { installOpenCodeToolPreset } = await import("../adapters/opencode-tool-preset.js");
         print(installOpenCodeToolPreset(process.cwd(), displayCliName));
         return;
       }
-      throw new Error("install expects 'codex-hooks' or 'opencode-tool'");
+      throw new Error("install expects 'codex-hooks', 'claude-hooks', or 'opencode-tool'");
     }
     case "status": {
       if (!arg1) {
@@ -774,6 +863,38 @@ async function run(): Promise<void> {
             sessionId: options.sessionId,
             threadId: options.threadId,
             turnId: options.turnId,
+          },
+          process.cwd(),
+        ),
+      );
+      return;
+    }
+    case "claude-runtime-hook": {
+      const { handleClaudeRuntimeHook } = await import("../adapters/claude-runtime-hook.js");
+      const options = parseClaudeRuntimeHookArgs(rest);
+      if (options.nativeHook) {
+        const { handleClaudeNativeHookPayload } = await import("../adapters/claude-native-hook.js");
+        const raw = await readStdinText();
+        let payload: Record<string, unknown>;
+        try {
+          payload = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+        } catch (error) {
+          console.error(`fooks claude-runtime-hook: invalid JSON payload: ${error instanceof Error ? error.message : String(error)}`);
+          process.exitCode = 1;
+          return;
+        }
+        const output = handleClaudeNativeHookPayload(payload, process.cwd());
+        if (output) {
+          print(output);
+        }
+        return;
+      }
+      print(
+        handleClaudeRuntimeHook(
+          {
+            hookEventName: options.event,
+            prompt: options.prompt,
+            sessionId: options.sessionId,
           },
           process.cwd(),
         ),

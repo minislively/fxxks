@@ -1,6 +1,6 @@
 # Setup fooks
 
-Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex is the only automatic hook path today; Claude and opencode setup results are bounded handoff/tool readiness summaries.
+Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, where the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary.
 
 ## 1. Install
 
@@ -29,13 +29,19 @@ fooks setup
 1. creates local `.fooks/` state;
 2. prepares Codex attachment metadata and runtime-home files;
 3. merges the fooks hook command into `~/.codex/hooks.json`;
-4. prepares Claude manual/shared handoff artifacts when a Claude home is available;
+4. prepares Claude manual/shared handoff artifacts and project-local Claude context hooks when a Claude home is available; Claude records/prepares the first eligible explicit frontend-file prompt and may inject bounded context for repeated same-file prompts;
 5. installs the project-local opencode custom tool and slash command when a supported component exists.
 
-The hook command is:
+The Codex hook command is:
 
 ```bash
 fooks codex-runtime-hook --native-hook
+```
+
+The Claude project-local hook command is:
+
+```bash
+fooks claude-runtime-hook --native-hook
 ```
 
 Package install alone does not edit Codex hooks, Claude files, or opencode project files. Activation only happens when you run `fooks setup`.
@@ -65,10 +71,10 @@ Good signs:
 
 - Bare `fooks status` returns `metricTier: "estimated"` and no error. A fresh repo may show zero sessions/events.
 - Codex status is connected/ready-style.
-- Claude status is `handoff-ready` when the local adapter files and Claude attachment manifest are present. This is a manual handoff health check, not an automatic Claude hook claim.
+- Claude status is `context-hook-ready` when the local adapter files, Claude attachment manifest, and project-local Claude hooks are present. It may be `handoff-ready` when adapter/manifest artifacts exist but the project-local hooks have not been installed yet. This is not a Claude `Read` interception or runtime-token savings claim.
 - Cache status is `empty` for a fresh repo or `healthy` after scan/use.
 
-Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex hook path, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
+Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 
 Likewise, `fooks status codex` and the Codex-ready portions of `fooks setup` report local attach/trust readiness only. They do not prove live Codex runtime-token savings, because this repo does not yet collect Codex runtime telemetry for that claim.
 
@@ -87,7 +93,7 @@ Likewise, `fooks status codex` and the Codex-ready portions of `fooks setup` rep
 | Runtime field | Ready state | Meaning |
 | --- | --- | --- |
 | `runtimes.codex.state` | `automatic-ready` | Codex attach metadata, trust status, and hook preset are ready. This confirms local setup/readiness only; it is not runtime-token telemetry. |
-| `runtimes.claude.state` | `handoff-ready` or `blocked` | Claude manual/shared handoff artifacts were prepared, or a non-fatal Claude blocker was reported. This does not mean Claude prompt interception is enabled. |
+| `runtimes.claude.state` | `context-hook-ready`, `handoff-ready`, or `blocked` | Claude manual/shared handoff artifacts and, when possible, project-local `SessionStart` / `UserPromptSubmit` hooks were prepared, or a non-fatal Claude blocker was reported. This does not mean Claude `Read` interception or runtime-token savings are enabled. |
 | `runtimes.opencode.state` | `tool-ready`, `manual-step-required`, or `blocked` | The project-local opencode helper is installed, needs an explicit/manual step, or hit a non-fatal blocker. This does not mean opencode read interception or automatic runtime-token savings are enabled. |
 | `blocksOverall` | `true` only for Codex today | Claude/opencode blockers should not make Codex setup look failed when Codex itself is ready. |
 
@@ -141,7 +147,7 @@ The generated tool:
 - does not edit Codex hooks;
 - does not edit global opencode config.
 
-Claude and opencode can use fooks payloads through manual/shared handoff paths, but this repo does not claim automatic runtime-token savings for Claude and opencode.
+Claude can receive bounded fooks context through project-local `SessionStart` / `UserPromptSubmit` hooks after a first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt occurs; manual/shared handoff paths remain available. opencode can use fooks payloads through manual/semi-automatic tool paths. This repo does not claim Claude `Read` interception, opencode read interception, or automatic runtime-token savings for Claude and opencode.
 
 ## Release smoke check
 
@@ -160,7 +166,9 @@ Mostly for debugging:
 ```bash
 fooks attach codex
 fooks install codex-hooks
+fooks install claude-hooks
 fooks codex-runtime-hook --native-hook
+fooks claude-runtime-hook --native-hook
 fooks scan
 fooks extract <file> --model-payload
 ```

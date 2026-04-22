@@ -128,7 +128,7 @@ export async function prepareExecutionContext(
   fs.writeFileSync(tempContextPath, contextContent);
 
   // Adapter contract: handoff command is abstracted, exact invocation not yet standardized
-  // This allows swapping between Codex, OMX, Claude, or other runtimes
+  // This keeps the reduced context reusable across supported coding runtimes such as Codex and Claude.
   const handoffCommand = `[runtime-adapter] ${prompt} --context ${tempContextPath}`;
 
   return {

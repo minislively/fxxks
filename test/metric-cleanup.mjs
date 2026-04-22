@@ -12,8 +12,20 @@ export async function cleanupMetricSessions(repoRoot, prefixes) {
   }
 
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    if (entry.isDirectory() && prefixes.some((prefix) => entry.name.startsWith(prefix))) {
-      fs.rmSync(path.join(root, entry.name), { recursive: true, force: true });
+    if (!entry.isDirectory()) continue;
+    const entryPath = path.join(root, entry.name);
+    const summaryPath = path.join(entryPath, "summary.json");
+    let keys = [entry.name];
+    if (fs.existsSync(summaryPath)) {
+      try {
+        const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+        keys = [entry.name, summary.rawSessionKey, summary.metricSessionKey, summary.sessionKey].filter(Boolean);
+      } catch {
+        // Fall back to the directory name for malformed ignored telemetry.
+      }
+    }
+    if (keys.some((key) => prefixes.some((prefix) => String(key).startsWith(prefix)))) {
+      fs.rmSync(entryPath, { recursive: true, force: true });
     }
   }
 
@@ -29,7 +41,7 @@ export async function cleanupMetricSessions(repoRoot, prefixes) {
     }
     try {
       const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
-      refreshProjectMetricSummaryFromSession(repoRoot, summary.sessionKey ?? entry.name);
+      refreshProjectMetricSummaryFromSession(repoRoot, summary.metricSessionKey ?? summary.sessionKey ?? entry.name);
       remainingSessionCount += 1;
     } catch {
       // Test cleanup should not fail the suite when ignored telemetry is malformed.

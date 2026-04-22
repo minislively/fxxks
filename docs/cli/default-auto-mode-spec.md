@@ -16,7 +16,7 @@ Fooks CLI provides **zero-configuration automatic optimization** for frontend AI
 **Defaults**:
 - Creates `.fooks/config.json` with `mode: "auto"`
 - Detects project type (React/TSX/Next.js/Vite/etc.)
-- Sets `runner: "auto"` (detects Codex/OMX availability)
+- Sets `runner: "auto"` (Codex-first product fallback; Claude is supported through setup/context hooks and handoff)
 
 **Output**:
 ```
@@ -35,7 +35,7 @@ Fooks CLI provides **zero-configuration automatic optimization** for frontend AI
 
 **Default flags**:
 - `--mode=auto` (overridable: `--mode=raw|hybrid|compressed`)
-- `--runner=auto` (overridable: `--runner=codex|omx`)
+- `--runner=auto` (overridable: `--runner=codex|claude`)
 - `--fallback=on` (fail-open: compressed→hybrid→raw)
 
 **Output**:
@@ -62,7 +62,7 @@ Fooks CLI provides **zero-configuration automatic optimization** for frontend AI
 **Purpose**: Diagnose setup and suggest fixes  
 **Checks**:
 - Auth configuration
-- Runner availability (codex/omx)
+- Runner availability (Codex/Claude product surface)
 - Project type detection
 - Cache integrity
 
@@ -128,16 +128,16 @@ compressed → hybrid → raw
 
 ### Auto-Detection Priority
 1. `codex` (if `~/.codex/auth.json` exists)
-2. `omx` (if `oh-my-codex` installed)
-3. Error with setup instructions
+2. `codex` compatibility fallback with setup instructions
+3. Claude support is exposed through `fooks setup` project-local context hooks and manual/shared handoff, not an OMX runner fallback
 
 ### Unified UX
 Same command structure across runners:
 ```bash
-# Both work identically from user perspective
+# Product-facing examples
 fooks run "Add button to header"
 fooks run --runner=codex "Add button to header"
-fooks run --runner=omx "Add button to header"
+fooks run --runner=claude "Add button to header"
 ```
 
 ### Debug/Benchmark Path (Hidden)
@@ -237,8 +237,8 @@ User completes `fooks run "<simple task>"` within 3 steps of installation withou
 - Configuring compression settings
 - Debugging runner setup
 
-### Consistency Across Runners
-Same task executed via `codex`, `omx`, or `vanilla` comparison shows:
+### Consistency Across Product Runtimes
+Same task executed via supported product runtimes or hidden benchmark harnesses shows:
 - Identical modified files (outcome parity)
 - Comparable or better token efficiency
 - Acceptable time variance (< 30%)

@@ -18,7 +18,7 @@ Claim boundary: these checks verify setup artifacts, manifests, and handoff payl
 - Prior docs/PR context inspected:
   - closed PR #35, `docs: agent-neutral CLI workflow for Codex/Claude`, closed on 2026-04-19
   - merged PR #37 / commit `9e5be1c`, `docs: validate fooks as agent-neutral terminal CLI`
-  - current `main` already contains the supporting CLI and adapter code paths, plus the merged validation note, but still leaves `fooks run` with Codex/OMX-flavored first-success wording
+  - current `main` already contains the supporting CLI and adapter code paths, plus the merged validation note, but previously left `fooks run` with runner-flavored first-success wording
 - Hermes note:
   - no Hermes-specific integration surface was found in this repo during this pass
 
@@ -100,8 +100,8 @@ node dist/cli/index.js run "Please update fixtures/compressed/FormSection.tsx"
 Observed result after the first-success wording pass:
 
 - output heading is `Shared Handoff Context`
-- output no longer labels the flow as a detected Codex/OMX runner
-- next-step text says `Open this context with your preferred runtime (codex, claude, omx, etc.)`
+- output no longer labels the flow as a detected runner
+- next-step text says `Open this context with your preferred runtime (codex or claude).`
 - context file still contains the same light exact-file selection for `fixtures/compressed/FormSection.tsx`
 
 This keeps the local value check intact while making the first-success path honest about the product surface: `fooks run` prepares a reusable context handoff and does not claim Claude-native runtime automation.

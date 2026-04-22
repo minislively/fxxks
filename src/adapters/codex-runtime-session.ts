@@ -14,7 +14,7 @@ export type CodexRuntimeSessionState = {
 };
 
 function stateRoot(cwd: string): string {
-  return path.join(cwd, ".omx", "state", "codex-runtime");
+  return path.join(cwd, ".fooks", "state", "codex-runtime");
 }
 
 function sanitizeKey(sessionKey: string): string {
@@ -42,7 +42,15 @@ export function readCodexRuntimeSession(cwd: string, sessionKey: string): CodexR
     return emptyState(sessionKey);
   }
 
-  return JSON.parse(fs.readFileSync(file, "utf8")) as CodexRuntimeSessionState;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as CodexRuntimeSessionState;
+    if (parsed.sessionKey !== sessionKey || typeof parsed.seenFiles !== "object" || parsed.seenFiles === null) {
+      return emptyState(sessionKey);
+    }
+    return parsed;
+  } catch {
+    return emptyState(sessionKey);
+  }
 }
 
 export function writeCodexRuntimeSession(cwd: string, state: CodexRuntimeSessionState): string {

@@ -138,7 +138,7 @@ export function classifyPromptContext(prompt: string, cwd = process.cwd()): Prom
 
 export function resolvePromptFileContext(prompt: string, cwd = process.cwd()): { filePath?: string; source: "prompt-target" | "none"; policy: PromptContextPolicy } {
   const policy = classifyPromptContext(prompt, cwd);
-  const filePath = policy.targets[0]?.filePath;
+  const filePath = policy.targets.find((target) => target.exists)?.filePath ?? policy.targets[0]?.filePath;
   return filePath ? { filePath, source: "prompt-target", policy } : { source: "none", policy };
 }
 

@@ -20,7 +20,7 @@
 - `fooks run <task>` - One-shot task execution (missing)
 - `fooks doctor` - Setup diagnostics (missing)
 - Auto fallback chain (compressed→hybrid→raw) - Partially in decide.ts
-- Unified runner UX polish (codex/omx parity)
+- Unified runner UX polish (Codex/Claude product boundary)
 - Typecheck/build verification hooks
 
 ---
@@ -76,12 +76,12 @@ compressed → hybrid → raw → error (no native degrade)
 ---
 
 ### Task 3: Add Runner Adapter Seam
-**Purpose**: Unified UX across codex/omx, hidden vanilla compare
+**Purpose**: Unified UX across Codex/Claude, hidden harness/vanilla compare
 
 **Structure**:
 - `src/adapters/runner.ts` (new) - Adapter interface
 - Codex adapter: primary implementation
-- OMX adapter: compatible structure (placeholder for omx integration)
+- Harness adapters stay internal-only and are not part of the fooks user-facing runtime surface
 - Vanilla adapter: hidden, benchmark-only
 
 **Touched Files**:
@@ -90,7 +90,7 @@ compressed → hybrid → raw → error (no native degrade)
 - `src/cli/run.ts` - Use adapter seam
 
 **Acceptance Criteria**:
-- [ ] Same UX regardless of runner (codex/omx)
+- [ ] Same UX across supported user-facing runtimes (Codex/Claude)
 - [ ] Vanilla compare exists for benchmark validation (hidden from CLI help)
 - [ ] Runner selection: auto-detect or explicit flag
 
@@ -161,5 +161,5 @@ fooks setup
 
 **Key Decisions**:
 - Orchestration-centered: scan → decide → extract → fallback → execute
-- Runner adapter seam: codex first, omx-compatible structure
+- Runner adapter seam: Codex/Claude product surface first; harness adapters stay internal
 - No timeline estimates until implementation starts

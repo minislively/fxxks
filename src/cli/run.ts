@@ -2,7 +2,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { scanProject } from "../core/scan.js";
 import { extractFile } from "../core/extract.js";
 import { decideMode } from "../core/decide.js";
@@ -14,7 +13,7 @@ import { readCodexTrustStatus } from "../adapters/codex-runtime-trust.js";
 export interface RunOptions {
   prompt: string;
   mode?: "auto" | "raw" | "hybrid" | "compressed";
-  runner?: "auto" | "codex" | "omx";
+  runner?: "auto" | "codex" | "claude";
   verbose?: boolean;
 }
 
@@ -73,7 +72,7 @@ function printSharedHandoff(executionContext: {
   console.log(`Inspect the shared context: cat ${quotedContextPath}`);
   console.log(`Codex: start \`codex\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
   console.log(`Claude: start \`claude\` in this repo, then paste your prompt and the context from ${quotedContextPath}`);
-  console.log("\nNext: Open this context with your preferred runtime (codex, claude, omx, etc.)");
+  console.log("\nNext: Open this context with your preferred runtime (codex or claude).");
   console.log(`Context file: ${executionContext.contextPath}`);
   console.log("======================\n");
 }
@@ -122,7 +121,7 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     const runner = (options.runner === "auto" || !options.runner) ? detectRunner() : options.runner;
 
     let executionContext;
-    if (runner === "codex" || runner === "omx") {
+    if (runner === "codex" || runner === "claude") {
       executionContext = await prepareExecutionContext(options.prompt, processedFiles, cwd, selection.policy);
       printSharedHandoff(executionContext);
     }
@@ -185,18 +184,9 @@ function hasCodexAuth(): boolean {
   return fs.existsSync(path.join(codexHome(), "auth.json"));
 }
 
-function commandExists(command: string): boolean {
-  const result = spawnSync(command, ["--version"], { stdio: "ignore" });
-  return !result.error;
-}
-
-export function detectRunner(): "codex" | "omx" {
+export function detectRunner(): "codex" {
   if (hasCodexAuth()) {
     return "codex";
-  }
-
-  if (commandExists("omx")) {
-    return "omx";
   }
 
   return "codex";
