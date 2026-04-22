@@ -61,6 +61,12 @@ runtime/time signal (median runtime-token reduction -25.5%; median latency
 reduction -14.4%). This is not provider billing telemetry, not an applied-code
 benchmark win, and not enough for stable runtime-token/time win claims.
 
+A same-day risk-closure rerun was also attempted after the claim-boundary
+hardening work. It stopped after three matched attempts because zero pairs passed
+acceptance in both modes, so it remained `insufficient-accepted-pairs` and
+produced no comparable accepted-pair medians. Do not use this rerun as a win
+claim; it only reinforces the current release boundary.
+
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
 ```bash
@@ -74,7 +80,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | Risk | Current disposition | Release implication |
 | --- | --- | --- |
 | `npm publish` not run | Keep unresolved until explicit human approval; use `npm run release:smoke` and `npm publish --dry-run` only for proof. | Blocks real publication, not docs/code PR merge. |
-| Layer 2 stable applied-code / multi-task evidence absent | Applied repeated diagnostic exists but accepted only 4/7 pairs and regressed on CLI runtime/time medians. Multi-task evidence still does not exist. | Blocks stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
+| Layer 2 stable applied-code / multi-task evidence absent | Applied repeated diagnostics exist but are negative/insufficient: the pre-launch run accepted only 4/7 pairs and regressed on CLI runtime/time medians; the same-day risk-closure rerun accepted 0/3 pairs before stopping. Multi-task evidence still does not exist. | Blocks stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
 | Local `fooks status` estimates | Bare status is documented as local context-size telemetry only. | Blocks billing-token, provider-cost, or `ccusage` replacement wording. |
 | Claude/opencode automatic savings | Claude now has bounded project-local context hooks that record/prepare the first eligible frontend-file prompt, then add repeated same-file context, but no measured runtime-token savings and no `Read` interception. opencode remains a manual/semi-automatic tool bridge. | Keep Claude context-hook wording and opencode tool wording only. |

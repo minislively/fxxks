@@ -10,7 +10,7 @@
 | Layer 2: Task Definition/Spec | Frontend task inventory and R4 spec | ✅ Complete | Task inventory, R4 spec, validation checklist, metric schema are ready. |
 | Layer 2: Runner Path | AI runner wrapper execution path | ✅ Unblocked | Current `codex exec` wrapper completed tiny and R4 paired read-only smokes. |
 | Layer 2: R4 Paired Smoke | Vanilla-vs-fooks proposal-only R4 execution | ✅ Collected | Two matched pairs succeeded on `combobox-example.tsx`; summaries stored under `results/R4-current-exec-smoke-2026-04-21*.json`. |
-| Layer 2: Repeated Applied Diagnostic | Matched vanilla/fooks applied-code repeated run | ⚠️ Diagnostic only | 2026-04-22 pre-launch run attempted 7 pairs, accepted 4/7, and classified `insufficient-accepted-pairs`; runtime-token/time medians regressed. |
+| Layer 2: Repeated Applied Diagnostic | Matched vanilla/fooks applied-code repeated run | ⚠️ Diagnostic only | 2026-04-22 pre-launch run attempted 7 pairs, accepted 4/7, and classified `insufficient-accepted-pairs`; a same-day risk-closure rerun stopped after 0/3 accepted pairs. |
 | Layer 2: Applied-Code Acceptance Gate | Validate generated file trees after they are written to disk | ✅ Implemented | `validate-r4-applied.js` checks required files, line limits, barrel exports, source hygiene, local import cycles, and TypeScript acceptance; a fixture self-test artifact exists. |
 
 ## 2. Canonical wording
@@ -22,6 +22,7 @@
 > The applied-code acceptance gate is now implemented and self-tested against a checked-in R4 candidate tree.
 > A 2026-04-22 repeated applied diagnostic attempted 7 matched pairs, accepted 4/7, and classified `insufficient-accepted-pairs`.
 > Accepted pairs kept prompt-size reduction (median 88.2%) but regressed on CLI runtime tokens (median -25.5%) and latency (median -14.4%).
+> A same-day risk-closure rerun after claim-boundary hardening stopped after 3 matched attempts because 0/3 pairs passed acceptance in both modes; it also classified `insufficient-accepted-pairs`.
 > This is **not** provider billing telemetry, not an applied-code benchmark win, and not enough for stable runtime-token/time win claims.
 
 ## 3. Completed assets
@@ -40,6 +41,7 @@
 | R4 repeated applied runner | ✅ Implemented | `run-r4-repeated.js` and `r4-repeated-summary.js` require matched accepted pairs before any narrow L1 candidate classification. |
 | R4 applied validator self-test | ✅ Passed | `results/R4-applied-acceptance-validator-self-test-2026-04-21.json` proves the gate can pass/fail concrete file trees without provider telemetry claims. |
 | R4 2026-04-22 pre-launch diagnostic | ⚠️ Insufficient | Attempted 7 pairs; accepted 4/7; prompt median 88.2% smaller; runtime-token median -25.5%; latency median -14.4%. |
+| R4 2026-04-22 risk-closure rerun | ⚠️ Insufficient | Stopped after 3 matched attempts; accepted 0/3 pairs, so no accepted-pair runtime-token or latency medians were available. |
 
 ## 4. 2026-04-21 tiny runner smoke
 

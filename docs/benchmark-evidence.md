@@ -52,6 +52,13 @@ telemetry. This result blocks provider billing-token, stable runtime-token, and
 stable time-win claims and motivates another repeated run after prompt/validator
 hardening.
 
+A follow-up risk-closure rerun on the same date was stopped after three matched
+attempts because zero pairs passed acceptance in both modes. Its summary also
+classified the run as `insufficient-accepted-pairs`; runtime-token and latency
+medians were intentionally absent because there were no comparable accepted
+pairs. Treat this as additional negative diagnostic evidence, not as a win or a
+replacement for a later multi-task applied-code benchmark.
+
 ## Reproducing or extending evidence
 
 The benchmark harness source remains in `benchmarks/`. Generated outputs under
