@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { decideCodexPreRead } from "./codex-pre-read";
+import { decidePreRead } from "./pre-read";
 import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, readClaudeRuntimeSession, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
-import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./codex-runtime-prompt";
+import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 import {
   estimateFileBytes,
@@ -60,11 +60,11 @@ function boundedFallbackContext(filePath: string | undefined, reason: string): s
   );
 }
 
-function payloadContextMode(payload: NonNullable<ReturnType<typeof decideCodexPreRead>["payload"]>): ContextMode {
+function payloadContextMode(payload: NonNullable<ReturnType<typeof decidePreRead>["payload"]>): ContextMode {
   return payload.useOriginal ? "light-minimal" : "light";
 }
 
-function buildPayloadContext(filePath: string, payload: NonNullable<ReturnType<typeof decideCodexPreRead>["payload"]>, contextMode: ContextMode): string {
+function buildPayloadContext(filePath: string, payload: NonNullable<ReturnType<typeof decidePreRead>["payload"]>, contextMode: ContextMode): string {
   return clampAdditionalContext([
     `fooks: Claude context hook · file: ${filePath} · context-mode: ${contextMode}`,
     "fooks does not intercept Claude Read or claim runtime-token savings.",
@@ -262,9 +262,9 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     return decision;
   }
 
-  let decision: ReturnType<typeof decideCodexPreRead>;
+  let decision: ReturnType<typeof decidePreRead>;
   try {
-    decision = decideCodexPreRead(resolvedTarget, cwd);
+    decision = decidePreRead(resolvedTarget, cwd);
   } catch (error) {
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
     const runtimeDecision: ClaudeRuntimeHookDecision = {
