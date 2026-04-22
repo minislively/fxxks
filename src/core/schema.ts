@@ -8,6 +8,56 @@ export type StyleSystem =
   | "inline-style"
   | "unknown";
 
+export type SourceRange = {
+  startLine: number;
+  endLine: number;
+};
+
+export type SourceFingerprint = {
+  fileHash: string;
+  lineCount: number;
+};
+
+export type LocatedString = {
+  value: string;
+  loc?: SourceRange;
+};
+
+export type EffectSignal = {
+  hook: string;
+  deps?: string[];
+  hasCleanup?: boolean;
+  hasAsyncWork?: boolean;
+  loc?: SourceRange;
+};
+
+export type CallbackSignal = {
+  hook: string;
+  deps?: string[];
+  loc?: SourceRange;
+};
+
+export type EventHandlerSignal = {
+  name: string;
+  trigger?: string;
+  loc?: SourceRange;
+};
+
+export type FormControlSignal = {
+  tag: string;
+  name?: string;
+  type?: string;
+  props?: string[];
+  handlers?: string[];
+  loc?: SourceRange;
+};
+
+export type FormSurface = {
+  controls?: FormControlSignal[];
+  submitHandlers?: LocatedString[];
+  validationAnchors?: LocatedString[];
+};
+
 export type ExtractionResult = {
   filePath: string;
   fileHash: string;
@@ -15,6 +65,7 @@ export type ExtractionResult = {
   mode: OutputMode;
   useOriginal?: boolean;
   componentName?: string;
+  componentLoc?: SourceRange;
   exports: Array<{
     name: string;
     kind: "default" | "named";
@@ -24,12 +75,17 @@ export type ExtractionResult = {
     propsName?: string;
     propsSummary?: string[];
     hasForwardRef?: boolean;
+    propsLoc?: SourceRange;
   };
   behavior?: {
     hooks: string[];
     stateSummary?: string[];
     effects?: string[];
+    effectSignals?: EffectSignal[];
+    callbackSignals?: CallbackSignal[];
     eventHandlers?: string[];
+    eventHandlerSignals?: EventHandlerSignal[];
+    formSurface?: FormSurface;
     hasSideEffects?: boolean;
   };
   structure?: {
@@ -47,6 +103,7 @@ export type ExtractionResult = {
     label: string;
     code: string;
     reason: string;
+    loc?: SourceRange;
   }>;
   rawText?: string;
   meta: {
@@ -66,13 +123,19 @@ export type ModelFacingPayload = {
   useOriginal?: boolean;
   rawText?: ExtractionResult["rawText"];
   componentName?: string;
+  componentLoc?: ExtractionResult["componentLoc"];
+  sourceFingerprint?: SourceFingerprint;
   exports?: ExtractionResult["exports"];
   contract?: ExtractionResult["contract"];
   behavior?: {
     hooks: string[];
     stateSummary?: string[];
     effects?: string[];
+    effectSignals?: EffectSignal[];
+    callbackSignals?: CallbackSignal[];
     eventHandlers?: string[];
+    eventHandlerSignals?: EventHandlerSignal[];
+    formSurface?: FormSurface;
     hasSideEffects?: boolean;
   };
   structure?: {
