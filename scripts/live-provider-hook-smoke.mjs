@@ -29,6 +29,9 @@ function runResult(command, args, options = {}) {
       status: typeof error?.status === "number" ? error.status : 1,
       stdout: String(error?.stdout ?? error?.output?.[1] ?? ""),
       stderr: String(error?.stderr ?? error?.output?.[2] ?? ""),
+      signal: error?.signal ?? null,
+      code: error?.code ?? null,
+      killed: Boolean(error?.killed),
       error: error instanceof Error ? error.message : String(error),
     };
   }
@@ -136,6 +139,50 @@ function summarizeProviderErrors(events, stderr) {
   return eventErrors;
 }
 
+function classifyProviderFailure(result, events, providerOutput) {
+  if (result.status === 0) return null;
+  const text = [
+    providerOutput,
+    result.stderr,
+    result.error,
+    result.signal,
+    result.code,
+    ...events.map((event) => JSON.stringify(event)),
+  ].filter(Boolean).join("\n");
+  if (/PERMISSION_DENIED|service has been disabled|disabled in this account|violation of Terms of Service|\b403\b/i.test(text)) {
+    return "auth-denied";
+  }
+  if (/auth_unavailable|no auth available|Failed to authenticate/i.test(text)) {
+    return "auth-unavailable";
+  }
+  if (/rate_limit|\b429\b/i.test(text)) {
+    return "rate-limited";
+  }
+  if (/server_error|\b503\b/i.test(text)) {
+    return "server-error";
+  }
+  if (/ETIMEDOUT|SIGTERM|timeout|timed out/i.test(text)) {
+    return "timeout";
+  }
+  return "provider-error";
+}
+
+function commandJsonResult(command, args, options = {}) {
+  const result = runResult(command, args, options);
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      exitCode: result.status,
+      error: result.stderr || result.error || result.stdout,
+    };
+  }
+  try {
+    return { ok: true, value: JSON.parse(result.stdout) };
+  } catch {
+    return { ok: true, value: result.stdout.trim() };
+  }
+}
+
 function runCodexProviderSmoke(project, env) {
   const outputPath = path.join(project, ".fooks", "live-codex-last-message.txt");
   const result = runResult("codex", [
@@ -153,6 +200,7 @@ function runCodexProviderSmoke(project, env) {
   const providerOutput = `${result.stdout}\n${result.stderr}`;
   const providerErrors = summarizeProviderErrors(events, result.stderr);
   const hookEvidenceObserved = hookEventHints.length > 0 || /hook|fooks/i.test(providerOutput);
+  const providerFailureKind = classifyProviderFailure(result, events, providerOutput);
   if (result.status !== 0 && !hookEvidenceObserved) {
     throw new Error(`Codex provider smoke failed before hook evidence: ${result.stderr || result.error || result.stdout}`);
   }
@@ -163,6 +211,7 @@ function runCodexProviderSmoke(project, env) {
     outputPath,
     lastMessageExists: fs.existsSync(outputPath),
     hookEvidenceObserved,
+    providerFailureKind,
     hookEventHints,
     providerErrors,
   };
@@ -184,6 +233,8 @@ function runClaudeProviderSmoke(project, env) {
   const providerOutput = `${result.stdout}\n${result.stderr}`;
   const providerErrors = summarizeProviderErrors(events, result.stderr);
   const hookEvidenceObserved = /fooks: Claude context hook|UserPromptSubmit|SessionStart/i.test(providerOutput);
+  const providerFailureKind = classifyProviderFailure(result, events, providerOutput);
+  const authStatus = commandJsonResult("claude", ["auth", "status"], { cwd: project, env, timeout: 10000 });
   if (result.status !== 0 && !hookEvidenceObserved) {
     throw new Error(`Claude provider smoke failed before hook evidence: ${result.stderr || result.error || result.stdout}`);
   }
@@ -192,6 +243,8 @@ function runClaudeProviderSmoke(project, env) {
     exitCode: result.status,
     providerCompleted: result.status === 0,
     hookEvidenceObserved,
+    providerFailureKind,
+    authStatus,
     hookEventHints,
     providerErrors,
     eventCount: events.length,

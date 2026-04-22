@@ -119,6 +119,13 @@ Expected observations:
 - The script creates a disposable frontend project and installs the packed local `fooks` CLI.
 - `fooks setup` must report Codex `automatic-ready` and Claude `context-hook-ready`.
 - Codex normally reports `providerCompleted: true`, `lastMessageExists: true`, and `hookEvidenceObserved: true`.
-- Claude can report `providerCompleted: false` when the local account, auth session, or upstream provider returns rate-limit/server/auth errors; this is acceptable only when `hookEvidenceObserved: true` and `providerErrors` records the provider-side failure.
+- Claude can report `providerCompleted: false` when the local account, auth session, or upstream provider returns rate-limit/server/auth errors; this is acceptable only when `hookEvidenceObserved: true`, `providerFailureKind` classifies the failure, and `providerErrors` records the provider-side failure.
+- `authStatus.loggedIn: true` only proves the local Claude Code auth file/session is present. It does not guarantee the upstream provider will complete the model call; `providerCompleted` is the provider completion signal.
 - Provider-backed CLI invocations must leave `fooks status` at `metricTier: "estimated"` with the provider-billing boundary intact.
 - Any captured evidence remains hook activation / local status evidence only; it is still not provider billing-token or provider-cost proof.
+
+Provider failure triage:
+
+- `auth-denied`: local Claude auth exists, but the upstream provider/account rejected the call. Fix outside fooks by repairing the Claude Code account/provider state, then rerun the Claude-only command.
+- `auth-unavailable`: Claude Code could not use an auth provider for the requested model/session. Re-authenticate or adjust the local Claude Code provider configuration, then rerun.
+- `rate-limited` / `server-error` / `timeout`: retry later or increase the Claude timeout knob. These do not invalidate hook evidence when `hookEvidenceObserved: true`.
