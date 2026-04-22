@@ -59,6 +59,30 @@ function stringProperty(value: unknown, key: string): string | undefined {
   return typeof property === "string" ? property : undefined;
 }
 
+function executableExists(command: string): boolean {
+  const pathValue = process.env.PATH;
+  if (!pathValue) return false;
+
+  const pathExts = process.platform === "win32"
+    ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";")
+    : [""];
+
+  for (const directory of pathValue.split(path.delimiter).filter(Boolean)) {
+    for (const extension of pathExts) {
+      const candidate = path.join(directory, `${command}${extension}`);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return true;
+      } catch {
+        // Keep scanning PATH. Optional host-tooling checks must stay read-only,
+        // non-throwing, and non-blocking.
+      }
+    }
+  }
+
+  return false;
+}
+
 function fileStatus(filePath: string, expectedRuntime?: "codex" | "claude"): FileStatus {
   if (!fs.existsSync(filePath)) {
     return { path: filePath, exists: false, blocker: `${path.basename(filePath)} is missing` };
@@ -257,6 +281,18 @@ function eligibleSourceFilesCheck(cwd: string): DoctorCheck {
   }
 }
 
+function claudeTypeScriptLspCheck(): DoctorCheck {
+  const available = executableExists("typescript-language-server");
+  return {
+    runtime: "claude",
+    name: "Claude optional TypeScript language server",
+    status: available ? "pass" : "warn",
+    message: available ? "typescript-language-server is available" : "typescript-language-server is not installed; this optional host tool does not block fooks hooks",
+    fix: available ? undefined : "Optional: npm install -g typescript-language-server typescript",
+    evidence: { command: "typescript-language-server", available },
+  };
+}
+
 function codexDoctorChecks(cwd: string, cliName: string): DoctorCheck[] {
   const hooks = readCodexHookPresetStatus(cliName);
   return [
@@ -320,6 +356,10 @@ function claudeDoctorChecks(cwd: string, focused = true): DoctorCheck[] {
       message: `${status.state} (${status.mode})`,
       evidence: { state: status.state, mode: status.mode, ready: status.ready },
     });
+  }
+
+  if (focused) {
+    checks.push(claudeTypeScriptLspCheck());
   }
 
   return checks;
