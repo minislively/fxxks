@@ -34,7 +34,7 @@
 ```bash
 cd ~/Workspace/fooks-test-repos/nextjs
 echo 'Move the "Sign in with GitHub" button from the left side to the right side of the page. Maintain all existing functionality and styling.' | \
-npx codex exec -m gpt-4o --full-auto --skip-git-repo-check
+npx codex exec -m gpt-5.4 --full-auto --skip-git-repo-check
 ```
 
 **스크립트:** `/tmp/vanilla-400-repro.sh`
@@ -55,7 +55,7 @@ npx codex exec -m gpt-4o --full-auto --skip-git-repo-check
 ```bash
 cd ~/Workspace/fooks
 node -e "const f=require('./dist/index.js');const r=f.extractFile('examples/auth/app/page.tsx');console.log('Move button:\n'+r.rawText)" | \
-npx codex exec -m gpt-4o --full-auto --skip-git-repo-check
+npx codex exec -m gpt-5.4 --full-auto --skip-git-repo-check
 ```
 
 **스크립트:** `/tmp/fooks-502-repro.sh`

@@ -62,7 +62,7 @@ CONTEXT: [FOOKS EXTRACTION RESULT HERE]
 ```bash
 cd ~/Workspace/fooks-test-repos/ui && \
 npx codex exec \
-  --model gpt-4o \
+  --model gpt-5.4 \
   --full-auto \
   --skip-git-repo-check \
   --prompt "Split combobox component into modular files (components/, hooks/, utils/, types/, index.ts). Max 200 lines per file. No circular deps. Maintain functionality." \
@@ -81,7 +81,7 @@ fs.writeFileSync('/tmp/case1-fooks-context.json', JSON.stringify(result, null, 2
 # 2. Run with fooks context
 cd ~/Workspace/fooks-test-repos/ui && \
 npx codex exec \
-  --model gpt-4o \
+  --model gpt-5.4 \
   --full-auto \
   --skip-git-repo-check \
   --prompt-file /tmp/case1-fooks-context.json \

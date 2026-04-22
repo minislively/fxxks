@@ -28,7 +28,7 @@ cd ~/Workspace/fooks-test-repos/ui
 
 # 2. Vanilla 실행 (fooks 미사용)
 npx codex exec \
-  --model gpt-4o \
+  --model gpt-5.4 \
   --full-auto \
   --skip-git-repo-check \
   --prompt "Split this 1,249 line combobox component into modular files:
@@ -60,7 +60,7 @@ console.log(JSON.stringify(result, null, 2));
 
 # 2. Fooks 실행
 npx codex exec \
-  --model gpt-4o \
+  --model gpt-5.4 \
   --full-auto \
   --skip-git-repo-check \
   --prompt "$(cat /tmp/case1-fooks-context.json)

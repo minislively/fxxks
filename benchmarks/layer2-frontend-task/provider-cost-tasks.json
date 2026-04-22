@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "provider-cost-task-manifest.v1",
+  "description": "Small capped-live smoke manifest for estimated API cost evidence. Usage-only live smoke is not launch-grade until quality gates and the full campaign threshold are satisfied.",
+  "tasks": [
+    {
+      "id": "frontend-component-summary",
+      "targetPairCount": 1,
+      "qualityGate": {
+        "id": "provider-cost-import-smoke",
+        "version": "v1",
+        "command": "manual review or imported artifact gate"
+      },
+      "baselinePrompt": "Summarize the responsibilities of a React combobox component and list likely extraction boundaries.",
+      "fooksPrompt": "Using a compact prepared context, summarize the responsibilities of a React combobox component and list likely extraction boundaries."
+    },
+    {
+      "id": "frontend-refactor-plan",
+      "targetPairCount": 1,
+      "qualityGate": {
+        "id": "provider-cost-import-smoke",
+        "version": "v1",
+        "command": "manual review or imported artifact gate"
+      },
+      "baselinePrompt": "Draft a concise refactor plan for splitting a large TSX form section into components, hooks, utils, and types.",
+      "fooksPrompt": "Using a compact prepared context, draft a concise refactor plan for splitting a large TSX form section into components, hooks, utils, and types."
+    }
+  ]
+}

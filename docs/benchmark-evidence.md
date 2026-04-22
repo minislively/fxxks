@@ -59,6 +59,261 @@ medians were intentionally absent because there were no comparable accepted
 pairs. Treat this as additional negative diagnostic evidence, not as a win or a
 replacement for a later multi-task applied-code benchmark.
 
+### L2 provider usage estimated-cost evidence, 2026-04-22
+
+The L2 evidence tier is an OpenAI direct benchmark pipeline that converts
+provider API usage-token artifacts into **estimated API cost deltas** under an
+explicit pricing assumption. This tier is designed to answer whether a matched
+baseline/fooks pair used fewer OpenAI API input/output tokens and what that
+would mean under a dated pricing table.
+
+Model selection is not hardcoded to an older OpenAI model. Direct OpenAI runs
+resolve the request model as `--model` first, then `OPENAI_MODEL`, then the
+current default `gpt-5.4`; the recorded evidence still uses the provider
+response model when available. Cost estimation is similarly decoupled from the
+runner model: pricing must come from explicit rates or from a LiteLLM-shaped
+pricing catalog (`--pricing-catalog`, `--pricing-catalog-url`, or
+`--fetch-pricing`), following the same broad pattern as ccusage: usage logs
+carry the model, a pricing catalog resolves that model, and missing pricing
+keeps the result inconclusive.
+
+Generated local evidence defaults to the project-local `.fooks/evidence/`
+namespace rather than temporary directories:
+
+- `.fooks/evidence/provider-cost/<run-id>/` stores provider usage
+  estimated-cost JSON/Markdown artifacts.
+- `.fooks/evidence/runtime/<run-id>/` stores repeated matched-pair
+  runtime-token/time summaries.
+- `.fooks/evidence/billing-import/<run-id>/` stores the first-pass manual
+  billing import schema/readme. This is only a future reconciliation lane; it
+  does not collect credentials or prove invoice savings by itself.
+
+This remains estimate-only evidence: it is not an invoice, provider dashboard,
+charge, or billing-grade savings proof. It also does not establish stable
+runtime-token or wall-clock wins. Public summaries must label this tier as
+`estimated-api-cost-only` until a separate billing-grade validation lane exists.
+
+The repeated provider-cost campaign runner is the path for making a positive
+estimated API cost claim true. It writes campaign summaries to
+`.fooks/evidence/provider-cost/<run-id>/summary.json` and keeps a
+`campaign-ledger.json` beside the summary. Launch-grade estimated API cost
+evidence requires all of the following:
+
+- at least three predeclared task classes;
+- at least five accepted matched baseline/fooks pairs per task class;
+- matching model, endpoint, service tier, reasoning, and setup identity inside
+  each comparable group;
+- `validated-provider-import` or `live-openai-usage` provenance, not
+  fixture-only mechanics;
+- a positive median estimated total API cost reduction per task and overall;
+- task-class quality gates that are not `usage-smoke`;
+- a campaign manifest and attempted-pair ledger preserving planned, attempted,
+  accepted, failed, missing-usage, neutral, regressed, and omitted pair counts;
+- explicit pricing assumptions including input, cached-input, output,
+  endpoint/service-tier, long-context, and regional/data-residency treatment.
+
+Fixture-only runs can reach `fixture-launch-grade-mechanics` to prove the
+threshold logic in CI, but they do not unlock public positive claimability.
+Default capped live batches (`$5` / `10` matched pairs) are smoke or
+`narrow-estimated-cost-candidate` evidence unless an explicitly budgeted
+campaign reaches the full threshold.
+
+A launch-grade live template is available at
+`benchmarks/layer2-frontend-task/provider-cost-live-campaign-tasks.json`.
+It predeclares three task classes with five matched pairs each. Running it
+without a resolved OpenAI credential writes a local blocker artifact under
+`.fooks/` and does not make a provider request; running it with credentials
+still requires explicit spend caps. Auth resolution is `--auth-mode=auto` by
+default: environment API key first, then Codex OAuth from
+`$FOOKS_CODEX_HOME/auth.json`, `$CODEX_HOME/auth.json`, or `~/.codex/auth.json`.
+Use `--auth-mode=codex-oauth --transport=codex-exec` to force the common
+Codex/ChatGPT sign-in path. That transport shells out to `codex exec --json`
+and parses the `turn.completed.usage` event instead of requiring a platform API
+key:
+
+```bash
+npm run bench:layer2:provider-cost:repeated -- \
+  --live-openai \
+  --auth-mode=codex-oauth \
+  --transport=codex-exec \
+  --task-manifest=benchmarks/layer2-frontend-task/provider-cost-live-campaign-tasks.json \
+  --model="${OPENAI_MODEL:-gpt-5.4}" \
+  --max-matched-pairs=15 \
+  --max-estimated-usd=5 \
+  --campaign-max-estimated-usd=15 \
+  --run-id=provider-cost-live-campaign
+```
+
+The first Codex OAuth campaign using that synthetic template completed the
+intended 3 × 5 denominator, but it was classified as diagnostic-only: 15/15
+pairs were accepted for usage, 14/15 regressed on estimated API cost, and the
+overall median estimated API cost reduction was negative. That run is useful
+because it prevents cherry-picking the earlier one-pair smoke, but it must not
+be used as a product-mechanism proof: the `fooks` side used a prompt that said
+"compact prepared context" without injecting a real `fooks extract` payload, and
+Codex agentic workspace/tool activity dominated the provider usage tokens.
+
+For the next proof attempt, use the corrected real-payload campaign builder. It
+writes a task manifest with actual full-source baseline payloads and actual
+`fooks extract --model-payload` JSON payloads, preserves prompt payload-size
+stats, and recommends isolated Codex workdirs plus AB/BA order:
+
+```bash
+npm run bench:layer2:provider-cost:corrected-manifest -- \
+  --run-id=provider-cost-corrected-real-payload \
+  --target-pair-count=5
+```
+
+Then dry-run or execute the generated manifest with no-tool enforcement:
+
+```bash
+npm run bench:layer2:provider-cost:repeated -- \
+  --live-openai \
+  --auth-mode=codex-oauth \
+  --transport=codex-exec \
+  --codex-workdir=isolated \
+  --pair-order=abba \
+  --require-no-tool-use=true \
+  --task-manifest=.fooks/evidence/provider-cost/provider-cost-corrected-real-payload/corrected-task-manifest.json \
+  --model="${OPENAI_MODEL:-gpt-5.4}" \
+  --fetch-pricing \
+  --max-matched-pairs=15 \
+  --max-estimated-usd=5 \
+  --campaign-max-estimated-usd=15 \
+  --run-id=provider-cost-corrected-real-payload
+```
+
+If `codex exec` emits command execution events in this corrected lane, the
+pair-side quality gate fails. That protects the evidence from claiming a
+payload-only/no-tool result when workspace inspection was actually used.
+
+Cost/pricing is deliberately not part of corrected manifest generation. The
+builder only writes prompt contexts and payload-size stats. Pricing assumptions
+are resolved later by the repeated evidence runner (`--fetch-pricing` or
+explicit pricing args) and are recorded on the pair evidence/summary. This keeps
+the cost layer from changing extraction behavior or prompt construction.
+
+The corrected Codex OAuth campaign run
+`provider-cost-corrected-real-payload-campaign-20260422` passed this estimated
+API-cost threshold:
+
+- status: `launch-grade-estimated-cost-evidence`;
+- denominator: 3 task classes × 5 accepted matched pairs = 15/15 accepted;
+- no-tool gate: 0 `command_execution` events on every baseline/fooks side;
+- overall median estimated API cost delta: `+0.001362` USD;
+- overall median estimated API cost reduction: `+4.171%`;
+- aggregate estimated API cost: baseline `$0.588855` vs fooks `$0.5547775`
+  (`$0.0340775`, 5.787% lower under the recorded pricing assumption);
+- aggregate provider-reported usage tokens in the campaign: baseline `376,104` vs fooks `372,065`
+  (`4,039` fewer total tokens);
+- task medians were positive for all three task classes, while 4/15 individual
+  pairs still regressed.
+
+This result unlocks only the estimate-scoped statement:
+
+> In this corrected 2026-04-22 Codex OAuth benchmark campaign, fooks reduced
+> estimated OpenAI API cost under explicit pricing assumptions.
+
+It still does **not** prove provider invoice/dashboard savings, actual charged
+cost savings, provider billing-token savings, stable runtime-token savings, or
+stable wall-clock/latency savings.
+
+Larger public-code profiles are available for checking whether the observed
+effect scales beyond the small fixture lane:
+
+```bash
+npm run bench:layer2:provider-cost:corrected-manifest -- \
+  --profile=nextjs-large \
+  --nextjs-root=~/Workspace/fooks-test-repos/nextjs \
+  --run-id=provider-cost-nextjs-large-real-payload \
+  --target-pair-count=5
+
+npm run bench:layer2:provider-cost:corrected-manifest -- \
+  --profile=tailwind-large \
+  --tailwindcss-root=~/Workspace/fooks-test-repos/tailwindcss \
+  --run-id=provider-cost-tailwind-large-real-payload \
+  --target-pair-count=5
+```
+
+Known 2026-04-22 large-profile Codex OAuth outcomes, both using `gpt-5.4`,
+Codex OAuth, isolated workdirs, AB/BA pair order, real full-source baseline
+payloads, real fooks model-facing payloads, no-tool enforcement, and LiteLLM
+catalog pricing:
+
+- `provider-cost-nextjs-large-real-payload-campaign-20260422`
+  - status: `launch-grade-estimated-cost-evidence`;
+  - denominator: 15/15 accepted, 0 regressions, 0 `command_execution` events;
+  - median estimated API cost reduction: `26.492%`;
+  - aggregate provider-reported usage tokens in the campaign: baseline `446,275` vs fooks `382,139`
+    (`14.371%` fewer total usage tokens);
+  - aggregate estimated API cost: baseline `$0.88386` vs fooks `$0.64497`
+    (`$0.23889`, `27.028%` lower under the recorded pricing assumption);
+  - task median reductions: App Router summary `30.681%`, Layout Router
+    refactor plan `28.699%`, Error Boundary test strategy `19.447%`.
+- `provider-cost-tailwind-large-real-payload-campaign-20260422`
+  - status: `launch-grade-estimated-cost-evidence`;
+  - denominator: 15/15 accepted, 0 regressions, 0 `command_execution` events;
+  - median estimated API cost reduction: `38.238%`;
+  - aggregate provider-reported usage tokens in the campaign: baseline `718,616` vs fooks `381,583`
+    (`46.9%` fewer total usage tokens);
+  - aggregate estimated API cost: baseline `$1.598875` vs fooks `$0.64853`
+    (`$0.950345`, `59.438%` lower under the recorded pricing assumption);
+  - task median reductions: Utilities summary `78.992%`, Variants refactor
+    plan `38.238%`, CSS Parser test strategy `33.582%`.
+
+These larger-profile runs explain why the small fixture lane had only a weak
+cost signal: Codex requests include a fixed wrapper/system overhead, so a small
+local prompt reduction can be diluted. On larger Next.js/Tailwind payloads, the
+payload reduction is large enough to dominate that fixed overhead and produces
+repeatable provider usage-token and estimated API-cost wins. The claim boundary
+remains estimate-scoped; these runs still do not prove invoice/dashboard
+savings or stable runtime latency.
+
+An import validation kit is available at
+`benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/`, with the
+runbook `benchmarks/layer2-frontend-task/PROVIDER_COST_IMPORT_RUNBOOK.md`.
+It supports a non-live mechanics check:
+
+```bash
+npm run bench:layer2:provider-cost:repeated -- \
+  --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json \
+  --run-id=provider-cost-import-kit-smoke
+```
+
+This sample must report `fixture-launch-grade-mechanics`; real launch-grade
+estimated-cost evidence requires replacing the fixture pair evidence with
+real `validated-provider-import` or `live-openai-usage` artifacts and preserving
+the attempted-pair ledger.
+
+### Runtime repeated candidate evidence lane
+
+The `.fooks/evidence/runtime/<run-id>/` tier is for internal repeated local
+telemetry only. A useful first-pass run must keep the same task, model, and
+setup identity across at least five accepted vanilla/fooks matched pairs. The
+summary should keep failed, missing, mixed-identity, and regressed pairs visible
+instead of cherry-picking favorable comparisons.
+
+Candidate evidence uses resolved identity, not a claim that every raw artifact
+carried every metadata field. Artifact-level identity, pair-level identity, and
+run-level identity supplied by the repeated runner are all valid identity
+sources. When a pair inherits task/model/setup identity from pair or run
+defaults, the summary records inherited identity source reasons for auditability;
+unresolved identity still blocks candidate evidence.
+
+This tier separates three concepts:
+
+1. telemetry availability — whether CLI runtime-token/latency fields are
+   present and comparable;
+2. candidate evidence — whether the local repeated-pair threshold was met; and
+3. product claimability — which remains false for stable runtime-token/time and
+   provider billing claims.
+
+A positive runtime candidate summary may be used as internal follow-up evidence,
+but it is still **not** provider billing-token evidence, actual cost-savings
+evidence, stable runtime-token savings evidence, or stable latency/time savings
+evidence. Stable/public claims require a later higher-N and likely multi-task
+validation lane.
+
 ## Reproducing or extending evidence
 
 The benchmark harness source remains in `benchmarks/`. Generated outputs under

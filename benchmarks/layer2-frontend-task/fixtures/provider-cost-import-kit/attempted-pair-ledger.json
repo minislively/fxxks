@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "provider-cost-attempted-pair-ledger.v1",
+  "plannedPairCount": 15,
+  "attemptedPairCount": 15,
+  "acceptedPairCount": 15,
+  "failedPairCount": 0,
+  "rejectedPairCount": 0,
+  "missingUsagePairCount": 0,
+  "neutralPairCount": 0,
+  "regressedPairCount": 0,
+  "omittedPairs": [],
+  "attemptedPairs": [
+    {
+      "pairId": "frontend-component-summary-1",
+      "taskClass": "frontend-component-summary",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-component-summary-2",
+      "taskClass": "frontend-component-summary",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-component-summary-3",
+      "taskClass": "frontend-component-summary",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-component-summary-4",
+      "taskClass": "frontend-component-summary",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-component-summary-5",
+      "taskClass": "frontend-component-summary",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-refactor-plan-1",
+      "taskClass": "frontend-refactor-plan",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-refactor-plan-2",
+      "taskClass": "frontend-refactor-plan",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-refactor-plan-3",
+      "taskClass": "frontend-refactor-plan",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-refactor-plan-4",
+      "taskClass": "frontend-refactor-plan",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-refactor-plan-5",
+      "taskClass": "frontend-refactor-plan",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-type-extraction-1",
+      "taskClass": "frontend-type-extraction",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-type-extraction-2",
+      "taskClass": "frontend-type-extraction",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-type-extraction-3",
+      "taskClass": "frontend-type-extraction",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-type-extraction-4",
+      "taskClass": "frontend-type-extraction",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    },
+    {
+      "pairId": "frontend-type-extraction-5",
+      "taskClass": "frontend-type-extraction",
+      "status": "estimated-cost-reduction",
+      "included": true,
+      "sourceKind": "fixture-mechanics"
+    }
+  ],
+  "note": "Fixture mechanics ledger. Replace with real attempted-pair ledger for validated-provider-import campaigns."
+}

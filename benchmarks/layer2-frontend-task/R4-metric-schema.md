@@ -25,7 +25,7 @@
 ### 동일 조건 보장
 | 조건 | 동일성 |
 |------|--------|
-| LLM model | 동일 (예: gpt-4o/claude-sonnet) |
+| LLM model | 동일 (예: gpt-5.4/claude-sonnet) |
 | Temperature | 0.1 (deterministic) |
 | System prompt | 동일한 task instruction |
 | max_tokens | 동일 (예: 8192) |

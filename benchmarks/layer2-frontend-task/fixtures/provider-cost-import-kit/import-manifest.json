@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "provider-cost-import-manifest.v1",
+  "description": "Fixture mechanics import kit. Proves threshold mechanics only; not public positive provider-cost evidence.",
+  "campaignManifestPath": "campaign-manifest.json",
+  "attemptedPairLedgerPath": "attempted-pair-ledger.json",
+  "pairEvidence": [
+    "pair-evidence/frontend-component-summary-1.json",
+    "pair-evidence/frontend-component-summary-2.json",
+    "pair-evidence/frontend-component-summary-3.json",
+    "pair-evidence/frontend-component-summary-4.json",
+    "pair-evidence/frontend-component-summary-5.json",
+    "pair-evidence/frontend-refactor-plan-1.json",
+    "pair-evidence/frontend-refactor-plan-2.json",
+    "pair-evidence/frontend-refactor-plan-3.json",
+    "pair-evidence/frontend-refactor-plan-4.json",
+    "pair-evidence/frontend-refactor-plan-5.json",
+    "pair-evidence/frontend-type-extraction-1.json",
+    "pair-evidence/frontend-type-extraction-2.json",
+    "pair-evidence/frontend-type-extraction-3.json",
+    "pair-evidence/frontend-type-extraction-4.json",
+    "pair-evidence/frontend-type-extraction-5.json"
+  ]
+}
