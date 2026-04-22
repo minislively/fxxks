@@ -1,8 +1,13 @@
+import { scanProject } from "../core/scan";
 import { extractFile } from "../core/extract";
 import { detectAccountContext, finalizeAttach, installRuntimeManifest } from "./shared";
+import { completeClaudeInitialScan, initializeClaudeTrustStatus } from "./claude-runtime-trust";
 import type { AttachResult } from "../core/schema";
 
 export function attachClaude(sampleFile: string, cwd = process.cwd()): AttachResult {
+  initializeClaudeTrustStatus(cwd);
+  const scan = scanProject(cwd);
+  const trustStatus = completeClaudeInitialScan(scan.scannedAt, cwd);
   const sample = extractFile(sampleFile);
   const account = detectAccountContext(cwd);
   const attemptedAt = new Date().toISOString();
@@ -41,5 +46,5 @@ export function attachClaude(sampleFile: string, cwd = process.cwd()): AttachRes
       blocker: "Claude runtime home not detected",
     };
   })();
-  return finalizeAttach("claude", sample, runtimeProof, cwd);
+  return finalizeAttach("claude", sample, runtimeProof, cwd, trustStatus);
 }

@@ -29,6 +29,8 @@ const {
   resolveOpenAILiveAuth,
 } = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "openai-live-auth.js"));
 const {
+  buildBillingImportReconciliation,
+  renderBillingReconciliationMarkdown,
   writeBillingImportArtifacts,
 } = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "billing-import-evidence.js"));
 
@@ -438,6 +440,196 @@ test("billing manual import artifacts stay local and do not unlock billing claim
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test("billing import reconciliation links redacted billing data beside estimated evidence without unlocking billing claims", () => {
+  const reconciliation = buildBillingImportReconciliation({
+    runId: "billing-reconciliation-smoke",
+    billingImportArtifact: {
+      schemaVersion: "billing-import-evidence.v1",
+      provider: "openai",
+      account: { id: "acct-redacted", redacted: true },
+      period: { start: "2026-04-22", end: "2026-04-23" },
+      model: "test-model",
+      currency: "USD",
+      usage: { inputTokens: 140_000, outputTokens: 18_000 },
+      billedAmount: 0.42,
+      source: { type: "dashboard-export", timestamp: "2026-04-23T00:00:00.000Z", redacted: true },
+      claimability: {
+        providerInvoiceOrBillingSavings: false,
+        providerBillingTokenSavings: false,
+      },
+    },
+    estimatedEvidence: sampleEvidence(),
+  });
+
+  assert.equal(reconciliation.schemaVersion, "billing-import-reconciliation.v1");
+  assert.equal(reconciliation.status, "reconciliation-ready");
+  assert.equal(reconciliation.claimBoundary, "billing-import-reconciliation-only");
+  assert.equal(reconciliation.claimability.providerInvoiceOrBillingSavings, false);
+  assert.equal(reconciliation.claimability.providerBillingTokenSavings, false);
+  assert.equal(reconciliation.claimability.estimatedApiCostDelta, true);
+  assert.equal(reconciliation.billingImport.claimability.providerInvoiceOrBillingSavings, false);
+  assert.equal(reconciliation.estimatedEvidence.claimBoundary, "estimated-api-cost-only");
+
+  const checks = Object.fromEntries(reconciliation.checks.map((item) => [item.id, item.status]));
+  assert.equal(checks["provider-match"], "pass");
+  assert.equal(checks["model-match"], "pass");
+  assert.equal(checks["billed-amount-present"], "pass");
+  assert.equal(checks["billing-claimability-blocked"], "pass");
+
+  const markdown = renderBillingReconciliationMarkdown(reconciliation);
+  assert.match(markdown, /Billing import reconciliation evidence/i);
+  assert.match(markdown, /not provider invoice\/billing savings proof/i);
+  assert.match(markdown, /does not unlock provider billing-token savings claims/i);
+});
+
+test("billing import reconciliation reports provider/model mismatches as non-claimable blockers", () => {
+  const reconciliation = buildBillingImportReconciliation({
+    billingImportArtifact: {
+      schemaVersion: "billing-import-evidence.v1",
+      provider: "anthropic",
+      period: { start: "2026-04-22", end: "2026-04-23" },
+      model: "claude-test",
+      currency: "USD",
+      usage: { inputTokens: 10_000, outputTokens: 1_000 },
+      billedAmount: 0.10,
+      source: { type: "manual-entry", timestamp: "2026-04-23T00:00:00.000Z", redacted: true },
+      claimability: {
+        providerInvoiceOrBillingSavings: true,
+        providerBillingTokenSavings: true,
+      },
+    },
+    estimatedEvidence: sampleEvidence(),
+  });
+
+  assert.equal(reconciliation.status, "mismatch");
+  assert.equal(reconciliation.claimability.providerInvoiceOrBillingSavings, false);
+  assert.equal(reconciliation.claimability.providerBillingTokenSavings, false);
+  assert.match(reconciliation.statusReasons.join("\n"), /anthropic vs openai/);
+  assert.match(reconciliation.statusReasons.join("\n"), /claude-test vs test-model/);
+  assert.match(reconciliation.warnings.join("\n"), /force-disabled/);
+});
+
+test("billing import reconciliation accepts provider-cost campaign summaries", () => {
+  const reconciliation = buildBillingImportReconciliation({
+    billingImportArtifact: {
+      schemaVersion: "billing-import-evidence.v1",
+      provider: "openai",
+      account: { redacted: true },
+      period: { start: "2026-04-22", end: "2026-04-23" },
+      model: "gpt-5.4",
+      currency: "USD",
+      usage: { inputTokens: 376_104, outputTokens: 40_000 },
+      billedAmount: 0.59,
+      source: { type: "invoice", timestamp: "2026-04-23T00:00:00.000Z", redacted: true },
+      claimability: {
+        providerInvoiceOrBillingSavings: false,
+        providerBillingTokenSavings: false,
+      },
+    },
+    estimatedEvidence: {
+      schemaVersion: "provider-cost-repeated-summary.v1",
+      claimBoundary: "estimated-api-cost-only",
+      runId: "campaign-summary-smoke",
+      status: "launch-grade-estimated-cost-evidence",
+      campaignManifest: {
+        model: "gpt-5.4",
+        pricingSourceUrl: "https://openai.com/api/pricing/",
+        pricingCheckedDate: "2026-04-22",
+      },
+      medians: {
+        estimatedApiCostDelta: 0.001362,
+        estimatedApiCostReductionPct: 4.171,
+      },
+      pairs: [{
+        sourceKind: "live-openai-usage",
+        identity: { provider: "openai", model: "gpt-5.4" },
+        pricingAssumption: { provider: "openai", model: "gpt-5.4", currency: "USD" },
+      }],
+      claimability: {
+        estimatedApiCostPositiveEvidence: true,
+        providerInvoiceOrBillingSavings: false,
+        providerBillingTokenSavings: false,
+      },
+    },
+  });
+
+  assert.equal(reconciliation.status, "reconciliation-ready");
+  assert.equal(reconciliation.estimatedEvidence.evidenceKind, "campaign-summary");
+  assert.equal(reconciliation.estimatedEvidence.deltas.aggregation, "median");
+  assert.equal(reconciliation.claimability.providerInvoiceOrBillingSavings, false);
+});
+
+test("billing import CLI writes reconciliation JSON and Markdown under project-local .fooks", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-billing-reconcile-"));
+  try {
+    const importPath = path.join(tempRoot, "billing-import.json");
+    const evidencePath = path.join(tempRoot, "estimated-evidence.json");
+    fs.writeFileSync(importPath, JSON.stringify({
+      schemaVersion: "billing-import-evidence.v1",
+      provider: "openai",
+      account: { redacted: true },
+      period: { start: "2026-04-22", end: "2026-04-23" },
+      model: "test-model",
+      currency: "USD",
+      usage: { inputTokens: 140_000, outputTokens: 18_000 },
+      billedAmount: 0.42,
+      source: { type: "usage-export", timestamp: "2026-04-23T00:00:00.000Z", redacted: true },
+      claimability: {
+        providerInvoiceOrBillingSavings: false,
+        providerBillingTokenSavings: false,
+      },
+    }));
+    fs.writeFileSync(evidencePath, JSON.stringify(sampleEvidence()));
+
+    const stdout = execFileSync(process.execPath, [
+      path.join(repoRoot, "benchmarks", "layer2-frontend-task", "billing-import-evidence.js"),
+      `--import=${importPath}`,
+      `--estimated-evidence=${evidencePath}`,
+      "--run-id=billing-reconcile-smoke",
+    ], { cwd: tempRoot, encoding: "utf8" });
+
+    const summary = JSON.parse(stdout);
+    assert.equal(summary.reconciliationStatus, "reconciliation-ready");
+    assert.equal(summary.reconciliationPath, ".fooks/evidence/billing-import/billing-reconcile-smoke/reconciliation.json");
+    assert.equal(summary.reconciliationMarkdownPath, ".fooks/evidence/billing-import/billing-reconcile-smoke/reconciliation.md");
+
+    const reconciliationPath = path.join(tempRoot, summary.reconciliationPath);
+    const markdownPath = path.join(tempRoot, summary.reconciliationMarkdownPath);
+    const reconciliation = JSON.parse(fs.readFileSync(reconciliationPath, "utf8"));
+    assert.equal(reconciliation.claimability.providerInvoiceOrBillingSavings, false);
+    assert.equal(reconciliation.status, "reconciliation-ready");
+    assert.match(fs.readFileSync(markdownPath, "utf8"), /not provider invoice\/billing savings proof/i);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("billing import example fixture reconciles against matching estimated evidence", () => {
+  const fixturePath = path.join(
+    repoRoot,
+    "benchmarks",
+    "layer2-frontend-task",
+    "fixtures",
+    "billing-import",
+    "redacted-openai-dashboard-export.example.json",
+  );
+  const billingImportArtifact = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+  const estimatedEvidence = buildProviderCostEvidence({
+    baselineArtifact: { provider: "openai", model: "gpt-5.4", inputTokens: 100_000, outputTokens: 10_000 },
+    fooksArtifact: { provider: "openai", model: "gpt-5.4", inputTokens: 40_000, outputTokens: 8_000 },
+    pricing: {
+      ...pricing,
+      model: "gpt-5.4",
+    },
+  });
+
+  const reconciliation = buildBillingImportReconciliation({ billingImportArtifact, estimatedEvidence });
+  assert.equal(reconciliation.status, "reconciliation-ready");
+  assert.equal(reconciliation.billingImport.source.redacted, true);
+  assert.equal(reconciliation.claimability.providerInvoiceOrBillingSavings, false);
+  assert.equal(reconciliation.claimability.providerBillingTokenSavings, false);
 });
 
 test("provider cost evidence CLI can read a LiteLLM-shaped pricing catalog", () => {

@@ -14,6 +14,17 @@ import { ManifestLoader } from './manifest-loader.mjs';
 import { BucketClassifier, DEFAULT_BUCKETS } from './bucket-classifier.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+export const EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY =
+  'local/dry-run edit targeting evidence only; not provider billing/cost proof and not LSP semantic safety';
+const WITH_GUIDANCE_LOCALIZATION_STEPS = Object.freeze([
+  'read-model-payload',
+  'verify-sourceFingerprint',
+  'select-patchTarget',
+]);
+const WITHOUT_GUIDANCE_LOCALIZATION_STEPS = Object.freeze([
+  'read-source-or-search',
+  'locate-edit-anchor-manually',
+]);
 
 function computeSeed(repoName, bucketId, globalSeed) {
   const hash = createHash('sha256');
@@ -76,6 +87,41 @@ function selectSamples(files, targetSize, seed) {
   }
   
   return selected;
+}
+
+function normalizePatchTargetsCount(value) {
+  return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+function buildEditGuidanceEvidenceVariant(editGuidanceEnabled, patchTargetsCount) {
+  const normalizedPatchTargetsCount = editGuidanceEnabled ? normalizePatchTargetsCount(patchTargetsCount) : 0;
+
+  return {
+    editGuidanceEnabled,
+    patchTargetsCount: normalizedPatchTargetsCount,
+    freshnessChecked: editGuidanceEnabled && normalizedPatchTargetsCount > 0,
+    targetLocalizationSteps: editGuidanceEnabled
+      ? [...WITH_GUIDANCE_LOCALIZATION_STEPS]
+      : [...WITHOUT_GUIDANCE_LOCALIZATION_STEPS],
+    claimBoundary: EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY,
+  };
+}
+
+export function buildEditGuidanceEvidencePair(options = {}) {
+  const targetFile = options.targetFile || 'unresolved-frontend-target.tsx';
+  const componentName = options.componentName || 'UnresolvedComponent';
+  const patchTargetsCount = normalizePatchTargetsCount(options.patchTargetsCount ?? 1) || 1;
+
+  return {
+    schemaVersion: 'fooks-edit-guidance-evidence.v1',
+    pairedTarget: {
+      filePath: targetFile,
+      componentName,
+    },
+    comparisonInvariant: 'with-guidance and without-guidance variants must use this same target file and component',
+    withGuidance: buildEditGuidanceEvidenceVariant(true, patchTargetsCount),
+    withoutGuidance: buildEditGuidanceEvidenceVariant(false, 0),
+  };
 }
 
 export class DryRunCommand {
@@ -148,6 +194,16 @@ export class DryRunCommand {
       };
     }
 
+    const selectedFiles = Object.values(bucketResults).flatMap(bucket => bucket.selectedFiles);
+    const editGuidanceTarget = options.editGuidanceTarget || {};
+    const editGuidanceEvidence = options.editGuidanceEvidence
+      ? buildEditGuidanceEvidencePair({
+          targetFile: editGuidanceTarget.filePath || selectedFiles[0]?.path,
+          componentName: editGuidanceTarget.componentName,
+          patchTargetsCount: options.editGuidancePatchTargetsCount,
+        })
+      : undefined;
+
     const report = {
       schemaVersion: 'fooks-benchmark.v2-dry-run',
       timestamp: new Date().toISOString(),
@@ -165,6 +221,7 @@ export class DryRunCommand {
       },
       buckets: bucketResults,
       discovery: classifier.lastDiscovery,
+      ...(editGuidanceEvidence ? { editGuidanceEvidence } : {}),
       coverageStatus: criticalDeficits > 0 ? 'insufficient' : 
                       Object.values(bucketResults).some(b => b.status === 'undersampled') ? 'partial' : 'full'
     };

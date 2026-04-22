@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export const CLAUDE_HOOK_EVENTS = ["SessionStart", "UserPromptSubmit"] as const;
+export const CLAUDE_HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "Stop"] as const;
 const CLAUDE_HOOK_SUFFIX = "claude-runtime-hook --native-hook";
 
 export type ClaudeHookEvent = (typeof CLAUDE_HOOK_EVENTS)[number];

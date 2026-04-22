@@ -268,7 +268,7 @@ export function readClaudeRuntimeStatus(cwd = process.cwd()): ClaudeRuntimeStatu
           ],
     notes: [
       "Claude P0 uses project-local context hooks in .claude/settings.local.json only; fooks does not mutate ~/.claude/settings.json.",
-      "Claude P0 supports project-local SessionStart/UserPromptSubmit context hooks only: first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may inject bounded context, and fooks does not intercept Read/tool calls or claim runtime-token savings.",
+      "Claude P0 supports project-local SessionStart/UserPromptSubmit/Stop context hooks: first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may inject bounded context, Stop cleans up session state, and fooks does not intercept Read/tool calls or claim runtime-token savings.",
     ],
   };
 }

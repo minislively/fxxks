@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { adapterDir, canonicalProjectDataDir, ensureProjectDataDirs } from "../core/paths";
-import type { AttachResult, CodexTrustStatus, ExtractionResult } from "../core/schema";
+import type { AttachResult, ClaudeTrustStatus, CodexTrustStatus, ExtractionResult } from "../core/schema";
 
 type AccountDetection = {
   account: string;
@@ -176,7 +176,7 @@ export function finalizeAttach(
   sample: ExtractionResult,
   runtimeProof: AttachResult["runtimeProof"],
   cwd = process.cwd(),
-  trustStatus?: CodexTrustStatus,
+  trustStatus?: CodexTrustStatus | ClaudeTrustStatus,
 ): AttachResult {
   return {
     runtime,

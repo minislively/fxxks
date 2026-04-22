@@ -4,7 +4,11 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BucketClassifier, DEFAULT_BUCKETS, _test } from '../benchmarks/frontend-harness/v2-runner/src/bucket-classifier.mjs';
-import { DryRunCommand } from '../benchmarks/frontend-harness/v2-runner/src/dry-run.mjs';
+import {
+  EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY,
+  DryRunCommand,
+  buildEditGuidanceEvidencePair,
+} from '../benchmarks/frontend-harness/v2-runner/src/dry-run.mjs';
 
 function writeFile(path, content) {
   mkdirSync(dirname(path), { recursive: true });
@@ -174,6 +178,84 @@ test('DryRunCommand reports additive discovery metadata and source-root traceabi
 
     assert.equal(report.coverageStatus, 'insufficient');
     assert.equal(exitCode, 1);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('edit guidance evidence pair keeps variants matched and claim-bounded', () => {
+  const evidence = buildEditGuidanceEvidencePair({
+    targetFile: 'apps/web/components/Button.tsx',
+    componentName: 'Button',
+    patchTargetsCount: 2
+  });
+
+  assert.equal(evidence.schemaVersion, 'fooks-edit-guidance-evidence.v1');
+  assert.deepEqual(evidence.pairedTarget, {
+    filePath: 'apps/web/components/Button.tsx',
+    componentName: 'Button'
+  });
+  assert.match(evidence.comparisonInvariant, /same target file and component/);
+
+  assert.equal(evidence.withGuidance.editGuidanceEnabled, true);
+  assert.equal(evidence.withGuidance.patchTargetsCount, 2);
+  assert.equal(evidence.withGuidance.freshnessChecked, true);
+  assert.deepEqual(evidence.withGuidance.targetLocalizationSteps, [
+    'read-model-payload',
+    'verify-sourceFingerprint',
+    'select-patchTarget'
+  ]);
+
+  assert.equal(evidence.withoutGuidance.editGuidanceEnabled, false);
+  assert.equal(evidence.withoutGuidance.patchTargetsCount, 0);
+  assert.equal(evidence.withoutGuidance.freshnessChecked, false);
+  assert.deepEqual(evidence.withoutGuidance.targetLocalizationSteps, [
+    'read-source-or-search',
+    'locate-edit-anchor-manually'
+  ]);
+
+  for (const variant of [evidence.withGuidance, evidence.withoutGuidance]) {
+    assert.equal(variant.claimBoundary, EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY);
+    assert.match(variant.claimBoundary, /not provider billing\/cost proof/);
+    assert.match(variant.claimBoundary, /not LSP semantic safety/);
+    assert.equal(
+      variant.targetLocalizationSteps.every(step => typeof step === 'string' && step.length > 0),
+      true
+    );
+  }
+});
+
+test('DryRunCommand can attach opt-in edit guidance evidence without changing default reports', async () => {
+  const fixture = createFixture();
+  try {
+    const defaultOutputPath = join(fixture.root, 'dry-run-default.json');
+    const evidenceOutputPath = join(fixture.root, 'dry-run-evidence.json');
+    const command = new DryRunCommand(fixture.manifestPath, fixture.reposBaseDir);
+
+    const defaultRun = await command.execute('fixture', { output: defaultOutputPath });
+    assert.equal(Object.hasOwn(defaultRun.report, 'editGuidanceEvidence'), false);
+
+    const evidenceRun = await command.execute('fixture', {
+      output: evidenceOutputPath,
+      editGuidanceEvidence: true,
+      editGuidanceTarget: {
+        filePath: 'apps/web/components/Button.tsx',
+        componentName: 'Button'
+      },
+      editGuidancePatchTargetsCount: 1
+    });
+    const written = JSON.parse(readFileSync(evidenceOutputPath, 'utf-8'));
+    const evidence = written.editGuidanceEvidence;
+
+    assert.equal(evidence.withGuidance.editGuidanceEnabled, true);
+    assert.equal(evidence.withoutGuidance.editGuidanceEnabled, false);
+    assert.deepEqual(evidence.pairedTarget, {
+      filePath: 'apps/web/components/Button.tsx',
+      componentName: 'Button'
+    });
+    assert.deepEqual(evidenceRun.report.editGuidanceEvidence, evidence);
+    assert.equal(Array.isArray(evidence.withGuidance.targetLocalizationSteps), true);
+    assert.equal(Array.isArray(evidence.withoutGuidance.targetLocalizationSteps), true);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

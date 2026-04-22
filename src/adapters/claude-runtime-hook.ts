@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { decidePreRead } from "./pre-read";
-import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, readClaudeRuntimeSession, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
+import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
+import { ensureFreshClaudeContextForTarget } from "./claude-runtime-trust";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 import {
@@ -64,13 +65,34 @@ function payloadContextMode(payload: NonNullable<ReturnType<typeof decidePreRead
   return payload.useOriginal ? "light-minimal" : "light";
 }
 
-function buildPayloadContext(filePath: string, payload: NonNullable<ReturnType<typeof decidePreRead>["payload"]>, contextMode: ContextMode): string {
-  return clampAdditionalContext([
+function buildPayloadContext(
+  filePath: string,
+  payload: NonNullable<ReturnType<typeof decidePreRead>["payload"]>,
+  contextMode: ContextMode,
+): { context: string; truncated: boolean; removedSections: string[] } {
+  const prefix = [
     `fooks: Claude context hook · file: ${filePath} · context-mode: ${contextMode}`,
     "fooks does not intercept Claude Read or claim runtime-token savings.",
     "",
-    JSON.stringify(payload, null, 2),
-  ].join("\n"));
+  ].join("\n");
+  const maxPayloadChars = CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS - prefix.length;
+  const removedSections: string[] = [];
+  const workingPayload = { ...payload } as Record<string, unknown>;
+  const sectionsToRemove = ["style", "snippets", "structure", "behavior"];
+
+  let json = JSON.stringify(workingPayload, null, 2);
+  while (json.length > maxPayloadChars && sectionsToRemove.length > 0) {
+    const section = sectionsToRemove.shift()!;
+    if (workingPayload[section] !== undefined) {
+      delete workingPayload[section];
+      removedSections.push(section);
+      json = JSON.stringify(workingPayload, null, 2);
+    }
+  }
+
+  const truncated = removedSections.length > 0;
+  const context = clampAdditionalContext(`${prefix}${json}`);
+  return { context, truncated, removedSections };
 }
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
@@ -229,14 +251,56 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     return runtimeDecision;
   }
 
-  const currentMtime = fs.statSync(resolvedTarget).mtimeMs;
-  const priorMtime = readClaudeRuntimeSession(cwd, sessionKey).seenFiles[target]?.lastModifiedAtMs;
-  const refreshed = priorMtime !== undefined && priorMtime !== currentMtime;
-
   const { statePath, seenCount } = markClaudeRuntimeSeenFile(cwd, sessionKey, target);
   const repeatedFile = seenCount >= 2;
 
+  const freshness = repeatedFile ? ensureFreshClaudeContextForTarget(target, cwd) : { refreshed: false };
+  const refreshed = freshness.refreshed;
+
   if (!repeatedFile) {
+    if (process.env.FOOKS_CLAUDE_FIRST_SEEN_INJECT === "1") {
+      let preRead: ReturnType<typeof decidePreRead> | undefined;
+      try {
+        preRead = decidePreRead(resolvedTarget, cwd);
+      } catch {
+        // fall through to default record behavior
+      }
+      if (preRead?.decision === "payload" && preRead.payload) {
+        const contextMode = payloadContextMode(preRead.payload);
+        const { context: additionalContext, truncated, removedSections } = buildPayloadContext(target, preRead.payload, contextMode);
+        const reasons = ["first-seen-file", "first-seen-inject"];
+        if (truncated) {
+          reasons.push(`truncated: ${removedSections.join(", ")}`);
+        }
+        const decision: ClaudeRuntimeHookDecision = {
+          runtime: "claude",
+          hookEventName,
+          action: "inject",
+          filePath: target,
+          reasons,
+          additionalContext,
+          statePath,
+          contextMode,
+          contextModeReason: contextMode === "light-minimal" ? "first-seen-exact-file-tiny-raw-original" : "first-seen-exact-file-payload",
+          contextBudget: policy.contextBudget,
+          promptSpecificity: policy.promptSpecificity,
+          contextPolicyVersion: policy.contextPolicyVersion,
+          debug: {
+            repeatedFile: false,
+            eligible: true,
+            bounded: true,
+            escapeHatchUsed: false,
+          },
+        };
+        recordClaudeMetric(cwd, sessionKey, decision, {
+          originalEstimatedBytes: targetEstimatedBytes(cwd, target),
+          actualEstimatedBytes: estimateTextBytes(additionalContext),
+          comparableForSavings: true,
+        });
+        return decision;
+      }
+    }
+
     const decision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
       hookEventName,
@@ -301,13 +365,17 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
 
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
-    const additionalContext = buildPayloadContext(target, decision.payload, contextMode);
+    const { context: additionalContext, truncated, removedSections } = buildPayloadContext(target, decision.payload, contextMode);
+    const reasons = refreshed ? ["repeated-file", "refreshed-before-inject"] : ["repeated-file"];
+    if (truncated) {
+      reasons.push(`truncated: ${removedSections.join(", ")}`);
+    }
     const runtimeDecision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
       hookEventName,
       action: "inject",
       filePath: target,
-      reasons: refreshed ? ["repeated-file", "refreshed-before-inject"] : ["repeated-file"],
+      reasons,
       additionalContext,
       statePath,
       contextMode,

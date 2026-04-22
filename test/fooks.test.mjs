@@ -2035,7 +2035,7 @@ test("status claude reports handoff-ready artifacts when project-local hooks are
   assert.equal(status.manifest.valid, true);
   assert.equal(status.hooks.exists, false);
   assert.equal(status.hooks.ready, false);
-  assert.deepEqual(status.hooks.missingEvents, ["SessionStart", "UserPromptSubmit"]);
+  assert.deepEqual(status.hooks.missingEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
 
   const text = collectStrings(status).join("\n");
   assert.match(text, /manual-shared-handoff/);
@@ -2055,29 +2055,29 @@ test("install claude-hooks creates local settings and status reports context-hoo
   assert.equal(result.runtime, "claude");
   assert.equal(result.created, true);
   assert.equal(result.modified, true);
-  assert.deepEqual(result.installedEvents, ["SessionStart", "UserPromptSubmit"]);
+  assert.deepEqual(result.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
   assert.equal(result.settingsPath, path.join(fs.realpathSync(tempDir), ".claude", "settings.local.json"));
 
   const settings = JSON.parse(fs.readFileSync(path.join(tempDir, ".claude", "settings.local.json"), "utf8"));
   assert.equal(settings.hooks.SessionStart[0].hooks[0].command, "fooks claude-runtime-hook --native-hook");
   assert.equal(settings.hooks.UserPromptSubmit[0].hooks[0].command, "fooks claude-runtime-hook --native-hook");
+  assert.equal(settings.hooks.Stop[0].hooks[0].command, "fooks claude-runtime-hook --native-hook");
   assert.equal(settings.hooks.Read, undefined);
   assert.equal(settings.hooks.PreToolUse, undefined);
   assert.equal(settings.hooks.PostToolUse, undefined);
-  assert.equal(settings.hooks.Stop, undefined);
   assert.equal(settings.hooks.SubagentStop, undefined);
   assert.equal(fs.existsSync(path.join(tempDir, ".claude", "settings.json")), false);
 
   const second = run(["install", "claude-hooks"], tempDir, env);
   assert.equal(second.modified, false);
-  assert.deepEqual(second.skippedEvents, ["SessionStart", "UserPromptSubmit"]);
+  assert.deepEqual(second.skippedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
 
   const status = run(["status", "claude"], tempDir, env);
   assert.equal(status.state, "context-hook-ready");
   assert.equal(status.mode, "automatic-context-hook");
   assert.equal(status.ready, true);
   assert.equal(status.hooks.ready, true);
-  assert.deepEqual(status.hooks.installedEvents, ["SessionStart", "UserPromptSubmit"]);
+  assert.deepEqual(status.hooks.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
   assert.deepEqual(status.hooks.missingEvents, []);
   assert.deepEqual(status.hooks.unexpectedFooksEvents, []);
 });

@@ -19,6 +19,75 @@ Launch-grade estimated API cost evidence requires:
 
 Fixture samples only prove mechanics. They should classify as `fixture-launch-grade-mechanics`, not public positive evidence.
 
+## Offline billing import reconciliation
+
+The billing-import tier is the safe, non-live bridge from existing estimated API
+cost evidence to future billing review. It validates a redacted/local billing
+artifact and writes a side-by-side reconciliation beside a provider-cost
+`evidence.json` or campaign `summary.json`.
+
+Generate only the local import schema/readme:
+
+```bash
+npm run bench:layer2:billing-import -- \
+  --run-id=billing-import-schema-smoke
+```
+
+Reconcile a redacted billing/dashboard/export/manual artifact with an existing
+estimated-cost artifact:
+
+```bash
+npm run bench:layer2:billing-import -- \
+  --import=/path/to/redacted-billing-import.json \
+  --estimated-evidence=.fooks/evidence/provider-cost/<run-id>/evidence.json \
+  --run-id=billing-reconciliation-review
+```
+
+A synthetic redacted example import is available for local mechanics checks:
+
+```bash
+npm run bench:layer2:billing-import -- \
+  --import=benchmarks/layer2-frontend-task/fixtures/billing-import/redacted-openai-dashboard-export.example.json \
+  --estimated-evidence=.fooks/evidence/provider-cost/<run-id>/evidence.json \
+  --run-id=billing-reconciliation-example
+```
+
+Campaign summaries can be passed with `--summary` or `--provider-cost`:
+
+```bash
+npm run bench:layer2:billing-import -- \
+  --import=/path/to/redacted-billing-import.json \
+  --summary=.fooks/evidence/provider-cost/<run-id>/summary.json \
+  --run-id=billing-campaign-reconciliation-review
+```
+
+Generated output:
+
+- `.fooks/evidence/billing-import/<run-id>/import.schema.json`
+- `.fooks/evidence/billing-import/<run-id>/README.md`
+- `.fooks/evidence/billing-import/<run-id>/reconciliation.json` when both
+  `--import` and estimated evidence are provided
+- `.fooks/evidence/billing-import/<run-id>/reconciliation.md` when both
+  `--import` and estimated evidence are provided
+
+The reconciliation status is intentionally narrow:
+
+- `reconciliation-ready`: required billing fields, provider/model matching,
+  usage tokens, billed amount, and estimate-scoped provider-cost evidence are
+  present for side-by-side review.
+- `inconclusive`: non-fatal data is missing, such as model, billed amount,
+  usage tokens, redaction metadata, or estimated aggregate cost.
+- `mismatch`: provider/model/period contract checks block linking the import
+  to the estimated evidence.
+- `invalid`: required import or estimated-evidence fields are absent or the
+  estimated evidence is not `estimated-api-cost-only`.
+
+Claim boundary: this is still **not** provider invoice/dashboard savings proof,
+actual charged-cost savings proof, or provider billing-token savings proof. The
+artifact always keeps `providerInvoiceOrBillingSavings=false` and
+`providerBillingTokenSavings=false`; it only makes the future billing review
+lane auditable without collecting credentials or calling billing APIs.
+
 ## Files in the import kit
 
 Fixture mechanics kit:

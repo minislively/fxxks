@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "billing-import-evidence.v1",
+  "provider": "openai",
+  "account": {
+    "id": "acct_redacted_example",
+    "projectId": "proj_redacted_example",
+    "redacted": true
+  },
+  "period": {
+    "start": "2026-04-22T00:00:00.000Z",
+    "end": "2026-04-23T00:00:00.000Z"
+  },
+  "model": "gpt-5.4",
+  "currency": "USD",
+  "usage": {
+    "inputTokens": 140000,
+    "outputTokens": 18000,
+    "cachedInputTokens": 0,
+    "cacheCreationInputTokens": 0
+  },
+  "billedAmount": 0.42,
+  "source": {
+    "type": "dashboard-export",
+    "timestamp": "2026-04-23T00:00:00.000Z",
+    "redacted": true,
+    "note": "Synthetic redacted example for exercising the local billing-import reconciliation lane; not a real invoice or dashboard export."
+  },
+  "claimability": {
+    "providerInvoiceOrBillingSavings": false,
+    "providerBillingTokenSavings": false
+  }
+}

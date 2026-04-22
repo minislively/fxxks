@@ -84,14 +84,38 @@ namespace rather than temporary directories:
   estimated-cost JSON/Markdown artifacts.
 - `.fooks/evidence/runtime/<run-id>/` stores repeated matched-pair
   runtime-token/time summaries.
-- `.fooks/evidence/billing-import/<run-id>/` stores the first-pass manual
-  billing import schema/readme. This is only a future reconciliation lane; it
-  does not collect credentials or prove invoice savings by itself.
+- `.fooks/evidence/billing-import/<run-id>/` stores the manual billing import
+  schema/readme and, when a redacted billing import plus estimated-cost evidence
+  are provided, `reconciliation.json` / `reconciliation.md` side-by-side review
+  artifacts.
 
 This remains estimate-only evidence: it is not an invoice, provider dashboard,
 charge, or billing-grade savings proof. It also does not establish stable
 runtime-token or wall-clock wins. Public summaries must label this tier as
 `estimated-api-cost-only` until a separate billing-grade validation lane exists.
+
+The billing import reconciliation lane is intentionally offline and local. It
+accepts provider invoice/dashboard/export/manual data that has already been
+redacted by the operator, compares provider/model/period/source/usage/billed
+amount fields against existing provider-cost `evidence.json` or campaign
+`summary.json`, and records whether the link is `reconciliation-ready`,
+`inconclusive`, `mismatch`, or `invalid`:
+
+```bash
+npm run bench:layer2:billing-import -- \
+  --import=/path/to/redacted-billing-import.json \
+  --estimated-evidence=.fooks/evidence/provider-cost/<run-id>/evidence.json \
+  --run-id=billing-reconciliation-review
+```
+
+For mechanics-only local checks, use the synthetic redacted example at
+`benchmarks/layer2-frontend-task/fixtures/billing-import/redacted-openai-dashboard-export.example.json`.
+
+This closes the previous tooling gap around provider billing/cost connection,
+but it does not change public claimability by itself. Reconciliation artifacts
+keep `providerInvoiceOrBillingSavings=false` and
+`providerBillingTokenSavings=false`; they are a review bridge, not billing-grade
+savings proof.
 
 The repeated provider-cost campaign runner is the path for making a positive
 estimated API cost claim true. It writes campaign summaries to

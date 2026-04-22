@@ -353,6 +353,21 @@ export type CodexTrustStatus = {
   updatedAt: string;
 };
 
+export type ClaudeActiveFileContext = CodexActiveFileContext;
+export type ClaudeTrustLifecycleState = CodexTrustLifecycleState;
+
+export type ClaudeTrustStatus = {
+  runtime: "claude";
+  connectionState: "connected" | "disconnected";
+  lifecycleState: ClaudeTrustLifecycleState;
+  attachedAt?: string;
+  lastScanAt?: string;
+  lastRefreshAt?: string;
+  lastAttachPreparedAt?: string;
+  activeFile?: ClaudeActiveFileContext;
+  updatedAt: string;
+};
+
 export type AttachResult = {
   runtime: "codex" | "claude";
   accountContext: string;
@@ -370,5 +385,5 @@ export type AttachResult = {
     artifactPath?: string;
     blocker?: string;
   };
-  trustStatus?: CodexTrustStatus;
+  trustStatus?: CodexTrustStatus | ClaudeTrustStatus;
 };
