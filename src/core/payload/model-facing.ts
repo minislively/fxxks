@@ -1,5 +1,17 @@
 import path from "node:path";
-import type { ExtractionResult, ModelFacingPayload, SourceFingerprint } from "../schema";
+import type { EditGuidance, ExtractionResult, ModelFacingPayload, PatchTarget, PatchTargetKind, SourceFingerprint, SourceRange } from "../schema";
+
+const PATCH_TARGET_LIMIT = 12;
+
+const EDIT_GUIDANCE_INSTRUCTIONS = [
+  "Use patchTargets only after confirming sourceFingerprint.fileHash and sourceFingerprint.lineCount still match the current source.",
+  "If fileHash or lineCount changed, re-run fooks extract or read the file before editing.",
+  "Treat loc ranges as AST-derived line edit aids, not LSP-backed semantic rename/reference locations.",
+];
+
+export type ModelFacingPayloadOptions = {
+  includeEditGuidance?: boolean;
+};
 
 function pruneArray<T>(value: T[] | undefined): T[] | undefined {
   return value && value.length > 0 ? value : undefined;
@@ -36,7 +48,76 @@ function sourceFingerprint(result: ExtractionResult): SourceFingerprint | undefi
   };
 }
 
-export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd()): ModelFacingPayload {
+function patchTargetLabel(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : fallback;
+}
+
+function buildEditGuidance(result: ExtractionResult, freshness: SourceFingerprint | undefined): EditGuidance | undefined {
+  if (!freshness) return undefined;
+
+  const targets: PatchTarget[] = [];
+  const seen = new Set<string>();
+
+  const addTarget = (kind: PatchTargetKind, label: string, loc: SourceRange | undefined, reason: string) => {
+    if (!loc) return;
+    const normalizedLabel = patchTargetLabel(label, kind);
+    const key = `${kind}:${normalizedLabel}:${loc.startLine}:${loc.endLine}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    targets.push({
+      kind,
+      label: normalizedLabel,
+      loc,
+      reason,
+    });
+  };
+
+  addTarget("component", result.componentName ?? "component", result.componentLoc, "Primary component declaration for broad component-level edits.");
+  addTarget("props", result.contract?.propsName ?? "props", result.contract?.propsLoc, "Props contract anchor for API and prop-shape edits.");
+
+  for (const signal of result.behavior?.effectSignals ?? []) {
+    const deps = signal.deps && signal.deps.length > 0 ? ` deps:[${signal.deps.join(", ")}]` : "";
+    addTarget("effect", `${signal.hook}${deps}`, signal.loc, "Effect hook anchor for side-effect, cleanup, and async-work edits.");
+  }
+
+  for (const signal of result.behavior?.callbackSignals ?? []) {
+    const deps = signal.deps && signal.deps.length > 0 ? ` deps:[${signal.deps.join(", ")}]` : "";
+    addTarget("callback", `${signal.hook}${deps}`, signal.loc, "Callback/memo hook anchor for interaction or derived-value edits.");
+  }
+
+  for (const signal of result.behavior?.eventHandlerSignals ?? []) {
+    addTarget("event-handler", signal.name, signal.loc, "Event handler anchor for user interaction edits.");
+  }
+
+  const formSurface = result.behavior?.formSurface;
+  for (const control of formSurface?.controls ?? []) {
+    const label = control.name ? `${control.tag}[name=${control.name}]` : control.tag;
+    addTarget("form-control", label, control.loc, "Form control anchor for input, validation, and handler edits.");
+  }
+
+  for (const handler of formSurface?.submitHandlers ?? []) {
+    addTarget("submit-handler", handler.value, handler.loc, "Form submit anchor for submission flow edits.");
+  }
+
+  for (const anchor of formSurface?.validationAnchors ?? []) {
+    addTarget("validation-anchor", anchor.value, anchor.loc, "Validation anchor for form validation and schema edits.");
+  }
+
+  for (const snippet of result.snippets ?? []) {
+    addTarget("snippet", snippet.label, snippet.loc, `Representative ${snippet.reason} snippet for localized patch edits.`);
+  }
+
+  if (targets.length === 0) return undefined;
+
+  return {
+    freshness,
+    instructions: EDIT_GUIDANCE_INSTRUCTIONS,
+    patchTargets: targets.slice(0, PATCH_TARGET_LIMIT),
+  };
+}
+
+export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd(), options: ModelFacingPayloadOptions = {}): ModelFacingPayload {
   if (result.useOriginal && result.mode === "raw" && result.rawText) {
     return {
       mode: result.mode,
@@ -94,6 +175,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
       })
     : undefined;
   const fingerprint = sourceFingerprint(result);
+  const editGuidance = options.includeEditGuidance ? buildEditGuidance(result, fingerprint) : undefined;
 
   return {
     mode: result.mode,
@@ -102,6 +184,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
     ...(result.componentName ? { componentName: result.componentName } : {}),
     ...(result.componentLoc ? { componentLoc: result.componentLoc } : {}),
     ...(fingerprint ? { sourceFingerprint: fingerprint } : {}),
+    ...(editGuidance ? { editGuidance } : {}),
     ...(result.exports.length > 0 ? { exports: result.exports } : {}),
     ...(contract ? { contract } : {}),
     ...(behavior ? { behavior } : {}),

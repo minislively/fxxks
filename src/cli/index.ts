@@ -831,7 +831,7 @@ async function run(): Promise<void> {
       const result = extractFile(file);
       if (modelPayload) {
         const { toModelFacingPayload } = await import("../core/payload/model-facing.js");
-        print(toModelFacingPayload(result));
+        print(toModelFacingPayload(result, process.cwd(), { includeEditGuidance: true }));
         return;
       }
       print(result);

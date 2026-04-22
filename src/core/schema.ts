@@ -58,6 +58,30 @@ export type FormSurface = {
   validationAnchors?: LocatedString[];
 };
 
+export type PatchTargetKind =
+  | "component"
+  | "props"
+  | "effect"
+  | "callback"
+  | "event-handler"
+  | "form-control"
+  | "submit-handler"
+  | "validation-anchor"
+  | "snippet";
+
+export type PatchTarget = {
+  kind: PatchTargetKind;
+  label: string;
+  loc: SourceRange;
+  reason: string;
+};
+
+export type EditGuidance = {
+  freshness: SourceFingerprint;
+  instructions: string[];
+  patchTargets: PatchTarget[];
+};
+
 export type ExtractionResult = {
   filePath: string;
   fileHash: string;
@@ -150,6 +174,7 @@ export type ModelFacingPayload = {
     hasStyleBranching?: boolean;
   };
   snippets?: ExtractionResult["snippets"];
+  editGuidance?: EditGuidance;
 };
 
 export type PayloadReadiness = {

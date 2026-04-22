@@ -70,6 +70,7 @@ export function compareModelFacingPayload(filePath: string, cwd = process.cwd())
     excludes: [
       "provider-tokenizer-behavior",
       "runtime-hook-envelope-overhead",
+      "optional-edit-guidance-overhead",
       "provider-billing-tokens",
       "provider-costs",
     ],

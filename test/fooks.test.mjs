@@ -125,6 +125,10 @@ function lastLineOf(filePath, needle) {
   return index + 1;
 }
 
+function patchTargetKeys(targets) {
+  return targets.map((item) => `${item.kind}:${item.label}:${item.loc.startLine}:${item.loc.endLine}`);
+}
+
 function withThrowingCodexPreRead(callback) {
   const originalDecideCodexPreRead = codexPreReadModule.decideCodexPreRead;
   codexPreReadModule.decideCodexPreRead = () => {
@@ -313,7 +317,7 @@ test("extract can return model-facing payload without engine metadata", () => {
 test("extract adds source ranges and hook intent signals to frontend payloads", () => {
   const samplePath = path.join(repoRoot, "fixtures", "compressed", "HookEffectPanel.tsx");
   const result = extractFile(samplePath);
-  const payload = toModelFacingPayload(result, repoRoot);
+  const payload = toModelFacingPayload(result, repoRoot, { includeEditGuidance: true });
 
   assert.deepEqual(payload.componentLoc, {
     startLine: lineOf(samplePath, "export function HookEffectPanel"),
@@ -323,6 +327,15 @@ test("extract adds source ranges and hook intent signals to frontend payloads", 
     fileHash: result.fileHash,
     lineCount: result.meta.lineCount,
   });
+  assert.deepEqual(payload.editGuidance.freshness, payload.sourceFingerprint);
+  assert.ok(payload.editGuidance.instructions.some((item) => item.includes("sourceFingerprint.fileHash") && item.includes("sourceFingerprint.lineCount")));
+  assert.ok(payload.editGuidance.instructions.some((item) => item.includes("re-run fooks extract") || item.includes("read the file")));
+  assert.ok(payload.editGuidance.instructions.some((item) => item.includes("not LSP-backed")));
+  assert.ok(payload.editGuidance.patchTargets.length <= 12);
+  const targetKeys = patchTargetKeys(payload.editGuidance.patchTargets);
+  assert.deepEqual(targetKeys, [...new Set(targetKeys)]);
+  assert.equal(payload.editGuidance.patchTargets[0].kind, "component");
+  assert.equal(payload.editGuidance.patchTargets[1].kind, "props");
   assert.equal(payload.contract.propsLoc.startLine, lineOf(samplePath, "type HookEffectPanelProps"));
 
   const effect = payload.behavior.effectSignals.find((item) => item.hook === "useEffect");
@@ -334,11 +347,13 @@ test("extract adds source ranges and hook intent signals to frontend payloads", 
     startLine: lineOf(samplePath, "useEffect(() =>"),
     endLine: lineOf(samplePath, "}, [loadUser, userId]);"),
   });
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "effect" && item.loc.startLine === effect.loc.startLine && item.reason.includes("Effect hook")));
 
   const memo = payload.behavior.callbackSignals.find((item) => item.hook === "useMemo");
   assert.ok(memo);
   assert.deepEqual(memo.deps, ["name"]);
   assert.equal(memo.loc.startLine, lineOf(samplePath, "const greeting = useMemo"));
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "callback" && item.loc.startLine === memo.loc.startLine && item.reason.includes("Callback")));
 
   const callback = payload.behavior.callbackSignals.find((item) => item.hook === "useCallback");
   assert.ok(callback);
@@ -346,7 +361,9 @@ test("extract adds source ranges and hook intent signals to frontend payloads", 
   assert.equal(callback.loc.startLine, lineOf(samplePath, "const handleRefresh = useCallback"));
 
   assert.ok(payload.behavior.eventHandlerSignals.some((item) => item.name === "handleRefresh" && item.loc.startLine === lineOf(samplePath, "const handleRefresh = useCallback")));
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "event-handler" && item.label === "handleRefresh"));
   assert.ok(payload.snippets.some((item) => item.reason === "effect-hook" && item.loc.startLine === lineOf(samplePath, "useEffect(() =>")));
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "snippet" && item.loc.startLine === lineOf(samplePath, "useEffect(() =>")));
   assert.equal("fileHash" in payload, false);
   assert.equal("meta" in payload, false);
 });
@@ -354,7 +371,7 @@ test("extract adds source ranges and hook intent signals to frontend payloads", 
 test("extract adds form control and validation surface signals with source ranges", () => {
   const samplePath = path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx");
   const result = extractFile(samplePath);
-  const payload = toModelFacingPayload(result, repoRoot);
+  const payload = toModelFacingPayload(result, repoRoot, { includeEditGuidance: true });
   const surface = payload.behavior.formSurface;
 
   assert.ok(surface);
@@ -362,6 +379,9 @@ test("extract adds form control and validation surface signals with source range
     fileHash: result.fileHash,
     lineCount: result.meta.lineCount,
   });
+  assert.deepEqual(payload.editGuidance.freshness, payload.sourceFingerprint);
+  assert.ok(payload.editGuidance.patchTargets.length <= 12);
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "component" && item.label === "FormControls"));
   assert.equal(payload.componentLoc.startLine, lineOf(samplePath, "export function FormControls"));
 
   const email = surface.controls.find((item) => item.tag === "input" && item.name === "email");
@@ -373,16 +393,19 @@ test("extract adds form control and validation surface signals with source range
     startLine: lineOf(samplePath, "<input name=\"email\""),
     endLine: lineOf(samplePath, "<input name=\"email\""),
   });
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "form-control" && item.label === "input[name=email]" && item.loc.startLine === email.loc.startLine));
 
   assert.ok(surface.controls.some((item) => item.tag === "select" && item.name === "role" && item.props.includes("defaultValue")));
   assert.ok(surface.controls.some((item) => item.tag === "textarea" && item.name === "notes" && item.props.includes("disabled")));
   assert.ok(surface.submitHandlers.some((item) => item.value === "onSubmit" && item.loc.startLine === lineOf(samplePath, "<form onSubmit")));
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "submit-handler" && item.label === "onSubmit"));
 
   const validationAnchors = surface.validationAnchors.map((item) => item.value);
   assert.ok(validationAnchors.includes("useForm"));
   assert.ok(validationAnchors.includes("resolver"));
   assert.ok(validationAnchors.includes("register"));
   assert.ok(validationAnchors.includes("Controller"));
+  assert.ok(payload.editGuidance.patchTargets.some((item) => item.kind === "validation-anchor" && item.label === "useForm"));
 });
 
 test("extract keeps non-form button event handlers out of form surface", () => {
@@ -410,6 +433,7 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.match(result.claimBoundary, /not provider costs/);
   assert.ok(result.excludes.includes("provider-tokenizer-behavior"));
   assert.ok(result.excludes.includes("runtime-hook-envelope-overhead"));
+  assert.ok(result.excludes.includes("optional-edit-guidance-overhead"));
 });
 
 test("compare keeps tiny raw fallback from reporting false positive savings", () => {
