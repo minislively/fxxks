@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { parseCodexRuntimeUsage } = require('./runtime-token-metrics');
 
 /**
  * Codex CLI Wrapper
@@ -73,6 +74,7 @@ class CodexWrapper {
         const lastMessage = fs.existsSync(lastMessagePath)
           ? fs.readFileSync(lastMessagePath, 'utf8')
           : '';
+        const runtimeUsage = parseCodexRuntimeUsage(stdout, stderr, lastMessage);
 
         fs.rmSync(tempDir, { recursive: true, force: true });
 
@@ -83,6 +85,7 @@ class CodexWrapper {
           stdout,
           stderr,
           lastMessage,
+          runtimeUsage,
           latencyMs,
           timestamp,
           metadata: {

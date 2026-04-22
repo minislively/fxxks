@@ -14,7 +14,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { validate } = require('./validate-r4-applied');
-const { parseCodexRuntimeTokens } = require('./runtime-token-metrics');
+const { parseCodexRuntimeUsage } = require('./runtime-token-metrics');
 
 function parseArgs(argv) {
   return argv.reduce((acc, arg) => {
@@ -114,6 +114,7 @@ function runCodex(prompt, workdir, model, timeoutMs) {
     child.on('error', reject);
     child.on('close', (exitCode, signal) => {
       const lastMessage = fs.existsSync(lastMessagePath) ? fs.readFileSync(lastMessagePath, 'utf8') : '';
+      const runtimeUsage = parseCodexRuntimeUsage(stdout, stderr, lastMessage);
       resolve({
         exitCode,
         signal,
@@ -121,7 +122,7 @@ function runCodex(prompt, workdir, model, timeoutMs) {
         stdout,
         stderr,
         lastMessage,
-        runtimeTokensTotal: parseCodexRuntimeTokens(stdout, stderr, lastMessage),
+        runtimeUsage,
         latencyMs: Date.now() - startedAt,
       });
     });
@@ -179,10 +180,13 @@ async function main() {
       latencyMs: codexResult.latencyMs,
       retryCount: 0,
       outputChars: codexResult.lastMessage.length || codexResult.stdout.length,
-      runtimeTokensTotal: codexResult.runtimeTokensTotal,
-      runtimeTokenSource: codexResult.runtimeTokensTotal === null ? null : 'codex-cli-output',
-      runtimeTokenClaimAvailable: codexResult.runtimeTokensTotal !== null,
-      runtimeTokenClaimBoundary: 'Runtime-reported CLI tokens are not provider billing tokens or costs.',
+      runtimeTokensInput: codexResult.runtimeUsage.inputTokens,
+      runtimeTokensOutput: codexResult.runtimeUsage.outputTokens,
+      runtimeTokensTotal: codexResult.runtimeUsage.totalTokens,
+      runtimeTokenSource: codexResult.runtimeUsage.source,
+      runtimeTokenTelemetryAvailable: codexResult.runtimeUsage.totalTokens !== null,
+      runtimeTokenClaimAvailable: codexResult.runtimeUsage.totalTokens !== null,
+      runtimeTokenClaimBoundary: codexResult.runtimeUsage.claimBoundary,
     },
     codexResult: {
       exitCode: codexResult.exitCode,

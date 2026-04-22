@@ -45,6 +45,15 @@ context-compression mechanics and targeted-file behavior, but must not claim
 stable direct runtime-token/time wins until a future multi-task benchmark class
 proves them.
 
+Use the evidence ladder in [`docs/benchmark-evidence.md`](benchmark-evidence.md)
+when reviewing release copy: L0 is local prompt/context-size evidence, L1 is
+Codex CLI runtime-reported telemetry from quality-gated matched pairs, L2a is
+provider usage-token / estimated API-cost evidence under explicit pricing
+assumptions, and L2b is provider invoice/dashboard/billed-usage evidence.
+Release copy must keep L1 runtime-token wording separate from L2a estimated API
+cost wording, and must not use either of them as L2b billing-grade cost or
+billing-token proof.
+
 Bare `fooks status` reports local estimated context-size telemetry from `.fooks/sessions`, including runtime/source breakdowns for Codex automatic hooks and Claude project-local context hooks. Its CLI output omits per-session details, is for maintainer/user inspection only, and must not be treated as provider billing tokens, provider costs, or a `ccusage` replacement.
 
 `fooks doctor [codex|claude] [--json]` reports read-only local setup and hook-readiness diagnostics. It may say whether local artifacts such as hooks, manifests, adapter files, Codex trust state, cache health, supported source files, and warning-only optional Claude TypeScript language server host tooling are present. It must not be described as live provider health proof. It is not a ccusage replacement and not provider billing telemetry or provider costs.

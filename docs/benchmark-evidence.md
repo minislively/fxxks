@@ -22,6 +22,51 @@ benchmark harness.
 - Automatic Claude or opencode runtime-token savings.
 - Universal file-read interception outside the documented Codex hook path.
 
+## Validation ladder
+
+The repo now treats token/cost evidence as four distinct layers with separate
+claim boundaries:
+
+| Level | Evidence source | What it can support | What it cannot support yet |
+| --- | --- | --- | --- |
+| L0 | Local prompt/context-size estimates such as `promptTokensApprox`, `fooks status`, `fooks compare`, and prepared-context benchmark payload accounting | Prepared-context / prompt-size reduction wording | Provider billing tokens, billed costs, or stable runtime-token/time wins |
+| L1 | Codex CLI runtime-reported telemetry parsed from matched run artifacts | Narrow internal runtime-token candidate evidence for one task/model/setup identity when accepted-pair gates pass | Provider billing-token/cost claims or stable public runtime-win wording |
+| L2a | Provider usage-token artifacts converted into estimated API cost under explicit pricing assumptions | Estimate-scoped provider-usage / estimated API-cost wording with pricing caveats | Invoice/dashboard/billed-cost claims |
+| L2b | Provider invoice, billing export, dashboard, or matched billed-usage telemetry | Billing-grade provider token/cost wording | Any broader product win beyond the measured scope |
+
+### L1 runtime-token candidate gate
+
+Before even internal L1 runtime-token wording is considered, the repeated
+Codex-applied lane must keep all of the following true:
+
+- matched vanilla/fooks pairs for one task identity, model, and setup identity;
+- both sides pass applied-code acceptance for each included pair;
+- at least five accepted pairs remain after failures and mixed-identity runs are
+  excluded;
+- runtime-token telemetry is present for every accepted pair used in the
+  aggregate;
+- median runtime-token reduction is positive, severe regressions are absent, and
+  regressions remain visible in the summary instead of being cherry-picked away.
+
+Even when this gate passes, public stable runtime-token/time claimability stays
+false until a later broader repeated lane exists.
+
+### L2b billing-grade gate
+
+Billing/cost wording requires a stricter lane than L1 or L2a:
+
+- L1/L2a methodology must already be stable enough to define the matched pair;
+- provider-side billing or billed-usage artifacts must exist;
+- baseline/fooks runs must be linkable by run ID, timestamp, or another
+  auditable join key;
+- the provider source must expose billed input/output/cache tokens and/or billed
+  cost, not only local estimates or CLI output;
+- model, account/org, cache policy, retries, parallelism, and environment must
+  be recorded well enough to explain deltas.
+
+This repo has L0, L1, and L2a machinery today. Billing-grade L2b remains a
+separate validation lane.
+
 ## Latest summarized evidence
 
 ### Initial Codex-oriented proxy snapshot, 2026-04-14

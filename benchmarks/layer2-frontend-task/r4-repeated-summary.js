@@ -123,8 +123,12 @@ function artifactStatus(artifactPath, artifact, defaults) {
     validationStatus: artifact.validation?.status || null,
     identity: artifactIdentity(artifact, defaults),
     promptTokensApprox: Number.isFinite(metrics.promptTokensApprox) ? metrics.promptTokensApprox : null,
+    runtimeTokensInput: Number.isFinite(metrics.runtimeTokensInput) ? metrics.runtimeTokensInput : null,
+    runtimeTokensOutput: Number.isFinite(metrics.runtimeTokensOutput) ? metrics.runtimeTokensOutput : null,
     runtimeTokensTotal: Number.isFinite(metrics.runtimeTokensTotal) ? metrics.runtimeTokensTotal : null,
     runtimeTokenTelemetryAvailable,
+    runtimeTokenSource: typeof metrics.runtimeTokenSource === 'string' ? metrics.runtimeTokenSource : null,
+    runtimeTokenClaimBoundary: typeof metrics.runtimeTokenClaimBoundary === 'string' ? metrics.runtimeTokenClaimBoundary : null,
     latencyMs: Number.isFinite(metrics.latencyMs) ? metrics.latencyMs : null,
     artifactError: artifact.artifactError || null,
   };

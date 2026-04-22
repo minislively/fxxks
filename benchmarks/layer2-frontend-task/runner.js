@@ -77,6 +77,12 @@ async function main() {
       latencyMs: result.latencyMs,
       retryCount: 0,
       outputChars: result.lastMessage?.length || result.stdout.length,
+      runtimeTokensInput: result.runtimeUsage.inputTokens,
+      runtimeTokensOutput: result.runtimeUsage.outputTokens,
+      runtimeTokensTotal: result.runtimeUsage.totalTokens,
+      runtimeTokenSource: result.runtimeUsage.source,
+      runtimeTokenTelemetryAvailable: result.runtimeUsage.totalTokens !== null,
+      runtimeTokenClaimBoundary: result.runtimeUsage.claimBoundary,
     }
   };
   

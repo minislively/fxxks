@@ -9,8 +9,9 @@ import { createRequire } from "node:module";
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { validate } = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "validate-r4-applied.js"));
-const { parseCodexRuntimeTokens } = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "runtime-token-metrics.js"));
+const { parseCodexRuntimeTokens, parseCodexRuntimeUsage } = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "runtime-token-metrics.js"));
 const { summarizeRepeatedPairs } = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "r4-repeated-summary.js"));
+const CodexWrapper = require(path.join(repoRoot, "benchmarks", "layer2-frontend-task", "codex-wrapper.js"));
 const fixtureRoot = path.join(repoRoot, "benchmarks", "layer2-frontend-task", "fixtures", "r4-applied-pass", "combobox");
 
 function copyDir(src, dest) {
@@ -34,6 +35,9 @@ function runArtifact({
   model,
   setupIdentity,
   targetFile,
+  runtimeTokensInput,
+  runtimeTokensOutput,
+  runtimeTokenSource,
 } = {}) {
   return {
     status,
@@ -45,7 +49,10 @@ function runArtifact({
     setupIdentity,
     metrics: {
       promptTokensApprox: prompt,
+      runtimeTokensInput: runtimeTokensInput ?? null,
+      runtimeTokensOutput: runtimeTokensOutput ?? null,
       runtimeTokensTotal: runtime,
+      runtimeTokenSource: runtimeTokenSource ?? (runtime !== null ? "codex-cli-output" : null),
       runtimeTokenClaimAvailable: runtime !== null,
       latencyMs: latency,
     },
@@ -152,6 +159,23 @@ test("Codex runtime-token parser extracts CLI tokens used without billing semant
   assert.equal(parseCodexRuntimeTokens("tokens used\n52,485\n"), 52485);
   assert.equal(parseCodexRuntimeTokens("debug", "tokens used: 1,234"), 1234);
   assert.equal(parseCodexRuntimeTokens("no usage here"), null);
+
+  const usage = parseCodexRuntimeUsage("Input tokens: 1,000\nOutput tokens: 234\nTotal tokens: 1,234");
+  assert.deepEqual(
+    {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      source: usage.source,
+    },
+    {
+      inputTokens: 1000,
+      outputTokens: 234,
+      totalTokens: 1234,
+      source: "codex-cli-output",
+    },
+  );
+  assert.match(usage.claimBoundary, /not provider billing tokens or costs/);
 });
 
 test("R4 repeated summary can classify a narrow L1 candidate", () => {
@@ -174,6 +198,7 @@ test("R4 repeated summary can classify a narrow L1 candidate", () => {
   assert.equal(summary.identity.inherited, false);
   assert.equal(Object.hasOwn(summary.pairs[0].vanilla, "runtimeTokenClaimAvailable"), false);
   assert.equal(summary.pairs[0].vanilla.runtimeTokenTelemetryAvailable, true);
+  assert.equal(summary.pairs[0].vanilla.runtimeTokenSource, "codex-cli-output");
   assert.equal(summary.claimability.stableRuntimeTokenSavings, false);
   assert.equal(summary.claimability.stableTimeOrLatencySavings, false);
   assert.match(summary.claimBoundary.join("\n"), /not provider billing tokens or costs/);
@@ -398,6 +423,40 @@ test("R4 repeated summary marks accepted pairs without runtime telemetry unavail
   assert.equal(summary.claimability.stableRuntimeTokenSavings, false);
 });
 
+test("R4 repeated summary preserves structured runtime-token fields when available", () => {
+  const pairs = Array.from({ length: 5 }, (_, index) => ({
+    pairIndex: index + 1,
+    vanillaArtifact: runArtifact({
+      runtimeTokensInput: 800 + index,
+      runtimeTokensOutput: 200,
+      runtime: 1000 + index,
+      latency: 1000 + index,
+      taskIdentity: "r4-combobox",
+      model: "gpt-5.4-mini",
+      setupIdentity: "setup-main",
+    }),
+    fooksArtifact: runArtifact({
+      runtimeTokensInput: 500 + index,
+      runtimeTokensOutput: 200,
+      runtime: 700 + index,
+      latency: 800 + index,
+      taskIdentity: "r4-combobox",
+      model: "gpt-5.4-mini",
+      setupIdentity: "setup-main",
+    }),
+  }));
+
+  const summary = summarizeRepeatedPairs({ requiredAcceptedPairs: 5, pairs });
+
+  assert.equal(summary.classification, "narrow-l1-candidate");
+  assert.equal(summary.pairs[0].vanilla.runtimeTokensInput, 800);
+  assert.equal(summary.pairs[0].vanilla.runtimeTokensOutput, 200);
+  assert.equal(summary.pairs[0].vanilla.runtimeTokensTotal, 1000);
+  assert.equal(summary.pairs[0].fooks.runtimeTokensInput, 500);
+  assert.equal(summary.pairs[0].fooks.runtimeTokensOutput, 200);
+  assert.equal(summary.claimability.providerBillingTokenSavings, false);
+});
+
 test("R4 repeated summary reports diagnostic candidate status when accepted pairs regress", () => {
   const pairs = Array.from({ length: 5 }, (_, index) => ({
     pairIndex: index + 1,
@@ -521,5 +580,50 @@ test("R4 repeated runner success still requires verifier to inspect candidate st
     assert.equal(summary.claimability.stableRuntimeTokenSavings, false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Codex wrapper artifacts include structured runtime usage without billing semantics", async () => {
+  const tempBin = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-bin-"));
+  const realPath = process.env.PATH;
+  const codexPath = path.join(tempBin, "codex");
+  try {
+    fs.writeFileSync(
+      codexPath,
+      [
+        "#!/usr/bin/env node",
+        "const fs = require('fs');",
+        "const outIndex = process.argv.indexOf('-o');",
+        "if (outIndex !== -1) fs.writeFileSync(process.argv[outIndex + 1], 'ok');",
+        "console.error('Input tokens: 1,000');",
+        "console.error('Output tokens: 234');",
+        "console.error('Total tokens: 1,234');",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    process.env.PATH = `${tempBin}${path.delimiter}${realPath}`;
+
+    const wrapper = new CodexWrapper({ model: "test-model", timeoutMs: 1000 });
+    const result = await wrapper.run("context", "task");
+
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      {
+        inputTokens: result.runtimeUsage.inputTokens,
+        outputTokens: result.runtimeUsage.outputTokens,
+        totalTokens: result.runtimeUsage.totalTokens,
+        source: result.runtimeUsage.source,
+      },
+      {
+        inputTokens: 1000,
+        outputTokens: 234,
+        totalTokens: 1234,
+        source: "codex-cli-output",
+      },
+    );
+    assert.match(result.runtimeUsage.claimBoundary, /not provider billing tokens or costs/);
+  } finally {
+    process.env.PATH = realPath;
+    fs.rmSync(tempBin, { recursive: true, force: true });
   }
 });
