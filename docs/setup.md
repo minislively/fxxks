@@ -76,8 +76,6 @@ Good signs:
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 
-Likewise, `fooks status codex` and the Codex-ready portions of `fooks setup` report local attach/trust readiness only. They do not prove live Codex runtime-token savings, because this repo does not yet collect Codex runtime telemetry for that claim.
-
 ## What the setup result means
 
 | State | Meaning |
@@ -92,7 +90,7 @@ Likewise, `fooks status codex` and the Codex-ready portions of `fooks setup` rep
 
 | Runtime field | Ready state | Meaning |
 | --- | --- | --- |
-| `runtimes.codex.state` | `automatic-ready` | Codex attach metadata, trust status, and hook preset are ready. This confirms local setup/readiness only; it is not runtime-token telemetry. |
+| `runtimes.codex.state` | `automatic-ready` | Codex attach, trust status, and hook preset are ready for the repeated-file optimization path. |
 | `runtimes.claude.state` | `context-hook-ready`, `handoff-ready`, or `blocked` | Claude manual/shared handoff artifacts and, when possible, project-local `SessionStart` / `UserPromptSubmit` hooks were prepared, or a non-fatal Claude blocker was reported. This does not mean Claude `Read` interception or runtime-token savings are enabled. |
 | `runtimes.opencode.state` | `tool-ready`, `manual-step-required`, or `blocked` | The project-local opencode helper is installed, needs an explicit/manual step, or hit a non-fatal blocker. This does not mean opencode read interception or automatic runtime-token savings are enabled. |
 | `blocksOverall` | `true` only for Codex today | Claude/opencode blockers should not make Codex setup look failed when Codex itself is ready. |

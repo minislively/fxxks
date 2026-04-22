@@ -6,6 +6,7 @@ type SeenFileState = {
   firstSeenAt: string;
   lastSeenAt: string;
   seenCount: number;
+  lastModifiedAtMs?: number;
 };
 
 export type ClaudeRuntimeSessionState = {
@@ -64,16 +65,24 @@ export function markClaudeRuntimeSeenFile(cwd: string, sessionKey: string, fileP
   const state = readClaudeRuntimeSession(cwd, sessionKey);
   const now = new Date().toISOString();
   const existing = state.seenFiles[filePath];
+  let lastModifiedAtMs: number | undefined;
+  try {
+    lastModifiedAtMs = fs.statSync(path.join(cwd, filePath)).mtimeMs;
+  } catch {
+    // ignore missing file
+  }
   state.seenFiles[filePath] = existing
     ? {
         ...existing,
         lastSeenAt: now,
         seenCount: existing.seenCount + 1,
+        lastModifiedAtMs: lastModifiedAtMs ?? existing.lastModifiedAtMs,
       }
     : {
         firstSeenAt: now,
         lastSeenAt: now,
         seenCount: 1,
+        lastModifiedAtMs,
       };
 
   return {

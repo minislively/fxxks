@@ -17,7 +17,7 @@ Before a public release, keep the public claim surface aligned to this matrix:
 
 | Environment | Release-ready wording | Do not claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup`; prepared-context/proxy evidence only | Universal file-read interception or measured runtime-token savings without Codex telemetry |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Universal file-read interception |
 | Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | `Read` interception, full prompt interception parity, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 

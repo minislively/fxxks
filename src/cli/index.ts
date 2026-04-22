@@ -243,9 +243,9 @@ function buildSetupScopeSummary(options: {
 
 function setupClaimBoundaries(): string[] {
   return [
-    "Codex setup installs the automatic fooks hook path when Codex trust checks pass, but it does not collect Codex runtime-token telemetry.",
+    "Codex setup installs the automatic fooks hook path when Codex trust checks pass.",
     "Claude setup installs project-local context hooks for SessionStart/UserPromptSubmit when handoff artifacts and local settings are valid; first eligible frontend-file prompts are recorded/prepared and repeated same-file prompts may receive bounded context; it does not intercept Read/tool calls or claim runtime-token savings.",
-    "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or provide runtime-token telemetry.",
+    "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or prove runtime-token savings.",
     "Projects without supported React .tsx/.jsx component candidates stay blocked for automatic setup instead of pretending unrelated files are ready.",
   ];
 }
@@ -362,7 +362,7 @@ function opencodeRuntimeReadiness(installResult: unknown): RuntimeReadiness {
     ],
     notes: [
       "opencode setup does not intercept read calls.",
-      "opencode setup does not provide automatic runtime-token telemetry.",
+      "opencode setup does not prove automatic runtime-token savings.",
     ],
   };
 }
@@ -382,7 +382,7 @@ function manualOpenCodeReadiness(blockers: string[], details: unknown = null): R
     ],
     notes: [
       "opencode setup does not intercept read calls.",
-      "opencode setup does not provide automatic runtime-token telemetry.",
+      "opencode setup does not prove automatic runtime-token savings.",
     ],
   };
 }
@@ -525,7 +525,7 @@ function printHelp(displayCliName: string): void {
 Everyday commands:
   ${displayCliName} setup
       Prepare one-command readiness for supported runtimes:
-      - Codex: automatic repeated-file runtime hook path when trust checks pass; no runtime-token telemetry claim.
+      - Codex: automatic repeated-file runtime hook path when trust checks pass.
       - Claude: project-local context hooks; first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may receive bounded context; no Read interception or runtime-token claim.
       - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
 

@@ -81,8 +81,6 @@ fooks scan
 
 `fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider billing tokens, provider costs, or a `ccusage` replacement.
 
-`fooks status codex` is also only a local attach/trust readiness check. It does not prove Codex runtime-token savings, because this repo does not yet collect Codex runtime telemetry for that claim.
-
 ## opencode support
 
 opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.
@@ -106,7 +104,7 @@ Use `/fooks-extract path/to/File.tsx` or ask opencode to call `fooks_extract` wh
 
 | Environment | Current support | Runtime-token claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Prepared-context/proxy evidence only; no runtime-token proof until measured telemetry exists |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Codex-oriented benchmark/proxy evidence only |
 | Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared, and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | No `Read` interception and no automatic runtime-token savings claim |
 | opencode | Manual/semi-automatic project-local tool and slash command prepared by `fooks setup` when possible | No read interception and no automatic runtime-token savings claim |
 
