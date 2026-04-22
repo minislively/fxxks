@@ -138,7 +138,7 @@ fooks status claude
 fooks status cache
 ```
 
-`fooks doctor` is the safest first diagnostic after setup because it is read-only and summarizes local setup artifacts, missing hook events, manifests, adapter files, trust status, cache health, and supported source-file presence. It does not prove live provider health; it is not a ccusage replacement and not provider billing telemetry or provider costs.
+`fooks doctor` is the safest first diagnostic after setup because it is read-only and summarizes local setup artifacts, missing hook events, manifests, adapter files, trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also reports the optional TypeScript language server as a warning-only host-tooling hint. It does not prove live provider health; it is not a ccusage replacement and not provider billing telemetry or provider costs.
 
 Common causes:
 

@@ -1914,6 +1914,10 @@ test("doctor claude focused target fails independently and keeps claim boundarie
   assert.equal(result.healthy, false);
   assert.ok(result.summary.fail >= 1);
   assert.ok(result.checks.every((item) => item.runtime === "claude"));
+  const optionalLsp = result.checks.find((item) => item.name === "Claude optional TypeScript language server");
+  assert.ok(optionalLsp);
+  assert.ok(["pass", "warn"].includes(optionalLsp.status));
+  assert.notEqual(optionalLsp.status, "fail");
   assert.ok(result.claimBoundaries.some((item) => item.includes("does not intercept Claude Read/tool calls")));
   assert.match(text, /Doctor does not prove provider health/);
   assert.doesNotMatch(text, /Claude Read interception is enabled/i);
