@@ -2457,6 +2457,11 @@ test("cli claude-runtime-hook handles native JSON and malformed JSON", () => {
   );
   assert.equal(unsupportedOutput, "");
 
+  const stopOutput = run(["claude-runtime-hook", "--event", "Stop", "--session-id", "cli-claude-native"], attachedDir);
+  assert.equal(stopOutput.hookEventName, "Stop");
+  assert.equal(stopOutput.action, "noop");
+  assert.ok(stopOutput.reasons.includes("session-stop"));
+
   let failure = "";
   try {
     runTextWithInput(["claude-runtime-hook", "--native-hook"], "{not-json", attachedDir);

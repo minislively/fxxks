@@ -545,7 +545,7 @@ Everyday commands:
   ${displayCliName} status cache
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
-  ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit> [--session-id <id>] [--prompt <text>] [--json]
+  ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} claude-runtime-hook --native-hook
 
 Install: npm install -g oh-my-fooks
@@ -679,12 +679,12 @@ function parseCodexRuntimeHookArgs(args: string[]): {
 
 function parseClaudeRuntimeHookArgs(args: string[]): {
   nativeHook: boolean;
-  event: "SessionStart" | "UserPromptSubmit";
+  event: "SessionStart" | "UserPromptSubmit" | "Stop";
   prompt?: string;
   sessionId?: string;
 } {
   let nativeHook = false;
-  let event: "SessionStart" | "UserPromptSubmit" | undefined;
+  let event: "SessionStart" | "UserPromptSubmit" | "Stop" | undefined;
   let prompt: string | undefined;
   let sessionId: string | undefined;
 
@@ -717,8 +717,8 @@ function parseClaudeRuntimeHookArgs(args: string[]): {
     return { nativeHook, event: "SessionStart", prompt, sessionId };
   }
 
-  if (event !== "SessionStart" && event !== "UserPromptSubmit") {
-    throw new Error("claude-runtime-hook requires --event <SessionStart|UserPromptSubmit>");
+  if (event !== "SessionStart" && event !== "UserPromptSubmit" && event !== "Stop") {
+    throw new Error("claude-runtime-hook requires --event <SessionStart|UserPromptSubmit|Stop>");
   }
 
   return { nativeHook, event, prompt, sessionId };

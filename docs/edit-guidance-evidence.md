@@ -27,7 +27,7 @@ Required fields:
   "patchTargetsCount": 1,
   "freshnessChecked": true,
   "targetLocalizationSteps": ["read-model-payload", "verify-sourceFingerprint", "select-patchTarget"],
-  "claimBoundary": "local/dry-run edit targeting evidence only; not provider billing/cost proof and not LSP semantic safety"
+  "claimBoundary": "local/dry-run edit targeting evidence only; not provider tokenizer proof, not provider billing/cost proof, and not LSP semantic safety"
 }
 ```
 
@@ -38,8 +38,8 @@ not a prose summary or a subjective model-quality score.
 
 - Line ranges are AST-derived edit aids, not LSP-backed semantic rename/reference
   locations.
-- This evidence lane is not provider tokenizer, billing-token, or provider-cost
-  proof.
+- This evidence lane is not provider tokenizer behavior/proof, billing-token
+  proof, or provider-cost proof.
 - A positive dry-run report is not by itself a claim that automatic Codex runtime
   editing improved; runtime integration still requires an explicit opt-in path and
   tests that preserve compact default payload behavior.

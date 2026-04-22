@@ -335,8 +335,8 @@ const claudeLocalSettings = path.join(project, ".claude", "settings.local.json")
 assert(fs.existsSync(claudeLocalSettings), "Claude project-local hooks should be installed under the project");
 const claudeSettings = JSON.parse(fs.readFileSync(claudeLocalSettings, "utf8"));
 assert(
-  JSON.stringify(Object.keys(claudeSettings.hooks ?? {}).sort()) === JSON.stringify(["SessionStart", "UserPromptSubmit"]),
-  "Claude smoke hooks should be limited to SessionStart and UserPromptSubmit",
+  JSON.stringify(Object.keys(claudeSettings.hooks ?? {}).sort()) === JSON.stringify(["SessionStart", "Stop", "UserPromptSubmit"]),
+  "Claude smoke hooks should be limited to SessionStart, UserPromptSubmit, and Stop",
 );
 assert(
   claudeSettings.hooks?.SessionStart?.[0]?.hooks?.[0]?.command === "fooks claude-runtime-hook --native-hook",
@@ -345,6 +345,10 @@ assert(
 assert(
   claudeSettings.hooks?.UserPromptSubmit?.[0]?.hooks?.[0]?.command === "fooks claude-runtime-hook --native-hook",
   "Claude UserPromptSubmit smoke hook should use the canonical fooks command",
+);
+assert(
+  claudeSettings.hooks?.Stop?.[0]?.hooks?.[0]?.command === "fooks claude-runtime-hook --native-hook",
+  "Claude Stop smoke hook should use the canonical fooks command",
 );
 const hookEnv = {
   ...process.env,

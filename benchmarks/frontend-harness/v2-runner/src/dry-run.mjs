@@ -15,7 +15,7 @@ import { BucketClassifier, DEFAULT_BUCKETS } from './bucket-classifier.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY =
-  'local/dry-run edit targeting evidence only; not provider billing/cost proof and not LSP semantic safety';
+  'local/dry-run edit targeting evidence only; not provider tokenizer proof, not provider billing/cost proof, and not LSP semantic safety';
 const WITH_GUIDANCE_LOCALIZATION_STEPS = Object.freeze([
   'read-model-payload',
   'verify-sourceFingerprint',
@@ -110,7 +110,9 @@ function buildEditGuidanceEvidenceVariant(editGuidanceEnabled, patchTargetsCount
 export function buildEditGuidanceEvidencePair(options = {}) {
   const targetFile = options.targetFile || 'unresolved-frontend-target.tsx';
   const componentName = options.componentName || 'UnresolvedComponent';
-  const patchTargetsCount = normalizePatchTargetsCount(options.patchTargetsCount ?? 1) || 1;
+  const patchTargetsCount = options.patchTargetsCount === undefined
+    ? 1
+    : normalizePatchTargetsCount(options.patchTargetsCount);
 
   return {
     schemaVersion: 'fooks-edit-guidance-evidence.v1',
