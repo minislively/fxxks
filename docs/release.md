@@ -47,6 +47,8 @@ proves them.
 
 Bare `fooks status` reports local estimated context-size telemetry from `.fooks/sessions`, including runtime/source breakdowns for Codex automatic hooks and Claude project-local context hooks. Its CLI output omits per-session details, is for maintainer/user inspection only, and must not be treated as provider billing tokens, provider costs, or a `ccusage` replacement.
 
+`fooks compare <file> --json` is allowed as a local file-level estimate for original source versus the fooks model-facing payload. For compressed/hybrid frontend files, that payload is TypeScript AST-derived component contract/behavior/structure/style context, not a provider-tokenized prompt. Public wording may use it to support estimated input-token/context-load reduction and cost-reduction potential, but it must stay distinct from runtime hook status and provider billing telemetry. Compare output is not provider tokenizer behavior, not runtime hook envelope overhead, not provider billing tokens, not provider costs, and not a `ccusage` replacement.
+
 Codex setup/attach/status readiness is also local state only. It may show that
 Codex hooks, manifests, and trust metadata were prepared, but it is not live
 Codex runtime telemetry and must not be described as proof of runtime-token
@@ -100,6 +102,7 @@ Automated local checks now covered by `npm run release:smoke`:
 - [x] temp-prefix global install smoke test passes.
 - [x] isolated `fooks setup` smoke test passes without mutating the real user Codex config.
 - [x] isolated `fooks setup` smoke test covers a fresh public-style repo without requiring `FOOKS_ACTIVE_ACCOUNT`.
+- [x] packed CLI `fooks compare <file> --json` smoke keeps local estimated payload comparison separate from provider billing/cost claims.
 
 Authority-gated checks before any real publish:
 
@@ -133,6 +136,7 @@ npm publish --dry-run
 - tarball required-file assertions
 - `npm pack --pack-destination <tmp>`
 - temporary-prefix global install
+- packed CLI `fooks compare <file> --json` local estimate check
 - disposable React/TSX project setup
 - isolated `FOOKS_CODEX_HOME` / `FOOKS_CLAUDE_HOME`
 - empty `FOOKS_ACTIVE_ACCOUNT` / `FOOKS_TARGET_ACCOUNT`

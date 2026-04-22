@@ -520,7 +520,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|run|scan|extract|decide|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|run|scan|extract|compare|decide|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -531,6 +531,7 @@ Everyday commands:
 
   ${displayCliName} run <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
+  ${displayCliName} compare <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
@@ -568,6 +569,23 @@ function parseExtractArgs(args: string[]): { filePath: string; modelPayload: boo
   }
 
   return { filePath: requireFilePath(filePath), modelPayload };
+}
+
+function parseCompareArgs(args: string[]): { filePath: string } {
+  let filePath: string | undefined;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      continue;
+    }
+    if (!filePath) {
+      filePath = arg;
+      continue;
+    }
+    throw new Error(`Unexpected compare argument: ${arg}`);
+  }
+
+  return { filePath: requireFilePath(filePath) };
 }
 
 function parseCodexRuntimeHookArgs(args: string[]): {
@@ -764,6 +782,13 @@ async function run(): Promise<void> {
         return;
       }
       print(result);
+      return;
+    }
+
+    case "compare": {
+      const { compareModelFacingPayload } = await import("../core/compare.js");
+      const { filePath: file } = parseCompareArgs(rest);
+      print(compareModelFacingPayload(file, process.cwd()));
       return;
     }
     case "decide": {

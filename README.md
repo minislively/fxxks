@@ -1,11 +1,11 @@
 # fooks
 
-Frontend context compression for Codex.
+Frontend context compression for Codex and Claude Code.
 
 Public npm package: `oh-my-fooks`
 CLI command: `fooks`
 
-`fooks` helps Codex avoid rereading the same React component source over and over. In an attached Codex project, repeated work on the same `.tsx` / `.jsx` file can reuse a smaller model-facing payload instead of pushing the full file context every time.
+`fooks` helps Codex and Claude Code reduce frontend code context for React component work. In an attached Codex project or a Claude project-local context-hook flow, repeated work on the same `.tsx` / `.jsx` file can reuse a smaller model-facing payload instead of pushing the full file context every time, lowering estimated input-token load and creating a path to lower usage cost.
 
 ## Quick start
 
@@ -70,6 +70,7 @@ fooks status          # local estimated context-size telemetry for this repo
 fooks status codex   # check Codex attach/hook state
 fooks status claude  # check Claude project-local context hook / handoff health
 fooks status cache   # check local fooks cache health
+fooks compare src/components/Button.tsx --json  # local original-vs-fooks payload estimate
 ```
 
 For manual inspection:
@@ -80,6 +81,16 @@ fooks scan
 ```
 
 `fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider billing tokens, provider costs, or a `ccusage` replacement.
+
+## Compare a file locally
+
+Use `fooks compare` when you want immediate, local proof for a specific frontend file:
+
+```bash
+fooks compare src/components/Button.tsx --json
+```
+
+The command compares the original source bytes with the exact fooks model-facing payload produced by `fooks extract <file> --model-payload`. For compressed/hybrid frontend files, that payload is built from fooks' TypeScript AST-derived component contract, behavior, structure, and style signals instead of the full source text. It reports estimated source/model-facing tokens, estimated saved bytes/tokens, and a reduction percent. This is a **local model-facing payload estimate**: it is not provider tokenizer behavior, not runtime hook envelope overhead, not provider billing tokens, not provider costs, and not a `ccusage` replacement. Small raw files may show zero savings because fooks intentionally preserves the original source when that is safer.
 
 ## opencode support
 

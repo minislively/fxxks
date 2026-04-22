@@ -76,6 +76,16 @@ Good signs:
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 
+## 4. Compare one frontend file locally
+
+Before opening a runtime, you can inspect the local file-level estimate for a supported frontend file:
+
+```bash
+fooks compare src/components/Button.tsx --json
+```
+
+`fooks compare` compares the original source bytes with the exact model-facing payload produced by `fooks extract <file> --model-payload`. For compressed/hybrid frontend files, that payload comes from fooks' TypeScript AST-derived component contract, behavior, structure, and style signals rather than the full source text. The token values are estimated from local byte counts, so this is a local model-facing payload estimate only. It is not provider tokenizer behavior, not runtime hook envelope overhead, not provider billing tokens, not provider costs, and not a `ccusage` replacement.
+
 ## What the setup result means
 
 | State | Meaning |
@@ -169,4 +179,5 @@ fooks codex-runtime-hook --native-hook
 fooks claude-runtime-hook --native-hook
 fooks scan
 fooks extract <file> --model-payload
+fooks compare src/components/Button.tsx --json
 ```
