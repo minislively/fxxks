@@ -21,7 +21,8 @@ const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"
 const { RAW_ORIGINAL_SIZE_THRESHOLD_BYTES } = require(path.join(repoRoot, "dist", "core", "decide.js"));
 const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 const { assessPayloadReadiness } = require(path.join(repoRoot, "dist", "core", "payload", "readiness.js"));
-const { decideCodexPreRead } = require(path.join(repoRoot, "dist", "adapters", "codex-pre-read.js"));
+const codexPreReadModule = require(path.join(repoRoot, "dist", "adapters", "codex-pre-read.js"));
+const { decideCodexPreRead } = codexPreReadModule;
 const {
   extractPromptTarget,
   hasFullReadEscapeHatch,
@@ -87,6 +88,19 @@ function collectStrings(value) {
   };
   visit(value);
   return strings;
+}
+
+function withThrowingCodexPreRead(callback) {
+  const originalDecideCodexPreRead = codexPreReadModule.decideCodexPreRead;
+  codexPreReadModule.decideCodexPreRead = () => {
+    throw new Error("synthetic payload build failure");
+  };
+
+  try {
+    return callback();
+  } finally {
+    codexPreReadModule.decideCodexPreRead = originalDecideCodexPreRead;
+  }
 }
 
 function makeTempProject(repositoryUrl = "https://github.com/minislively/temp-project.git") {
@@ -562,6 +576,56 @@ test("cli run prefers direct Codex prompt guidance when setup is already ready o
   assert.match(output, /If you intentionally want another runtime, use your original prompt there instead of the metadata-only temp context\./);
   assert.doesNotMatch(output, /Reliable first success: run `fooks setup` in this repo first\./);
   assert.doesNotMatch(output, /Optional check: `fooks status codex`/);
+});
+
+test("runtime hook falls back when repeated-file payload build throws", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-payload-throw-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  const targetBytes = fs.statSync(path.join(tempDir, target)).size;
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  withThrowingCodexPreRead(() => {
+    const fallback = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      tempDir,
+    );
+
+    assert.equal(fallback.action, "fallback");
+    assert.equal(fallback.filePath, target);
+    assert.deepEqual(fallback.reasons, ["repeated-file", "payload-build-failed"]);
+    assert.equal(fallback.contextMode, "full");
+    assert.equal(fallback.contextModeReason, "payload-build-failed");
+    assert.equal(fallback.fallback.action, "full-read");
+    assert.equal(fallback.fallback.reason, "payload-build-failed");
+    assert.equal(fallback.debug.repeatedFile, true);
+    assert.equal(fallback.debug.eligible, true);
+    assert.equal(fallback.debug.escapeHatchUsed, false);
+    assert.equal(fallback.debug.decision, undefined);
+
+    const summary = readSessionMetricSummary(tempDir, sessionId);
+    assert.equal(summary.eventCount, 2);
+    assert.equal(summary.recordCount, 1);
+    assert.equal(summary.fallbackCount, 1);
+    assert.equal(summary.comparableEventCount, 1);
+    assert.equal(summary.totals.originalEstimatedBytes, targetBytes);
+    assert.equal(summary.totals.actualEstimatedBytes, targetBytes);
+    assert.equal(summary.totals.savedEstimatedBytes, 0);
+  });
 });
 
 test("runtime hook reuses payload only on repeated same-file prompts in one session", () => {
@@ -1128,6 +1192,43 @@ test("native hook bridge injects tiny raw originals on repeated prompts", () => 
   assert.match(fallback.hookSpecificOutput.additionalContext, /"useOriginal": true/);
 });
 
+test("native hook bridge maps payload-build failures to full-read guidance", () => {
+  const attachedDir = makeTempProject();
+  run(["attach", "codex"], attachedDir, { FOOKS_CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-")) });
+
+  const sessionId = `native-payload-throw-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  handleCodexNativeHookPayload(
+    {
+      hook_event_name: "UserPromptSubmit",
+      cwd: attachedDir,
+      prompt: `Please update ${target}`,
+      session_id: sessionId,
+    },
+    attachedDir,
+  );
+
+  withThrowingCodexPreRead(() => {
+    const output = handleCodexNativeHookPayload(
+      {
+        hook_event_name: "UserPromptSubmit",
+        cwd: attachedDir,
+        prompt: `Again, update ${target}`,
+        session_id: sessionId,
+      },
+      attachedDir,
+    );
+
+    assert.equal(output.hookSpecificOutput.hookEventName, "UserPromptSubmit");
+    assert.match(
+      output.hookSpecificOutput.additionalContext,
+      /^fooks: fallback \(payload-build-failed\) · file: src\/components\/FormSection\.tsx · Read the full source file for this turn\.$/,
+    );
+    assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /provider billing tokens/i);
+    assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /token savings/i);
+  });
+});
+
 test("native hook bridge uses fixed full-read status vocabulary for escape hatch overrides", () => {
   const attachedDir = makeTempProject();
   run(["attach", "codex"], attachedDir, { FOOKS_CODEX_HOME: fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-")) });
@@ -1670,8 +1771,8 @@ test("claude runtime hook records first eligible prompt, injects repeated same-f
   const start = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
   assert.equal(start.action, "inject");
   assert.ok(start.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
-  assert.match(start.additionalContext, /does not intercept Claude Read\/tool calls/);
-  assert.match(start.additionalContext, /records\/prepares/);
+  assert.match(start.additionalContext, /no Read interception/);
+  assert.match(start.additionalContext, /first prompt triggers context/);
   assert.match(start.statePath, /\.fooks\/state\/claude-runtime/);
   assert.deepEqual(JSON.parse(fs.readFileSync(start.statePath, "utf8")).seenFiles, {});
 
@@ -1873,7 +1974,7 @@ test("claude fallback metrics record zero savings and telemetry failures are non
   const blockedSession = "claude-blocked-metrics";
   const start = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: blockedSession }, blockedDir);
   assert.equal(start.action, "inject");
-  assert.match(start.additionalContext, /context hook is active/);
+  assert.match(start.additionalContext, /fooks: active/);
   const first = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: blockedSession, prompt: `Explain ${target}` }, blockedDir);
   assert.equal(first.action, "record");
   const second = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId: blockedSession, prompt: `Again, explain ${target}` }, blockedDir);

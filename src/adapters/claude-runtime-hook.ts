@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { decideCodexPreRead } from "./codex-pre-read";
 import { initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
-import { resolvePromptFileContext } from "./codex-runtime-prompt";
+import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./codex-runtime-prompt";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 import {
   estimateFileBytes,
@@ -39,6 +39,7 @@ export type ClaudeRuntimeHookDecision = {
     repeatedFile: boolean;
     eligible: boolean;
     bounded: boolean;
+    escapeHatchUsed?: boolean;
   };
   fallback?: {
     action: "full-read";
@@ -65,7 +66,7 @@ function payloadContextMode(payload: NonNullable<ReturnType<typeof decideCodexPr
 function buildPayloadContext(filePath: string, payload: NonNullable<ReturnType<typeof decideCodexPreRead>["payload"]>, contextMode: ContextMode): string {
   return clampAdditionalContext([
     `fooks: Claude context hook · file: ${filePath} · context-mode: ${contextMode}`,
-    "This is bounded model-facing context for the explicit frontend file prompt. fooks does not intercept Claude Read/tool calls and does not claim Claude runtime-token savings.",
+    "fooks does not intercept Claude Read or claim runtime-token savings.",
     "",
     JSON.stringify(payload, null, 2),
   ].join("\n"));
@@ -105,11 +106,9 @@ function recordClaudeMetric(
 }
 
 function sessionStartContext(): string {
-  return clampAdditionalContext([
-    "fooks: Claude context hook is active for this project.",
-    "When the user explicitly prompts about an existing in-project .tsx or .jsx file, fooks records/prepares the first same-session prompt; a repeated same-file prompt may add bounded model-facing context through UserPromptSubmit.",
-    "P0 boundary: fooks does not intercept Claude Read/tool calls and does not claim Claude runtime-token savings.",
-  ].join("\n"));
+  return clampAdditionalContext(
+    "fooks: active · no Read interception · first prompt triggers context.",
+  );
 }
 
 function noopDecision(input: ClaudeRuntimeHookInput, reasons: string[], policy?: ReturnType<typeof resolvePromptFileContext>["policy"]): ClaudeRuntimeHookDecision {
@@ -127,6 +126,7 @@ function noopDecision(input: ClaudeRuntimeHookInput, reasons: string[], policy?:
       repeatedFile: false,
       eligible: false,
       bounded: true,
+      escapeHatchUsed: false,
     },
   };
 }
@@ -151,6 +151,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         repeatedFile: false,
         eligible: true,
         bounded: true,
+        escapeHatchUsed: false,
       },
     };
   }
@@ -173,6 +174,40 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     return decision;
   }
 
+  const escapeHatchUsed = hasFullReadEscapeHatch(prompt);
+  if (escapeHatchUsed) {
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const runtimeDecision: ClaudeRuntimeHookDecision = {
+      runtime: "claude",
+      hookEventName,
+      action: "fallback",
+      filePath: target,
+      reasons: ["escape-hatch-full-read"],
+      additionalContext: boundedFallbackContext(target, "escape-hatch-full-read"),
+      contextMode: "full",
+      contextModeReason: "escape-hatch-full-read",
+      contextBudget: policy.contextBudget,
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
+      debug: {
+        repeatedFile: false,
+        eligible: true,
+        bounded: true,
+        escapeHatchUsed: true,
+      },
+      fallback: {
+        action: "full-read",
+        reason: "escape-hatch-full-read",
+      },
+    };
+    recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: originalEstimatedBytes,
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return runtimeDecision;
+  }
+
   const { statePath, seenCount } = markClaudeRuntimeSeenFile(cwd, sessionKey, target);
   const repeatedFile = seenCount >= 2;
 
@@ -193,6 +228,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         repeatedFile: false,
         eligible: true,
         bounded: true,
+        escapeHatchUsed: false,
       },
     };
     recordClaudeMetric(cwd, sessionKey, decision, {
@@ -223,6 +259,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         repeatedFile: true,
         eligible: true,
         bounded: true,
+        escapeHatchUsed: false,
       },
       fallback: {
         action: "full-read",
@@ -257,6 +294,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         repeatedFile: true,
         eligible: true,
         bounded: true,
+        escapeHatchUsed: false,
       },
     };
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
@@ -286,6 +324,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       repeatedFile: true,
       eligible: decision.eligible,
       bounded: true,
+      escapeHatchUsed: false,
     },
     fallback: {
       action: "full-read",
