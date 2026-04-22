@@ -1,6 +1,7 @@
 export { scanProject } from "./core/scan";
 export { extractFile } from "./core/extract";
 export { toModelFacingPayload } from "./core/payload/model-facing";
+export { compareModelFacingPayload } from "./core/compare";
 export { assessPayloadReadiness } from "./core/payload/readiness";
 export { decideMode } from "./core/decide";
 export { classifyPromptContext, discoverRelevantFilesByPolicy, extractPromptTargets } from "./core/context-policy";

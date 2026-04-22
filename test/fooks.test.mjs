@@ -266,6 +266,39 @@ test("extract can return model-facing payload without engine metadata", () => {
   assert.equal(result.style.system, "tailwind");
 });
 
+test("compare reports local estimated model-facing payload reduction", () => {
+  const result = run(["compare", "fixtures/compressed/FormSection.tsx", "--json"]);
+  assert.equal(result.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(result.mode, "compressed");
+  assert.equal(result.useOriginal, false);
+  assert.equal(result.metricTier, "estimated");
+  assert.equal(result.measurement, "local-model-facing-payload");
+  assert.ok(result.sourceBytes > result.modelFacingBytes);
+  assert.ok(result.estimatedSourceTokens > result.estimatedModelFacingTokens);
+  assert.ok(result.savedEstimatedBytes > 0);
+  assert.ok(result.savedEstimatedTokens > 0);
+  assert.ok(result.reductionPercent > 0);
+  assert.equal(result.payloadLarger, false);
+  assert.match(result.claimBoundary, /not provider billing tokens/);
+  assert.match(result.claimBoundary, /not provider costs/);
+  assert.ok(result.excludes.includes("provider-tokenizer-behavior"));
+  assert.ok(result.excludes.includes("runtime-hook-envelope-overhead"));
+});
+
+test("compare keeps tiny raw fallback from reporting false positive savings", () => {
+  const result = run(["compare", "fixtures/raw/SimpleButton.tsx", "--json"]);
+  assert.equal(result.filePath, path.join("fixtures", "raw", "SimpleButton.tsx"));
+  assert.equal(result.mode, "raw");
+  assert.equal(result.useOriginal, true);
+  assert.equal(result.metricTier, "estimated");
+  assert.equal(result.savedEstimatedBytes, 0);
+  assert.equal(result.savedEstimatedTokens, 0);
+  assert.equal(result.reductionPercent, 0);
+  assert.equal(result.payloadLarger, true);
+  assert.equal(result.nonSavingReason, "original-source-preserved-for-small-raw-file");
+  assert.match(result.claimBoundary, /not provider billing tokens/);
+});
+
 test("extract produces compressed output for boilerplate-heavy fixture", () => {
   const result = run(["extract", "fixtures/compressed/FormSection.tsx"]);
   assert.equal(result.mode, "compressed");
@@ -1603,6 +1636,7 @@ test("setup reports blocked state for projects without React components", () => 
 test("cli help advertises setup and package install has no auto hook side effects", () => {
   const help = runText(["--help"]);
   assert.match(help, /fooks setup/);
+  assert.match(help, /fooks compare <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /Codex: automatic repeated-file runtime hook path/);
   assert.match(help, /Claude: project-local context hooks/);
@@ -2387,6 +2421,27 @@ test("package release surface keeps internal docs out of the npm tarball", () =>
   assert.match(releaseSmoke, /packed tarball includes non-public path/);
   assert.match(gitignore, /docs\/internal\//);
   assert.match(gitignore, /\.opencode\//);
+});
+
+test("docs describe local compare estimates without billing-cost claims", () => {
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const combined = `${readme}
+${setup}
+${release}`;
+
+  assert.match(readme, /Frontend context compression for Codex and Claude Code/);
+  assert.match(combined, /fooks compare src\/components\/Button\.tsx/);
+  assert.match(combined, /local model-facing payload estimate|local file-level estimate/);
+  assert.match(combined, /TypeScript AST-derived/);
+  assert.match(combined, /estimated input-token load|estimated input-token/);
+  assert.match(combined, /not provider billing tokens/);
+  assert.match(combined, /not provider costs/);
+  assert.match(combined, /Claude.*project-local context hooks|project-local `SessionStart` \/ `UserPromptSubmit` hooks/s);
+  assert.doesNotMatch(combined, /fooks reduces your actual provider bill/i);
+  assert.doesNotMatch(combined, /measured Codex\/Claude billing tokens/i);
+  assert.doesNotMatch(combined, /automatic Claude Read\/tool interception/i);
 });
 
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {

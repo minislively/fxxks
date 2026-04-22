@@ -190,7 +190,54 @@ fs.writeFileSync(
   `${JSON.stringify({ name: "tmp-fooks-release-smoke", repository: { url: "https://github.com/example-org/tmp-fooks-release-smoke.git" } }, null, 2)}\n`,
 );
 fs.writeFileSync(path.join(project, "src", "App.tsx"), "export function App(){ return <main>Hello</main>; }\n");
-
+fs.writeFileSync(
+  path.join(project, "src", "LargeForm.tsx"),
+  [
+    "type Field = { id: string; label: string; placeholder: string };",
+    "",
+    "type LargeFormProps = {",
+    "  title: string;",
+    "  description: string;",
+    "  fields: Field[];",
+    "  footerText?: string;",
+    "};",
+    "",
+    "function fallbackFooterText(value?: string) {",
+    "  return value ?? 'All fields are required before continuing.';",
+    "}",
+    "",
+    "export function LargeForm({ title, description, fields, footerText }: LargeFormProps) {",
+    "  return (",
+    "    <section className=\"grid gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm\">",
+    "      <header className=\"grid gap-2\">",
+    "        <h2 className=\"text-lg font-semibold text-slate-900\">{title}</h2>",
+    "        <p className=\"text-sm text-slate-600\">{description}</p>",
+    "      </header>",
+    "",
+    "      <div className=\"grid gap-4 md:grid-cols-2\">",
+    "        {fields.map((field) => (",
+    "          <label key={field.id} className=\"grid gap-2 text-sm text-slate-700\">",
+    "            <span className=\"font-medium text-slate-800\">{field.label}</span>",
+    "            <input",
+    "              className=\"rounded-md border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200\"",
+    "              placeholder={field.placeholder}",
+    "            />",
+    "          </label>",
+    "        ))}",
+    "      </div>",
+    "",
+    "      <footer className=\"flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500\">",
+    "        <span>{fallbackFooterText(footerText)}</span>",
+    "        <button className=\"inline-flex items-center rounded-md bg-slate-900 px-3 py-2 font-medium text-white\">",
+    "          Continue",
+    "        </button>",
+    "      </footer>",
+    "    </section>",
+    "  );",
+    "}",
+    "",
+  ].join("\n"),
+);
 const setupStdout = execFileSync(fooksBin, ["setup"], {
   cwd: project,
   encoding: "utf8",
@@ -236,11 +283,31 @@ const claudeStatusStdout = execFileSync(fooksBin, ["status", "claude"], {
     FOOKS_CLAUDE_HOME: claudeHome,
   },
 });
+const compareStdout = runInstalledFooks(fooksBin, ["compare", "src/LargeForm.tsx", "--json"], {
+  cwd: project,
+  env: {
+    ...process.env,
+    HOME: path.join(runtimeRoot, "home"),
+    XDG_CONFIG_HOME: path.join(runtimeRoot, "config"),
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  },
+});
 assertPublicSurfaceClaimBoundaries({
   "fooks setup output": setupStdout,
   "fooks status output": statusStdout,
   "fooks status claude output": claudeStatusStdout,
+  "fooks compare output": compareStdout,
 });
+const compare = JSON.parse(compareStdout);
+assert(compare.metricTier === "estimated", `compare should expose estimated metric tier, got ${compare.metricTier}`);
+assert(compare.measurement === "local-model-facing-payload", `unexpected compare measurement ${compare.measurement}`);
+assert(compare.claimBoundary?.includes("not provider billing tokens"), "compare should keep provider billing boundary");
+assert(compare.claimBoundary?.includes("not provider costs"), "compare should keep provider cost boundary");
+assert(compare.excludes?.includes("provider-tokenizer-behavior"), "compare should exclude provider tokenizer behavior");
+assert(compare.excludes?.includes("runtime-hook-envelope-overhead"), "compare should exclude runtime hook envelope overhead");
+assert(compare.sourceBytes > compare.modelFacingBytes, "release compare fixture should show a local payload reduction");
+assert(compare.savedEstimatedTokens > 0, "release compare fixture should show positive estimated token reduction");
 const status = JSON.parse(statusStdout);
 assert(status.metricTier === "estimated", `status should expose estimated metric tier, got ${status.metricTier}`);
 assert(status.claimBoundary?.includes("not provider billing tokens"), "status should keep provider billing boundary");
@@ -404,6 +471,13 @@ console.log(JSON.stringify({
       latestSessionCount: postHookStatus.latestSessionCount,
       runtimeSources: Object.keys(postHookStatus.breakdown.byRuntimeAndSource ?? {}).sort(),
       claimBoundary: postHookStatus.claimBoundary,
+    },
+    compare: {
+      measurement: compare.measurement,
+      metricTier: compare.metricTier,
+      reductionPercent: compare.reductionPercent,
+      savedEstimatedTokens: compare.savedEstimatedTokens,
+      claimBoundary: compare.claimBoundary,
     },
   },
   accountDetails: setup.attach.runtimeProof.details.filter((detail) => detail.startsWith("account-")),
