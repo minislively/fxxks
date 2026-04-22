@@ -39,13 +39,18 @@ three pairs, and median runtime-token reduction was negative. Treat this as a
 regression signal until future benchmark classes repeatedly demonstrate stable
 wins.
 
-### Layer 2 proposal-only R4 smokes, 2026-04-21
+### Layer 2 R4 applied-code diagnostic, 2026-04-22
 
-Two proposal-only R4 paired smokes through the current `codex exec` runner
-reduced the prompt supplied to Codex from 11,365 approximate tokens in vanilla
-mode to 861 in fooks mode. These runs validate runner success, output shape,
-path-sanitization, and claim boundaries. They are not provider billing telemetry
-and are not applied-code benchmark wins.
+A pre-launch repeated R4 applied-code diagnostic attempted seven matched
+vanilla/fooks pairs after the proposal-only smokes, validator hardening, and
+applied acceptance gate. Only four pairs passed acceptance in both modes, so the summary classification is
+`insufficient-accepted-pairs`. Within the accepted pairs, fooks supplied a much
+smaller prompt (median 88.2% reduction), but CLI-reported runtime tokens and
+latency regressed (median runtime-token reduction -25.5%; median latency
+reduction -14.4%). The CLI runtime-token field is not provider billing
+telemetry. This result blocks provider billing-token, stable runtime-token, and
+stable time-win claims and motivates another repeated run after prompt/validator
+hardening.
 
 ## Reproducing or extending evidence
 

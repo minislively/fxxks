@@ -10,8 +10,8 @@
 | Layer 2: Task Definition/Spec | Frontend task inventory and R4 spec | ✅ Complete | Task inventory, R4 spec, validation checklist, metric schema are ready. |
 | Layer 2: Runner Path | AI runner wrapper execution path | ✅ Unblocked | Current `codex exec` wrapper completed tiny and R4 paired read-only smokes. |
 | Layer 2: R4 Paired Smoke | Vanilla-vs-fooks proposal-only R4 execution | ✅ Collected | Two matched pairs succeeded on `combobox-example.tsx`; summaries stored under `results/R4-current-exec-smoke-2026-04-21*.json`. |
-| Layer 2: Repeated Validated Smoke | Proposal-only R4 smoke validation | ✅ Collected | Validation artifact covers two matched pairs in `results/R4-current-exec-validation-2026-04-21.json`; applied-code/multi-task evidence remains out of scope. |
-| Layer 2: Applied-Code Acceptance Gate | Validate generated file trees after they are written to disk | ✅ Implemented | `validate-r4-applied.js` checks required files, line limits, barrel exports, local import cycles, and TypeScript acceptance; a fixture self-test artifact exists. Live matched vanilla/fooks applied runs remain pending. |
+| Layer 2: Repeated Applied Diagnostic | Matched vanilla/fooks applied-code repeated run | ⚠️ Diagnostic only | 2026-04-22 pre-launch run attempted 7 pairs, accepted 4/7, and classified `insufficient-accepted-pairs`; runtime-token/time medians regressed. |
+| Layer 2: Applied-Code Acceptance Gate | Validate generated file trees after they are written to disk | ✅ Implemented | `validate-r4-applied.js` checks required files, line limits, barrel exports, source hygiene, local import cycles, and TypeScript acceptance; a fixture self-test artifact exists. |
 
 ## 2. Canonical wording
 
@@ -20,7 +20,9 @@
 > Two current `codex exec` R4 paired smokes passed on 2026-04-21.
 > In both proposal-only pairs, the prompt supplied to Codex dropped from `11365` approx tokens in vanilla mode to `861` approx tokens in fooks mode (`92.4%` smaller).
 > The applied-code acceptance gate is now implemented and self-tested against a checked-in R4 candidate tree.
-> This is prompt-size smoke evidence, **not** provider billing telemetry, not an acceptance-validated code benchmark, and not enough for stable runtime-token/time win claims.
+> A 2026-04-22 repeated applied diagnostic attempted 7 matched pairs, accepted 4/7, and classified `insufficient-accepted-pairs`.
+> Accepted pairs kept prompt-size reduction (median 88.2%) but regressed on CLI runtime tokens (median -25.5%) and latency (median -14.4%).
+> This is **not** provider billing telemetry, not an applied-code benchmark win, and not enough for stable runtime-token/time win claims.
 
 ## 3. Completed assets
 
@@ -34,8 +36,10 @@
 | First candidate | ✅ Fixed | R4 Feature Module Split on `combobox-example.tsx`. |
 | R4 paired smoke summaries | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21.json` and `benchmarks/layer2-frontend-task/results/R4-current-exec-smoke-2026-04-21-run-2.json`. |
 | R4 paired smoke validation | ✅ Collected | `benchmarks/layer2-frontend-task/results/R4-current-exec-validation-2026-04-21.json`. |
-| R4 applied acceptance validator | ✅ Implemented | `validate-r4-applied.js` validates on-disk candidate trees; `run-r4-applied.js` creates isolated workspace-write Codex attempts. |
+| R4 applied acceptance validator | ✅ Implemented | `validate-r4-applied.js` validates on-disk candidate trees; `run-r4-applied.js` creates isolated workspace-write Codex attempts and records CLI runtime tokens when available. |
+| R4 repeated applied runner | ✅ Implemented | `run-r4-repeated.js` and `r4-repeated-summary.js` require matched accepted pairs before any narrow L1 candidate classification. |
 | R4 applied validator self-test | ✅ Passed | `results/R4-applied-acceptance-validator-self-test-2026-04-21.json` proves the gate can pass/fail concrete file trees without provider telemetry claims. |
+| R4 2026-04-22 pre-launch diagnostic | ⚠️ Insufficient | Attempted 7 pairs; accepted 4/7; prompt median 88.2% smaller; runtime-token median -25.5%; latency median -14.4%. |
 
 ## 4. 2026-04-21 tiny runner smoke
 

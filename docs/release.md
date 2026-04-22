@@ -52,17 +52,14 @@ Codex hooks, manifests, and trust metadata were prepared, but it is not live
 Codex runtime telemetry and must not be described as proof of runtime-token
 savings.
 
-Layer 2 now has two proposal-only R4 paired smokes through the current
-`codex exec` runner. In both pairs, the prompt supplied to Codex dropped from
-`11365` approx tokens in vanilla mode to `861` in fooks mode (`92.4%` smaller),
-both modes exited successfully, and a repeated proposal-smoke validation artifact
-checks success fields, output shape, prompt-size delta consistency, path-sanitization,
-and claim boundaries. This reduces the runner-path and repeated-smoke-validation
-blockers. An applied-code acceptance gate now exists and is self-tested for
-on-disk candidate trees, but live matched vanilla/fooks generated outputs have
-not passed it yet. Therefore the current evidence is still not provider billing
-telemetry, not an applied-code benchmark win, and not enough for stable
-runtime-token/time win claims.
+Layer 2 now has proposal-only R4 paired smokes, an applied-code acceptance gate,
+and a pre-launch repeated applied diagnostic. The 2026-04-22 repeated diagnostic
+attempted seven matched vanilla/fooks pairs and accepted four; it is classified
+`insufficient-accepted-pairs`. Accepted pairs preserved the prepared-prompt
+compression signal (median 88.2% smaller prompt) but showed negative CLI
+runtime/time signal (median runtime-token reduction -25.5%; median latency
+reduction -14.4%). This is not provider billing telemetry, not an applied-code
+benchmark win, and not enough for stable runtime-token/time win claims.
 
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
@@ -77,7 +74,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | Risk | Current disposition | Release implication |
 | --- | --- | --- |
 | `npm publish` not run | Keep unresolved until explicit human approval; use `npm run release:smoke` and `npm publish --dry-run` only for proof. | Blocks real publication, not docs/code PR merge. |
-| Layer 2 applied-code / multi-task evidence absent | Runner path plus two repeated proposal-only smokes now exist. The applied acceptance gate is implemented/self-tested, but matched live generated outputs and multi-task evidence do not exist yet. | Blocks only stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
+| Layer 2 stable applied-code / multi-task evidence absent | Applied repeated diagnostic exists but accepted only 4/7 pairs and regressed on CLI runtime/time medians. Multi-task evidence still does not exist. | Blocks stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
 | Local `fooks status` estimates | Bare status is documented as local context-size telemetry only. | Blocks billing-token, provider-cost, or `ccusage` replacement wording. |
 | Claude/opencode automatic savings | Explicit non-goal unless new runtime bridges are designed and measured. | Keep handoff/tool wording only. |

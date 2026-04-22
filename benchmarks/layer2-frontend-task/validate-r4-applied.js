@@ -101,8 +101,8 @@ function checkBarrels(root) {
     const source = read(barrelPath);
     const missing = expectedNames.filter((name) => {
       const importSafe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const exportFromPattern = new RegExp(`export\\s+(?:\\*|\\{[^}]*\\})\\s+from\\s+['\"]\\./${importSafe}['\"]`);
-      const namedPattern = new RegExp(`export\\s+\\{[^}]*\\b${importSafe}\\b[^}]*\\}`);
+      const exportFromPattern = new RegExp(`export\\s+(?:type\\s+)?(?:\\*|\\{[^}]*\\})\\s+from\\s+['\"]\\./${importSafe}['\"]`);
+      const namedPattern = new RegExp(`export\\s+(?:type\\s+)?\\{[^}]*\\b${importSafe}\\b[^}]*\\}`);
       return !exportFromPattern.test(source) && !namedPattern.test(source);
     });
     return { file: barrel, passed: missing.length === 0, missing };
@@ -160,6 +160,77 @@ function importSpecifiers(source) {
     }
   }
   return specs;
+}
+
+function jsxTagNameText(name) {
+  if (!name) return 'jsx';
+  if (typeof name.getText === 'function') return name.getText();
+  return String(name);
+}
+
+function detectJsxTagsWithTypeScript(source, filePath) {
+  let ts;
+  try {
+    ts = require('typescript');
+  } catch {
+    return null;
+  }
+
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const tags = [];
+  const visit = (node) => {
+    if (ts.isJsxSelfClosingElement(node)) {
+      tags.push(`<${jsxTagNameText(node.tagName)} />`);
+    } else if (ts.isJsxOpeningElement(node)) {
+      tags.push(`<${jsxTagNameText(node.tagName)}>`);
+    } else if (ts.isJsxClosingElement(node)) {
+      tags.push(`</${jsxTagNameText(node.tagName)}>`);
+    } else if (ts.isJsxOpeningFragment(node) || ts.isJsxClosingFragment(node)) {
+      tags.push('<>');
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return tags;
+}
+
+function detectJsxTags(source, filePath) {
+  if (!filePath.endsWith('.tsx')) return [];
+  const astMatches = detectJsxTagsWithTypeScript(source, filePath);
+  if (astMatches !== null) return astMatches;
+
+  // Fallback for environments without TypeScript installed. Keep this narrow to
+  // avoid confusing TSX-safe generic type parameters such as function Foo<T>().
+  return [...source.matchAll(/<\s*([a-z][A-Za-z0-9-]*)(?:\s[^>]*|\/)>/g)].map((match) => match[0].trim());
+}
+
+function checkSourceHygiene(root) {
+  const files = allSourceFiles(root);
+  const measured = files.map((filePath) => {
+    const source = read(filePath);
+    const specifiers = importSpecifiers(source);
+    const externalImports = specifiers.filter((specifier) => !specifier.startsWith('.'));
+    const nonAsciiMatches = [...source].filter((char) => char.charCodeAt(0) > 127);
+    const jsxTagMatches = detectJsxTags(source, filePath);
+    return {
+      file: rel(root, filePath),
+      passed: externalImports.length === 0 && nonAsciiMatches.length === 0 && jsxTagMatches.length === 0,
+      externalImports,
+      nonAsciiCount: nonAsciiMatches.length,
+      jsxTagMatches,
+    };
+  });
+  return {
+    name: 'source hygiene forbids external imports, JSX, and non-ASCII text',
+    passed: measured.length === REQUIRED_FILES.length && measured.every((entry) => entry.passed),
+    measured,
+  };
 }
 
 function findCycles(graph) {
@@ -320,6 +391,7 @@ function validate(root, options = {}) {
     requiredFileGate,
     checkLineLimits(resolvedRoot, maxLines),
     checkBarrels(resolvedRoot),
+    checkSourceHygiene(resolvedRoot),
     checkCircularImports(resolvedRoot),
   ];
   const commandGates = [

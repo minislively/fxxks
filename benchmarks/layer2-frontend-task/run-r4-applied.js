@@ -14,6 +14,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { validate } = require('./validate-r4-applied');
+const { parseCodexRuntimeTokens } = require('./runtime-token-metrics');
 
 function parseArgs(argv) {
   return argv.reduce((acc, arg) => {
@@ -59,9 +60,16 @@ Requirements:
 1. Preserve the public component intent from the provided context.
 2. Keep every generated file under 200 lines.
 3. Use TypeScript exports and imports that typecheck without circular dependencies.
-4. Add barrel exports in every index.ts.
+4. Add barrel exports in every index.ts; ensure utils/index.ts exports combobox-utils consumers.
 5. Do not edit files outside ./combobox.
 6. Prefer self-contained generated code over imports from unavailable packages.
+7. Do not import React, react/jsx-runtime, DOM libraries, or any external package.
+8. Do not use JSX; the .tsx files must be plain TypeScript modules/functions.
+9. hooks/useCombobox.ts must be plain TypeScript with dependency-free state/data helpers.
+10. Use ASCII-only source text.
+11. Add an explicit readonly-array guard where input options/items are normalized.
+12. Keep domain types simple and concrete; prefer string/number/null value types over unconstrained generic component APIs unless the generic is obviously type-safe.
+13. Keep the final response under 120 words and do not include full diffs.
 
 Context:
 ${context}
@@ -105,13 +113,15 @@ function runCodex(prompt, workdir, model, timeoutMs) {
     });
     child.on('error', reject);
     child.on('close', (exitCode, signal) => {
+      const lastMessage = fs.existsSync(lastMessagePath) ? fs.readFileSync(lastMessagePath, 'utf8') : '';
       resolve({
         exitCode,
         signal,
         success: exitCode === 0,
         stdout,
         stderr,
-        lastMessage: fs.existsSync(lastMessagePath) ? fs.readFileSync(lastMessagePath, 'utf8') : '',
+        lastMessage,
+        runtimeTokensTotal: parseCodexRuntimeTokens(stdout, stderr, lastMessage),
         latencyMs: Date.now() - startedAt,
       });
     });
@@ -169,6 +179,10 @@ async function main() {
       latencyMs: codexResult.latencyMs,
       retryCount: 0,
       outputChars: codexResult.lastMessage.length || codexResult.stdout.length,
+      runtimeTokensTotal: codexResult.runtimeTokensTotal,
+      runtimeTokenSource: codexResult.runtimeTokensTotal === null ? null : 'codex-cli-output',
+      runtimeTokenClaimAvailable: codexResult.runtimeTokensTotal !== null,
+      runtimeTokenClaimBoundary: 'Runtime-reported CLI tokens are not provider billing tokens or costs.',
     },
     codexResult: {
       exitCode: codexResult.exitCode,
