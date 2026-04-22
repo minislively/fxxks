@@ -315,8 +315,11 @@ const claudeStart = runNativeHook(fooksBin, "claude", project, hookEnv, {
   cwd: project,
   session_id: "release-smoke-claude",
 }, "Claude SessionStart");
+const claudeStartContext = claudeStart.hookSpecificOutput?.additionalContext ?? "";
 assert(
-  claudeStart.hookSpecificOutput?.additionalContext?.includes("context hook is active"),
+  claudeStartContext.includes("fooks: active")
+    && claudeStartContext.includes("no Read interception")
+    && claudeStartContext.includes("first prompt triggers context"),
   "Claude native SessionStart should emit bounded readiness context",
 );
 const firstClaudePrompt = runNativeHook(fooksBin, "claude", project, hookEnv, {
