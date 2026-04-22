@@ -90,6 +90,27 @@ function collectStrings(value) {
   return strings;
 }
 
+function fileSnapshot(root) {
+  if (!fs.existsSync(root)) {
+    return ["<missing>"];
+  }
+  const entries = [];
+  const visit = (current) => {
+    const stat = fs.statSync(current);
+    const relative = path.relative(root, current) || ".";
+    if (stat.isDirectory()) {
+      entries.push(`${relative}/`);
+      for (const child of fs.readdirSync(current).sort()) {
+        visit(path.join(current, child));
+      }
+      return;
+    }
+    entries.push(`${relative}:${stat.size}:${fs.readFileSync(current, "utf8")}`);
+  };
+  visit(root);
+  return entries;
+}
+
 function lineOf(filePath, needle) {
   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
   const index = lines.findIndex((line) => line.includes(needle));
@@ -1746,6 +1767,7 @@ test("setup reports blocked state for projects without React components", () => 
 test("cli help advertises setup and package install has no auto hook side effects", () => {
   const help = runText(["--help"]);
   assert.match(help, /fooks setup/);
+  assert.match(help, /fooks doctor \[codex\|claude\] \[--json\]/);
   assert.match(help, /fooks compare <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /Codex: automatic repeated-file runtime hook path/);
@@ -1769,6 +1791,173 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.equal(pkg.scripts?.prepare, undefined);
   assert.match(pkg.scripts?.["release:smoke"], /scripts\/release-smoke\.mjs/);
   assert.doesNotMatch(pkg.scripts?.["release:smoke"], /publish|version|tag/);
+});
+
+test("doctor rejects unknown targets and exposes bounded command help", () => {
+  const help = runText(["doctor", "--help"]);
+  assert.match(help, /Usage: fooks doctor \[codex\|claude\] \[--json\]/);
+  assert.match(help, /read-only local diagnostics/);
+  assert.match(help, /Does not prove provider health/);
+  assert.match(help, /Does not enable Claude Read\/tool-call interception/);
+
+  let output = "";
+  try {
+    runText(["doctor", "opencode", "--json"]);
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  assert.match(output, /Unexpected doctor argument: opencode/);
+});
+
+test("doctor codex reports missing runtime blockers without mutating local state", () => {
+  const tempDir = makeTempProject();
+  const codexHome = path.join(tempDir, ".missing-codex-home");
+  const claudeHome = path.join(tempDir, ".missing-claude-home");
+  const env = { FOOKS_CODEX_HOME: codexHome, FOOKS_CLAUDE_HOME: claudeHome };
+  const beforeProject = fileSnapshot(tempDir);
+  const beforeCodex = fileSnapshot(codexHome);
+  const beforeClaude = fileSnapshot(claudeHome);
+
+  const result = run(["doctor", "codex", "--json"], tempDir, env);
+
+  assert.equal(result.command, "doctor");
+  assert.equal(result.target, "codex");
+  assert.equal(result.healthy, false);
+  assert.ok(result.summary.fail >= 1);
+  assert.ok(result.checks.some((item) => item.name === "Codex runtime home" && item.status === "fail"));
+  assert.ok(result.checks.some((item) => item.name === "Codex hooks" && item.status === "fail"));
+  assert.ok(result.nextSteps.some((item) => item.includes("FOOKS_CODEX_HOME")));
+  assert.deepEqual(fileSnapshot(tempDir), beforeProject);
+  assert.deepEqual(fileSnapshot(codexHome), beforeCodex);
+  assert.deepEqual(fileSnapshot(claudeHome), beforeClaude);
+});
+
+test("doctor codex detects incomplete hook event installation", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  fs.writeFileSync(path.join(codexHome, "hooks.json"), JSON.stringify({
+    hooks: {
+      SessionStart: [{ matcher: "startup|resume", hooks: [{ type: "command", command: "fooks codex-runtime-hook --native-hook" }] }],
+    },
+  }, null, 2));
+
+  const result = run(["doctor", "codex", "--json"], tempDir, {
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  });
+  const hooks = result.checks.find((item) => item.name === "Codex hooks");
+  assert.equal(hooks.status, "fail");
+  assert.deepEqual(hooks.evidence.installedEvents, ["SessionStart"]);
+  assert.deepEqual(hooks.evidence.missingEvents, ["UserPromptSubmit", "Stop"]);
+  assert.match(hooks.fix, /fooks install codex-hooks/);
+});
+
+test("doctor codex passes after isolated setup and reports readiness evidence", () => {
+  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const env = {
+    FOOKS_ACTIVE_ACCOUNT: "",
+    FOOKS_TARGET_ACCOUNT: "",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  };
+  const setup = run(["setup"], tempDir, env);
+  assert.equal(setup.ready, true);
+
+  const result = run(["doctor", "codex", "--json"], tempDir, env);
+  assert.equal(result.healthy, true);
+  assert.equal(result.summary.fail, 0);
+  const hooks = result.checks.find((item) => item.name === "Codex hooks");
+  assert.equal(hooks.status, "pass");
+  assert.deepEqual(hooks.evidence.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
+  assert.equal(hooks.evidence.commandMatches, true);
+  const manifest = result.checks.find((item) => item.name === "Codex runtime manifest");
+  assert.equal(manifest.status, "pass");
+  assert.equal(manifest.evidence.bridgeCommandPlausible, true);
+  assert.equal(result.checks.find((item) => item.name === "Codex trust status").status, "pass");
+  assert.equal(result.checks.find((item) => item.name === "Eligible source files").status, "pass");
+});
+
+test("doctor aggregate treats Claude-only blockers as warnings when Codex is ready", () => {
+  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = path.join(tempDir, ".missing-claude-home");
+  const env = {
+    FOOKS_ACTIVE_ACCOUNT: "",
+    FOOKS_TARGET_ACCOUNT: "",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  };
+  const setup = run(["setup"], tempDir, env);
+  assert.equal(setup.ready, true);
+  assert.equal(setup.runtimes.claude.blocksOverall, false);
+
+  const result = run(["doctor", "--json"], tempDir, env);
+  assert.equal(result.target, "all");
+  assert.equal(result.healthy, true);
+  assert.equal(result.summary.fail, 0);
+  assert.ok(result.summary.warn >= 1);
+  assert.ok(result.checks.some((item) => item.runtime === "claude" && item.status === "warn"));
+});
+
+test("doctor claude focused target fails independently and keeps claim boundaries", () => {
+  const tempDir = makeTempProject();
+  const result = run(["doctor", "claude", "--json"], tempDir, {
+    FOOKS_CLAUDE_HOME: path.join(tempDir, ".missing-claude-home"),
+    FOOKS_CODEX_HOME: path.join(tempDir, ".missing-codex-home"),
+  });
+  const text = collectStrings(result).join("\n");
+
+  assert.equal(result.target, "claude");
+  assert.equal(result.healthy, false);
+  assert.ok(result.summary.fail >= 1);
+  assert.ok(result.checks.every((item) => item.runtime === "claude"));
+  assert.ok(result.claimBoundaries.some((item) => item.includes("does not intercept Claude Read/tool calls")));
+  assert.match(text, /Doctor does not prove provider health/);
+  assert.doesNotMatch(text, /Claude Read interception is enabled/i);
+  assert.doesNotMatch(text, /Claude runtime-token savings are enabled/i);
+  assert.doesNotMatch(text, /provider billing-token reduction is enabled/i);
+});
+
+test("doctor human output is readable and includes fixes plus boundaries", () => {
+  const tempDir = makeTempProject();
+  const output = runText(["doctor", "codex"], tempDir, {
+    FOOKS_CODEX_HOME: path.join(tempDir, ".missing-codex-home"),
+    FOOKS_CLAUDE_HOME: path.join(tempDir, ".missing-claude-home"),
+  });
+  assert.match(output, /^fooks doctor codex/m);
+  assert.match(output, /❌ Codex runtime home/);
+  assert.match(output, /Fix: Create the Codex runtime home or set FOOKS_CODEX_HOME/);
+  assert.match(output, /Summary: \d+ passed, \d+ warnings, \d+ failures/);
+  assert.match(output, /Overall: unhealthy/);
+  assert.match(output, /Boundary: Doctor reports local fooks configuration and runtime hook readiness only\./);
+});
+
+test("doctor is read-only for prepared project, Codex, and Claude paths", () => {
+  const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const env = {
+    FOOKS_ACTIVE_ACCOUNT: "",
+    FOOKS_TARGET_ACCOUNT: "",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  };
+  run(["setup"], tempDir, env);
+  const beforeProject = fileSnapshot(tempDir);
+  const beforeCodex = fileSnapshot(codexHome);
+  const beforeClaude = fileSnapshot(claudeHome);
+
+  run(["doctor", "--json"], tempDir, env);
+  run(["doctor", "codex", "--json"], tempDir, env);
+  run(["doctor", "claude", "--json"], tempDir, env);
+  runText(["doctor", "codex"], tempDir, env);
+
+  assert.deepEqual(fileSnapshot(tempDir), beforeProject);
+  assert.deepEqual(fileSnapshot(codexHome), beforeCodex);
+  assert.deepEqual(fileSnapshot(claudeHome), beforeClaude);
 });
 
 

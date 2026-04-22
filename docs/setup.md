@@ -61,6 +61,9 @@ The setup JSON includes an additive `scope` object with `packageInstall`, `proje
 ## 3. Check status
 
 ```bash
+fooks doctor
+fooks doctor codex
+fooks doctor claude
 fooks status
 fooks status codex
 fooks status claude
@@ -69,10 +72,13 @@ fooks status cache
 
 Good signs:
 
+- `fooks doctor` returns `healthy: true` when the selected runtime's local setup artifacts are ready. In aggregate mode, Claude-only blockers remain warnings when Codex is ready because Claude support is non-fatal to the Codex automatic hook path.
 - Bare `fooks status` returns `metricTier: "estimated"` and no error. A fresh repo may show zero sessions/events.
 - Codex status is connected/ready-style.
 - Claude status is `context-hook-ready` when the local adapter files, Claude attachment manifest, and project-local Claude hooks are present. It may be `handoff-ready` when adapter/manifest artifacts exist but the project-local hooks have not been installed yet. This is not a Claude `Read` interception or runtime-token savings claim.
 - Cache status is `empty` for a fresh repo or `healthy` after scan/use.
+
+`fooks doctor [codex|claude] [--json]` is read-only. It checks local fooks setup artifacts, runtime manifests, hook event installation, Codex trust status, cache health, and supported source-file presence. It does not mutate `.fooks/`, Codex hooks, Claude project-local settings, or runtime-home manifests. It also does not prove live provider health; it is not a ccusage replacement and not provider billing telemetry or provider costs.
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider billing tokens, provider costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 

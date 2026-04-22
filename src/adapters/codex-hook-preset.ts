@@ -2,10 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const CODEX_HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "Stop"] as const;
+export const CODEX_HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "Stop"] as const;
 const CODEX_HOOK_SUFFIX = "codex-runtime-hook --native-hook";
 
-type CodexHookEvent = (typeof CODEX_HOOK_EVENTS)[number];
+export type CodexHookEvent = (typeof CODEX_HOOK_EVENTS)[number];
 
 type HookCommand = {
   type: "command";
@@ -21,6 +21,18 @@ type HookMatcher = {
 
 type HooksFile = {
   hooks?: Record<string, HookMatcher[]>;
+};
+
+export type CodexHookPresetStatus = {
+  home: string;
+  hooksPath: string;
+  homeExists: boolean;
+  exists: boolean;
+  valid?: boolean;
+  installedEvents: CodexHookEvent[];
+  missingEvents: CodexHookEvent[];
+  commandMatches?: boolean;
+  blocker?: string;
 };
 
 export type CodexHookPresetInstallResult = {
@@ -69,6 +81,17 @@ function readHooksFile(filePath: string): HooksFile {
   if (!fs.existsSync(filePath)) return { hooks: {} };
   const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as HooksFile;
   return { hooks: parsed.hooks ?? {} };
+}
+
+function hookCommandsForEvent(hooksFile: HooksFile, event: CodexHookEvent): string[] {
+  const eventHooks = hooksFile.hooks?.[event] ?? [];
+  if (!Array.isArray(eventHooks)) return [];
+  return eventHooks.flatMap((matcher) => {
+    if (!Array.isArray(matcher?.hooks)) return [];
+    return matcher.hooks
+      .filter((hook) => hook?.type === "command" && typeof hook.command === "string")
+      .map((hook) => hook.command);
+  });
 }
 
 function findCompatibleCommandHook(matcher: HookMatcher, cliName = "fooks"): HookCommand | undefined {
@@ -129,5 +152,71 @@ export function installCodexHookPreset(cliName = "fooks"): CodexHookPresetInstal
     modified,
     installedEvents,
     skippedEvents,
+  };
+}
+
+export function readCodexHookPresetStatus(cliName = "fooks"): CodexHookPresetStatus {
+  const home = runtimeHome();
+  const filePath = hooksPath();
+  const homeExists = fs.existsSync(home);
+
+  if (!homeExists) {
+    return {
+      home,
+      hooksPath: filePath,
+      homeExists,
+      exists: false,
+      installedEvents: [],
+      missingEvents: [...CODEX_HOOK_EVENTS],
+      commandMatches: false,
+      blocker: "Codex runtime home not detected",
+    };
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return {
+      home,
+      hooksPath: filePath,
+      homeExists,
+      exists: false,
+      installedEvents: [],
+      missingEvents: [...CODEX_HOOK_EVENTS],
+      commandMatches: false,
+      blocker: "Codex hooks file is missing",
+    };
+  }
+
+  let hooksFile: HooksFile;
+  try {
+    hooksFile = readHooksFile(filePath);
+  } catch (error) {
+    return {
+      home,
+      hooksPath: filePath,
+      homeExists,
+      exists: true,
+      valid: false,
+      installedEvents: [],
+      missingEvents: [...CODEX_HOOK_EVENTS],
+      commandMatches: false,
+      blocker: `Codex hooks file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const command = defaultCodexHookCommand(cliName);
+  const installedEvents = CODEX_HOOK_EVENTS.filter((event) => hookCommandsForEvent(hooksFile, event).some((item) => isCompatibleCodexHookCommand(item, cliName)));
+  const missingEvents = CODEX_HOOK_EVENTS.filter((event) => !installedEvents.includes(event));
+  const commandMatches = installedEvents.length > 0 && installedEvents.every((event) => hookCommandsForEvent(hooksFile, event).some((item) => item === command));
+
+  return {
+    home,
+    hooksPath: filePath,
+    homeExists,
+    exists: true,
+    valid: true,
+    installedEvents,
+    missingEvents,
+    commandMatches,
+    blocker: missingEvents.length > 0 ? `Missing compatible Codex fooks hooks for: ${missingEvents.join(", ")}` : undefined,
   };
 }
