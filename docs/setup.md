@@ -84,7 +84,7 @@ Before opening a runtime, you can inspect the local file-level estimate for a su
 fooks compare src/components/Button.tsx --json
 ```
 
-`fooks compare` compares the original source bytes with the exact model-facing payload produced by `fooks extract <file> --model-payload`. For compressed/hybrid frontend files, that payload comes from fooks' TypeScript AST-derived component contract, behavior, structure, and style signals rather than the full source text. The token values are estimated from local byte counts, so this is a local model-facing payload estimate only. It is not provider tokenizer behavior, not runtime hook envelope overhead, not provider billing tokens, not provider costs, and not a `ccusage` replacement.
+`fooks compare` compares the original source bytes with the exact model-facing payload produced by `fooks extract <file> --model-payload`. For compressed/hybrid frontend files, that payload comes from fooks' TypeScript AST-derived component contract, behavior, structure, style, bounded source-line ranges, a source fingerprint for freshness checks, hook/effect intent, and form/control signals rather than the full source text. The line ranges are AST-derived edit aids and should be treated as valid only for the matching source fingerprint. The token values are estimated from local byte counts, so this is a local model-facing payload estimate only. It is not provider tokenizer behavior, not runtime hook envelope overhead, not provider billing tokens, not provider costs, and not a `ccusage` replacement.
 
 ## What the setup result means
 
