@@ -362,7 +362,7 @@ function opencodeRuntimeReadiness(installResult: unknown): RuntimeReadiness {
     ],
     notes: [
       "opencode setup does not intercept read calls.",
-      "opencode setup does not provide automatic runtime-token telemetry.",
+      "opencode setup does not prove automatic runtime-token savings.",
     ],
   };
 }
@@ -382,7 +382,7 @@ function manualOpenCodeReadiness(blockers: string[], details: unknown = null): R
     ],
     notes: [
       "opencode setup does not intercept read calls.",
-      "opencode setup does not provide automatic runtime-token telemetry.",
+      "opencode setup does not prove automatic runtime-token savings.",
     ],
   };
 }
