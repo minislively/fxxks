@@ -60,19 +60,115 @@ Expected observations:
 
 ## Manual Claude Code check
 
+Use this Claude-only lane for issue-backed smoke work such as
+[#115](https://github.com/minislively/fooks/issues/115). It is intentionally a
+project-local hook smoke. It should prove that Claude Code can receive bounded
+context through fooks' `SessionStart` / `UserPromptSubmit` hooks, not that fooks
+intercepts Claude `Read` calls or proves provider chargeable-token changes.
+
+### Claude-only deterministic preflight
+
+Run the deterministic checks first. These do not require a real Claude provider
+completion:
+
+```bash
+npm run build
+npm run smoke:claude
+```
+
+If the follow-up PR changes setup, release, or smoke-output wording, also run:
+
+```bash
+npm run release:smoke
+```
+
+### Disposable Claude project setup
+
 1. In a disposable React/TSX project with Claude Code available, run:
 
    ```bash
+   TMP_PROJECT="$(mktemp -d /tmp/fooks-claude-live.XXXXXX)"
+   cd "$TMP_PROJECT"
+   mkdir -p src/components
+   printf '%s\n' '{"name":"fooks-claude-live-smoke","scripts":{}}' > package.json
+   printf '%s\n' \
+     'export function Card() {' \
+     '  return (' \
+     '    <section>' \
+     '      <h2>Claude Live Smoke</h2>' \
+     '      <p>This component verifies fooks Claude context hooks.</p>' \
+     '    </section>' \
+     '  );' \
+     '}' \
+     > src/components/Card.tsx
    fooks setup
    fooks status claude
    cat .claude/settings.local.json
    ```
 
-2. Confirm `.claude/settings.local.json` contains only fooks `SessionStart` and `UserPromptSubmit` hook commands. It must not install Claude `Read`, `PreToolUse`, or `PostToolUse` interception.
-3. Open Claude Code in that project.
-4. Prompt once about an existing `.tsx` / `.jsx` component.
-5. Prompt again about the same file in the same session.
-6. Run:
+2. Confirm `.claude/settings.local.json` contains only fooks `SessionStart` and
+   `UserPromptSubmit` hook commands. It must not install Claude `Read`,
+   `PreToolUse`, or `PostToolUse` interception.
+
+### Native hook payload smoke
+
+Before opening Claude Code, verify the native hook bridge with one stable session
+id. The first same-file prompt is record-only; the repeated same-file prompt is
+the deterministic context-injection proof.
+
+```bash
+MANUAL_SESSION_ID="manual-claude-native-smoke"
+
+printf '%s\n' '{
+  "hook_event_name": "SessionStart",
+  "cwd": "'"$PWD"'",
+  "session_id": "'"$MANUAL_SESSION_ID"'"
+}' | fooks claude-runtime-hook --native-hook
+
+# Expected: may print no output because it records first-seen file state.
+printf '%s\n' '{
+  "hook_event_name": "UserPromptSubmit",
+  "cwd": "'"$PWD"'",
+  "session_id": "'"$MANUAL_SESSION_ID"'",
+  "prompt": "Explain src/components/Card.tsx"
+}' | fooks claude-runtime-hook --native-hook
+
+# Expected: emits hookSpecificOutput.additionalContext.
+printf '%s\n' '{
+  "hook_event_name": "UserPromptSubmit",
+  "cwd": "'"$PWD"'",
+  "session_id": "'"$MANUAL_SESSION_ID"'",
+  "prompt": "Again, explain src/components/Card.tsx"
+}' | fooks claude-runtime-hook --native-hook
+```
+
+Expected native-hook observations:
+
+- `SessionStart` emits bounded `additionalContext`.
+- The first eligible same-file `UserPromptSubmit` may emit no native JSON because
+  it is record-only.
+- The repeated same-file `UserPromptSubmit` emits
+  `hookSpecificOutput.additionalContext`.
+- Any emitted context preserves the boundary: project-local Claude context hook
+  only, no Claude `Read` interception, and no runtime/provider token-cost
+  savings claim.
+
+### Manual Claude Code session
+
+1. Open Claude Code in that project.
+2. Prompt once about the fixture:
+
+   ```text
+   Explain src/components/Card.tsx
+   ```
+
+3. Prompt again about the same file in the same session:
+
+   ```text
+   Again, explain src/components/Card.tsx
+   ```
+
+4. Run:
 
    ```bash
    fooks status
@@ -82,17 +178,25 @@ Expected observations:
 
 - Claude status is `context-hook-ready`.
 - The first eligible frontend-file prompt is record/preparation only.
-- The repeated same-file prompt may receive bounded `additionalContext` through `UserPromptSubmit`.
-- `fooks status` includes a Claude `project-local-context-hook` runtime/source breakdown.
+- The repeated same-file prompt may receive bounded `additionalContext` through
+  `UserPromptSubmit`.
+- `fooks status` includes a Claude `project-local-context-hook` runtime/source
+  breakdown.
+- Sanitized evidence should include the ready/blocker state and claim boundary,
+  but should redact user-specific paths, account context, and any private prompt
+  text not needed to prove hook behavior.
 
 ## Evidence to attach to a PR
 
 Use sanitized excerpts only:
 
 - `npm run release:smoke` success summary.
+- `npm run smoke:claude` success summary for deterministic Claude hook behavior.
 - `fooks status` fields showing `metricTier`, `claimBoundary`, and runtime/source keys.
 - Confirmation that provider billing-token/cost proof remains deferred.
 - Confirmation that `ccusage` replacement remains out of scope.
+- Confirmation that Claude `Read`, `PreToolUse`, and `PostToolUse` interception
+  remain out of scope for this smoke lane.
 
 ## Opt-in provider-backed live smoke
 
