@@ -272,6 +272,17 @@ const statusStdout = execFileSync(fooksBin, ["status"], {
     FOOKS_CLAUDE_HOME: claudeHome,
   },
 });
+const doctorStdout = execFileSync(fooksBin, ["doctor", "--json"], {
+  cwd: project,
+  encoding: "utf8",
+  env: {
+    ...process.env,
+    HOME: path.join(runtimeRoot, "home"),
+    XDG_CONFIG_HOME: path.join(runtimeRoot, "config"),
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  },
+});
 const claudeStatusStdout = execFileSync(fooksBin, ["status", "claude"], {
   cwd: project,
   encoding: "utf8",
@@ -295,6 +306,7 @@ const compareStdout = runInstalledFooks(fooksBin, ["compare", "src/LargeForm.tsx
 });
 assertPublicSurfaceClaimBoundaries({
   "fooks setup output": setupStdout,
+  "fooks doctor output": doctorStdout,
   "fooks status output": statusStdout,
   "fooks status claude output": claudeStatusStdout,
   "fooks compare output": compareStdout,
@@ -313,6 +325,11 @@ assert(status.metricTier === "estimated", `status should expose estimated metric
 assert(status.claimBoundary?.includes("not provider billing tokens"), "status should keep provider billing boundary");
 assert(status.breakdown && typeof status.breakdown === "object", "status should expose runtime/source breakdown");
 assert(!Object.prototype.hasOwnProperty.call(status, "sessions"), "CLI status should omit per-session contribution details");
+const doctor = JSON.parse(doctorStdout);
+assert(doctor.command === "doctor", `doctor command should be doctor, got ${doctor.command}`);
+assert(doctor.healthy === true, `doctor should be healthy after setup, got ${doctor.healthy}`);
+assert(doctor.summary?.fail === 0, `doctor should have zero failures after setup, got ${doctor.summary?.fail}`);
+assert(doctor.claimBoundaries?.some((item) => item.includes("local fooks configuration")), "doctor should expose local-configuration claim boundary");
 assert(fs.existsSync(path.join(codexHome, "hooks.json")), "isolated Codex hooks file should be written under FOOKS_CODEX_HOME");
 const claudeLocalSettings = path.join(project, ".claude", "settings.local.json");
 assert(fs.existsSync(claudeLocalSettings), "Claude project-local hooks should be installed under the project");
@@ -471,6 +488,11 @@ console.log(JSON.stringify({
       latestSessionCount: postHookStatus.latestSessionCount,
       runtimeSources: Object.keys(postHookStatus.breakdown.byRuntimeAndSource ?? {}).sort(),
       claimBoundary: postHookStatus.claimBoundary,
+    },
+    doctor: {
+      healthy: doctor.healthy,
+      summary: doctor.summary,
+      claimBoundaries: doctor.claimBoundaries,
     },
     compare: {
       measurement: compare.measurement,

@@ -25,6 +25,7 @@ Then open Codex in that repo and work normally. The same setup command also prep
 | --- | --- | --- |
 | `npm install -g oh-my-fooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
 | `fooks setup` | current project + runtime homes | Creates project-local `.fooks/` state, may add project-local `.opencode/` helper files, and may update runtime-home files such as Codex hooks/manifests or Claude handoff manifests. |
+| `fooks doctor` | current project + runtime-home inspection | Reads local setup and hook-readiness artifacts without writing files; it is not live provider health, billing-token, cost, or `ccusage` proof. |
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
 
 The `fooks setup` JSON includes a `scope` object so support/debug logs can show which paths are project-local and which are user-runtime/home scoped.
@@ -66,6 +67,9 @@ These are Codex-focused benchmark/proxy measurements from a 5-task sample. The t
 
 ```bash
 fooks setup          # one-time readiness: Codex hooks + Claude context hooks + opencode helper
+fooks doctor         # read-only local setup and hook-readiness diagnostics
+fooks doctor codex   # focus on Codex setup/hook readiness
+fooks doctor claude  # focus on Claude project-local context-hook readiness
 fooks status          # local estimated context-size telemetry for this repo
 fooks status codex   # check Codex attach/hook state
 fooks status claude  # check Claude project-local context hook / handoff health
@@ -127,10 +131,14 @@ If setup does not report ready:
 
 ```bash
 fooks setup
+fooks doctor
+fooks doctor codex
 fooks status codex
 fooks status claude
 fooks status cache
 ```
+
+`fooks doctor` is the safest first diagnostic after setup because it is read-only and summarizes local setup artifacts, missing hook events, manifests, adapter files, trust status, cache health, and supported source-file presence. It does not prove live provider health; it is not a ccusage replacement and not provider billing telemetry or provider costs.
 
 Common causes:
 

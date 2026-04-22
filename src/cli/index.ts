@@ -520,7 +520,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|run|scan|extract|compare|decide|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|run|scan|extract|compare|decide|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -528,6 +528,9 @@ Everyday commands:
       - Codex: automatic repeated-file runtime hook path when trust checks pass.
       - Claude: project-local context hooks; first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may receive bounded context; no Read interception or runtime-token claim.
       - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
+
+  ${displayCliName} doctor [codex|claude] [--json]
+      Read-only local setup and runtime hook readiness diagnostics.
 
   ${displayCliName} run <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
@@ -586,6 +589,33 @@ function parseCompareArgs(args: string[]): { filePath: string } {
   }
 
   return { filePath: requireFilePath(filePath) };
+}
+
+function parseDoctorArgs(args: string[]): { target: "all" | "codex" | "claude"; json: boolean; help: boolean } {
+  let target: "all" | "codex" | "claude" = "all";
+  let json = false;
+  let help = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      help = true;
+      continue;
+    }
+    if (arg === "codex" || arg === "claude") {
+      if (target !== "all") {
+        throw new Error("doctor accepts at most one target: 'codex' or 'claude'");
+      }
+      target = arg;
+      continue;
+    }
+    throw new Error(`Unexpected doctor argument: ${arg}`);
+  }
+
+  return { target, json, help };
 }
 
 function parseCodexRuntimeHookArgs(args: string[]): {
@@ -732,6 +762,29 @@ async function run(): Promise<void> {
     }
     case "setup": {
       print(await runSetup(displayCliName, process.cwd()));
+      return;
+    }
+    case "doctor": {
+      const { doctorHelp, formatDoctor, runDoctor } = await import("./doctor.js");
+      let options: ReturnType<typeof parseDoctorArgs>;
+      try {
+        options = parseDoctorArgs(rest);
+      } catch (error) {
+        console.error(`fooks doctor: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(doctorHelp(displayCliName));
+        process.exitCode = 1;
+        return;
+      }
+      if (options.help) {
+        console.log(doctorHelp(displayCliName));
+        return;
+      }
+      const result = runDoctor({ target: options.target, cwd: process.cwd(), cliName: displayCliName });
+      if (options.json) {
+        print(result);
+      } else {
+        process.stdout.write(formatDoctor(result));
+      }
       return;
     }
     case "run": {
