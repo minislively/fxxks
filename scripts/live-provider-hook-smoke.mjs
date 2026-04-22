@@ -17,7 +17,21 @@ function run(command, args, options = {}) {
     input: options.input,
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
     env: { ...process.env, ...(options.env ?? {}) },
+    timeout: options.timeout,
   });
+}
+
+function runResult(command, args, options = {}) {
+  try {
+    return { status: 0, stdout: run(command, args, options), stderr: "" };
+  } catch (error) {
+    return {
+      status: typeof error?.status === "number" ? error.status : 1,
+      stdout: String(error?.stdout ?? error?.output?.[1] ?? ""),
+      stderr: String(error?.stderr ?? error?.output?.[2] ?? ""),
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function commandVersion(command, args = ["--version"]) {
@@ -111,40 +125,75 @@ function summarizeHookEvents(events) {
   });
 }
 
+function summarizeProviderErrors(events, stderr) {
+  const eventErrors = events.filter((event) => (
+    event?.type === "result" && event?.is_error
+  ) || event?.subtype === "api_retry" || event?.error || event?.api_error_status).slice(-5).map((event) => {
+    const text = JSON.stringify(event);
+    return text.length > 600 ? `${text.slice(0, 600)}…` : text;
+  });
+  if (stderr) eventErrors.push(stderr.length > 600 ? `${stderr.slice(0, 600)}…` : stderr);
+  return eventErrors;
+}
+
 function runCodexProviderSmoke(project, env) {
   const outputPath = path.join(project, ".fooks", "live-codex-last-message.txt");
-  const stdout = run("codex", [
+  const result = runResult("codex", [
     "exec",
+    "--skip-git-repo-check",
     "--cd", project,
     "--sandbox", "read-only",
     "--ephemeral",
     "--json",
     "--output-last-message", outputPath,
     "Reply with exactly FOOKS_CODEX_LIVE_OK after considering src/components/Card.tsx. Do not edit files.",
-  ], { cwd: project, env });
-  const events = parseJsonLines(stdout);
+  ], { cwd: project, env, timeout: Number(process.env.FOOKS_LIVE_CODEX_TIMEOUT_MS ?? "60000") });
+  const events = parseJsonLines(result.stdout);
+  const hookEventHints = summarizeHookEvents(events);
+  const providerOutput = `${result.stdout}\n${result.stderr}`;
+  const providerErrors = summarizeProviderErrors(events, result.stderr);
+  const hookEvidenceObserved = hookEventHints.length > 0 || /hook|fooks/i.test(providerOutput);
+  if (result.status !== 0 && !hookEvidenceObserved) {
+    throw new Error(`Codex provider smoke failed before hook evidence: ${result.stderr || result.error || result.stdout}`);
+  }
   return {
-    command: "codex exec --json --ephemeral",
+    command: "codex exec --skip-git-repo-check --json --ephemeral",
+    exitCode: result.status,
+    providerCompleted: result.status === 0,
     outputPath,
     lastMessageExists: fs.existsSync(outputPath),
-    hookEventHints: summarizeHookEvents(events),
+    hookEvidenceObserved,
+    hookEventHints,
+    providerErrors,
   };
 }
 
 function runClaudeProviderSmoke(project, env) {
-  const stdout = run("claude", [
+  const result = runResult("claude", [
     "--print",
+    "--verbose",
     "--output-format=stream-json",
     "--include-hook-events",
     "--max-budget-usd", process.env.FOOKS_LIVE_CLAUDE_MAX_BUDGET_USD ?? "0.05",
     "--tools", "",
     "--no-session-persistence",
     "Reply with exactly FOOKS_CLAUDE_LIVE_OK after considering src/components/Card.tsx. Do not edit files.",
-  ], { cwd: project, env });
-  const events = parseJsonLines(stdout);
+  ], { cwd: project, env, timeout: Number(process.env.FOOKS_LIVE_CLAUDE_TIMEOUT_MS ?? "60000") });
+  const events = parseJsonLines(result.stdout);
+  const hookEventHints = summarizeHookEvents(events);
+  const providerOutput = `${result.stdout}\n${result.stderr}`;
+  const providerErrors = summarizeProviderErrors(events, result.stderr);
+  const hookEvidenceObserved = /fooks: Claude context hook|UserPromptSubmit|SessionStart/i.test(providerOutput);
+  if (result.status !== 0 && !hookEvidenceObserved) {
+    throw new Error(`Claude provider smoke failed before hook evidence: ${result.stderr || result.error || result.stdout}`);
+  }
   return {
-    command: "claude --print --output-format=stream-json --include-hook-events",
-    hookEventHints: summarizeHookEvents(events),
+    command: "claude --print --verbose --output-format=stream-json --include-hook-events",
+    exitCode: result.status,
+    providerCompleted: result.status === 0,
+    hookEvidenceObserved,
+    hookEventHints,
+    providerErrors,
     eventCount: events.length,
   };
 }

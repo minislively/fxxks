@@ -105,16 +105,20 @@ FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-prov
 
 The first command is safe and only reports installed CLI versions plus the exact opt-in command. The second command may use the local Codex / Claude Code account and can spend provider tokens, so run it only when that is intentional.
 
-Optional flags:
+Optional flags and timeout knobs:
 
 ```bash
 FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider --skip-codex
 FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider --skip-claude
+FOOKS_LIVE_CODEX_TIMEOUT_MS=120000 FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider --skip-claude
+FOOKS_LIVE_CLAUDE_TIMEOUT_MS=120000 FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider --skip-codex
 ```
 
 Expected observations:
 
 - The script creates a disposable frontend project and installs the packed local `fooks` CLI.
 - `fooks setup` must report Codex `automatic-ready` and Claude `context-hook-ready`.
+- Codex normally reports `providerCompleted: true`, `lastMessageExists: true`, and `hookEvidenceObserved: true`.
+- Claude can report `providerCompleted: false` when the local account, auth session, or upstream provider returns rate-limit/server/auth errors; this is acceptable only when `hookEvidenceObserved: true` and `providerErrors` records the provider-side failure.
 - Provider-backed CLI invocations must leave `fooks status` at `metricTier: "estimated"` with the provider-billing boundary intact.
 - Any captured evidence remains hook activation / local status evidence only; it is still not provider billing-token or provider-cost proof.
