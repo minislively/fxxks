@@ -222,7 +222,31 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     return runtimeDecision;
   }
 
-  const decision = decideCodexPreRead(path.join(cwd, target), cwd);
+  let decision: ReturnType<typeof decideCodexPreRead>;
+  try {
+    decision = decideCodexPreRead(path.join(cwd, target), cwd);
+  } catch {
+    markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
+    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const runtimeDecision = fallbackDecision(
+      hookEventName,
+      target,
+      statePath,
+      ["repeated-file", "payload-build-failed"],
+      true,
+      true,
+      false,
+      "payload-build-failed",
+      policy,
+    );
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: originalEstimatedBytes,
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return runtimeDecision;
+  }
+
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
     const additionalContext = buildAdditionalContext(target, decision.payload, contextMode);
