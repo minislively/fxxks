@@ -17,7 +17,7 @@ function safeString(value: unknown): string {
 
 function readHookEventName(payload: NativePayload): ClaudeRuntimeHookEvent | null {
   const raw = safeString(payload.hook_event_name ?? payload.hookEventName ?? payload.event ?? payload.name).trim();
-  if (raw === "SessionStart" || raw === "UserPromptSubmit") return raw;
+  if (raw === "SessionStart" || raw === "UserPromptSubmit" || raw === "Stop") return raw;
   return null;
 }
 

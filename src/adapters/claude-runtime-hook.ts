@@ -1,19 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import { decideCodexPreRead } from "./codex-pre-read";
-import { initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
+import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, readClaudeRuntimeSession, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./codex-runtime-prompt";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 import {
   estimateFileBytes,
   estimateTextBytes,
+  finalizeSessionMetricSummarySafe,
   initializeSessionMetricSummarySafe,
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
 
 export const CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS = 9000;
 
-export type ClaudeRuntimeHookEvent = "SessionStart" | "UserPromptSubmit";
+export type ClaudeRuntimeHookEvent = "SessionStart" | "UserPromptSubmit" | "Stop";
 
 export type ClaudeRuntimeHookInput = {
   hookEventName: ClaudeRuntimeHookEvent;
@@ -156,6 +157,26 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     };
   }
 
+  if (hookEventName === "Stop") {
+    const statePath = clearClaudeRuntimeSession(cwd, sessionKey);
+    finalizeSessionMetricSummarySafe(cwd, sessionKey, { runtime: "claude", measurementSource: "project-local-context-hook" });
+    return {
+      runtime: "claude",
+      hookEventName,
+      action: "noop",
+      reasons: ["session-stop"],
+      statePath,
+      contextMode: "no-op",
+      contextModeReason: "session-stop",
+      debug: {
+        repeatedFile: false,
+        eligible: false,
+        bounded: true,
+        escapeHatchUsed: false,
+      },
+    };
+  }
+
   const prompt = input.prompt ?? "";
   const promptContext = resolvePromptFileContext(prompt, cwd);
   const target = promptContext.filePath;
@@ -207,6 +228,10 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     });
     return runtimeDecision;
   }
+
+  const currentMtime = fs.statSync(resolvedTarget).mtimeMs;
+  const priorMtime = readClaudeRuntimeSession(cwd, sessionKey).seenFiles[target]?.lastModifiedAtMs;
+  const refreshed = priorMtime !== undefined && priorMtime !== currentMtime;
 
   const { statePath, seenCount } = markClaudeRuntimeSeenFile(cwd, sessionKey, target);
   const repeatedFile = seenCount >= 2;
@@ -282,7 +307,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       hookEventName,
       action: "inject",
       filePath: target,
-      reasons: ["repeated-file"],
+      reasons: refreshed ? ["repeated-file", "refreshed-before-inject"] : ["repeated-file"],
       additionalContext,
       statePath,
       contextMode,
