@@ -3,7 +3,7 @@
  * Layer 2 Direct Execution Runner - Provider-Agnostic
  * 
  * Interface:
- *   Input:  --mode=vanilla|fooks --target=<file> --output=<json> [--provider=openai|anthropic] [--model=gpt-4o|claude-sonnet-4]
+ *   Input:  --mode=vanilla|fooks --target=<file> --output=<json> [--provider=openai|anthropic] [--model=<model-id>]
  *   Output: JSON artifact with metrics, validation, and comparison data
  * 
  * First Success Criteria:
@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { resolveOpenAIModel } = require('./model-resolution.js');
 
 // Parse arguments
 const args = process.argv.slice(2).reduce((acc, arg) => {
@@ -30,7 +31,13 @@ const mode = args.mode || 'vanilla';
 const targetFile = args.target;
 const outputPath = args.output;
 const provider = args.provider || 'openai';
-const model = args.model || 'gpt-4o';
+const openAIModel = resolveOpenAIModel({ modelArg: args.model });
+const model = provider === 'openai'
+  ? openAIModel.model
+  : args.model || process.env.ANTHROPIC_MODEL || process.env.CLAUDE_MODEL || 'model-unspecified';
+const modelSource = provider === 'openai'
+  ? openAIModel.modelSource
+  : args.model ? 'cli --model' : 'provider env/default';
 
 // Validate inputs
 if (!targetFile || !outputPath) {
@@ -38,7 +45,7 @@ if (!targetFile || !outputPath) {
   process.exit(1);
 }
 
-console.log(`[Direct Runner] Mode: ${mode}, Provider: ${provider}, Model: ${model}`);
+console.log(`[Direct Runner] Mode: ${mode}, Provider: ${provider}, Model: ${model} (${modelSource})`);
 console.log(`[Direct Runner] Target: ${targetFile}`);
 console.log(`[Direct Runner] Output: ${outputPath}`);
 
@@ -136,6 +143,7 @@ const placeholderArtifact = {
   status: 'implementation-in-progress',
   provider,
   model,
+  modelSource,
   inputTokens,
   outputTokens: 0,
   latencyMs: 0,

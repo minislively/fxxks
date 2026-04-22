@@ -1,0 +1,155 @@
+{
+  "schemaVersion": "provider-cost-evidence.v1",
+  "evidenceTier": "L2-provider-usage-estimated-cost",
+  "claimBoundary": "estimated-api-cost-only",
+  "generatedAt": "2026-04-22T07:10:40.840Z",
+  "runId": "frontend-type-extraction-5",
+  "sourceKind": "fixture-mechanics",
+  "status": "estimated-cost-reduction",
+  "statusReasons": [],
+  "provider": "openai",
+  "model": "gpt-5.4",
+  "pricingAssumption": {
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "currency": "USD",
+    "inputPer1MTokens": 2.5,
+    "outputPer1MTokens": 15,
+    "cachedInputPer1MTokens": 0.25,
+    "cacheCreationInputPer1MTokens": null,
+    "sourceUrl": "https://openai.com/api/pricing/",
+    "checkedDate": "2026-04-22",
+    "pricingSourceKind": null,
+    "catalogModelKey": null,
+    "catalogMatchKind": null,
+    "catalogLookupReasons": [],
+    "endpoint": "chat.completions",
+    "serviceTier": "standard",
+    "pricingTreatment": {
+      "longContextApplies": false,
+      "regionalProcessingApplies": false
+    },
+    "note": "Estimated API cost only; not an invoice, charge, or provider billing statement."
+  },
+  "runs": {
+    "baseline": {
+      "role": "baseline",
+      "status": "usage-available",
+      "artifactStatus": null,
+      "usageSource": "fixture-mechanics",
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "timestamp": null,
+      "runId": null,
+      "inputTokens": 105000,
+      "outputTokens": 10500,
+      "totalTokens": 115500,
+      "cachedInputTokens": null,
+      "reasoningOutputTokens": null,
+      "taskClass": "frontend-type-extraction",
+      "taskIdentity": "frontend-type-extraction",
+      "setupIdentity": "provider-cost-import-kit-fixture",
+      "endpoint": "chat.completions",
+      "serviceTier": "standard",
+      "reasoning": null,
+      "maxOutputTokens": null,
+      "qualityGate": {
+        "id": "artifact-shape-and-output-review",
+        "status": "passed",
+        "version": "v1"
+      },
+      "reasons": [],
+      "estimatedApiCost": {
+        "input": 0.2625,
+        "inputStandard": 0.2625,
+        "inputCached": 0,
+        "output": 0.1575,
+        "total": 0.42,
+        "currency": "USD"
+      }
+    },
+    "fooks": {
+      "role": "fooks",
+      "status": "usage-available",
+      "artifactStatus": null,
+      "usageSource": "fixture-mechanics",
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "timestamp": null,
+      "runId": null,
+      "inputTokens": 54500,
+      "outputTokens": 8600,
+      "totalTokens": 63100,
+      "cachedInputTokens": null,
+      "reasoningOutputTokens": null,
+      "taskClass": "frontend-type-extraction",
+      "taskIdentity": "frontend-type-extraction",
+      "setupIdentity": "provider-cost-import-kit-fixture",
+      "endpoint": "chat.completions",
+      "serviceTier": "standard",
+      "reasoning": null,
+      "maxOutputTokens": null,
+      "qualityGate": {
+        "id": "artifact-shape-and-output-review",
+        "status": "passed",
+        "version": "v1"
+      },
+      "reasons": [],
+      "estimatedApiCost": {
+        "input": 0.13625,
+        "inputStandard": 0.13625,
+        "inputCached": 0,
+        "output": 0.129,
+        "total": 0.26525,
+        "currency": "USD"
+      }
+    }
+  },
+  "deltas": {
+    "inputTokens": {
+      "absolute": 50500,
+      "reductionPct": 48.095
+    },
+    "outputTokens": {
+      "absolute": 1900,
+      "reductionPct": 18.095
+    },
+    "totalTokens": {
+      "absolute": 52400,
+      "reductionPct": 45.368
+    },
+    "estimatedApiCostInput": {
+      "absolute": 0.12625,
+      "reductionPct": 48.095
+    },
+    "estimatedApiCostOutput": {
+      "absolute": 0.0285,
+      "reductionPct": 18.095
+    },
+    "estimatedApiCostTotal": {
+      "absolute": 0.15475,
+      "reductionPct": 36.845
+    }
+  },
+  "claimability": {
+    "estimatedApiCostDelta": true,
+    "providerInvoiceOrBillingSavings": false,
+    "providerBillingTokenSavings": false,
+    "stableRuntimeTokenSavings": false,
+    "stableTimeOrLatencySavings": false
+  },
+  "claimBoundaryNotes": [
+    "This is estimated API cost evidence from provider usage tokens and pricing assumptions only.",
+    "It is not provider invoice, dashboard, charge, or billing-grade savings evidence.",
+    "It does not establish stable runtime-token, wall-clock, or latency savings."
+  ],
+  "taskClass": "frontend-type-extraction",
+  "setupIdentity": "provider-cost-import-kit-fixture",
+  "endpoint": "chat.completions",
+  "serviceTier": "standard",
+  "qualityGate": {
+    "id": "artifact-shape-and-output-review",
+    "status": "passed",
+    "version": "v1"
+  }
+}

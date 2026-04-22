@@ -7,6 +7,10 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const {
+  parseCliArgs,
+  resolveOpenAIModel,
+} = require('./model-resolution.js');
 
 const API_KEY = process.env.OPENAI_API_KEY;
 if (!API_KEY) {
@@ -14,10 +18,13 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const targetFile = process.argv[2] || 'apps/v4/registry/bases/radix/examples/combobox-example.tsx';
-const mode = process.argv[3] || 'vanilla';
+const args = parseCliArgs(process.argv.slice(2));
+const modelConfig = resolveOpenAIModel({ modelArg: args.model });
+const MODEL = modelConfig.model;
+const targetFile = args.target || args._[0] || 'apps/v4/registry/bases/radix/examples/combobox-example.tsx';
+const mode = args.mode || args._[1] || 'vanilla';
 
-console.log(`[Direct Executor] Mode: ${mode}, Target: ${targetFile}`);
+console.log(`[Direct Executor] Mode: ${mode}, Target: ${targetFile}, Model: ${MODEL} (${modelConfig.modelSource})`);
 console.log(`[Direct Executor] Starting CASE-1 execution...`);
 
 // Read target file
@@ -33,7 +40,7 @@ const prompt = mode === 'vanilla'
 
 // API call
 const data = JSON.stringify({
-  model: 'gpt-4o',
+  model: MODEL,
   messages: [{ role: 'user', content: prompt }],
   temperature: 0.1
 });
@@ -61,11 +68,14 @@ const req = https.request(options, (res) => {
     
     if (res.statusCode === 200) {
       const result = JSON.parse(body);
-      const outputTokens = result.usage?.completion_tokens || 0;
-      const inputTokens = result.usage?.prompt_tokens || 0;
+      const usage = result.usage || {};
+      const outputTokens = Number.isFinite(usage.completion_tokens) ? usage.completion_tokens : null;
+      const inputTokens = Number.isFinite(usage.prompt_tokens) ? usage.prompt_tokens : null;
+      const usageAvailable = inputTokens !== null && outputTokens !== null;
+      const model = result.model || MODEL;
       
-      console.log(`[Direct Executor] Input tokens: ${inputTokens}`);
-      console.log(`[Direct Executor] Output tokens: ${outputTokens}`);
+      console.log(`[Direct Executor] Input tokens: ${inputTokens ?? 'unavailable'}`);
+      console.log(`[Direct Executor] Output tokens: ${outputTokens ?? 'unavailable'}`);
       console.log(`[Direct Executor] Content preview: ${result.choices[0].message.content.substring(0, 200)}...`);
       
       // Save result
@@ -73,7 +83,18 @@ const req = https.request(options, (res) => {
       fs.mkdirSync(outputDir.replace('~', process.env.HOME), { recursive: true });
       fs.writeFileSync(
         path.join(outputDir.replace('~', process.env.HOME), 'api-response.json'),
-        JSON.stringify({ latency, inputTokens, outputTokens, status: 'success', timestamp: new Date().toISOString() }, null, 2)
+        JSON.stringify({
+          provider: 'openai',
+          model,
+          requestedModel: MODEL,
+          modelSource: modelConfig.modelSource,
+          usageSource: 'live-openai-usage',
+          latency,
+          inputTokens,
+          outputTokens,
+          status: usageAvailable ? 'success' : 'usage-unavailable',
+          timestamp: new Date().toISOString(),
+        }, null, 2)
       );
       console.log(`[Direct Executor] Result saved to ${outputDir}/api-response.json`);
     } else {

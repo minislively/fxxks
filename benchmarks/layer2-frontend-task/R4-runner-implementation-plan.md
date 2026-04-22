@@ -71,7 +71,7 @@ async function runCodex(context, prompt) {
   
   // Codex CLI 호출
   const codex = spawn('codex', [
-    '--model', 'gpt-4o',
+    '--model', process.env.OPENAI_MODEL || 'gpt-5.4',
     '--temperature', '0.1',
     '--prompt', buildPrompt(context, prompt)
   ]);

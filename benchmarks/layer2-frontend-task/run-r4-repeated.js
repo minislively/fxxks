@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { summarizeRepeatedPairs, writeSummary } = require('./r4-repeated-summary');
+const { ensureEvidenceDir, evidencePaths, timestampRunId } = require('./evidence-paths');
 
 function parseArgs(argv) {
   return argv.reduce((acc, arg) => {
@@ -57,27 +58,61 @@ function seedPairs(values) {
 }
 
 function usage() {
-  return 'Usage: node run-r4-repeated.js --target=<file> --output=<summary.json> [--results-dir=<dir>] [--required-accepted=5] [--max-pairs=8] [--model=gpt-5.4-mini] [--timeoutMs=300000] [--run-id=<id>] [--seed-pair=<vanilla.json>:<fooks.json>] [--keep-workdir]';
+  return 'Usage: node run-r4-repeated.js --target=<file> [--output=<summary.json>] [--results-dir=<dir>] [--required-accepted=5] [--max-pairs=8] [--model=gpt-5.4-mini] [--timeoutMs=300000] [--run-id=<id>] [--task-id=<id>] [--setup-id=<id>] [--seed-pair=<vanilla.json>:<fooks.json>] [--keep-workdir]';
+}
+
+function taskIdentityFromTarget(target) {
+  if (!target) return null;
+  return `target:${path.relative(process.cwd(), path.resolve(target)).split(path.sep).join('/')}`;
+}
+
+function setupIdentity({ taskIdentity, model, requiredAcceptedPairs, explicitSetupId }) {
+  if (explicitSetupId) return explicitSetupId;
+  return [
+    `task=${taskIdentity || 'unspecified-task'}`,
+    `model=${model || 'unspecified-model'}`,
+    'runner=run-r4-repeated',
+    'prompt=R4-feature-module-split-v1',
+    'validator=validate-r4-applied',
+    'modePair=vanilla-vs-fooks',
+    `requiredAccepted=${requiredAcceptedPairs}`,
+  ].join('|');
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const target = args.target;
-  const output = args.output;
+  const runId = args['run-id'] || timestampRunId('runtime');
+  const defaultPaths = args.output ? null : evidencePaths({
+    tier: 'runtime',
+    runId,
+    jsonName: 'summary.json',
+    markdownName: 'summary.md',
+  });
+  const output = args.output || defaultPaths.json;
   const requiredAcceptedPairs = Number(args['required-accepted'] || 5);
   const maxPairs = Number(args['max-pairs'] || requiredAcceptedPairs);
   const model = args.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
+  const taskIdentity = args['task-id'] || taskIdentityFromTarget(target);
+  const resolvedSetupIdentity = setupIdentity({
+    taskIdentity,
+    model,
+    requiredAcceptedPairs,
+    explicitSetupId: args['setup-id'] || args['setup-identity'],
+  });
   const timeoutMs = Number(args.timeoutMs || process.env.CODEX_TIMEOUT_MS || 300000);
-  const runId = args['run-id'] || new Date().toISOString().slice(0, 10);
-  const resultsDir = args['results-dir'] || path.dirname(output || path.join('benchmarks', 'layer2-frontend-task', 'results', 'summary.json'));
+  const resultsDir = args['results-dir'] || (defaultPaths
+    ? path.join(defaultPaths.dir, 'pairs')
+    : path.dirname(output));
   const keepWorkdir = Boolean(args['keep-workdir']);
+  const pairs = seedPairs(args['seed-pair']);
 
-  if (!target || !output || requiredAcceptedPairs < 1 || maxPairs < 1) {
+  if ((!target && pairs.length < maxPairs) || !output || requiredAcceptedPairs < 1 || maxPairs < 1) {
     console.error(usage());
     process.exit(1);
   }
-
-  const pairs = seedPairs(args['seed-pair']);
+  if (defaultPaths) ensureEvidenceDir({ tier: 'runtime', runId });
+  fs.mkdirSync(resultsDir, { recursive: true });
   let nextPairIndex = pairs.length + 1;
 
   while (pairs.length < maxPairs) {
@@ -91,14 +126,35 @@ async function main() {
     runApplied({ mode: 'fooks', target, output: fooksPath, model, timeoutMs, keepWorkdir });
     pairs.push({ pairIndex, vanillaPath, fooksPath });
 
-    const interim = summarizeRepeatedPairs({ requiredAcceptedPairs, pairs });
+    const interim = summarizeRepeatedPairs({
+      runId,
+      taskIdentity,
+      model,
+      setupIdentity: resolvedSetupIdentity,
+      requiredAcceptedPairs,
+      pairs,
+    });
     writeSummary(output, interim);
     if (interim.acceptedPairCount >= requiredAcceptedPairs) break;
   }
 
-  const summary = summarizeRepeatedPairs({ requiredAcceptedPairs, pairs });
+  const summary = summarizeRepeatedPairs({
+    runId,
+    taskIdentity,
+    model,
+    setupIdentity: resolvedSetupIdentity,
+    requiredAcceptedPairs,
+    pairs,
+  });
   writeSummary(output, summary);
-  console.log(JSON.stringify({ output, classification: summary.classification, acceptedPairCount: summary.acceptedPairCount, attemptedPairCount: summary.attemptedPairCount }, null, 2));
+  console.log(JSON.stringify({
+    output,
+    runId,
+    classification: summary.classification,
+    candidateStatus: summary.candidate.status,
+    acceptedPairCount: summary.acceptedPairCount,
+    attemptedPairCount: summary.attemptedPairCount,
+  }, null, 2));
   if (summary.acceptedPairCount < requiredAcceptedPairs) process.exit(2);
 }
 

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "provider-cost-campaign-manifest.v1",
+  "campaignId": "provider-cost-import-kit-fixture",
+  "model": "gpt-5.4",
+  "endpoint": "chat.completions",
+  "serviceTier": "standard",
+  "reasoning": "default",
+  "maxOutputTokens": 512,
+  "setupIdentity": "provider-cost-import-kit-fixture",
+  "pricingSourceUrl": "https://openai.com/api/pricing/",
+  "pricingCheckedDate": "2026-04-22",
+  "requiredTaskClasses": 3,
+  "requiredAcceptedPairsPerTask": 5,
+  "taskClasses": [
+    {
+      "id": "frontend-component-summary",
+      "targetPairCount": 5,
+      "qualityGate": {
+        "id": "artifact-shape-and-output-review",
+        "version": "v1",
+        "command": "manual/imported artifact gate"
+      }
+    },
+    {
+      "id": "frontend-refactor-plan",
+      "targetPairCount": 5,
+      "qualityGate": {
+        "id": "artifact-shape-and-output-review",
+        "version": "v1",
+        "command": "manual/imported artifact gate"
+      }
+    },
+    {
+      "id": "frontend-type-extraction",
+      "targetPairCount": 5,
+      "qualityGate": {
+        "id": "artifact-shape-and-output-review",
+        "version": "v1",
+        "command": "manual/imported artifact gate"
+      }
+    }
+  ],
+  "caps": {
+    "maxEstimatedUsd": 5,
+    "campaignMaxEstimatedUsd": 15,
+    "maxMatchedPairs": 20,
+    "maxBatches": 3
+  }
+}

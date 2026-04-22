@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "provider-cost-task-manifest.v1",
+  "description": "Launch-grade live OpenAI estimated API cost campaign template: 3 task classes × 5 matched baseline/fooks pairs. Uses OpenAI API key or Codex OAuth auth.json credentials with explicit spend caps.",
+  "requiredTaskClasses": 3,
+  "requiredAcceptedPairsPerTask": 5,
+  "tasks": [
+    {
+      "id": "frontend-component-summary",
+      "targetPairCount": 5,
+      "qualityGate": {
+        "id": "applied-validation",
+        "version": "v1",
+        "command": "manual review: baseline and fooks answers must both correctly summarize responsibilities and extraction boundaries"
+      },
+      "baselinePrompt": "Summarize the responsibilities of a React combobox component and list likely extraction boundaries. Include accessibility, keyboard handling, option rendering, and state management concerns.",
+      "fooksPrompt": "Using a compact prepared context for a React combobox, summarize responsibilities and extraction boundaries: accessibility, keyboard handling, option rendering, state management."
+    },
+    {
+      "id": "frontend-refactor-plan",
+      "targetPairCount": 5,
+      "qualityGate": {
+        "id": "applied-validation",
+        "version": "v1",
+        "command": "manual review: baseline and fooks answers must both provide an actionable TSX refactor plan"
+      },
+      "baselinePrompt": "Draft a concise refactor plan for splitting a large TypeScript React form section into components, hooks, utilities, and types. Include migration steps, test coverage, and rollback strategy.",
+      "fooksPrompt": "Using compact prepared context for a large TS React form section, draft a concise split plan: components, hooks, utilities, types, tests, rollback."
+    },
+    {
+      "id": "frontend-test-strategy",
+      "targetPairCount": 5,
+      "qualityGate": {
+        "id": "applied-validation",
+        "version": "v1",
+        "command": "manual review: baseline and fooks answers must both identify behavior-preserving tests and risk coverage"
+      },
+      "baselinePrompt": "Create a behavior-preserving test strategy for extracting frontend utilities from a mixed React component. Cover unit tests, integration tests, snapshot risks, edge cases, and acceptance criteria.",
+      "fooksPrompt": "Using compact prepared context for frontend utility extraction, create a behavior-preserving test strategy: unit, integration, snapshot risks, edge cases, acceptance criteria."
+    }
+  ]
+}
