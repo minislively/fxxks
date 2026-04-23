@@ -91,10 +91,24 @@ export function markClaudeRuntimeSeenFile(cwd: string, sessionKey: string, fileP
   };
 }
 
+function removeEmptyDirs(dir: string, stopAt: string): void {
+  let current = dir;
+  while (current !== stopAt && fs.existsSync(current)) {
+    const entries = fs.readdirSync(current);
+    if (entries.length === 0) {
+      fs.rmdirSync(current);
+      current = path.dirname(current);
+    } else {
+      break;
+    }
+  }
+}
+
 export function clearClaudeRuntimeSession(cwd: string, sessionKey: string): string {
   const file = claudeRuntimeSessionPath(cwd, sessionKey);
   if (fs.existsSync(file)) {
     fs.rmSync(file);
+    removeEmptyDirs(path.dirname(file), cwd);
   }
   return file;
 }

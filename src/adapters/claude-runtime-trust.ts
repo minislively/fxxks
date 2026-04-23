@@ -24,13 +24,26 @@ export function readClaudeTrustStatus(cwd = process.cwd()): ClaudeTrustStatus {
       updatedAt: now(),
     };
   }
-  return JSON.parse(fs.readFileSync(file, "utf8")) as ClaudeTrustStatus;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as ClaudeTrustStatus;
+  } catch {
+    return {
+      runtime: "claude",
+      connectionState: "disconnected",
+      lifecycleState: "disconnected",
+      updatedAt: now(),
+    };
+  }
 }
 
 export function writeClaudeTrustStatus(status: ClaudeTrustStatus, cwd = process.cwd()): ClaudeTrustStatus {
   const file = statusFile(cwd);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(status, null, 2));
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(status, null, 2));
+  } catch {
+    // swallow write failures to avoid crashing the hook pipeline
+  }
   return status;
 }
 
@@ -104,6 +117,5 @@ export function ensureFreshClaudeContextForTarget(target: string, cwd = process.
     return { refreshed: true, scannedAt: refreshed.scannedAt };
   }
 
-  patchClaudeTrustStatus({ connectionState: "connected", lifecycleState: "ready" }, cwd);
   return { refreshed: false, scannedAt: index.scannedAt };
 }

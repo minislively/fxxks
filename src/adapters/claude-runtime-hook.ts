@@ -142,8 +142,13 @@ function noopDecision(input: ClaudeRuntimeHookInput, reasons: string[], policy?:
   };
 }
 
+const VALID_CLAUDE_HOOK_EVENTS = new Set<ClaudeRuntimeHookEvent>(["SessionStart", "UserPromptSubmit", "Stop"]);
+
 export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = process.cwd()): ClaudeRuntimeHookDecision {
   const hookEventName = input.hookEventName;
+  if (!VALID_CLAUDE_HOOK_EVENTS.has(hookEventName)) {
+    return noopDecision({ ...input, hookEventName: "UserPromptSubmit" }, ["unrecognized-hook-event"]);
+  }
   const sessionKey = resolveClaudeRuntimeSessionKey(input.sessionId);
 
   if (hookEventName === "SessionStart") {
