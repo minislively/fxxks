@@ -56,7 +56,7 @@ function hasSingleExactFrontendTarget(
   return fs.existsSync(path.join(cwd, target));
 }
 
-function hasPositiveFreshness(target: string, cwd: string, freshness: ReturnType<typeof ensureFreshCodexContextForTarget>): boolean {
+export function hasPositiveFreshness(target: string, cwd: string, freshness: ReturnType<typeof ensureFreshCodexContextForTarget>): boolean {
   return fs.existsSync(path.join(cwd, target)) && Boolean(freshness.scannedAt);
 }
 

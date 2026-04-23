@@ -34,6 +34,7 @@ const {
 const {
   handleCodexRuntimeHook,
   isEditIntentPrompt,
+  hasPositiveFreshness,
 } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const {
   readProjectMetricSummary,
@@ -3189,4 +3190,13 @@ test("isEditIntentPrompt recognizes edit-intent prompts and rejects non-edit pro
   assert.equal(isEditIntentPrompt("Review the code for style issues"), false);
   assert.equal(isEditIntentPrompt("What does this component do?"), false);
   assert.equal(isEditIntentPrompt("Describe the architecture"), false);
+});
+
+test("hasPositiveFreshness requires scannedAt to pass", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-freshness-"));
+  const tempFile = path.join(tempDir, "freshness-test.tsx");
+  fs.writeFileSync(tempFile, "export function Test() {}");
+  assert.equal(hasPositiveFreshness("freshness-test.tsx", tempDir, { refreshed: false, scannedAt: new Date().toISOString() }), true);
+  assert.equal(hasPositiveFreshness("freshness-test.tsx", tempDir, { refreshed: false }), false);
+  fs.rmSync(tempDir, { recursive: true });
 });
