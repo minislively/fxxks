@@ -28,12 +28,13 @@ function parseArgs(argv) {
   }, {});
 }
 
-function runApplied({ mode, target, output, model, timeoutMs, keepWorkdir }) {
+function runApplied({ mode, target, output, provider, model, timeoutMs, keepWorkdir }) {
   const args = [
     path.join(__dirname, 'run-r4-applied.js'),
     `--mode=${mode}`,
     `--target=${target}`,
     `--output=${output}`,
+    `--provider=${provider}`,
     `--model=${model}`,
     `--timeoutMs=${timeoutMs}`,
   ];
@@ -58,7 +59,7 @@ function seedPairs(values) {
 }
 
 function usage() {
-  return 'Usage: node run-r4-repeated.js --target=<file> [--output=<summary.json>] [--results-dir=<dir>] [--required-accepted=5] [--max-pairs=8] [--model=gpt-5.4-mini] [--timeoutMs=300000] [--run-id=<id>] [--task-id=<id>] [--setup-id=<id>] [--seed-pair=<vanilla.json>:<fooks.json>] [--keep-workdir]';
+  return 'Usage: node run-r4-repeated.js --target=<file> [--output=<summary.json>] [--results-dir=<dir>] [--required-accepted=5] [--max-pairs=8] [--provider=codex|claude] [--model=<model>] [--timeoutMs=300000] [--run-id=<id>] [--task-id=<id>] [--setup-id=<id>] [--seed-pair=<vanilla.json>:<fooks.json>] [--keep-workdir]';
 }
 
 function taskIdentityFromTarget(target) {
@@ -66,10 +67,11 @@ function taskIdentityFromTarget(target) {
   return `target:${path.relative(process.cwd(), path.resolve(target)).split(path.sep).join('/')}`;
 }
 
-function setupIdentity({ taskIdentity, model, requiredAcceptedPairs, explicitSetupId }) {
+function setupIdentity({ taskIdentity, provider, model, requiredAcceptedPairs, explicitSetupId }) {
   if (explicitSetupId) return explicitSetupId;
   return [
     `task=${taskIdentity || 'unspecified-task'}`,
+    `provider=${provider || 'unspecified-provider'}`,
     `model=${model || 'unspecified-model'}`,
     'runner=run-r4-repeated',
     'prompt=R4-feature-module-split-v1',
@@ -92,15 +94,17 @@ async function main() {
   const output = args.output || defaultPaths.json;
   const requiredAcceptedPairs = Number(args['required-accepted'] || 5);
   const maxPairs = Number(args['max-pairs'] || requiredAcceptedPairs);
-  const model = args.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
+  const provider = args.provider || 'codex';
+  const model = args.model || process.env.CODEX_MODEL || process.env.CLAUDE_MODEL || 'gpt-5.4-mini';
   const taskIdentity = args['task-id'] || taskIdentityFromTarget(target);
   const resolvedSetupIdentity = setupIdentity({
     taskIdentity,
+    provider,
     model,
     requiredAcceptedPairs,
     explicitSetupId: args['setup-id'] || args['setup-identity'],
   });
-  const timeoutMs = Number(args.timeoutMs || process.env.CODEX_TIMEOUT_MS || 300000);
+  const timeoutMs = Number(args.timeoutMs || process.env.CODEX_TIMEOUT_MS || process.env.CLAUDE_TIMEOUT_MS || 300000);
   const resultsDir = args['results-dir'] || (defaultPaths
     ? path.join(defaultPaths.dir, 'pairs')
     : path.dirname(output));
@@ -122,8 +126,8 @@ async function main() {
     const vanillaPath = `${prefix}-vanilla.json`;
     const fooksPath = `${prefix}-fooks.json`;
 
-    runApplied({ mode: 'vanilla', target, output: vanillaPath, model, timeoutMs, keepWorkdir });
-    runApplied({ mode: 'fooks', target, output: fooksPath, model, timeoutMs, keepWorkdir });
+    runApplied({ mode: 'vanilla', target, output: vanillaPath, provider, model, timeoutMs, keepWorkdir });
+    runApplied({ mode: 'fooks', target, output: fooksPath, provider, model, timeoutMs, keepWorkdir });
     pairs.push({ pairIndex, vanillaPath, fooksPath });
 
     const interim = summarizeRepeatedPairs({

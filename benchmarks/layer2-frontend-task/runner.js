@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * R4 Feature Module Split - Runner with Codex Wrapper
+ * R4 Feature Module Split - Runner with Provider Wrapper
  */
 
 const fs = require('fs');
 const path = require('path');
 const CodexWrapper = require('./codex-wrapper');
+const ClaudeWrapper = require('./claude-wrapper');
 
 // Parse arguments
 const args = process.argv.slice(2).reduce((acc, arg) => {
@@ -19,13 +20,15 @@ const args = process.argv.slice(2).reduce((acc, arg) => {
 const mode = args.mode || 'vanilla';
 const targetFile = args.target;
 const outputPath = args.output;
-const model = args.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
+const provider = args.provider || 'codex';
+const model = args.model || process.env.CODEX_MODEL || process.env.CLAUDE_MODEL || 'gpt-5.4-mini';
 
 if (!targetFile || !outputPath) {
-  console.error('Usage: node runner.js --mode=vanilla|fooks --target=<file> --output=<json>');
+  console.error('Usage: node runner.js --mode=vanilla|fooks --target=<file> --output=<json> [--provider=codex|claude] [--model=<model>]');
   process.exit(1);
 }
 
+console.log(`[R4 Runner] Provider: ${provider}`);
 console.log(`[R4 Runner] Mode: ${mode}`);
 console.log(`[R4 Runner] Target: ${targetFile}`);
 
@@ -33,7 +36,7 @@ async function main() {
   // Prepare context based on mode
   let context;
   let fooksPath;
-  
+
   if (mode === 'fooks') {
     // Use fooks extraction
     fooksPath = path.join(__dirname, '../../dist/index.js');
@@ -50,28 +53,32 @@ async function main() {
     console.log(`[R4 Runner] Vanilla mode: reading full file`);
     context = fs.readFileSync(targetFile, 'utf-8');
   }
-  
-  // Initialize Codex wrapper
-  const codex = new CodexWrapper({
-    model
-  });
-  
-  // Execute Codex
+
+  // Initialize provider wrapper
+  let wrapper;
+  if (provider === 'claude') {
+    wrapper = new ClaudeWrapper({ model });
+  } else {
+    wrapper = new CodexWrapper({ model });
+  }
+
+  // Execute benchmark
   const taskPrompt = 'Refactor this combobox component into modular files (components/, hooks/, utils/, types/)';
-  
-  console.log(`[R4 Runner] Calling Codex...`);
-  const result = await codex.run(context, taskPrompt);
-  
-  console.log(`[R4 Runner] Codex completed with exitCode: ${result.exitCode}`);
+
+  console.log(`[R4 Runner] Calling ${provider}...`);
+  const result = await wrapper.run(context, taskPrompt);
+
+  console.log(`[R4 Runner] ${provider} completed with exitCode: ${result.exitCode}`);
   console.log(`[R4 Runner] Latency: ${result.latencyMs}ms`);
   console.log(`[R4 Runner] Prompt tokens: ${result.metadata.promptTokens}`);
-  
+
   // Save result
   const output = {
     mode,
     targetFile,
+    provider,
     timestamp: result.timestamp,
-    codexResult: result,
+    result,
     metrics: {
       promptTokensApprox: result.metadata.promptTokens,
       latencyMs: result.latencyMs,
@@ -85,10 +92,10 @@ async function main() {
       runtimeTokenClaimBoundary: result.runtimeUsage.claimBoundary,
     }
   };
-  
+
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
-  
+
   console.log(`[R4 Runner] Result saved to: ${outputPath}`);
   console.log(`[R4 Runner] Success: ${result.success}`);
 }

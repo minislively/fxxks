@@ -2,11 +2,7 @@
 /**
  * Run an applied-code R4 benchmark attempt in an isolated workspace.
  *
- * Unlike runner.js, this command allows Codex to write candidate files into a
- * temporary workspace and immediately validates that applied tree with
- * validate-r4-applied.js. It is the first executable path toward lifting the
- * "proposal-only" boundary; repeated matched runs are still required before any
- * stable runtime-token/time claim.
+ * Supports both Codex and Claude providers via --provider flag.
  */
 
 const fs = require('fs');
@@ -15,6 +11,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { validate } = require('./validate-r4-applied');
 const { parseCodexRuntimeUsage } = require('./runtime-token-metrics');
+const ClaudeWrapper = require('./claude-wrapper');
 
 function parseArgs(argv) {
   return argv.reduce((acc, arg) => {
@@ -131,27 +128,77 @@ function runCodex(prompt, workdir, model, timeoutMs) {
   });
 }
 
+async function runClaude(prompt, workdir, model, timeoutMs) {
+  const wrapper = new ClaudeWrapper({ model, timeoutMs });
+  const result = await wrapper.run(prompt, 'Write the files now. Do not only describe a plan; create the files in the workspace.');
+
+  // Write files to workdir if Claude returned code blocks
+  if (result.success && result.lastMessage) {
+    const codeBlocks = extractCodeBlocks(result.lastMessage);
+    for (const block of codeBlocks) {
+      const filePath = path.join(workdir, block.filePath);
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, block.content);
+    }
+  }
+
+  return {
+    exitCode: result.exitCode,
+    signal: null,
+    success: result.success,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    lastMessage: result.lastMessage,
+    runtimeUsage: result.runtimeUsage,
+    latencyMs: result.latencyMs,
+  };
+}
+
+function extractCodeBlocks(text) {
+  const blocks = [];
+  const fenceRegex = /```(?:\w+)?\s*\n([\s\S]*?)```/g;
+  const filePathRegex = /^(?:\s*\/\/\s*)?(?:File:\s*)?(.+\.(?:ts|tsx|js|jsx))\s*\n/;
+  let match;
+  while ((match = fenceRegex.exec(text)) !== null) {
+    let content = match[1];
+    const fileMatch = content.match(filePathRegex);
+    if (fileMatch) {
+      const filePath = fileMatch[1].trim();
+      content = content.slice(fileMatch[0].length);
+      blocks.push({ filePath, content });
+    }
+  }
+  return blocks;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const mode = args.mode || 'vanilla';
   const targetFile = args.target;
   const outputPath = args.output;
-  const model = args.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
-  const timeoutMs = Number(args.timeoutMs || process.env.CODEX_TIMEOUT_MS || 300000);
+  const provider = args.provider || 'codex';
+  const model = args.model || process.env.CODEX_MODEL || process.env.CLAUDE_MODEL || 'gpt-5.4-mini';
+  const timeoutMs = Number(args.timeoutMs || process.env.CODEX_TIMEOUT_MS || process.env.CLAUDE_TIMEOUT_MS || 300000);
   const keepWorkdir = Boolean(args['keep-workdir']);
 
   if (!targetFile || !outputPath || !['vanilla', 'fooks'].includes(mode)) {
-    console.error('Usage: node run-r4-applied.js --mode=vanilla|fooks --target=<file> --output=<json> [--model=<model>] [--timeoutMs=<ms>] [--keep-workdir]');
+    console.error('Usage: node run-r4-applied.js --mode=vanilla|fooks --target=<file> --output=<json> [--provider=codex|claude] [--model=<model>] [--timeoutMs=<ms>] [--keep-workdir]');
     process.exit(1);
   }
 
-  const workdir = args.workdir ? path.resolve(args.workdir) : fs.mkdtempSync(path.join(os.tmpdir(), `fooks-r4-applied-${mode}-`));
+  const workdir = args.workdir ? path.resolve(args.workdir) : fs.mkdtempSync(path.join(os.tmpdir(), `fooks-r4-applied-${provider}-${mode}-`));
   fs.mkdirSync(workdir, { recursive: true });
   const context = buildContext(mode, targetFile);
   const prompt = buildPrompt(context);
   const timestamp = new Date().toISOString();
 
-  const codexResult = await runCodex(prompt, workdir, model, timeoutMs);
+  let providerResult;
+  if (provider === 'claude') {
+    providerResult = await runClaude(prompt, workdir, model, timeoutMs);
+  } else {
+    providerResult = await runCodex(prompt, workdir, model, timeoutMs);
+  }
+
   const candidateRoot = path.join(workdir, 'combobox');
   let validation;
   try {
@@ -165,36 +212,37 @@ async function main() {
   }
 
   const artifact = {
-    status: codexResult.success && validation.status === 'applied-acceptance-validated'
+    status: providerResult.success && validation.status === 'applied-acceptance-validated'
       ? 'applied-code-run-validated'
       : 'applied-code-run-failed',
     schemaVersion: 'layer2-r4-applied-run.v1',
     timestamp,
     mode,
+    provider,
     targetFile: path.resolve(targetFile),
     model,
     sandbox: 'workspace-write isolated tempdir',
     workdir: keepWorkdir ? workdir : null,
     metrics: {
       promptTokensApprox: promptTokensApprox(prompt),
-      latencyMs: codexResult.latencyMs,
+      latencyMs: providerResult.latencyMs,
       retryCount: 0,
-      outputChars: codexResult.lastMessage.length || codexResult.stdout.length,
-      runtimeTokensInput: codexResult.runtimeUsage.inputTokens,
-      runtimeTokensOutput: codexResult.runtimeUsage.outputTokens,
-      runtimeTokensTotal: codexResult.runtimeUsage.totalTokens,
-      runtimeTokenSource: codexResult.runtimeUsage.source,
-      runtimeTokenTelemetryAvailable: codexResult.runtimeUsage.totalTokens !== null,
-      runtimeTokenClaimAvailable: codexResult.runtimeUsage.totalTokens !== null,
-      runtimeTokenClaimBoundary: codexResult.runtimeUsage.claimBoundary,
+      outputChars: providerResult.lastMessage.length || providerResult.stdout.length,
+      runtimeTokensInput: providerResult.runtimeUsage.inputTokens,
+      runtimeTokensOutput: providerResult.runtimeUsage.outputTokens,
+      runtimeTokensTotal: providerResult.runtimeUsage.totalTokens,
+      runtimeTokenSource: providerResult.runtimeUsage.source,
+      runtimeTokenTelemetryAvailable: providerResult.runtimeUsage.totalTokens !== null,
+      runtimeTokenClaimAvailable: providerResult.runtimeUsage.totalTokens !== null,
+      runtimeTokenClaimBoundary: providerResult.runtimeUsage.claimBoundary,
     },
-    codexResult: {
-      exitCode: codexResult.exitCode,
-      signal: codexResult.signal,
-      success: codexResult.success,
-      stderrTail: codexResult.stderr.slice(-4000),
-      stdoutTail: codexResult.stdout.slice(-4000),
-      lastMessageTail: codexResult.lastMessage.slice(-4000),
+    providerResult: {
+      exitCode: providerResult.exitCode,
+      signal: providerResult.signal,
+      success: providerResult.success,
+      stderrTail: providerResult.stderr.slice(-4000),
+      stdoutTail: providerResult.stdout.slice(-4000),
+      lastMessageTail: providerResult.lastMessage.slice(-4000),
     },
     validation,
     claimBoundary: [
