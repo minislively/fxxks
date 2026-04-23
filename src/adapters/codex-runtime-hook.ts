@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { decidePreRead } from "./pre-read";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
@@ -18,6 +19,10 @@ import {
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
 
+const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify)\b/i;
+const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
+const EDIT_GUIDANCE_CONTEXT_MAX_BYTES = 8_192;
+
 function payloadContextMode(payload: ModelFacingPayload): ContextMode {
   return payload.useOriginal ? "light-minimal" : "light";
 }
@@ -32,6 +37,49 @@ function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, c
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
   return estimateFileBytes(path.join(cwd, filePath));
+}
+
+export function isEditIntentPrompt(prompt: string): boolean {
+  return EDIT_INTENT_PATTERN.test(prompt);
+}
+
+function hasSingleExactFrontendTarget(
+  policy: ReturnType<typeof resolvePromptFileContext>["policy"],
+  target: string,
+  cwd: string,
+): boolean {
+  if (policy.promptSpecificity !== "exact-file") return false;
+  if (policy.targets.length !== 1) return false;
+  if (policy.targets[0]?.filePath !== target || !policy.targets[0]?.exists) return false;
+  if (!FRONTEND_EXTENSIONS.has(path.extname(target))) return false;
+  return fs.existsSync(path.join(cwd, target));
+}
+
+function hasPositiveFreshness(target: string, cwd: string, freshness: ReturnType<typeof ensureFreshCodexContextForTarget>): boolean {
+  return fs.existsSync(path.join(cwd, target)) && Boolean(freshness.scannedAt);
+}
+
+function canAttemptRuntimeEditGuidance(
+  prompt: string,
+  target: string,
+  cwd: string,
+  policy: ReturnType<typeof resolvePromptFileContext>["policy"],
+  freshness: ReturnType<typeof ensureFreshCodexContextForTarget>,
+): boolean {
+  return hasSingleExactFrontendTarget(policy, target, cwd) && isEditIntentPrompt(prompt) && hasPositiveFreshness(target, cwd, freshness);
+}
+
+function hasMatchingEditGuidance(payload: ModelFacingPayload): boolean {
+  return Boolean(
+    payload.sourceFingerprint &&
+      payload.editGuidance?.freshness.fileHash === payload.sourceFingerprint.fileHash &&
+      payload.editGuidance.freshness.lineCount === payload.sourceFingerprint.lineCount,
+  );
+}
+
+function editGuidanceBudgetLimit(originalEstimatedBytes: number | undefined): number {
+  if (originalEstimatedBytes === undefined) return EDIT_GUIDANCE_CONTEXT_MAX_BYTES;
+  return Math.min(EDIT_GUIDANCE_CONTEXT_MAX_BYTES, Math.max(originalEstimatedBytes * 2, 4_096));
 }
 
 function recordRuntimeDecisionMetric(
@@ -247,21 +295,50 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     return runtimeDecision;
   }
 
+  const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+  const editGuidanceAllowed =
+    decision.decision === "payload" &&
+    Boolean(decision.payload?.sourceFingerprint) &&
+    canAttemptRuntimeEditGuidance(prompt, target, cwd, policy, freshness);
+  if (editGuidanceAllowed) {
+    try {
+      const optInDecision = decidePreRead(path.join(cwd, target), cwd, "codex", { includeEditGuidance: true });
+      if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
+        const optInContextMode = payloadContextMode(optInDecision.payload);
+        const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode);
+        const estimatedContextBytes = estimateTextBytes(optInAdditionalContext);
+        if (estimatedContextBytes <= editGuidanceBudgetLimit(originalEstimatedBytes)) {
+          decision = optInDecision;
+        }
+      }
+    } catch {
+      // If the optional edit-guidance pass fails, keep the already-built compact payload.
+    }
+  }
+
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
     const additionalContext = buildAdditionalContext(target, decision.payload, contextMode);
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+    const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
     const runtimeDecision: CodexRuntimeHookDecision = {
       runtime: "codex",
       hookEventName,
       action: "inject",
       filePath: target,
-      reasons: freshness.refreshed ? ["repeated-file", "refreshed-before-attach"] : ["repeated-file"],
+      reasons: [
+        "repeated-file",
+        ...(freshness.refreshed ? ["refreshed-before-attach"] : []),
+        ...(editGuidanceIncluded ? ["edit-guidance-opt-in"] : []),
+      ],
       statePath,
       additionalContext,
       contextMode,
-      contextModeReason: contextMode === "light-minimal" ? "repeated-exact-file-tiny-raw-original" : "repeated-exact-file-payload",
+      contextModeReason: editGuidanceIncluded
+        ? "repeated-exact-file-edit-guidance"
+        : contextMode === "light-minimal"
+          ? "repeated-exact-file-tiny-raw-original"
+          : "repeated-exact-file-payload",
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
@@ -275,13 +352,12 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
       actualEstimatedBytes: estimateTextBytes(additionalContext),
-      comparableForSavings: originalEstimatedBytes !== undefined,
+      comparableForSavings: editGuidanceIncluded ? false : originalEstimatedBytes !== undefined,
     });
     return runtimeDecision;
   }
 
   markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-  const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
   const runtimeDecision = fallbackDecision(
     hookEventName,
     target,

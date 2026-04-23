@@ -799,7 +799,7 @@ test("runtime hook falls back when repeated-file payload build throws", () => {
     {
       hookEventName: "UserPromptSubmit",
       sessionId,
-      prompt: `Please update ${target}`,
+      prompt: `Please inspect ${target}`,
     },
     tempDir,
   );
@@ -870,6 +870,7 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   );
   assert.equal(second.action, "inject");
   assert.equal(second.contextMode, "light");
+  assert.equal(second.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(second.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
   assert.ok(
     second.additionalContext.startsWith(
@@ -878,9 +879,11 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   );
   assert.equal(second.additionalContext.includes("#fooks-full-read"), false);
   assert.equal(second.additionalContext.includes("#fooks-disable-pre-read"), false);
-  assert.equal(second.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal(second.additionalContext.includes("\"editGuidance\""), true);
+  assert.ok(second.reasons.includes("edit-guidance-opt-in"));
   assert.equal(second.debug.repeatedFile, true);
-  assert.equal("editGuidance" in second.debug.decision.payload, false);
+  assert.deepEqual(second.debug.decision.payload.editGuidance.freshness, second.debug.decision.payload.sourceFingerprint);
+  assert.ok(second.debug.decision.payload.editGuidance.patchTargets.length <= 12);
 
   fs.writeFileSync(second.statePath, "{not-json");
   const afterCorruptState = handleCodexRuntimeHook(
@@ -893,6 +896,81 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   );
   assert.equal(afterCorruptState.action, "record");
   assert.equal(afterCorruptState.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+});
+
+test("runtime hook gates edit guidance to repeated exact-file edit intent prompts", () => {
+  const target = path.join("fixtures", "compressed", "FormSection.tsx");
+
+  const inspectSession = `hook-inspect-no-edit-guidance-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: inspectSession }, repoRoot);
+  const firstInspect = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: inspectSession,
+      prompt: `Please inspect ${target}`,
+    },
+    repoRoot,
+  );
+  const secondInspect = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: inspectSession,
+      prompt: `Again, explain ${target}`,
+    },
+    repoRoot,
+  );
+  assert.equal(firstInspect.action, "record");
+  assert.equal(secondInspect.action, "inject");
+  assert.equal(secondInspect.contextModeReason, "repeated-exact-file-payload");
+  assert.equal(secondInspect.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal("editGuidance" in secondInspect.debug.decision.payload, false);
+  assert.equal(secondInspect.reasons.includes("edit-guidance-opt-in"), false);
+
+  const reviewOnlySession = `hook-review-only-no-edit-guidance-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: reviewOnlySession }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: reviewOnlySession,
+      prompt: `Please review only ${target}`,
+    },
+    repoRoot,
+  );
+  const reviewOnly = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: reviewOnlySession,
+      prompt: `Again, review only ${target}`,
+    },
+    repoRoot,
+  );
+  assert.equal(reviewOnly.action, "inject");
+  assert.equal(reviewOnly.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal(reviewOnly.reasons.includes("edit-guidance-opt-in"), false);
+
+  const multiFileSession = `hook-multifile-no-edit-guidance-${Date.now()}`;
+  const otherTarget = path.join("fixtures", "jsx", "SimpleWidget.jsx");
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: multiFileSession }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: multiFileSession,
+      prompt: `Please update ${target} and ${otherTarget}`,
+    },
+    repoRoot,
+  );
+  const multiFile = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: multiFileSession,
+      prompt: `Again, fix ${target} and ${otherTarget}`,
+    },
+    repoRoot,
+  );
+  assert.equal(multiFile.action, "inject");
+  assert.equal(multiFile.promptSpecificity, "exact-file");
+  assert.equal(multiFile.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal(multiFile.reasons.includes("edit-guidance-opt-in"), false);
 });
 
 test("bare status reports fast estimated session savings without exposing session contribution internals", () => {
@@ -994,7 +1072,7 @@ test("runtime hook stores redacted estimated metrics for record, inject, fallbac
     {
       hookEventName: "UserPromptSubmit",
       sessionId,
-      prompt: `Again, update ${target}`,
+      prompt: `Again, inspect ${target}`,
     },
     tempDir,
   );
@@ -1021,7 +1099,7 @@ test("runtime hook stores redacted estimated metrics for record, inject, fallbac
   assert.match(sessionSummary.metricSessionKey, /^codex:automatic-hook:/);
 
   const eventLog = fs.readFileSync(sessionEventsPath(tempDir, sessionSummary.metricSessionKey), "utf8");
-  assert.doesNotMatch(eventLog, /Again, update/);
+  assert.doesNotMatch(eventLog, /Again, inspect/);
   assert.doesNotMatch(eventLog, /additionalContext/);
   assert.doesNotMatch(eventLog, /rawText/);
   assert.doesNotMatch(eventLog, /"debug"/);

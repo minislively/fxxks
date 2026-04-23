@@ -62,8 +62,34 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(firstInject.action, "record");
   assert.equal(secondInject.action, "inject");
   assert.match(secondInject.additionalContext, /^fooks: reused pre-read \(compressed\)/);
-  assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), false);
-  assert.equal("editGuidance" in secondInject.debug.decision.payload, false);
+  assert.equal(secondInject.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), true);
+  assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
+  assert.deepEqual(secondInject.debug.decision.payload.editGuidance.freshness, secondInject.debug.decision.payload.sourceFingerprint);
+
+  const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);
+  const firstReadOnly = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: readOnlySession,
+      prompt: "Please read fixtures/compressed/FormSection.tsx",
+    },
+    repoRoot,
+  );
+  const secondReadOnly = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: readOnlySession,
+      prompt: "Again, summarize fixtures/compressed/FormSection.tsx",
+    },
+    repoRoot,
+  );
+
+  assert.equal(firstReadOnly.action, "record");
+  assert.equal(secondReadOnly.action, "inject");
+  assert.equal(secondReadOnly.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal("editGuidance" in secondReadOnly.debug.decision.payload, false);
 
   const smallRawSession = `bridge-contract-small-raw-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: smallRawSession }, repoRoot);
