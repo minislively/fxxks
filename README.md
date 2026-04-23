@@ -2,14 +2,20 @@
 
 Smaller model-facing context for repeated React component work in Codex.
 
-Broad category: Frontend context compression for Codex and Claude Code. Current strongest path: Codex repeated React component work.
+Broad category: Frontend context compression for Codex and Claude Code. Current strongest path: Codex repeated React component work; Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
+
+`fooks` is for Codex users who repeatedly work on the same React `.tsx` / `.jsx` file. On the first eligible mention, fooks records the component context; on later same-file prompts, it can send a compact model-facing payload instead of the full source when safe.
 
 - Public npm package: `oh-my-fooks`
 - CLI command: `fooks`
 
-`fooks` helps Codex users avoid resending the same full `.tsx` / `.jsx` component context during iterative frontend work. In the Codex repeated-file hook path, the first eligible file mention records context and later same-file prompts may reuse a compact fooks payload when safe.
+## 30-second version
 
-The core claim is deliberately narrow: **lower model-facing input/context load for supported repeated frontend work**. That is not provider billing/cost proof, not provider billing-token proof, not stable runtime-token or latency proof, and not a `ccusage` replacement.
+Use fooks when you are iterating on the same large React component in Codex and want to avoid repeatedly sending the full file context.
+
+- **Best today:** Codex + repeated same-file `.tsx` / `.jsx` work.
+- **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
+- **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
 
 ## Quick start and local proof
 
@@ -24,13 +30,26 @@ Then open Codex in that repo and work normally. `fooks compare` gives an immedia
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
 
-## What fooks is / is not
+## Best today / not today
 
-| fooks is | fooks is not |
+| Best today | Not today |
 | --- | --- |
-| A focused context-reduction helper for repeated React `.tsx` / `.jsx` work, strongest today in Codex. | A universal file-read interceptor for every language, framework, runtime, or file type. |
-| A way to inspect local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
-| A project setup tool that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token savings. |
+| Repeated same-file React `.tsx` / `.jsx` work in Codex. | Universal file-read interception for every language, framework, runtime, or file type. |
+| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
+| Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior. |
+
+## Not supported yet
+
+These are useful future directions, but they are not required for the current Codex repeated React workflow:
+
+- Vue, Svelte, or non-React framework support.
+- General `.ts` / backend-file context compression.
+- Multi-file refactor context compression.
+- Universal runtime file-read interception.
+- LSP-backed semantic rename/reference safety.
+- Provider invoice/dashboard or billing-grade charge proof.
+
+See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stronger support or stronger evidence claims.
 
 ## Runtime support at a glance
 
@@ -87,9 +106,18 @@ The command compares the original source bytes with the compact base fooks model
 
 ## Benchmark and evidence boundaries
 
-The shortest evidence summary is:
+The evidence ladder is intentionally split so public wording does not collapse prompt-size, runtime telemetry, and billing-grade proof into one claim:
 
-- Local commands such as `fooks compare` and `fooks status` support **model-facing context / prompt-size estimate** wording.
+| Level | Evidence | Supports | Does not support |
+| --- | --- | --- | --- |
+| Local estimate | `fooks compare`, `fooks status`, prepared payload accounting | Model-facing context / prompt-size estimate wording | Provider tokenizer, billing, or invoice wording |
+| Runtime telemetry | Codex CLI-reported matched-run diagnostics | Narrow internal runtime candidate evidence when quality gates pass | Stable public runtime-token or latency claims |
+| Estimated API cost | Provider usage tokens converted under explicit pricing assumptions | Estimate-scoped API-cost wording with caveats | Invoice/dashboard or actual charged-cost proof |
+| Billing-grade proof | Provider invoice, dashboard, or billed-usage exports | Future billing-grade wording for the measured scope | Not claimed today |
+
+Current public summary:
+
+- Local commands support **model-facing context / prompt-size estimate** wording.
 - The 2026-04-14 Codex-oriented proxy snapshot showed a prepared-context estimate reduction from roughly 2.1M to 450K estimated context tokens in a 5-task sample, with no success-rate regression in that sample.
 - Later benchmark lanes include estimate-scoped API-cost evidence, but that wording must stay qualified as **estimated API cost under explicit pricing assumptions**.
 - Direct runtime-token/time evidence remains unstable or negative in some diagnostics, so fooks does not claim stable runtime-token, wall-clock, or latency wins.
@@ -97,6 +125,24 @@ The shortest evidence summary is:
 Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
 The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider billing-token proof, and not a Claude or opencode automatic savings claim.
+
+## Common questions
+
+### Does this prove my provider bill will be lower?
+
+No. fooks can reduce model-facing prompt/context size in supported cases, and the benchmark docs include estimate-scoped API-cost evidence under explicit pricing assumptions. That is not provider invoice, dashboard, actual charged-cost, or billing-grade proof.
+
+### Is Claude automatic too?
+
+Not at Codex parity. Claude support uses project-local `SessionStart` / `UserPromptSubmit` context hooks plus handoff artifacts. fooks does not intercept Claude `Read` tool calls.
+
+### Does opencode get automatic read interception?
+
+No. opencode support is a project-local `fooks_extract` tool and `/fooks-extract` slash command. It steers explicit tool use; it does not replace opencode's built-in `read` behavior.
+
+### Which files are supported?
+
+The strongest path today is repeated same-file React `.tsx` / `.jsx` work in Codex. Unsupported or unsafe cases fall back to normal full-source behavior.
 
 ## Everyday commands
 
@@ -186,6 +232,7 @@ Useful public docs:
 - Setup details: [`docs/setup.md`](docs/setup.md)
 - opencode support boundary: [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
+- Roadmap / future evidence lanes: [`docs/roadmap.md`](docs/roadmap.md)
 - Benchmark evidence and claim boundaries: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
 Benchmark harness internals and generated reports live in the source repository, but are intentionally not part of the npm package payload.

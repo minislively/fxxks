@@ -1,6 +1,6 @@
 # Benchmark Architecture: Two-Layer System
 
-> Extraction Benchmark vs Frontend Task Benchmark
+> Historical benchmark planning note. For current public claim boundaries, use [`docs/benchmark-evidence.md`](../docs/benchmark-evidence.md) and [`benchmarks/layer2-frontend-task/STATUS.md`](layer2-frontend-task/STATUS.md). This file explains the benchmark direction, but older `TBD` / phase language below should not be read as the current release claim surface.
 
 ---
 

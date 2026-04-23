@@ -122,6 +122,7 @@ function assertPackedFiles(packEntry) {
     "dist/adapters/opencode-tool-preset.js",
     "docs/setup.md",
     "docs/release.md",
+    "docs/roadmap.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
@@ -172,6 +173,7 @@ assertPublicSurfaceClaimBoundaries({
   "README.md": fs.readFileSync(path.join(repoRoot, "README.md"), "utf8"),
   "docs/setup.md": fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8"),
   "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
+  "docs/roadmap.md": fs.readFileSync(path.join(repoRoot, "docs", "roadmap.md"), "utf8"),
   "docs/internal/live-hook-smoke-checklist.md": fs.existsSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"))
     ? fs.readFileSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"), "utf8")
     : "",
