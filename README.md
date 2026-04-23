@@ -1,8 +1,8 @@
 # fooks
 
-Smaller model-facing context for repeated React component work in Codex.
+Frontend context compression for iterative React/TSX work in Codex and Claude Code.
 
-Broad category: Frontend context compression for Codex and Claude Code. Current strongest path: Codex repeated React component work; Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
+`fooks` reduces model-facing input for supported repeated frontend file work. On the first eligible `.tsx` / `.jsx` mention, it records compact context; later same-file prompts may reuse it when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
 
 `fooks` is for Codex users who repeatedly work on the same React `.tsx` / `.jsx` file. On the first eligible mention, fooks records the component context; on later same-file prompts, it can send a compact model-facing payload instead of the full source when safe.
 
