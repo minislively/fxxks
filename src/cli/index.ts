@@ -543,6 +543,7 @@ Everyday commands:
   ${displayCliName} status codex
   ${displayCliName} status claude
   ${displayCliName} status cache
+  ${displayCliName} status worktree
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -913,7 +914,12 @@ async function run(): Promise<void> {
         print(monitor.healthReport());
         return;
       }
-      throw new Error("status expects no argument, 'codex', 'claude', or 'cache'");
+      if (arg1 === "worktree") {
+        const { currentWorktreeEvidenceStatus } = await import("../core/worktree-evidence.js");
+        print(currentWorktreeEvidenceStatus(process.cwd()));
+        return;
+      }
+      throw new Error("status expects no argument, 'codex', 'claude', 'cache', or 'worktree'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");

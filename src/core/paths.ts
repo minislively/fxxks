@@ -56,6 +56,10 @@ export function sessionSummaryPath(cwd: string, sessionKey: string): string {
   return path.join(sessionDir(cwd, sessionKey), "summary.json");
 }
 
+export function sessionWorktreeEvidencePath(cwd: string, sessionKey: string): string {
+  return path.join(sessionDir(cwd, sessionKey), "worktree.json");
+}
+
 export function sessionsSummaryPath(cwd = process.cwd()): string {
   return path.join(sessionsDir(cwd), "summary.json");
 }

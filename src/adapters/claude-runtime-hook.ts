@@ -18,6 +18,7 @@ import {
   initializeSessionMetricSummarySafe,
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
+import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
 
 export { CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS };
 
@@ -154,6 +155,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
   if (hookEventName === "SessionStart") {
     const statePath = initializeClaudeRuntimeSession(cwd, sessionKey);
     initializeSessionMetricSummarySafe(cwd, sessionKey, { runtime: "claude", measurementSource: "project-local-context-hook" });
+    initializeWorktreeEvidenceSafe(cwd, sessionKey);
     return {
       runtime: "claude",
       hookEventName,
@@ -176,6 +178,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     const statePath = clearClaudeRuntimeSession(cwd, sessionKey);
     clearClaudeActiveFile(cwd);
     finalizeSessionMetricSummarySafe(cwd, sessionKey, { runtime: "claude", measurementSource: "project-local-context-hook" });
+    finalizeWorktreeEvidenceSafe(cwd, sessionKey);
     return {
       runtime: "claude",
       hookEventName,

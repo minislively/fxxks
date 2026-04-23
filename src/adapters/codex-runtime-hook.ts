@@ -18,6 +18,7 @@ import {
   initializeSessionMetricSummarySafe,
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
+import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
 
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
@@ -154,6 +155,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     const statePath = initializeCodexRuntimeSession(cwd, sessionKey);
     markCodexReady(cwd);
     initializeSessionMetricSummarySafe(cwd, sessionKey);
+    initializeWorktreeEvidenceSafe(cwd, sessionKey);
     return {
       runtime: "codex",
       hookEventName,
@@ -174,6 +176,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     const statePath = clearCodexRuntimeSession(cwd, sessionKey);
     clearCodexActiveFile(cwd);
     finalizeSessionMetricSummarySafe(cwd, sessionKey);
+    finalizeWorktreeEvidenceSafe(cwd, sessionKey);
     return {
       runtime: "codex",
       hookEventName,

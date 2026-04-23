@@ -12,7 +12,11 @@ const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 
 const { handleClaudeRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-hook.js"));
-const { readClaudeTrustStatus, ensureFreshClaudeContextForTarget } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-trust.js"));
+const {
+  ensureFreshClaudeContextForTarget,
+  readClaudeTrustStatus,
+  writeClaudeTrustStatus,
+} = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-trust.js"));
 const { clearClaudeRuntimeSession, claudeRuntimeSessionPath } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-session.js"));
 const { scanProject } = require(path.join(repoRoot, "dist", "core", "scan.js"));
 
@@ -75,8 +79,18 @@ test("claude ensureFreshClaudeContextForTarget non-stale path does not rewrite t
   const tempDir = makeTempProject();
   const target = path.join("src", "components", "FormSection.tsx");
 
-  scanProject(tempDir);
-  const before = readClaudeTrustStatus(tempDir);
+  const scan = scanProject(tempDir);
+  const before = writeClaudeTrustStatus(
+    {
+      runtime: "claude",
+      connectionState: "connected",
+      lifecycleState: "ready",
+      updatedAt: "2026-04-23T00:00:00.000Z",
+      lastScanAt: scan.scannedAt,
+      lastRefreshAt: scan.scannedAt,
+    },
+    tempDir,
+  );
   const beforeUpdatedAt = before.updatedAt;
 
   const result = ensureFreshClaudeContextForTarget(target, tempDir);
