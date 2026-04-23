@@ -56,7 +56,7 @@ export function patchClaudeTrustStatus(
     ...previous,
     ...partial,
     runtime: "claude",
-    updatedAt: now(),
+    updatedAt: partial.updatedAt ?? now(),
   };
   if (partial.activeFile === undefined && Object.prototype.hasOwnProperty.call(partial, "activeFile")) {
     delete next.activeFile;
