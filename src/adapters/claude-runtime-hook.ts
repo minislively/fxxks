@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { decidePreRead } from "./pre-read";
 import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
-import { ensureFreshClaudeContextForTarget } from "./claude-runtime-trust";
+import { clearClaudeActiveFile, ensureFreshClaudeContextForTarget, markClaudeAttachPrepared } from "./claude-runtime-trust";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 import {
@@ -14,6 +14,8 @@ import {
 } from "../core/session-metrics";
 
 export const CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS = 9000;
+const CLAUDE_CONTEXT_TRUNCATION_SUFFIX =
+  "\n\n[fooks: context truncated to stay within Claude hook additionalContext cap. Read the full source file if exact code is required.]";
 
 export type ClaudeRuntimeHookEvent = "SessionStart" | "UserPromptSubmit" | "Stop";
 
@@ -51,7 +53,7 @@ export type ClaudeRuntimeHookDecision = {
 
 function clampAdditionalContext(value: string): string {
   if (value.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS) return value;
-  return `${value.slice(0, CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS - 126).trimEnd()}\n\n[fooks: context truncated to stay within Claude hook additionalContext cap. Read the full source file if exact code is required.]`;
+  return `${value.slice(0, CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS - CLAUDE_CONTEXT_TRUNCATION_SUFFIX.length).trimEnd()}${CLAUDE_CONTEXT_TRUNCATION_SUFFIX}`;
 }
 
 function boundedFallbackContext(filePath: string | undefined, reason: string): string {
@@ -181,6 +183,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
 
   if (hookEventName === "Stop") {
     const statePath = clearClaudeRuntimeSession(cwd, sessionKey);
+    clearClaudeActiveFile(cwd);
     finalizeSessionMetricSummarySafe(cwd, sessionKey, { runtime: "claude", measurementSource: "project-local-context-hook" });
     return {
       runtime: "claude",
@@ -243,6 +246,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         reason: "escape-hatch-full-read",
       },
     };
+    markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
       actualEstimatedBytes: originalEstimatedBytes,
@@ -261,7 +265,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     if (process.env.FOOKS_CLAUDE_FIRST_SEEN_INJECT === "1") {
       let preRead: ReturnType<typeof decidePreRead> | undefined;
       try {
-        preRead = decidePreRead(resolvedTarget, cwd);
+        preRead = decidePreRead(resolvedTarget, cwd, "claude");
       } catch {
         // fall through to default record behavior
       }
@@ -292,6 +296,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
             escapeHatchUsed: false,
           },
         };
+        markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
         recordClaudeMetric(cwd, sessionKey, decision, {
           originalEstimatedBytes: targetEstimatedBytes(cwd, target),
           actualEstimatedBytes: estimateTextBytes(additionalContext),
@@ -328,8 +333,9 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
 
   let decision: ReturnType<typeof decidePreRead>;
   try {
-    decision = decidePreRead(resolvedTarget, cwd);
+    decision = decidePreRead(resolvedTarget, cwd, "claude");
   } catch (error) {
+    markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
     const runtimeDecision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
@@ -390,6 +396,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         escapeHatchUsed: false,
       },
     };
+    markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
     recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
@@ -399,6 +406,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     return runtimeDecision;
   }
 
+  markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
   const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
   const runtimeDecision: ClaudeRuntimeHookDecision = {
     runtime: "claude",

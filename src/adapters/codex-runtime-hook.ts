@@ -1,6 +1,6 @@
 import path from "node:path";
-import { decideCodexPreRead } from "./codex-pre-read";
-import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./codex-runtime-prompt";
+import { decidePreRead } from "./pre-read";
+import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
 import { buildPreReadReuseStatus } from "./codex-runtime-status";
 import { clearCodexActiveFile, ensureFreshCodexContextForTarget, markCodexAttachPrepared, markCodexReady } from "./codex-runtime-trust";
 import {
@@ -71,7 +71,7 @@ function fallbackDecision(
   escapeHatchUsed: boolean,
   fallbackReason: string,
   policy?: ReturnType<typeof resolvePromptFileContext>["policy"],
-  decision?: ReturnType<typeof decideCodexPreRead>,
+  decision?: ReturnType<typeof decidePreRead>,
 ): CodexRuntimeHookDecision {
   return {
     runtime: "codex",
@@ -222,9 +222,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     return runtimeDecision;
   }
 
-  let decision: ReturnType<typeof decideCodexPreRead>;
+  let decision: ReturnType<typeof decidePreRead>;
   try {
-    decision = decideCodexPreRead(path.join(cwd, target), cwd);
+    decision = decidePreRead(path.join(cwd, target), cwd);
   } catch {
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);

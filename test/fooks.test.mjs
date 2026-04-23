@@ -23,6 +23,7 @@ const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "pa
 const { assessPayloadReadiness } = require(path.join(repoRoot, "dist", "core", "payload", "readiness.js"));
 const codexPreReadModule = require(path.join(repoRoot, "dist", "adapters", "codex-pre-read.js"));
 const { decideCodexPreRead } = codexPreReadModule;
+const preReadModule = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const {
   extractPromptTarget,
   hasFullReadEscapeHatch,
@@ -47,6 +48,7 @@ const { attachClaude } = require(path.join(repoRoot, "dist", "adapters", "claude
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
 const { installClaudeHookPreset, claudeLocalSettingsPath } = require(path.join(repoRoot, "dist", "adapters", "claude-hook-preset.js"));
 const { handleClaudeRuntimeHook, CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-hook.js"));
+const { readClaudeTrustStatus } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-trust.js"));
 const { handleClaudeNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "claude-native-hook.js"));
 const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
 const ts = require("typescript");
@@ -131,14 +133,18 @@ function patchTargetKeys(targets) {
 
 function withThrowingCodexPreRead(callback) {
   const originalDecideCodexPreRead = codexPreReadModule.decideCodexPreRead;
-  codexPreReadModule.decideCodexPreRead = () => {
+  const originalDecidePreRead = preReadModule.decidePreRead;
+  const throwingFn = () => {
     throw new Error("synthetic payload build failure");
   };
+  codexPreReadModule.decideCodexPreRead = throwingFn;
+  preReadModule.decidePreRead = throwingFn;
 
   try {
     return callback();
   } finally {
     codexPreReadModule.decideCodexPreRead = originalDecideCodexPreRead;
+    preReadModule.decidePreRead = originalDecidePreRead;
   }
 }
 
@@ -2237,6 +2243,55 @@ test("claude runtime hook records first eligible prompt, injects repeated same-f
   assert.equal(linkedTs.action, "noop");
   const missing = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", prompt: "Create src/components/NewPanel.tsx" }, tempDir);
   assert.equal(missing.action, "noop");
+});
+
+test("claude runtime hook refreshes stale target state and clears active file on stop", () => {
+  const tempDir = makeTempProject();
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  run(["attach", "claude"], tempDir, { FOOKS_CLAUDE_HOME: claudeHome });
+
+  const sessionId = `claude-hook-refresh-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Review ${target}`,
+    },
+    tempDir,
+  );
+
+  appendMarker(path.join(tempDir, target), "// claude-trust-refresh-marker");
+
+  const second = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, review ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "inject");
+  assert.equal(second.filePath, target);
+  assert.ok(second.reasons.includes("refreshed-before-inject"));
+  assert.match(second.additionalContext, /fooks does not intercept Claude Read/);
+
+  const prepared = readClaudeTrustStatus(tempDir);
+  assert.equal(prepared.connectionState, "connected");
+  assert.equal(prepared.lifecycleState, "attach-prepared");
+  assert.equal(prepared.activeFile.filePath, target);
+  assert.equal(prepared.activeFile.source, "prompt-target");
+  assert.ok(prepared.lastRefreshAt);
+  assert.ok(prepared.lastAttachPreparedAt);
+
+  handleClaudeRuntimeHook({ hookEventName: "Stop", sessionId }, tempDir);
+
+  const afterStop = readClaudeTrustStatus(tempDir);
+  assert.equal(afterStop.connectionState, "connected");
+  assert.equal(afterStop.lifecycleState, "ready");
+  assert.equal("activeFile" in afterStop, false);
 });
 
 test("codex and claude estimated metrics are runtime/source-qualified without session collisions", () => {

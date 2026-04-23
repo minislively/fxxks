@@ -2,7 +2,7 @@ import path from "node:path";
 import { extractFile } from "../core/extract";
 import { toModelFacingPayload } from "../core/payload/model-facing";
 import { assessPayloadReadiness } from "../core/payload/readiness";
-import type { CodexPreReadDecision } from "../core/schema";
+import type { PreReadDecision } from "../core/schema";
 
 const ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 
@@ -11,14 +11,14 @@ function relativePath(filePath: string, cwd: string): string {
   return relative || path.basename(filePath);
 }
 
-export function decidePreRead(filePath: string, cwd = process.cwd()): CodexPreReadDecision {
+export function decidePreRead(filePath: string, cwd = process.cwd(), runtime: PreReadDecision["runtime"] = "codex"): PreReadDecision {
   const resolvedPath = path.resolve(filePath);
   const outputPath = relativePath(resolvedPath, cwd);
   const extension = path.extname(resolvedPath);
 
   if (!ELIGIBLE_EXTENSIONS.has(extension)) {
     return {
-      runtime: "codex",
+      runtime,
       filePath: outputPath,
       eligible: false,
       decision: "fallback",
@@ -44,7 +44,7 @@ export function decidePreRead(filePath: string, cwd = process.cwd()): CodexPreRe
 
   if (readiness.ready) {
     return {
-      runtime: "codex",
+      runtime,
       filePath: outputPath,
       eligible: true,
       decision: "payload",
@@ -56,7 +56,7 @@ export function decidePreRead(filePath: string, cwd = process.cwd()): CodexPreRe
   }
 
   return {
-    runtime: "codex",
+    runtime,
     filePath: outputPath,
     eligible: true,
     decision: "fallback",

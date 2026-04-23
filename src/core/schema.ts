@@ -191,8 +191,8 @@ export type PayloadReadiness = {
   };
 };
 
-export type CodexPreReadDecision = {
-  runtime: "codex";
+export type PreReadDecision = {
+  runtime: "codex" | "claude";
   filePath: string;
   eligible: boolean;
   decision: "payload" | "fallback";
@@ -211,6 +211,9 @@ export type CodexPreReadDecision = {
     reason: string;
   };
 };
+
+/** @deprecated Use PreReadDecision instead. Kept for backward compatibility. */
+export type CodexPreReadDecision = PreReadDecision;
 
 
 export type PromptSpecificity = "exact-file" | "file-hinted" | "ambiguous";
@@ -251,7 +254,7 @@ export type CodexRuntimeHookDecision = {
     repeatedFile: boolean;
     eligible: boolean;
     escapeHatchUsed: boolean;
-    decision?: CodexPreReadDecision;
+    decision?: PreReadDecision;
   };
   fallback?: {
     action: "full-read";
