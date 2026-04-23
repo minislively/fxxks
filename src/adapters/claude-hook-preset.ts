@@ -23,6 +23,18 @@ type ClaudeSettingsFile = {
   [key: string]: unknown;
 };
 
+export type ClaudeHookPresetStatus = {
+  settingsPath: string;
+  exists: boolean;
+  valid?: boolean;
+  installedEvents: ClaudeHookEvent[];
+  missingEvents: ClaudeHookEvent[];
+  unexpectedFooksEvents: string[];
+  commandMatches?: boolean;
+  disabledByLocalSettings?: boolean;
+  blocker?: string;
+};
+
 export type ClaudeHookPresetInstallResult = {
   settingsPath: string;
   backupPath?: string;
@@ -71,6 +83,73 @@ function readSettingsFile(filePath: string): ClaudeSettingsFile {
   if (!fs.existsSync(filePath)) return {};
   const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as ClaudeSettingsFile;
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+}
+
+function hookCommandsForEvent(settings: ClaudeSettingsFile, event: string): string[] {
+  const matchers = settings.hooks?.[event] ?? [];
+  if (!Array.isArray(matchers)) return [];
+  return matchers.flatMap((matcher) => {
+    if (!Array.isArray(matcher?.hooks)) return [];
+    return (matcher.hooks as HookCommand[])
+      .filter((hook) => hook?.type === "command" && typeof hook.command === "string")
+      .map((hook) => hook.command as string);
+  });
+}
+
+export function readClaudeHookPresetStatus(cwd = process.cwd(), cliName = "fooks"): ClaudeHookPresetStatus {
+  const filePath = claudeLocalSettingsPath(cwd);
+  if (!fs.existsSync(filePath)) {
+    return {
+      settingsPath: filePath,
+      exists: false,
+      installedEvents: [],
+      missingEvents: [...CLAUDE_HOOK_EVENTS],
+      unexpectedFooksEvents: [],
+      commandMatches: false,
+    };
+  }
+
+  let settings: ClaudeSettingsFile;
+  try {
+    settings = readSettingsFile(filePath);
+  } catch (error) {
+    return {
+      settingsPath: filePath,
+      exists: true,
+      valid: false,
+      installedEvents: [],
+      missingEvents: [...CLAUDE_HOOK_EVENTS],
+      unexpectedFooksEvents: [],
+      commandMatches: false,
+      blocker: `Claude local settings are not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  const command = defaultClaudeHookCommand(cliName);
+  const installedEvents = CLAUDE_HOOK_EVENTS.filter((event) => hookCommandsForEvent(settings, event).some((item) => isCompatibleClaudeHookCommand(item, cliName)));
+  const missingEvents = CLAUDE_HOOK_EVENTS.filter((event) => !installedEvents.includes(event));
+  const unexpectedFooksEvents = Object.keys(settings.hooks ?? {}).filter(
+    (event) => !CLAUDE_HOOK_EVENTS.includes(event as ClaudeHookEvent) && hookCommandsForEvent(settings, event).some((item) => isCompatibleClaudeHookCommand(item, cliName)),
+  );
+  const disabledByLocalSettings = settings.disableAllHooks === true;
+  const commandMatches = installedEvents.every((event) => hookCommandsForEvent(settings, event).some((item) => item === command));
+  const blocker = disabledByLocalSettings
+    ? "Claude hooks are disabled by local settings"
+    : unexpectedFooksEvents.length > 0
+      ? `Unsupported fooks Claude hook events are installed: ${unexpectedFooksEvents.join(", ")}`
+      : undefined;
+
+  return {
+    settingsPath: filePath,
+    exists: true,
+    valid: true,
+    installedEvents,
+    missingEvents,
+    unexpectedFooksEvents,
+    commandMatches,
+    disabledByLocalSettings,
+    blocker,
+  };
 }
 
 function ensureEventHook(settingsFile: ClaudeSettingsFile, event: ClaudeHookEvent, command: string): boolean {

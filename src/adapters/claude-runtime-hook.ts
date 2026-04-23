@@ -4,6 +4,12 @@ import { decidePreRead } from "./pre-read";
 import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
 import { clearClaudeActiveFile, ensureFreshClaudeContextForTarget, markClaudeAttachPrepared } from "./claude-runtime-trust";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
+import {
+  clampAdditionalContext,
+  boundedFallbackContext,
+  sessionStartContext,
+  CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
+} from "./claude-runtime-status";
 import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
 import {
   estimateFileBytes,
@@ -13,9 +19,7 @@ import {
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
 
-export const CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS = 9000;
-const CLAUDE_CONTEXT_TRUNCATION_SUFFIX =
-  "\n\n[fooks: context truncated to stay within Claude hook additionalContext cap. Read the full source file if exact code is required.]";
+export { CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS };
 
 export type ClaudeRuntimeHookEvent = "SessionStart" | "UserPromptSubmit" | "Stop";
 
@@ -50,18 +54,6 @@ export type ClaudeRuntimeHookDecision = {
     reason: string;
   };
 };
-
-function clampAdditionalContext(value: string): string {
-  if (value.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS) return value;
-  return `${value.slice(0, CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS - CLAUDE_CONTEXT_TRUNCATION_SUFFIX.length).trimEnd()}${CLAUDE_CONTEXT_TRUNCATION_SUFFIX}`;
-}
-
-function boundedFallbackContext(filePath: string | undefined, reason: string): string {
-  const target = filePath ?? "requested frontend file";
-  return clampAdditionalContext(
-    `fooks: Claude context hook fallback · file: ${target} · reason: ${reason} · Read the full source file for this turn. No Claude Read interception or runtime-token savings is claimed.`,
-  );
-}
 
 function payloadContextMode(payload: NonNullable<ReturnType<typeof decidePreRead>["payload"]>): ContextMode {
   return payload.useOriginal ? "light-minimal" : "light";
@@ -128,12 +120,6 @@ function recordClaudeMetric(
     comparableForSavings: options.comparableForSavings,
     observedOriginalEstimatedBytes: options.observedOriginalEstimatedBytes,
   });
-}
-
-function sessionStartContext(): string {
-  return clampAdditionalContext(
-    "fooks: active · no Read interception · first prompt triggers context.",
-  );
 }
 
 function noopDecision(input: ClaudeRuntimeHookInput, reasons: string[], policy?: ReturnType<typeof resolvePromptFileContext>["policy"]): ClaudeRuntimeHookDecision {

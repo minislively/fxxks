@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { adapterDir } from "../core/paths";
-import { claudeLocalSettingsPath, CLAUDE_HOOK_EVENTS, defaultClaudeHookCommand, isCompatibleClaudeHookCommand, type ClaudeHookEvent } from "./claude-hook-preset";
+import { readClaudeHookPresetStatus, type ClaudeHookEvent } from "./claude-hook-preset";
 import { runtimeManifestPath } from "./shared";
 
 type ClaudeStatusState = "context-hook-ready" | "handoff-ready" | "blocked";
@@ -23,20 +23,6 @@ type ClaudeManifestStatus = {
   runtimeMatches?: boolean;
   projectRootMatches?: boolean;
   blocker?: string;
-};
-
-type HookCommand = {
-  type?: unknown;
-  command?: unknown;
-};
-
-type HookMatcher = {
-  hooks?: unknown;
-};
-
-type ClaudeSettingsFile = {
-  hooks?: Record<string, HookMatcher[]>;
-  disableAllHooks?: unknown;
 };
 
 export type ClaudeHookStatus = {
@@ -152,73 +138,21 @@ function manifestStatus(cwd: string): ClaudeManifestStatus {
   }
 }
 
-function hookCommandsForEvent(settings: ClaudeSettingsFile, event: string): string[] {
-  const matchers = settings.hooks?.[event] ?? [];
-  if (!Array.isArray(matchers)) return [];
-  return matchers.flatMap((matcher) => {
-    if (!Array.isArray(matcher?.hooks)) return [];
-    return (matcher.hooks as HookCommand[])
-      .filter((hook) => hook?.type === "command" && typeof hook.command === "string")
-      .map((hook) => hook.command as string);
-  });
-}
-
 function hookStatus(cwd: string): ClaudeHookStatus {
-  const filePath = claudeLocalSettingsPath(cwd);
-  if (!fs.existsSync(filePath)) {
-    return {
-      path: filePath,
-      exists: false,
-      ready: false,
-      installedEvents: [],
-      missingEvents: [...CLAUDE_HOOK_EVENTS],
-      unexpectedFooksEvents: [],
-      commandMatches: false,
-    };
-  }
-
-  let settings: ClaudeSettingsFile;
-  try {
-    settings = readJson(filePath) as ClaudeSettingsFile;
-  } catch (error) {
-    return {
-      path: filePath,
-      exists: true,
-      ready: false,
-      valid: false,
-      installedEvents: [],
-      missingEvents: [...CLAUDE_HOOK_EVENTS],
-      unexpectedFooksEvents: [],
-      commandMatches: false,
-      blocker: `Claude local settings are not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-
-  const command = defaultClaudeHookCommand("fooks");
-  const installedEvents = CLAUDE_HOOK_EVENTS.filter((event) => hookCommandsForEvent(settings, event).some((item) => isCompatibleClaudeHookCommand(item, "fooks"))) as ClaudeHookEvent[];
-  const missingEvents = CLAUDE_HOOK_EVENTS.filter((event) => !installedEvents.includes(event)) as ClaudeHookEvent[];
-  const unexpectedFooksEvents = Object.keys(settings.hooks ?? {}).filter(
-    (event) => !CLAUDE_HOOK_EVENTS.includes(event as ClaudeHookEvent) && hookCommandsForEvent(settings, event).some((item) => isCompatibleClaudeHookCommand(item, "fooks")),
-  );
-  const disabledByLocalSettings = settings.disableAllHooks === true;
-  const commandMatches = installedEvents.every((event) => hookCommandsForEvent(settings, event).some((item) => item === command));
-  const blocker = disabledByLocalSettings
-    ? "Claude hooks are disabled by local settings"
-    : unexpectedFooksEvents.length > 0
-      ? `Unsupported fooks Claude hook events are installed: ${unexpectedFooksEvents.join(", ")}`
-      : undefined;
+  const preset = readClaudeHookPresetStatus(cwd);
+  const ready = preset.missingEvents.length === 0 && preset.unexpectedFooksEvents.length === 0 && !preset.disabledByLocalSettings;
 
   return {
-    path: filePath,
-    exists: true,
-    ready: missingEvents.length === 0 && unexpectedFooksEvents.length === 0 && !disabledByLocalSettings,
-    valid: true,
-    installedEvents,
-    missingEvents,
-    unexpectedFooksEvents,
-    commandMatches,
-    disabledByLocalSettings,
-    blocker,
+    path: preset.settingsPath,
+    exists: preset.exists,
+    ready,
+    valid: preset.valid,
+    installedEvents: preset.installedEvents,
+    missingEvents: preset.missingEvents,
+    unexpectedFooksEvents: preset.unexpectedFooksEvents,
+    commandMatches: preset.commandMatches,
+    disabledByLocalSettings: preset.disabledByLocalSettings,
+    blocker: preset.blocker,
   };
 }
 
