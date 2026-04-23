@@ -134,3 +134,23 @@ A frontend task is ready to execute only when:
 - [ ] Reuse scan evidence is recorded before new files/helpers are added.
 - [ ] Shared abstractions have 3+ repetition evidence or an existing precedent.
 - [ ] The final report includes selected primary lane, support work performed, gates marked `in` or `support`, defer ledger, tests run, and known gaps.
+
+## Post-Ralph verification status
+
+Ralph completed the `test` lane verification (see `.omx/artifacts/frontend-scope-taxonomy-ralph-check.mjs`). Remaining core lanes are deferred until explicitly selected:
+
+- `feature` — deferred
+- `design/UI` — deferred
+- `refactor` — deferred
+- `migration` — deferred
+- `test` — ✅ completed by Ralph
+
+Layer 3 separate lanes remain deferred unless explicitly opened:
+
+- `docs/process` — deferred
+- `hooks/enforcement` — deferred
+- `benchmark/evidence` — deferred
+- `analytics/telemetry/logging` — deferred
+- `performance/bundle` — deferred
+- `tooling` — deferred
+- `BE/API` — out of repo-side path unless separate lane explicitly opened
