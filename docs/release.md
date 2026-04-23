@@ -17,7 +17,7 @@ Before a public release, keep the public claim surface aligned to this matrix:
 
 | Environment | Release-ready wording | Do not claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Universal file-read interception |
+| Codex | Automatic repeated-file hook path through `fooks setup`; strongest path remains repeated same-file React `.tsx` / `.jsx`, with an experimental Codex-first `.ts` / `.js` same-file beta after supported setup when module signals are strong enough | Universal file-read interception, Vue/SFC support, multi-file refactors, Claude/opencode parity, stable/GA TS/JS support, or LSP semantic safety |
 | Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | `Read` interception, full prompt interception parity, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 
@@ -62,7 +62,7 @@ Bare `fooks status` reports local estimated context-size telemetry from `.fooks/
 
 `fooks extract <file> --model-payload` may expose `editGuidance.patchTargets` when source ranges are available. Public wording may describe those patch targets as compact, AST-derived line-aware edit anchors for components, props, effects, callbacks, event handlers, form controls, submit handlers, validation anchors, and representative snippets. Public wording must also state the freshness rule: use the targets only while `sourceFingerprint.fileHash` and `sourceFingerprint.lineCount` match the current source, otherwise rerun extraction or read the file before editing. Do not describe this guidance as LSP-backed semantic rename/reference resolution, provider tokenizer behavior, provider billing-token proof, provider-cost proof, or a `ccusage` replacement.
 
-Automatic runtime pre-read payloads stay compact unless a gated Codex edit path is active: repeated exact-file `.tsx` / `.jsx` edit-intent prompts may include bounded `editGuidance` only after positive freshness, source fingerprint equality, and payload-budget checks pass. First-turn prompts, read/inspect/explain/summarize/review-only prompts, ambiguous or multi-file prompts, stale/missing targets, and fallback paths must continue to omit `editGuidance`. Public wording must not describe this as live Codex edit outcome proof.
+Automatic runtime pre-read payloads stay compact unless a gated Codex edit path is active: repeated exact-file `.tsx` / `.jsx` edit-intent prompts may include bounded `editGuidance` only after positive freshness, source fingerprint equality, and payload-budget checks pass. Experimental `.ts` / `.js` beta payloads remain same-file, module-signal gated, and must continue to omit `editGuidance` in this release slice. First-turn prompts, read/inspect/explain/summarize/review-only prompts, ambiguous or multi-file prompts, stale/missing targets, and fallback paths must continue to omit `editGuidance`. Public wording must not describe this as live Codex edit outcome proof.
 
 Codex setup/attach/status readiness is also local state only. It may show that
 Codex hooks, manifests, and trust metadata were prepared, but it is not live

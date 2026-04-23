@@ -23,12 +23,14 @@ function getLanguage(filePath: string): Language {
   const ext = path.extname(filePath);
   if (ext === ".tsx") return "tsx";
   if (ext === ".jsx") return "jsx";
+  if (ext === ".js") return "js";
   return "ts";
 }
 
 function getScriptKind(language: Language): ts.ScriptKind {
   if (language === "tsx") return ts.ScriptKind.TSX;
   if (language === "jsx") return ts.ScriptKind.JSX;
+  if (language === "js") return ts.ScriptKind.JS;
   return ts.ScriptKind.TS;
 }
 
@@ -173,6 +175,63 @@ function getComponentName(exports: ExtractionResult["exports"]): string | undefi
   const defaultExport = exports.find((item) => item.kind === "default" && isPascal(item.name));
   if (defaultExport) return defaultExport.name;
   return exports.find((item) => isPascal(item.name))?.name;
+}
+
+function collectModuleDeclarations(sourceFile: ts.SourceFile): NonNullable<NonNullable<ExtractionResult["structure"]>["moduleDeclarations"]> {
+  const declarations: NonNullable<NonNullable<ExtractionResult["structure"]>["moduleDeclarations"]> = [];
+
+  const addDeclaration = (
+    kind: NonNullable<NonNullable<ExtractionResult["structure"]>["moduleDeclarations"]>[number]["kind"],
+    value: string | undefined,
+    node: ts.Node,
+    exported = false,
+  ): void => {
+    if (!value) return;
+    const compacted = compactText(value);
+    if (!compacted) return;
+    declarations.push({
+      kind,
+      value: compacted,
+      ...(exported ? { exported: true } : {}),
+      loc: sourceRangeOf(sourceFile, node),
+    });
+  };
+
+  const isExported = (node: ts.Node): boolean =>
+    ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name) {
+      addDeclaration("function", statement.name.text, statement, isExported(statement));
+      continue;
+    }
+    if (ts.isClassDeclaration(statement) && statement.name) {
+      addDeclaration("class", statement.name.text, statement, isExported(statement));
+      continue;
+    }
+    if (ts.isInterfaceDeclaration(statement)) {
+      addDeclaration("interface", statement.name.text, statement, isExported(statement));
+      continue;
+    }
+    if (ts.isTypeAliasDeclaration(statement)) {
+      addDeclaration("type", statement.name.text, statement, isExported(statement));
+      continue;
+    }
+    if (ts.isEnumDeclaration(statement)) {
+      addDeclaration("enum", statement.name.text, statement, isExported(statement));
+      continue;
+    }
+    if (ts.isVariableStatement(statement)) {
+      const exported = isExported(statement);
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          addDeclaration("variable", declaration.name.text, declaration, exported);
+        }
+      }
+    }
+  }
+
+  return dedupeBy(declarations, (item) => `${item.kind}:${item.value}:${item.loc?.startLine ?? ""}`).slice(0, 12);
 }
 
 function findDeclarationByName(sourceFile: ts.SourceFile, name: string): ts.Node | undefined {
@@ -555,6 +614,9 @@ export function extractSource(filePath: string, sourceText: string): ExtractionR
   const style = detectStyleSystem(sourceFile);
   const behaviorStructure = collectBehaviorAndStructure(sourceFile);
   const importCount = sourceFile.statements.filter(ts.isImportDeclaration).length;
+  const moduleDeclarations = language === "ts" || language === "js"
+    ? collectModuleDeclarations(sourceFile)
+    : [];
   const base: Omit<ExtractionResult, "mode"> = {
     filePath,
     fileHash,
@@ -574,6 +636,12 @@ export function extractSource(filePath: string, sourceText: string): ExtractionR
       generatedAt: new Date().toISOString(),
     },
   };
+  if (moduleDeclarations.length > 0) {
+    base.structure = {
+      ...base.structure,
+      moduleDeclarations,
+    };
+  }
 
   const { mode, complexityScore, reasons, confidence, useOriginal } = decideMode(base);
   const result: ExtractionResult = {

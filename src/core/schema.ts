@@ -1,5 +1,5 @@
 export type OutputMode = "raw" | "compressed" | "hybrid";
-export type Language = "tsx" | "jsx" | "ts";
+export type Language = "tsx" | "jsx" | "ts" | "js";
 export type DecisionConfidence = "high" | "medium" | "low";
 export type StyleSystem =
   | "tailwind"
@@ -56,6 +56,11 @@ export type FormSurface = {
   controls?: FormControlSignal[];
   submitHandlers?: LocatedString[];
   validationAnchors?: LocatedString[];
+};
+
+export type ModuleDeclarationSignal = LocatedString & {
+  kind: "function" | "class" | "variable" | "type" | "interface" | "enum";
+  exported?: boolean;
 };
 
 export type PatchTargetKind =
@@ -117,6 +122,7 @@ export type ExtractionResult = {
     conditionalRenders?: string[];
     repeatedBlocks?: string[];
     jsxDepth?: number;
+    moduleDeclarations?: ModuleDeclarationSignal[];
   };
   style?: {
     system?: StyleSystem;
@@ -167,6 +173,7 @@ export type ModelFacingPayload = {
     conditionalRenders?: string[];
     repeatedBlocks?: string[];
     jsxDepth?: number;
+    moduleDeclarations?: ModuleDeclarationSignal[];
   };
   style?: {
     system?: StyleSystem;

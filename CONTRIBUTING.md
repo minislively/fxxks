@@ -30,6 +30,7 @@ The npm package is `oh-my-fooks`; the installed CLI command is `fooks`. Do not d
 ## Pull request checklist
 
 - [ ] Source changes are tracked; generated `dist/` is ignored and rebuilt by scripts.
+- [ ] Frontend/process scope follows [`docs/frontend-scope-taxonomy.md`](docs/frontend-scope-taxonomy.md): selected primary lane, required support work, and `in/support/defer/blocked` boundaries are recorded when applicable.
 - [ ] Docs match the current claim boundary.
 - [ ] `npm run lint` passes.
 - [ ] `npm test` passes.

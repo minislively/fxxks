@@ -10,15 +10,26 @@ Related tracking issue: #131.
 
 Before implementation starts:
 
-1. Pick exactly one core execution lane.
+1. Pick exactly one primary lane unless a bundle exception is declared.
 2. Classify connected frontend concerns as gates, not automatic work.
 3. Default evidence, infrastructure, and backend/API lanes to defer unless explicitly selected.
 4. Run a reuse scan before adding files, helpers, mocks, types, regexes, adapters, or shared utilities.
 5. Require 3+ concrete repetitions or an existing precedent before introducing shared abstractions.
 
+## PR execution contract
+
+Use this contract before implementation or process-only work begins.
+
+1. **User Intent Classification** — classify the primary user intent as one Layer 1 core execution lane (`feature`, `design/UI`, `refactor`, `migration`, `test`) or as one explicitly selected Layer 3 separate lane such as `docs/process`.
+2. **Primary Lane Contract** — select exactly one primary lane by default. A core execution lane is a Layer 1 frontend implementation lane; a primary lane is the single owner for the PR and may also be an explicitly selected Layer 3 separate lane.
+3. **Required Support Work** — list only subordinate work required to complete the primary lane, such as tests, QA, docs, fixtures, or small cleanup. `support` here does not mean product/runtime support, does not expand public support claims, and is not a second primary lane.
+4. **Boundary Gates** — classify connected concerns as `in`, `support`, `defer`, or `blocked`.
+5. **Bundle Exception** — if more than one primary lane is truly required, declare why the work cannot be split, what extra risk it adds, and what extra verification will cover that risk.
+6. **PR Execution** — execute the selected primary lane plus required support work only. Everything else goes into the defer ledger or is marked blocked.
+
 ## Layer 1: core execution lanes
 
-Select at most one lane for a first implementation handoff.
+Select at most one Layer 1 lane for a first implementation handoff. For docs/process-only or evidence-only PRs, select the relevant Layer 3 lane as the primary lane instead of forcing the work into a frontend implementation lane.
 
 | Core lane | Allowed first pass | Must not cross into |
 | --- | --- | --- |
@@ -30,7 +41,14 @@ Select at most one lane for a first implementation handoff.
 
 ## Layer 2: frontend boundary gates
 
-Classify every gate as `in`, `defer`, or `blocked`. A gate is `in` only when it is required for the selected core lane and does not broaden the task beyond that lane's allowed first pass.
+Classify every gate as `in`, `support`, `defer`, or `blocked`.
+
+- `in` means the gate is owned by the selected primary lane.
+- `support` means required subordinate work for the selected primary lane; it is not product/runtime support and not a second primary lane.
+- `defer` means visible but intentionally left for a later lane.
+- `blocked` means the PR cannot safely decide or complete that gate without missing authority, evidence, or upstream work.
+
+A gate is `in` only when it is required for the selected primary lane and does not broaden the task beyond that lane's allowed first pass.
 
 | Boundary gate | Default rule | Incidental scope forbidden unless selected |
 | --- | --- | --- |
@@ -45,7 +63,7 @@ Classify every gate as `in`, `defer`, or `blocked`. A gate is `in` only when it 
 
 ## Layer 3: separate evidence, infrastructure, and defer lanes
 
-These lanes are visible during planning but default to defer unless explicitly selected as the current lane.
+These lanes are visible during planning but default to defer unless explicitly selected as the primary lane. When one of these lanes is selected as primary, Layer 1 core execution lanes should normally defer.
 
 | Separate lane | Default disposition |
 | --- | --- |
@@ -62,27 +80,37 @@ These lanes are visible during planning but default to defer unless explicitly s
 Use this before implementation:
 
 ```md
-Selected core lane: <feature | design/UI | refactor | migration | test>
+Primary lane: <feature | design/UI | refactor | migration | test | BE/API sync | analytics/telemetry/logging | performance/bundle | build/tooling/dependencies | hooks/enforcement | benchmark/evidence | docs/process>
+Primary lane type: <Layer 1 core execution lane | Layer 3 separate lane>
 One-sentence change: <exact behavior/boundary/state/test intent>
+Required support work:
+- tests: <support | defer | blocked> — <reason>
+- QA: <support | defer | blocked> — <reason>
+- docs: <support | defer | blocked> — <reason>
+- fixtures: <support | defer | blocked> — <reason>
+- small cleanup: <support | defer | blocked> — <reason>
+
+Bundle exception: <none | required>
+- If required: <why this cannot split into separate PRs, added risk, extra verification>
 
 Layer 2 boundary gates:
-- routing/app shell: <in | defer | blocked> — <reason>
-- state/data flow: <in | defer | blocked> — <reason>
-- forms/validation: <in | defer | blocked> — <reason>
-- accessibility: <in | defer | blocked> — <reason>
-- i18n/content/locale: <in | defer | blocked> — <reason>
-- error/loading/empty states: <in | defer | blocked> — <reason>
-- component API/props: <in | defer | blocked> — <reason>
-- styling tokens/classes: <in | defer | blocked> — <reason>
+- routing/app shell: <in | support | defer | blocked> — <reason>
+- state/data flow: <in | support | defer | blocked> — <reason>
+- forms/validation: <in | support | defer | blocked> — <reason>
+- accessibility: <in | support | defer | blocked> — <reason>
+- i18n/content/locale: <in | support | defer | blocked> — <reason>
+- error/loading/empty states: <in | support | defer | blocked> — <reason>
+- component API/props: <in | support | defer | blocked> — <reason>
+- styling tokens/classes: <in | support | defer | blocked> — <reason>
 
 Layer 3 separate/defer lanes:
-- BE/API sync: defer — out of current repo-side path
-- analytics/telemetry/logging: <defer | selected>
-- performance/bundle: <defer | selected>
-- build/tooling/dependencies: <defer | selected>
-- hooks/enforcement: <defer | selected>
-- benchmark/evidence: <defer | selected>
-- docs/process: <defer | selected>
+- BE/API sync: <selected | defer | blocked> — <reason>
+- analytics/telemetry/logging: <selected | defer | blocked> — <reason>
+- performance/bundle: <selected | defer | blocked> — <reason>
+- build/tooling/dependencies: <selected | defer | blocked> — <reason>
+- hooks/enforcement: <selected | defer | blocked> — <reason>
+- benchmark/evidence: <selected | defer | blocked> — <reason>
+- docs/process: <selected | defer | blocked> — <reason>
 
 Reuse scan:
 - Existing references checked: <2-5 file refs or "none found after scan">
@@ -96,10 +124,13 @@ Defer ledger:
 
 A frontend task is ready to execute only when:
 
-- [ ] Exactly one core lane is selected.
-- [ ] All Layer 2 gates are classified as `in`, `defer`, or `blocked`.
-- [ ] Layer 3 lanes are deferred unless explicitly selected.
+- [ ] Exactly one primary lane is selected, unless a bundle exception is declared.
+- [ ] The primary lane type is identified as a Layer 1 core execution lane or Layer 3 separate lane.
+- [ ] Required support work is listed and justified.
+- [ ] All Layer 2 gates are classified as `in`, `support`, `defer`, or `blocked`.
+- [ ] Layer 3 lanes are deferred unless explicitly selected as the primary lane.
+- [ ] Any bundle exception explains why the work cannot split, the added risk, and the extra verification.
 - [ ] BE/API sync is deferred unless a separate approved BE/API lane exists.
 - [ ] Reuse scan evidence is recorded before new files/helpers are added.
 - [ ] Shared abstractions have 3+ repetition evidence or an existing precedent.
-- [ ] The final report includes selected lane, gates marked `in`, defer ledger, tests run, and known gaps.
+- [ ] The final report includes selected primary lane, support work performed, gates marked `in` or `support`, defer ledger, tests run, and known gaps.

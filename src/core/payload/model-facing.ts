@@ -13,6 +13,10 @@ export type ModelFacingPayloadOptions = {
   includeEditGuidance?: boolean;
 };
 
+function supportsEditGuidance(result: ExtractionResult): boolean {
+  return result.language === "tsx" || result.language === "jsx";
+}
+
 function pruneArray<T>(value: T[] | undefined): T[] | undefined {
   return value && value.length > 0 ? value : undefined;
 }
@@ -30,6 +34,7 @@ function hasSourceRanges(result: ExtractionResult): boolean {
   return Boolean(
     result.componentLoc ||
       result.contract?.propsLoc ||
+      result.structure?.moduleDeclarations?.some((item) => item.loc) ||
       result.snippets?.some((item) => item.loc) ||
       result.behavior?.effectSignals?.some((item) => item.loc) ||
       result.behavior?.callbackSignals?.some((item) => item.loc) ||
@@ -164,6 +169,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
         ...(pruneArray(result.structure.conditionalRenders) ? { conditionalRenders: result.structure.conditionalRenders } : {}),
         ...(pruneArray(result.structure.repeatedBlocks) ? { repeatedBlocks: result.structure.repeatedBlocks } : {}),
         ...(typeof result.structure.jsxDepth === "number" ? { jsxDepth: result.structure.jsxDepth } : {}),
+        ...(pruneArray(result.structure.moduleDeclarations) ? { moduleDeclarations: result.structure.moduleDeclarations } : {}),
       })
     : undefined;
 
@@ -175,7 +181,9 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
       })
     : undefined;
   const fingerprint = sourceFingerprint(result);
-  const editGuidance = options.includeEditGuidance ? buildEditGuidance(result, fingerprint) : undefined;
+  const editGuidance = options.includeEditGuidance && supportsEditGuidance(result)
+    ? buildEditGuidance(result, fingerprint)
+    : undefined;
 
   return {
     mode: result.mode,

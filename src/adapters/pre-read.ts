@@ -4,9 +4,14 @@ import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/pa
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import type { PreReadDecision } from "../core/schema";
 
-const ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
+const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
+const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 
 export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
+
+function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<string> {
+  return runtime === "codex" ? CODEX_TS_JS_BETA_EXTENSIONS : REACT_ELIGIBLE_EXTENSIONS;
+}
 
 function relativePath(filePath: string, cwd: string): string {
   const relative = path.relative(cwd, filePath);
@@ -21,9 +26,9 @@ export function decidePreRead(
 ): PreReadDecision {
   const resolvedPath = path.resolve(filePath);
   const outputPath = relativePath(resolvedPath, cwd);
-  const extension = path.extname(resolvedPath);
+  const extension = path.extname(resolvedPath).toLowerCase();
 
-  if (!ELIGIBLE_EXTENSIONS.has(extension)) {
+  if (!eligibleExtensions(runtime).has(extension)) {
     return {
       runtime,
       filePath: outputPath,

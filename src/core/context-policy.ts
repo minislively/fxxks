@@ -2,10 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import type { FileTarget } from "./discover";
 
-const ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
+const REACT_EXTENSIONS = new Set([".tsx", ".jsx"]);
+const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const ESCAPE_HATCH_TOKENS = ["#fooks-full-read", "#fooks-disable-pre-read"] as const;
-const FILE_TOKEN_PATTERN = /(?:[A-Za-z]:)?[A-Za-z0-9_./\\-]+\.(?:tsx|jsx)\b/g;
+const FILE_TOKEN_PATTERN = /(?:[A-Za-z]:)?[A-Za-z0-9_./\\-]+\.(?:tsx|jsx|ts|js)\b/g;
 const STOPWORDS = new Set(["add", "the", "fix", "update", "to", "for", "with", "from", "and", "this", "that"]);
+
+export type ContextCapability = "react-only" | "codex-ts-js-beta";
 
 export type PromptSpecificity = "exact-file" | "file-hinted" | "ambiguous";
 export type ContextMode = "no-op" | "light" | "light-minimal" | "full" | "auto";
@@ -43,13 +46,17 @@ function isWithinCwd(resolved: string, cwd: string): boolean {
   return relativeToCwd === "" || (!relativeToCwd.startsWith(`..${path.sep}`) && relativeToCwd !== ".." && !path.isAbsolute(relativeToCwd));
 }
 
-function normalizeCandidate(token: string, cwd: string): PromptTarget | null {
+function eligibleExtensions(capability: ContextCapability): ReadonlySet<string> {
+  return capability === "codex-ts-js-beta" ? CODEX_TS_JS_BETA_EXTENSIONS : REACT_EXTENSIONS;
+}
+
+function normalizeCandidate(token: string, cwd: string, capability: ContextCapability): PromptTarget | null {
   const cleaned = trimPromptToken(token);
   if (!cleaned) return null;
 
   const resolved = path.isAbsolute(cleaned) ? path.resolve(cleaned) : path.resolve(cwd, cleaned);
   const extension = path.extname(resolved).toLowerCase();
-  if (!ELIGIBLE_EXTENSIONS.has(extension)) return null;
+  if (!eligibleExtensions(capability).has(extension)) return null;
   if (!isWithinCwd(resolved, cwd)) return null;
 
   const relativeToCwd = path.relative(cwd, resolved) || path.basename(resolved);
@@ -89,12 +96,12 @@ function totalBytes(cwd: string, files: string[]): number {
   return total;
 }
 
-export function extractPromptTargets(prompt: string, cwd = process.cwd()): PromptTarget[] {
-  return uniqueTargets([...prompt.matchAll(FILE_TOKEN_PATTERN)].map((match) => normalizeCandidate(match[0], cwd)).filter((target): target is PromptTarget => Boolean(target)));
+export function extractPromptTargets(prompt: string, cwd = process.cwd(), capability: ContextCapability = "react-only"): PromptTarget[] {
+  return uniqueTargets([...prompt.matchAll(FILE_TOKEN_PATTERN)].map((match) => normalizeCandidate(match[0], cwd, capability)).filter((target): target is PromptTarget => Boolean(target)));
 }
 
-export function extractPromptTarget(prompt: string, cwd = process.cwd()): string | null {
-  return extractPromptTargets(prompt, cwd)[0]?.filePath ?? null;
+export function extractPromptTarget(prompt: string, cwd = process.cwd(), capability: ContextCapability = "react-only"): string | null {
+  return extractPromptTargets(prompt, cwd, capability)[0]?.filePath ?? null;
 }
 
 export function hasFullReadEscapeHatch(prompt: string): boolean {
@@ -105,8 +112,8 @@ export function codexRuntimeEscapeHatches(): readonly string[] {
   return ESCAPE_HATCH_TOKENS;
 }
 
-export function classifyPromptContext(prompt: string, cwd = process.cwd()): PromptContextPolicy {
-  const targets = extractPromptTargets(prompt, cwd);
+export function classifyPromptContext(prompt: string, cwd = process.cwd(), capability: ContextCapability = "react-only"): PromptContextPolicy {
+  const targets = extractPromptTargets(prompt, cwd, capability);
   if (targets.length > 0) {
     const selected = targets.filter((target) => target.exists).slice(0, 1);
     return {
@@ -136,8 +143,8 @@ export function classifyPromptContext(prompt: string, cwd = process.cwd()): Prom
   };
 }
 
-export function resolvePromptFileContext(prompt: string, cwd = process.cwd()): { filePath?: string; source: "prompt-target" | "none"; policy: PromptContextPolicy } {
-  const policy = classifyPromptContext(prompt, cwd);
+export function resolvePromptFileContext(prompt: string, cwd = process.cwd(), capability: ContextCapability = "react-only"): { filePath?: string; source: "prompt-target" | "none"; policy: PromptContextPolicy } {
+  const policy = classifyPromptContext(prompt, cwd, capability);
   const filePath = policy.targets.find((target) => target.exists)?.filePath ?? policy.targets[0]?.filePath;
   return filePath ? { filePath, source: "prompt-target", policy } : { source: "none", policy };
 }
@@ -150,8 +157,14 @@ function promptKeywords(prompt: string): string[] {
     .filter((word) => word.length > 2 && !STOPWORDS.has(word));
 }
 
-export function discoverRelevantFilesByPolicy(prompt: string, allFiles: FileTarget[], cwd = process.cwd(), maxFiles = 5): { files: string[]; policy: PromptContextPolicy } {
-  const explicitPolicy = classifyPromptContext(prompt, cwd);
+export function discoverRelevantFilesByPolicy(
+  prompt: string,
+  allFiles: FileTarget[],
+  cwd = process.cwd(),
+  maxFiles = 5,
+  capability: ContextCapability = "react-only",
+): { files: string[]; policy: PromptContextPolicy } {
+  const explicitPolicy = classifyPromptContext(prompt, cwd, capability);
   if (explicitPolicy.promptSpecificity === "exact-file") {
     const files = explicitPolicy.targets.filter((target) => target.exists).slice(0, 1).map((target) => target.filePath);
     return {

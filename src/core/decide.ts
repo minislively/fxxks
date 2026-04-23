@@ -84,11 +84,13 @@ export function decideMode(base: Omit<ExtractionResult, "mode">): DecideMetrics 
   const jsxDepth = base.structure?.jsxDepth ?? 0;
   const conditionalCount = base.structure?.conditionalRenders?.length ?? 0;
   const repeatedCount = base.structure?.repeatedBlocks?.length ?? 0;
+  const moduleDeclarationCount = base.structure?.moduleDeclarations?.length ?? 0;
   const hookCount = base.behavior?.hooks.length ?? 0;
   const handlerCount = base.behavior?.eventHandlers?.length ?? 0;
   const styleBranching = base.style?.hasStyleBranching ? 1 : 0;
   const importCount = base.meta.importCount;
   const rawSizeBytes = base.meta.rawSizeBytes;
+  const moduleLanguage = base.language === "ts" || base.language === "js";
 
   const complexityScore =
     lineCount * 0.05 +
@@ -110,8 +112,9 @@ export function decideMode(base: Omit<ExtractionResult, "mode">): DecideMetrics 
   if (styleBranching) reasons.push("style-branching");
   if (importCount >= 8) reasons.push("import-heavy");
   if (lineCount >= 120) reasons.push("long-file");
+  if (moduleLanguage && moduleDeclarationCount > 0) reasons.push("module-structure");
 
-  const isRawCandidate = lineCount <= 45 && jsxDepth <= 3 && conditionalCount <= 1 && hookCount <= 1 && handlerCount <= 1 && !styleBranching;
+  const isRawCandidate = !moduleLanguage && lineCount <= 45 && jsxDepth <= 3 && conditionalCount <= 1 && hookCount <= 1 && handlerCount <= 1 && !styleBranching;
   const isHybridCandidate = conditionalCount >= 2 || handlerCount >= 3 || hookCount >= 3 || styleBranching === 1;
 
   if (isRawCandidate) {

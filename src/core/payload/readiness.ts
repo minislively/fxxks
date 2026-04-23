@@ -2,8 +2,14 @@ import type { ExtractionResult, ModelFacingPayload, PayloadReadiness } from "../
 
 export function assessPayloadReadiness(result: ExtractionResult, payload: ModelFacingPayload): PayloadReadiness {
   const reasons: string[] = [];
+  const moduleLanguage = result.language === "ts" || result.language === "js";
+  const hasModuleStructure = Boolean(payload.structure?.moduleDeclarations?.some((item) => item.kind !== "variable"));
 
-  if (payload.useOriginal && result.mode === "raw" && payload.rawText) {
+  if (moduleLanguage && !hasModuleStructure) {
+    reasons.push("missing-module-structure");
+  }
+
+  if (!moduleLanguage && payload.useOriginal && result.mode === "raw" && payload.rawText) {
     return {
       ready: true,
       reasons,
@@ -20,7 +26,7 @@ export function assessPayloadReadiness(result: ExtractionResult, payload: ModelF
   }
 
   if (result.mode === "raw") reasons.push("raw-mode");
-  if (!payload.contract) reasons.push("missing-contract");
+  if (!moduleLanguage && !payload.contract) reasons.push("missing-contract");
   if (!payload.behavior) reasons.push("missing-behavior");
   if (!payload.structure) reasons.push("missing-structure");
   if (result.mode === "hybrid" && (!payload.snippets || payload.snippets.length === 0)) {

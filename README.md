@@ -1,19 +1,20 @@
 # fooks
 
-Frontend context compression for iterative React/TSX work in Codex and Claude Code.
+Smaller model-facing context for repeated same-file work in Codex.
 
 `fooks` reduces model-facing input for supported repeated frontend file work. On the first eligible `.tsx` / `.jsx` mention, it records compact context; later same-file prompts may reuse it when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
 
-`fooks` is for Codex users who repeatedly work on the same React `.tsx` / `.jsx` file. On the first eligible mention, fooks records the component context; on later same-file prompts, it can send a compact model-facing payload instead of the full source when safe.
+`fooks` is for Codex users who repeatedly work on the same supported file in one repo. The strongest path is still React `.tsx` / `.jsx`, and there is now an experimental Codex-first `.ts` / `.js` same-file beta. On the first eligible mention, fooks records the file context; on later same-file prompts, it can send a compact model-facing payload instead of the full source when safe.
 
 - Public npm package: `oh-my-fooks`
 - CLI command: `fooks`
 
 ## 30-second version
 
-Use fooks when you are iterating on the same large React component in Codex and want to avoid repeatedly sending the full file context.
+Use fooks when you are iterating on the same large supported file in Codex and want to avoid repeatedly sending the full file context.
 
 - **Best today:** Codex + repeated same-file `.tsx` / `.jsx` work.
+- **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
 - **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
 - **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
 
@@ -34,7 +35,7 @@ Then open Codex in that repo and work normally. `fooks compare` gives an immedia
 
 | Best today | Not today |
 | --- | --- |
-| Repeated same-file React `.tsx` / `.jsx` work in Codex. | Universal file-read interception for every language, framework, runtime, or file type. |
+| Repeated same-file React `.tsx` / `.jsx` work in Codex, plus experimental Codex-first `.ts` / `.js` same-file beta. | Universal file-read interception for every language, framework, runtime, or file type. |
 | Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
 | Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior. |
 
@@ -43,11 +44,12 @@ Then open Codex in that repo and work normally. `fooks compare` gives an immedia
 These are useful future directions, but they are not required for the current Codex repeated React workflow:
 
 - Vue, Svelte, or non-React framework support.
-- General `.ts` / backend-file context compression.
 - Multi-file refactor context compression.
 - Universal runtime file-read interception.
 - LSP-backed semantic rename/reference safety.
 - Provider invoice/dashboard or billing-grade charge proof.
+
+Experimental `.ts` / `.js` support is **not** a claim of backend/framework semantic understanding, multi-file refactor support, Vue/SFC support, Claude/opencode parity, read interception, or LSP rename/reference safety. Unsupported or weak TS/JS files fall back to normal full-source behavior.
 
 See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stronger support or stronger evidence claims.
 
@@ -55,7 +57,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 
 | Environment | Current path | Automation level | Do not assume |
 | --- | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Strongest path: repeated same-file `.tsx` / `.jsx` prompts can reuse compact context when safe | Universal file-read interception, stable runtime-token wins, or provider billing/cost proof |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Strongest path: repeated same-file `.tsx` / `.jsx` prompts can reuse compact context when safe; experimental same-file `.ts` / `.js` beta is available after supported Codex setup when module signals are strong enough | Universal file-read interception, stable runtime-token wins, provider billing/cost proof, Vue/SFC support, multi-file refactors, or LSP semantic safety |
 | Claude | Project-local `SessionStart` / `UserPromptSubmit` context hooks plus manual/shared handoff artifacts | Narrower path: first eligible explicit frontend-file prompt is recorded/prepared; a repeated same-file prompt may receive bounded context | `Read` interception, full prompt-interception parity with Codex, or runtime-token savings proof |
 | opencode | Project-local `fooks_extract` tool and `/fooks-extract` slash command | Manual/semi-automatic tool steering | Built-in `read` interception or automatic runtime-token savings |
 
@@ -75,7 +77,7 @@ The `fooks setup` JSON includes a `scope` object so support/debug logs can show 
 Current automatic optimization is intentionally narrow:
 
 - Runtime: Codex hooks
-- Files: `.tsx` and `.jsx`
+- Files: strongest path `.tsx` / `.jsx`; experimental Codex-first `.ts` / `.js` same-file beta
 - Pattern: repeated same-file work in one Codex session
 - First mention: record only
 - Later same-file mentions: reuse a compact fooks payload when safe
@@ -92,7 +94,7 @@ If fooks cannot safely build a payload, it falls back to normal full-source beha
 
 ## Compare a file locally
 
-Use `fooks compare` when you want immediate, local proof for a specific frontend file:
+Use `fooks compare` when you want immediate, local proof for a specific supported file:
 
 ```bash
 fooks compare src/components/Button.tsx --json

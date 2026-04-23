@@ -194,7 +194,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   }
 
   const prompt = input.prompt ?? "";
-  const promptContext = resolvePromptFileContext(prompt, cwd);
+  const promptContext = resolvePromptFileContext(prompt, cwd, "codex-ts-js-beta");
   const target = promptContext.filePath;
   const policy = promptContext.policy;
   const escapeHatchUsed = hasFullReadEscapeHatch(prompt);

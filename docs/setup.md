@@ -1,6 +1,6 @@
 # Setup fooks
 
-Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, where the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary.
+Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, where the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary. Experimental Codex-first `.ts` / `.js` same-file beta depends on an already-supported Codex setup in this release slice; TS/JS-only project setup eligibility is still deferred.
 
 ## 1. Install
 
@@ -118,6 +118,8 @@ When source ranges are present, `fooks extract <file> --model-payload` also emit
 ### No React component found
 
 Run setup from the project root and confirm the repo has `.tsx` or `.jsx` component files.
+
+Experimental `.ts` / `.js` same-file beta does **not** yet make TS/JS-only projects setup-eligible by themselves. In this release slice, TS/JS beta works after an already-supported Codex setup or through explicit CLI extraction/comparison commands.
 
 ### Account context
 

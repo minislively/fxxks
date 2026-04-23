@@ -1,11 +1,11 @@
 # Roadmap and future evidence lanes
 
-This page frames common "does fooks support X?" questions as future support or evidence lanes. These items are **not required** for the current strongest workflow: Codex repeated same-file React `.tsx` / `.jsx` context reduction.
+This page frames common "does fooks support X?" questions as future support or evidence lanes. These items are **not required** for the current strongest workflow: Codex repeated same-file React `.tsx` / `.jsx` context reduction, with a narrower experimental Codex-first `.ts` / `.js` same-file beta.
 
 ## Current strongest workflow
 
 - Runtime: Codex hooks prepared by `fooks setup`.
-- Files: React `.tsx` / `.jsx` components.
+- Files: React `.tsx` / `.jsx` components (strongest path), plus experimental Codex-first `.ts` / `.js` same-file beta after supported setup.
 - Pattern: repeated same-file work in one Codex session.
 - Evidence: local model-facing prompt/context estimates, plus estimate-scoped API-cost evidence where the benchmark docs say the assumptions hold.
 
@@ -14,7 +14,7 @@ This page frames common "does fooks support X?" questions as future support or e
 | Lane | Why it matters | Current boundary |
 | --- | --- | --- |
 | Vue / Svelte / broader frontend frameworks | Would expand the component extraction model beyond React. | Not part of the current automatic path. |
-| General `.ts` / backend files | Would make fooks useful outside React component loops. | Current extraction and public wording stay frontend-focused. |
+| Broader `.ts` / `.js` coverage beyond the beta | Would make fooks useful outside React component loops more consistently. | Experimental Codex-first same-file `.ts` / `.js` beta exists, but it is module-signal gated, same-file only, and not provider-parity, multi-file, or semantic-safety support. |
 | Multi-file refactor context compression | Would support broader agentic refactors where several files must stay in view. | Current strongest path is repeated same-file work. |
 | Universal read interception | Would make runtime behavior broader than Codex repeated-file hooks. | Not claimed; unsupported cases should fall back to normal source reading. |
 | LSP-backed semantic locations | Would strengthen rename/reference/edit safety beyond line-aware hints. | Current source ranges and patch targets are AST-derived edit aids, not LSP semantic proof. |

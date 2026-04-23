@@ -568,6 +568,28 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.ok(jsx.payload.contract);
   assert.equal("editGuidance" in jsx.payload, false);
 
+  const moduleTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"), repoRoot);
+  assert.equal(moduleTs.eligible, true);
+  assert.equal(moduleTs.decision, "payload");
+  assert.equal(moduleTs.debug.language, "ts");
+  assert.ok(moduleTs.payload.structure.moduleDeclarations?.length);
+  assert.equal("editGuidance" in moduleTs.payload, false);
+
+  const moduleTsWithGuidance = preReadModule.decidePreRead(
+    path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"),
+    repoRoot,
+    "codex",
+    { includeEditGuidance: true },
+  );
+  assert.equal(moduleTsWithGuidance.decision, "payload");
+  assert.equal("editGuidance" in moduleTsWithGuidance.payload, false);
+
+  const moduleJs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "module-config.js"), repoRoot);
+  assert.equal(moduleJs.eligible, true);
+  assert.equal(moduleJs.decision, "payload");
+  assert.equal(moduleJs.debug.language, "js");
+  assert.ok(moduleJs.payload.structure.moduleDeclarations?.length);
+
   const raw = decideCodexPreRead(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"), repoRoot);
   assert.equal(raw.eligible, true);
   assert.equal(raw.decision, "payload");
@@ -575,12 +597,22 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.equal(raw.payload.useOriginal, true);
   assert.equal(raw.payload.rawText?.length, 356);
 
+  const weakTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "empty.ts"), repoRoot);
+  assert.equal(weakTs.eligible, true);
+  assert.equal(weakTs.decision, "fallback");
+  assert.ok(weakTs.reasons.includes("missing-module-structure"));
+  assert.equal(weakTs.fallback.reason, "missing-module-structure");
+
+  const claudeTs = preReadModule.decidePreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"), repoRoot, "claude");
+  assert.equal(claudeTs.eligible, false);
+  assert.equal(claudeTs.decision, "fallback");
+  assert.ok(claudeTs.reasons.includes("ineligible-extension"));
+
   const linkedTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-linked", "Button.types.ts"), repoRoot);
-  assert.equal(linkedTs.eligible, false);
-  assert.equal(linkedTs.decision, "fallback");
-  assert.equal("payload" in linkedTs, false);
-  assert.ok(linkedTs.reasons.includes("ineligible-extension"));
-  assert.equal(linkedTs.filePath, path.join("fixtures", "ts-linked", "Button.types.ts"));
+  assert.equal(linkedTs.eligible, true);
+  assert.equal(linkedTs.decision, "payload");
+  assert.ok(linkedTs.payload.structure.moduleDeclarations?.length);
+  assert.equal(linkedTs.debug.language, "ts");
 });
 
 test("codex pre-read falls back for larger raw files past the original-source threshold", () => {
@@ -673,6 +705,12 @@ test("runtime prompt parser finds eligible tsx/jsx paths and escape hatches", ()
   const tsTarget = extractPromptTarget("Check fixtures/ts-linked/Button.types.ts too", repoRoot);
   assert.equal(tsTarget, null);
 
+  const codexTsTarget = extractPromptTarget("Check fixtures/ts-linked/Button.types.ts too", repoRoot, "codex-ts-js-beta");
+  assert.equal(codexTsTarget, path.join("fixtures", "ts-linked", "Button.types.ts"));
+
+  const codexJsTarget = extractPromptTarget("Inspect fixtures/ts-js-beta/module-config.js please", repoRoot, "codex-ts-js-beta");
+  assert.equal(codexJsTarget, path.join("fixtures", "ts-js-beta", "module-config.js"));
+
   assert.equal(hasFullReadEscapeHatch("Need exact source #fooks-full-read"), true);
   assert.equal(hasFullReadEscapeHatch("Need exact source #fooks-disable-pre-read"), true);
   assert.equal(hasFullReadEscapeHatch("No override here"), false);
@@ -692,11 +730,50 @@ test("shared context policy distinguishes exact-file light/no-op from ambiguous 
   assert.equal(exactNew.contextMode, "no-op");
   assert.equal(exactNew.contextBudget.selectedFiles, 0);
 
+  const codexTs = classifyPromptContext("Inspect fixtures/ts-linked/Button.types.ts", repoRoot, "codex-ts-js-beta");
+  assert.equal(codexTs.promptSpecificity, "exact-file");
+  assert.equal(codexTs.contextMode, "light");
+  assert.equal(codexTs.targets[0].filePath, path.join("fixtures", "ts-linked", "Button.types.ts"));
+
   const ambiguous = discoverRelevantFilesByPolicy("Add loading state to the form section", discoverProjectFilesForTest(tempDir), tempDir);
   assert.equal(ambiguous.policy.promptSpecificity, "ambiguous");
   assert.equal(ambiguous.policy.contextMode, "auto");
   assert.ok(ambiguous.files.length > 0);
   assert.ok(ambiguous.files.length <= 5);
+});
+
+test("ts/js extraction and readiness stay module-gated", () => {
+  const moduleTs = extractFile(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"));
+  assert.equal(moduleTs.language, "ts");
+  assert.ok(moduleTs.structure.moduleDeclarations?.some((item) => item.value === "formatAmount"));
+  const moduleTsPayload = toModelFacingPayload(moduleTs, repoRoot);
+  assert.ok(moduleTsPayload.structure.moduleDeclarations?.length);
+  const moduleTsReadiness = assessPayloadReadiness(moduleTs, moduleTsPayload);
+  assert.equal(moduleTsReadiness.ready, true);
+  assert.equal(moduleTsReadiness.reasons.includes("missing-module-structure"), false);
+
+  const moduleJs = extractFile(path.join(repoRoot, "fixtures", "ts-js-beta", "module-config.js"));
+  assert.equal(moduleJs.language, "js");
+  assert.ok(moduleJs.structure.moduleDeclarations?.some((item) => item.value === "mergeThemeConfig"));
+  const moduleJsPayload = toModelFacingPayload(moduleJs, repoRoot);
+  assert.ok(moduleJsPayload.structure.moduleDeclarations?.length);
+  assert.equal(assessPayloadReadiness(moduleJs, moduleJsPayload).ready, true);
+
+  const weakTs = extractFile(path.join(repoRoot, "fixtures", "ts-js-beta", "empty.ts"));
+  assert.equal(weakTs.language, "ts");
+  const weakTsPayload = toModelFacingPayload(weakTs, repoRoot);
+  const weakTsReadiness = assessPayloadReadiness(weakTs, weakTsPayload);
+  assert.equal(weakTsReadiness.ready, false);
+  assert.ok(weakTsReadiness.reasons.includes("missing-module-structure"));
+
+  const weakJs = extractFile(path.join(repoRoot, "fixtures", "ts-js-beta", "weak-config.js"));
+  assert.equal(weakJs.language, "js");
+  assert.ok(weakJs.structure.moduleDeclarations?.some((item) => item.kind === "variable"));
+  const weakJsPayload = toModelFacingPayload(weakJs, repoRoot, { includeEditGuidance: true });
+  const weakJsReadiness = assessPayloadReadiness(weakJs, weakJsPayload);
+  assert.equal(weakJsReadiness.ready, false);
+  assert.ok(weakJsReadiness.reasons.includes("missing-module-structure"));
+  assert.equal("editGuidance" in weakJsPayload, false);
 });
 
 function discoverProjectFilesForTest(cwd) {
@@ -1321,8 +1398,8 @@ test("runtime hook supports jsx repeated prompts and ignores linked ts prompts",
     },
     repoRoot,
   );
-  assert.equal(tsPrompt.action, "noop");
-  assert.ok(tsPrompt.reasons.includes("no-eligible-file-in-prompt"));
+  assert.equal(tsPrompt.action, "record");
+  assert.equal(tsPrompt.filePath, path.join("fixtures", "ts-linked", "Button.types.ts"));
 });
 
 test("cli codex-runtime-hook reuses runtime decision logic and advertises the command", () => {
@@ -2918,7 +2995,7 @@ test("docs describe local compare estimates without billing-cost claims", () => 
 ${setup}
 ${release}`;
 
-  assert.match(readme, /Frontend context compression for.*Codex and Claude Code/);
+  assert.match(readme, /Smaller model-facing context for.*Codex/);
   assert.match(combined, /fooks compare src\/components\/Button\.tsx/);
   assert.match(combined, /local model-facing payload estimate|local file-level estimate/);
   assert.match(combined, /TypeScript AST-derived/);
