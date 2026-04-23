@@ -5,7 +5,7 @@ Frontend context compression for Codex and Claude Code.
 Public npm package: `oh-my-fooks`
 CLI command: `fooks`
 
-`fooks` helps Codex and Claude Code reduce frontend code context for React component work. In an attached Codex project or a Claude project-local context-hook flow, repeated work on the same `.tsx` / `.jsx` file can reuse a smaller model-facing payload instead of pushing the full file context every time, lowering estimated input-token load. Provider billing-token savings, billed-cost savings, and stable runtime-token/time wins remain separate validation tracks and are not claimed by default.
+`fooks` helps Codex and Claude Code reduce frontend code context for React component work. In an attached Codex project or a Claude project-local context-hook flow, repeated work on the same `.tsx` / `.jsx` file can reuse a smaller model-facing payload instead of pushing the full file context every time, lowering estimated input-token load. Provider-side billing telemetry, billed-cost evidence, and stable runtime-token/time win evidence remain separate validation tracks and are not claimed by default.
 
 ## Quick start
 

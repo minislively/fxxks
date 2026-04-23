@@ -62,6 +62,8 @@ Bare `fooks status` reports local estimated context-size telemetry from `.fooks/
 
 `fooks extract <file> --model-payload` may expose `editGuidance.patchTargets` when source ranges are available. Public wording may describe those patch targets as compact, AST-derived line-aware edit anchors for components, props, effects, callbacks, event handlers, form controls, submit handlers, validation anchors, and representative snippets. Public wording must also state the freshness rule: use the targets only while `sourceFingerprint.fileHash` and `sourceFingerprint.lineCount` match the current source, otherwise rerun extraction or read the file before editing. Do not describe this guidance as LSP-backed semantic rename/reference resolution, provider tokenizer behavior, provider billing-token proof, provider-cost proof, or a `ccusage` replacement.
 
+Automatic runtime pre-read payloads stay compact by default: Codex repeated-file injection may include `sourceFingerprint` when available, but it must not include `editGuidance` unless a future explicit opt-in path proves exact-file frontend edit intent, positive freshness, fingerprint equality, and payload-budget safety with tests. Until that gated runtime opt-in exists, public wording must not claim automatic Codex runtime editing is improved by default.
+
 Codex setup/attach/status readiness is also local state only. It may show that
 Codex hooks, manifests, and trust metadata were prepared, but it is not live
 Codex runtime telemetry and must not be described as proof of runtime-token

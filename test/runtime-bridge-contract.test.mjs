@@ -62,6 +62,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(firstInject.action, "record");
   assert.equal(secondInject.action, "inject");
   assert.match(secondInject.additionalContext, /^fooks: reused pre-read \(compressed\)/);
+  assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal("editGuidance" in secondInject.debug.decision.payload, false);
 
   const smallRawSession = `bridge-contract-small-raw-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: smallRawSession }, repoRoot);

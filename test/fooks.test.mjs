@@ -323,6 +323,13 @@ test("extract can return model-facing payload without engine metadata", () => {
 test("extract adds source ranges and hook intent signals to frontend payloads", () => {
   const samplePath = path.join(repoRoot, "fixtures", "compressed", "HookEffectPanel.tsx");
   const result = extractFile(samplePath);
+  const defaultPayload = toModelFacingPayload(result, repoRoot);
+  assert.deepEqual(defaultPayload.sourceFingerprint, {
+    fileHash: result.fileHash,
+    lineCount: result.meta.lineCount,
+  });
+  assert.equal("editGuidance" in defaultPayload, false);
+
   const payload = toModelFacingPayload(result, repoRoot, { includeEditGuidance: true });
 
   assert.deepEqual(payload.componentLoc, {
@@ -536,11 +543,22 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.equal(compressed.decision, "payload");
   assert.equal(compressed.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
   assert.ok(compressed.payload);
+  assert.ok(compressed.payload.sourceFingerprint);
+  assert.equal("editGuidance" in compressed.payload, false);
   assert.ok(["low", "medium", "high"].includes(compressed.debug.decideConfidence));
+
+  const compressedOptIn = preReadModule.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
+    includeEditGuidance: true,
+  });
+  assert.equal(compressedOptIn.decision, "payload");
+  assert.ok(compressedOptIn.payload.editGuidance);
+  assert.deepEqual(compressedOptIn.payload.editGuidance.freshness, compressedOptIn.payload.sourceFingerprint);
+  assert.ok(compressedOptIn.payload.editGuidance.patchTargets.length <= 12);
 
   const hybrid = decideCodexPreRead(path.join(repoRoot, "fixtures", "hybrid", "DashboardPanel.tsx"), repoRoot);
   assert.equal(hybrid.decision, "payload");
   assert.ok(hybrid.payload.snippets?.length);
+  assert.equal("editGuidance" in hybrid.payload, false);
   assert.ok(["medium", "high"].includes(hybrid.debug.decideConfidence));
 
   const jsx = decideCodexPreRead(path.join(repoRoot, "fixtures", "jsx", "SimpleWidget.jsx"), repoRoot);
@@ -548,6 +566,7 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.equal(jsx.decision, "payload");
   assert.equal(jsx.filePath, path.join("fixtures", "jsx", "SimpleWidget.jsx"));
   assert.ok(jsx.payload.contract);
+  assert.equal("editGuidance" in jsx.payload, false);
 
   const raw = decideCodexPreRead(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"), repoRoot);
   assert.equal(raw.eligible, true);
@@ -559,6 +578,7 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   const linkedTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-linked", "Button.types.ts"), repoRoot);
   assert.equal(linkedTs.eligible, false);
   assert.equal(linkedTs.decision, "fallback");
+  assert.equal("payload" in linkedTs, false);
   assert.ok(linkedTs.reasons.includes("ineligible-extension"));
   assert.equal(linkedTs.filePath, path.join("fixtures", "ts-linked", "Button.types.ts"));
 });
@@ -858,7 +878,9 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   );
   assert.equal(second.additionalContext.includes("#fooks-full-read"), false);
   assert.equal(second.additionalContext.includes("#fooks-disable-pre-read"), false);
+  assert.equal(second.additionalContext.includes("\"editGuidance\""), false);
   assert.equal(second.debug.repeatedFile, true);
+  assert.equal("editGuidance" in second.debug.decision.payload, false);
 
   fs.writeFileSync(second.statePath, "{not-json");
   const afterCorruptState = handleCodexRuntimeHook(
