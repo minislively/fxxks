@@ -31,7 +31,10 @@ const {
 const {
   codexRuntimeSessionPath,
 } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-session.js"));
-const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const {
+  handleCodexRuntimeHook,
+  isEditIntentPrompt,
+} = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const {
   readProjectMetricSummary,
   readSessionMetricSummary,
@@ -3175,4 +3178,15 @@ test("attach can use explicit active account override instead of repository meta
   });
   assert.equal(result.runtimeProof.status, "passed");
   assert.ok(result.runtimeProof.details.includes("account-source=env"));
+});
+
+test("isEditIntentPrompt recognizes edit-intent prompts and rejects non-edit prompts", () => {
+  assert.equal(isEditIntentPrompt("Update Button.tsx to add disabled state"), true);
+  assert.equal(isEditIntentPrompt("Fix validation in Form.tsx"), true);
+  assert.equal(isEditIntentPrompt("Refactor the hook logic"), true);
+  assert.equal(isEditIntentPrompt("Patch the module export"), true);
+  assert.equal(isEditIntentPrompt("Read Form.tsx and explain how it works"), false);
+  assert.equal(isEditIntentPrompt("Review the code for style issues"), false);
+  assert.equal(isEditIntentPrompt("What does this component do?"), false);
+  assert.equal(isEditIntentPrompt("Describe the architecture"), false);
 });
