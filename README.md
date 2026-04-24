@@ -136,6 +136,13 @@ Current public summary:
 
 ### Public-code benchmark snapshot
 
+These figures are **not OMX-session benchmarks** and not a full interactive
+"install fooks, work normally" session benchmark. They come from a Codex OAuth
+no-tool benchmark harness that compares matched baseline prompts containing
+real full-source context against matched fooks prompts containing real
+`fooks extract --model-payload` context, using isolated Codex workdirs and AB/BA
+pair order.
+
 | Profile / project | Scope | Accepted pairs | Regressions | Median estimated API-cost reduction | Aggregate estimated API cost | Provider-reported usage tokens |
 | --- | --- | ---: | ---: | ---: | --- | --- |
 | Small fixture lane | 3 task classes × 5 pairs | 15/15 | 4/15 pairs | 4.171% | `$0.588855` baseline → `$0.5547775` fooks (`$0.0340775`, 5.787% lower) | `376,104` baseline → `372,065` fooks |
