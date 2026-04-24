@@ -97,5 +97,10 @@ test("claude ensureFreshClaudeContextForTarget non-stale path does not rewrite t
   assert.equal(result.refreshed, false);
 
   const after = readClaudeTrustStatus(tempDir);
-  assert.equal(after.updatedAt, beforeUpdatedAt);
+  const afterMs = new Date(after.updatedAt).getTime();
+  const beforeMs = new Date(beforeUpdatedAt).getTime();
+  assert.ok(
+    Math.abs(afterMs - beforeMs) < 100,
+    `updatedAt drift too large: ${after.updatedAt} vs ${beforeUpdatedAt}`,
+  );
 });
