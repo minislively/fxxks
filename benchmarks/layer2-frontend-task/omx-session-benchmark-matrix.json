@@ -1,0 +1,72 @@
+{
+  "schema": "fooks.omx-session-benchmark.matrix.v1",
+  "claimBoundary": "Pending live matched-run evidence; not README-claimable yet.",
+  "variants": [
+    {
+      "id": "plain-vanilla",
+      "commandSurface": "codex exec",
+      "fooksState": "disabled",
+      "requiredEnv": { "FOOKS_DISABLE": "1" }
+    },
+    {
+      "id": "plain-fooks",
+      "commandSurface": "codex exec",
+      "fooksState": "enabled",
+      "requiredEnv": {
+        "FOOKS_CODEX_HOME": "<isolated-workdir>/.fooks",
+        "FOOKS_ACTIVE_ACCOUNT": "minislively"
+      },
+      "setupCommands": ["node <fooks-cli> init", "node <fooks-cli> scan"]
+    },
+    {
+      "id": "omx-vanilla",
+      "commandSurface": "omx exec",
+      "fooksState": "disabled",
+      "requiredEnv": { "FOOKS_DISABLE": "1" }
+    },
+    {
+      "id": "omx-fooks",
+      "commandSurface": "omx exec",
+      "fooksState": "enabled",
+      "requiredEnv": {
+        "FOOKS_CODEX_HOME": "<isolated-workdir>/.fooks",
+        "FOOKS_ACTIVE_ACCOUNT": "minislively"
+      },
+      "setupCommands": ["node <fooks-cli> init", "node <fooks-cli> scan"]
+    }
+  ],
+  "taskFamilies": [
+    {
+      "id": "nextjs-app-router-repeated",
+      "sourceRootLabel": "nextjs",
+      "targetFile": "packages/next/src/client/components/app-router.tsx",
+      "promptShape": "summary then exact-file follow-up in the same session"
+    },
+    {
+      "id": "nextjs-layout-router-repeated",
+      "sourceRootLabel": "nextjs",
+      "targetFile": "packages/next/src/client/components/layout-router.tsx",
+      "promptShape": "refactor plan then exact-file follow-up in the same session"
+    },
+    {
+      "id": "tailwind-utilities-repeated",
+      "sourceRootLabel": "tailwindcss",
+      "targetFile": "packages/tailwindcss/src/utilities.ts",
+      "promptShape": "summary then exact-file follow-up in the same session"
+    },
+    {
+      "id": "tailwind-variants-repeated",
+      "sourceRootLabel": "tailwindcss",
+      "targetFile": "packages/tailwindcss/src/variants.ts",
+      "promptShape": "refactor plan then exact-file follow-up in the same session"
+    }
+  ],
+  "qualityGates": {
+    "minimumAcceptedPairsPerTask": 5,
+    "sameModelAcrossVariants": true,
+    "samePromptAcrossVariants": true,
+    "noToolLaneFailsOnCommandExecution": true,
+    "recordUsageForEveryAcceptedSide": true,
+    "reportRegressions": true
+  }
+}
