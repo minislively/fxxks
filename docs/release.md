@@ -4,9 +4,9 @@ This checklist prepares `fooks` for public npm distribution without publishing i
 
 ## Package and CLI boundary
 
-- npm package name: `oh-my-fooks`
+- npm package name: `fooks-frontend-hooks`
 - installed CLI command: `fooks`
-- install command: `npm install -g oh-my-fooks`
+- install command: `npm install -g fooks-frontend-hooks`
 - first setup command: `fooks setup`
 
 The npm package name intentionally differs from the CLI command because the unscoped npm package `fooks` is already occupied by another owner. Public docs must not tell users to globally install the occupied `fooks` npm package unless that ownership situation changes and a new release plan is approved.
@@ -106,7 +106,7 @@ A user who already has another global `fooks` binary may see command conflicts. 
 ```bash
 which fooks
 npm prefix -g
-npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
+npm ls -g --depth=0 | grep -E 'fooks|fooks-frontend-hooks'
 ```
 
 ## Residual risk disposition
@@ -125,7 +125,7 @@ Do not run `npm publish` without explicit approval after this checklist is revie
 
 Automated local checks now covered by `npm run release:smoke`:
 
-- [x] package/CLI boundary is documented: `oh-my-fooks` installs `fooks`.
+- [x] package/CLI boundary is documented: `fooks-frontend-hooks` installs `fooks`.
 - [x] possible pre-existing global `fooks` binary conflict is documented.
 - [x] no install, pack, publish, or version lifecycle script mutates user machines or publishes implicitly.
 - [x] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and the npm-package public docs allowlist.
@@ -138,7 +138,7 @@ Automated local checks now covered by `npm run release:smoke`:
 
 Authority-gated checks before any real publish:
 
-- [ ] `npm view oh-my-fooks` still confirms the name/state expected for release.
+- [ ] `npm view fooks-frontend-hooks` still confirms the name/state expected for release.
 - [ ] `npm whoami` shows the intended publishing account.
 - [ ] package version and Git tag strategy are decided.
 - [ ] license decision is explicit and reflected in package metadata if required.
@@ -180,7 +180,7 @@ rm -rf /tmp/fooks-pack
 mkdir -p /tmp/fooks-pack
 npm pack --pack-destination /tmp/fooks-pack
 TMP_PREFIX=$(mktemp -d)
-TARBALL=$(ls /tmp/fooks-pack/oh-my-fooks-*.tgz | tail -n 1)
+TARBALL=$(ls /tmp/fooks-pack/fooks-frontend-hooks-*.tgz | tail -n 1)
 npm install -g --prefix "$TMP_PREFIX" "$TARBALL"
 "$TMP_PREFIX/bin/fooks" status cache
 ```

@@ -5,10 +5,10 @@ Use this when you want one explicit command to prepare fooks for a supported fro
 ## 1. Install
 
 ```bash
-npm install -g oh-my-fooks
+npm install -g fooks-frontend-hooks
 ```
 
-The package is named `oh-my-fooks`; it installs the `fooks` command. This is a **global CLI install** step: it changes which command is available from your npm global prefix/PATH, but it does not activate any repository by itself.
+The package is named `fooks-frontend-hooks`; it installs the `fooks` command. This is a **global CLI install** step: it changes which command is available from your npm global prefix/PATH, but it does not activate any repository by itself.
 
 If setup seems to run the wrong binary, check:
 
@@ -52,7 +52,7 @@ Package install alone does not edit Codex hooks, Claude files, or opencode proje
 
 | Scope | Examples | Notes |
 | --- | --- | --- |
-| Global CLI install | `npm install -g oh-my-fooks`, `fooks` on PATH | This happens before setup. `fooks setup` does not install or update the npm package. |
+| Global CLI install | `npm install -g fooks-frontend-hooks`, `fooks` on PATH | This happens before setup. `fooks setup` does not install or update the npm package. |
 | Project-local | `.fooks/config.json`, `.fooks/cache/`, `.opencode/tools/fooks_extract.ts`, `.opencode/commands/fooks-extract.md` | These apply to the current project root where you run `fooks setup`. |
 | User runtime/home | `~/.codex/hooks.json`, Codex attachment manifests, Claude handoff manifests | These are runtime integration files. Tests and smoke checks can isolate them with `FOOKS_CODEX_HOME` and `FOOKS_CLAUDE_HOME`. |
 

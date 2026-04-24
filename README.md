@@ -8,7 +8,7 @@ Smaller model-facing context for repeated same-file work in Codex.
 
 If your first question is “What about Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP rename/reference safety, or Claude/opencode parity?”, treat those as roadmap asks, not current support.
 
-- Public npm package: `oh-my-fooks`
+- Public npm package: `fooks-frontend-hooks`
 - CLI command: `fooks`
 
 ## 30-second version
@@ -26,7 +26,7 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 ## Quick start and local proof
 
 ```bash
-npm install -g oh-my-fooks
+npm install -g fooks-frontend-hooks
 cd your-react-project
 fooks setup
 fooks compare src/components/Button.tsx --json
@@ -72,7 +72,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 
 | Step | Scope | What can change |
 | --- | --- | --- |
-| `npm install -g oh-my-fooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
+| `npm install -g fooks-frontend-hooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
 | `fooks setup` | current project + runtime homes | Creates project-local `.fooks/` state, may add project-local `.opencode/` helper files, and may update runtime-home files such as Codex hooks/manifests or Claude handoff manifests. |
 | `fooks doctor` | current project + runtime-home inspection | Reads local setup and hook-readiness artifacts without writing files; it is not live provider health, billing-token, cost, or `ccusage` proof. |
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
