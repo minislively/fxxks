@@ -51,6 +51,7 @@ const {
 } = require(path.join(repoRoot, "dist", "core", "session-metrics.js"));
 const { FOOKS_COMPARE_CLAIM_BOUNDARY } = require(path.join(repoRoot, "dist", "core", "compare.js"));
 const {
+  runtimeStatusPath,
   sessionEventsPath,
   sessionSummaryPath,
   sessionsSummaryPath,
@@ -61,6 +62,7 @@ const { attachClaude } = require(path.join(repoRoot, "dist", "adapters", "claude
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
 const { installClaudeHookPreset, claudeLocalSettingsPath } = require(path.join(repoRoot, "dist", "adapters", "claude-hook-preset.js"));
 const { handleClaudeRuntimeHook, CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-hook.js"));
+const { readCodexTrustStatus } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-trust.js"));
 const { readClaudeTrustStatus } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-trust.js"));
 const { handleClaudeNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "claude-native-hook.js"));
 const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
@@ -1780,6 +1782,25 @@ test("runtime hook injects tiny raw originals and still honors escape hatch fall
   assert.ok(overridden.reasons.includes("escape-hatch-full-read"));
   assert.equal(overridden.fallback.reason, "escape-hatch-full-read");
   assert.equal(overridden.debug.escapeHatchUsed, true);
+});
+
+test("codex trust status recovers from corrupt runtime telemetry", () => {
+  const tempDir = makeTempProject();
+  const statusPath = runtimeStatusPath("codex", tempDir);
+  fs.mkdirSync(path.dirname(statusPath), { recursive: true });
+  fs.writeFileSync(statusPath, "{not-json");
+
+  const disconnected = readCodexTrustStatus(tempDir);
+  assert.equal(disconnected.connectionState, "disconnected");
+  assert.equal(disconnected.lifecycleState, "disconnected");
+
+  const sessionId = `hook-corrupt-status-${Date.now()}`;
+  const started = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  assert.equal(started.action, "noop");
+
+  const recovered = readCodexTrustStatus(tempDir);
+  assert.equal(recovered.connectionState, "connected");
+  assert.equal(recovered.lifecycleState, "ready");
 });
 
 test("runtime hook refreshes stale target state before repeated attach and updates trust status", () => {

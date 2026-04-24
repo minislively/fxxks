@@ -17,21 +17,33 @@ function statusFile(cwd: string): string {
 export function readCodexTrustStatus(cwd = process.cwd()): CodexTrustStatus {
   const file = statusFile(cwd);
   if (!fs.existsSync(file)) {
-    return {
-      runtime: "codex",
-      connectionState: "disconnected",
-      lifecycleState: "disconnected",
-      updatedAt: now(),
-    };
+    return disconnectedCodexTrustStatus();
   }
-  return JSON.parse(fs.readFileSync(file, "utf8")) as CodexTrustStatus;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as CodexTrustStatus;
+  } catch {
+    return disconnectedCodexTrustStatus();
+  }
 }
 
 export function writeCodexTrustStatus(status: CodexTrustStatus, cwd = process.cwd()): CodexTrustStatus {
   const file = statusFile(cwd);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(status, null, 2));
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(status, null, 2));
+  } catch {
+    // Trust status is runtime telemetry; never crash the hook pipeline on local state write failures.
+  }
   return status;
+}
+
+function disconnectedCodexTrustStatus(): CodexTrustStatus {
+  return {
+    runtime: "codex",
+    connectionState: "disconnected",
+    lifecycleState: "disconnected",
+    updatedAt: now(),
+  };
 }
 
 export function patchCodexTrustStatus(
