@@ -133,6 +133,16 @@ Current public summary:
 - These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove invoice/dashboard savings, actual charged-cost savings, provider billing-token savings, stable runtime-token savings, or stable wall-clock/latency savings.
 - Direct runtime-token/time evidence remains unstable or negative in some diagnostics, so fooks does not claim stable runtime-token, wall-clock, or latency wins.
 
+### Public-code benchmark snapshot
+
+| Profile / project | Scope | Accepted pairs | Regressions | Median estimated API-cost reduction | Aggregate estimated API cost | Provider-reported usage tokens |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| Small fixture lane | 3 task classes × 5 pairs | 15/15 | 4/15 pairs | 4.171% | `$0.588855` baseline → `$0.5547775` fooks (`$0.0340775`, 5.787% lower) | `376,104` baseline → `372,065` fooks |
+| Next.js large profile | App Router summary, Layout Router refactor plan, Error Boundary test strategy | 15/15 | 0/15 pairs | 26.492% | `$0.88386` baseline → `$0.64497` fooks (`$0.23889`, 27.028% lower) | `446,275` baseline → `382,139` fooks |
+| Tailwind large profile | Utilities summary, Variants refactor plan, CSS Parser test strategy | 15/15 | 0/15 pairs | 38.238% | `$1.598875` baseline → `$0.64853` fooks (`$0.950345`, 59.438% lower) | `718,616` baseline → `381,583` fooks |
+
+Task-median reductions for the larger profiles were Next.js App Router summary `30.681%`, Layout Router refactor plan `28.699%`, Error Boundary test strategy `19.447%`; Tailwind Utilities summary `78.992%`, Variants refactor plan `38.238%`, CSS Parser test strategy `33.582%`.
+
 Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
 The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider billing-token proof, and not a Claude or opencode automatic savings claim.
