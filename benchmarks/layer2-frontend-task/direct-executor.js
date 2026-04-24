@@ -12,6 +12,7 @@ const {
   resolveOpenAIModel,
 } = require('./model-resolution.js');
 
+const repoRoot = path.resolve(__dirname, '..', '..');
 const API_KEY = process.env.OPENAI_API_KEY;
 if (!API_KEY) {
   console.error('[Direct Executor] ERROR: OPENAI_API_KEY not set');
@@ -23,13 +24,15 @@ const modelConfig = resolveOpenAIModel({ modelArg: args.model });
 const MODEL = modelConfig.model;
 const targetFile = args.target || args._[0] || 'apps/v4/registry/bases/radix/examples/combobox-example.tsx';
 const mode = args.mode || args._[1] || 'vanilla';
+const targetRepoRoot = process.env.FOOKS_LAYER2_TARGET_REPO || path.resolve(repoRoot, '..', 'fooks-test-repos', 'ui');
+const outputRoot = process.env.FOOKS_LAYER2_OUTPUT_DIR || path.join(repoRoot, 'benchmarks', 'layer2-frontend-task', 'results');
 
 console.log(`[Direct Executor] Mode: ${mode}, Target: ${targetFile}, Model: ${MODEL} (${modelConfig.modelSource})`);
 console.log(`[Direct Executor] Starting CASE-1 execution...`);
 
 // Read target file
 const fullContent = fs.readFileSync(
-  path.join('/home/bellman/Workspace/fooks-test-repos/ui', targetFile),
+  path.join(targetRepoRoot, targetFile),
   'utf-8'
 );
 
@@ -79,10 +82,10 @@ const req = https.request(options, (res) => {
       console.log(`[Direct Executor] Content preview: ${result.choices[0].message.content.substring(0, 200)}...`);
       
       // Save result
-      const outputDir = `~/Workspace/fooks/benchmarks/layer2-frontend-task/results/case1-${mode}`;
-      fs.mkdirSync(outputDir.replace('~', process.env.HOME), { recursive: true });
+      const outputDir = path.join(outputRoot, `case1-${mode}`);
+      fs.mkdirSync(outputDir, { recursive: true });
       fs.writeFileSync(
-        path.join(outputDir.replace('~', process.env.HOME), 'api-response.json'),
+        path.join(outputDir, 'api-response.json'),
         JSON.stringify({
           provider: 'openai',
           model,

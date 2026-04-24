@@ -1,7 +1,7 @@
 {
   "reportSchemaVersion": "frontend-harness.v2-context-mode",
   "timestamp": "2026-04-20T01:11:11.470117",
-  "artifactDir": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131",
+  "artifactDir": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131",
   "iterations": 3,
   "qualityGatedDecision": {
     "rawMedianTotalTimeImprovement": 15.088006830527354,
@@ -137,8 +137,8 @@
         "command": {
           "runner": "codex exec --full-auto",
           "runner_key": "codex",
-          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613139",
-          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613139/.codex",
+          "cwd": "<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776613139",
+          "codex_home": "<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776613139/.codex",
           "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
           "codex_bin": "codex"
         },
@@ -152,7 +152,7 @@
         },
         "contextPolicyVersion": "context-policy.v1",
         "contextBudgetSource": "expected-policy",
-        "stdout_tail": "Implemented the component extraction.\n\nModified:\n- [tab-container.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613139/apps/web/app/(app)/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx:9)\n\nCreated:\n- None\n\nWhat changed:\n- Extracted the visible tab section header JSX (`H3` title plus muted `Small` description) into a local typed `Header` component.\n- Kept `TabContainer`\u2019s props, behavior, layout classes, and rendered structure effectively unchanged.\n- Did not edit API routes, generated files, tests, or locale JSON.\n\nVerification:\n- `git diff --check` passed for the touched file.\n- `pnpm exec prettier --check ...` could not run because `prettier` is not installed in the available workspace binaries.\n",
+        "stdout_tail": "Implemented the component extraction.\n\nModified:\n- [tab-container.tsx](<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776613139/apps/web/app/(app)/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx:9)\n\nCreated:\n- None\n\nWhat changed:\n- Extracted the visible tab section header JSX (`H3` title plus muted `Small` description) into a local typed `Header` component.\n- Kept `TabContainer`\u2019s props, behavior, layout classes, and rendered structure effectively unchanged.\n- Did not edit API routes, generated files, tests, or locale JSON.\n\nVerification:\n- `git diff --check` passed for the touched file.\n- `pnpm exec prettier --check ...` could not run because `prettier` is not installed in the available workspace binaries.\n",
         "stderr_tail": ")/environments/[environmentId]/surveys/[surveyId]/(analysis)/summary/components/shareEmbedModal/tab-container.tsx\n@@ -6,15 +6,23 @@\n   children: React.ReactNode;\n }\n \n+type HeaderProps = Pick<TabContainerProps, \"title\" | \"description\">;\n+\n+const Header = ({ title, description }: HeaderProps) => {\n+  return (\n+    <div className=\"pb-2\">\n+      <H3>{title}</H3>\n+      <Small color=\"muted\" margin=\"headerDescription\">\n+        {description}\n+      </Small>\n+    </div>\n+  );\n+};\n+\n export const TabContainer = ({ title, description, children }: TabContainerProps) => {\n   return (\n     <div className=\"flex h-full grow flex-col items-start space-y-4\">\n-      <div className=\"pb-2\">\n-        <H3>{title}</H3>\n-        <Small color=\"muted\" margin=\"headerDescription\">\n-          {description}\n-        </Small>\n-      </div>\n+      <Header title={title} description={description} />\n       <div className=\"h-full w-full space-y-4 overflow-y-auto\">{children}</div>\n     </div>\n   );\n\ntokens used\n81,597\n",
         "error": null,
         "validation": {
@@ -171,8 +171,8 @@
           }
         },
         "artifact": {
-          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-vanilla.patch",
-          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-vanilla.diffstat",
+          "patch_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-vanilla.patch",
+          "diffstat_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-vanilla.diffstat",
           "patch_bytes": 1477,
           "diffstat": " .../components/shareEmbedModal/tab-container.tsx     | 20 ++++++++++++++------\n 1 file changed, 14 insertions(+), 6 deletions(-)\n",
           "diff_check": {
@@ -277,7 +277,7 @@
               "name": "init",
               "success": true,
               "duration_ms": 94,
-              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.fooks/cache\"}\n",
+              "stdout_tail": "{\"config\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391/.fooks/config.json\",\"cacheDir\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391/.fooks/cache\"}\n",
               "stderr_tail": ""
             },
             {
@@ -291,7 +291,7 @@
               "name": "attach-codex",
               "success": true,
               "duration_ms": 500,
-              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T15:43:16.453Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.codex/fooks/attachments/bm-t4-fooks-1776613391.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.codex/fooks/attachments/bm-t4-fooks-1776613391.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T15:43:16.443Z\",\"attachedAt\":\"2026-04-19T15:43:16.440Z\",\"lastScanAt\":\"2026-04-19T15:43:16.440Z\",\"lastRefreshAt\":\"2026-04-19T15:43:16.440Z\"}}\n",
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T15:43:16.453Z\",\"artifactPath\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391/.codex/fooks/attachments/bm-t4-fooks-1776613391.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391/.codex/fooks/attachments/bm-t4-fooks-1776613391.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T15:43:16.443Z\",\"attachedAt\":\"2026-04-19T15:43:16.440Z\",\"lastScanAt\":\"2026-04-19T15:43:16.440Z\",\"lastRefreshAt\":\"2026-04-19T15:43:16.440Z\"}}\n",
               "stderr_tail": ""
             }
           ],
@@ -300,8 +300,8 @@
         "command": {
           "runner": "codex exec --full-auto",
           "runner_key": "codex",
-          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391",
-          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/.codex",
+          "cwd": "<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391",
+          "codex_home": "<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391/.codex",
           "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
           "codex_bin": "codex"
         },
@@ -315,7 +315,7 @@
         },
         "contextPolicyVersion": "context-policy.v1",
         "contextBudgetSource": "expected-policy",
-        "stdout_tail": "Implemented the extraction in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776613391/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16).\n\nChanged:\n- Added a local `Header` component with typed `HeaderProps`.\n- Moved the existing title, description, beta/soon badges, and optional action button JSX into that component.\n- Kept the original styling and behavior intact.\n- Tightened `children` from `any` to `ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- `pnpm exec prettier --check ...` and `pnpm exec eslint ...` could not run because `prettier` and `eslint` are not installed in this worktree.\n- The repo\u2019s local Next docs directory was missing; the required fallback `npx @next/codemod agents-md --output AGENTS.md` failed because network access to npm was blocked.\n",
+        "stdout_tail": "Implemented the extraction in [SettingsCard.tsx](<fooks-test-repos>/.worktrees/bm-T4-fooks-1776613391/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16).\n\nChanged:\n- Added a local `Header` component with typed `HeaderProps`.\n- Moved the existing title, description, beta/soon badges, and optional action button JSX into that component.\n- Kept the original styling and behavior intact.\n- Tightened `children` from `any` to `ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- `pnpm exec prettier --check ...` and `pnpm exec eslint ...` could not run because `prettier` and `eslint` are not installed in this worktree.\n- The repo\u2019s local Next docs directory was missing; the required fallback `npx @next/codemod agents-md --output AGENTS.md` failed because network access to npm was blocked.\n",
         "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n71,074\n",
         "error": null,
         "validation": {
@@ -338,8 +338,8 @@
           }
         },
         "artifact": {
-          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-fooks.patch",
-          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-fooks.diffstat",
+          "patch_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-fooks.patch",
+          "diffstat_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter1-fooks.diffstat",
           "patch_bytes": 3214,
           "diffstat": " .../settings/components/SettingsCard.tsx           | 58 ++++++++++++++--------\n 1 file changed, 37 insertions(+), 21 deletions(-)\n",
           "diff_check": {
@@ -470,8 +470,8 @@
         "command": {
           "runner": "codex exec --full-auto",
           "runner_key": "codex",
-          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613733",
-          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613733/.codex",
+          "cwd": "<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776613733",
+          "codex_home": "<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776613733/.codex",
           "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
           "codex_bin": "codex"
         },
@@ -485,7 +485,7 @@
         },
         "contextPolicyVersion": "context-policy.v1",
         "contextBudgetSource": "expected-policy",
-        "stdout_tail": "Implemented the component extraction in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776613733/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx).\n\nWhat changed:\n- Extracted the section header JSX into a local typed `Header` component.\n- Kept the same title, description, beta/coming soon badges, optional action button, classes, and translation behavior.\n- Tightened `children` from `any` to `ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- `pnpm --filter @formbricks/web exec tsc --noEmit --pretty false` could not run because `tsc` is not installed in this checkout.\n- `pnpm exec prettier --check ...` could not run because `prettier` is not installed in this checkout.\n",
+        "stdout_tail": "Implemented the component extraction in [SettingsCard.tsx](<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776613733/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx).\n\nWhat changed:\n- Extracted the section header JSX into a local typed `Header` component.\n- Kept the same title, description, beta/coming soon badges, optional action button, classes, and translation behavior.\n- Tightened `children` from `any` to `ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- `pnpm --filter @formbricks/web exec tsc --noEmit --pretty false` could not run because `tsc` is not installed in this checkout.\n- `pnpm exec prettier --check ...` could not run because `prettier` is not installed in this checkout.\n",
         "stderr_tail": "e}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n215,116\n",
         "error": null,
         "validation": {
@@ -504,8 +504,8 @@
           }
         },
         "artifact": {
-          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-vanilla.patch",
-          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-vanilla.diffstat",
+          "patch_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-vanilla.patch",
+          "diffstat_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-vanilla.diffstat",
           "patch_bytes": 3214,
           "diffstat": " .../settings/components/SettingsCard.tsx           | 58 ++++++++++++++--------\n 1 file changed, 37 insertions(+), 21 deletions(-)\n",
           "diff_check": {
@@ -610,7 +610,7 @@
               "name": "init",
               "success": true,
               "duration_ms": 109,
-              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.fooks/cache\"}\n",
+              "stdout_tail": "{\"config\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050/.fooks/config.json\",\"cacheDir\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050/.fooks/cache\"}\n",
               "stderr_tail": ""
             },
             {
@@ -624,7 +624,7 @@
               "name": "attach-codex",
               "success": true,
               "duration_ms": 572,
-              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T15:54:16.959Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.codex/fooks/attachments/bm-t4-fooks-1776614050.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.codex/fooks/attachments/bm-t4-fooks-1776614050.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T15:54:16.947Z\",\"attachedAt\":\"2026-04-19T15:54:16.937Z\",\"lastScanAt\":\"2026-04-19T15:54:16.937Z\",\"lastRefreshAt\":\"2026-04-19T15:54:16.937Z\"}}\n",
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T15:54:16.959Z\",\"artifactPath\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050/.codex/fooks/attachments/bm-t4-fooks-1776614050.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050/.codex/fooks/attachments/bm-t4-fooks-1776614050.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T15:54:16.947Z\",\"attachedAt\":\"2026-04-19T15:54:16.937Z\",\"lastScanAt\":\"2026-04-19T15:54:16.937Z\",\"lastRefreshAt\":\"2026-04-19T15:54:16.937Z\"}}\n",
               "stderr_tail": ""
             }
           ],
@@ -633,8 +633,8 @@
         "command": {
           "runner": "codex exec --full-auto",
           "runner_key": "codex",
-          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050",
-          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/.codex",
+          "cwd": "<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050",
+          "codex_home": "<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050/.codex",
           "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
           "codex_bin": "codex"
         },
@@ -648,7 +648,7 @@
         },
         "contextPolicyVersion": "context-policy.v1",
         "contextBudgetSource": "expected-policy",
-        "stdout_tail": "Implemented the local header extraction in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614050/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16).\n\nWhat changed:\n- Added typed `HeaderProps` and `SettingsCardProps`.\n- Extracted the existing title, description, badge, and optional action button JSX into a local non-exported `Header` component.\n- Kept the existing classes, translation key, conditionals, and `buttonInfo` behavior intact.\n- Replaced `children: any` with `children: ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- Focused `prettier` and `eslint` checks could not run because this worktree has no installed dependencies; `pnpm exec prettier` and filtered `eslint` both reported the commands were not found.\n",
+        "stdout_tail": "Implemented the local header extraction in [SettingsCard.tsx](<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614050/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16).\n\nWhat changed:\n- Added typed `HeaderProps` and `SettingsCardProps`.\n- Extracted the existing title, description, badge, and optional action button JSX into a local non-exported `Header` component.\n- Kept the existing classes, translation key, conditionals, and `buttonInfo` behavior intact.\n- Replaced `children: any` with `children: ReactNode`.\n\nFiles modified:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nFiles created:\n- None\n\nVerification:\n- `git diff --check` passed.\n- Focused `prettier` and `eslint` checks could not run because this worktree has no installed dependencies; `pnpm exec prettier` and filtered `eslint` both reported the commands were not found.\n",
         "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n81,400\n",
         "error": null,
         "validation": {
@@ -671,8 +671,8 @@
           }
         },
         "artifact": {
-          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-fooks.patch",
-          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-fooks.diffstat",
+          "patch_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-fooks.patch",
+          "diffstat_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter2-fooks.diffstat",
           "patch_bytes": 3393,
           "diffstat": " .../settings/components/SettingsCard.tsx           | 73 +++++++++++++---------\n 1 file changed, 43 insertions(+), 30 deletions(-)\n",
           "diff_check": {
@@ -803,8 +803,8 @@
         "command": {
           "runner": "codex exec --full-auto",
           "runner_key": "codex",
-          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776614300",
-          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776614300/.codex",
+          "cwd": "<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776614300",
+          "codex_home": "<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776614300/.codex",
           "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
           "codex_bin": "codex"
         },
@@ -818,7 +818,7 @@
         },
         "contextPolicyVersion": "context-policy.v1",
         "contextBudgetSource": "expected-policy",
-        "stdout_tail": "Extracted the settings section header JSX into a local typed `Header` component in [SettingsCard.tsx](</Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-vanilla-1776614300/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16>).\n\nWhat changed:\n- Added `HeaderProps` and `SettingsCardProps`.\n- Moved the existing title, description, beta/soon badges, and optional action button into `Header`.\n- Kept styling, rendered markup, button behavior, and existing translation usage intact.\n- Tightened `children` from `any` to `ReactNode`.\n\nModified files:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nCreated files:\n- None\n\nVerification:\n- `git diff --check -- apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx` passed.\n- Targeted `prettier` and `eslint` checks could not run because this workspace has no installed `prettier`/`eslint` binaries in `node_modules`.\n- I did not edit API routes, generated files, tests, or locale JSON.\n",
+        "stdout_tail": "Extracted the settings section header JSX into a local typed `Header` component in [SettingsCard.tsx](<<fooks-test-repos>/.worktrees/bm-T4-vanilla-1776614300/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16>).\n\nWhat changed:\n- Added `HeaderProps` and `SettingsCardProps`.\n- Moved the existing title, description, beta/soon badges, and optional action button into `Header`.\n- Kept styling, rendered markup, button behavior, and existing translation usage intact.\n- Tightened `children` from `any` to `ReactNode`.\n\nModified files:\n- `apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx`\n\nCreated files:\n- None\n\nVerification:\n- `git diff --check -- apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx` passed.\n- Targeted `prettier` and `eslint` checks could not run because this workspace has no installed `prettier`/`eslint` binaries in `node_modules`.\n- I did not edit API routes, generated files, tests, or locale JSON.\n",
         "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n93,867\n",
         "error": null,
         "validation": {
@@ -837,8 +837,8 @@
           }
         },
         "artifact": {
-          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-vanilla.patch",
-          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-vanilla.diffstat",
+          "patch_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-vanilla.patch",
+          "diffstat_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-vanilla.diffstat",
           "patch_bytes": 3393,
           "diffstat": " .../settings/components/SettingsCard.tsx           | 73 +++++++++++++---------\n 1 file changed, 43 insertions(+), 30 deletions(-)\n",
           "diff_check": {
@@ -943,7 +943,7 @@
               "name": "init",
               "success": true,
               "duration_ms": 90,
-              "stdout_tail": "{\"config\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.fooks/config.json\",\"cacheDir\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.fooks/cache\"}\n",
+              "stdout_tail": "{\"config\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/.fooks/config.json\",\"cacheDir\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/.fooks/cache\"}\n",
               "stderr_tail": ""
             },
             {
@@ -957,7 +957,7 @@
               "name": "attach-codex",
               "success": true,
               "duration_ms": 513,
-              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T16:05:20.006Z\",\"artifactPath\":\"/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.codex/fooks/attachments/bm-t4-fooks-1776614715.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.codex/fooks/attachments/bm-t4-fooks-1776614715.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T16:05:19.996Z\",\"attachedAt\":\"2026-04-19T16:05:19.993Z\",\"lastScanAt\":\"2026-04-19T16:05:19.993Z\",\"lastRefreshAt\":\"2026-04-19T16:05:19.993Z\"}}\n",
+              "stdout_tail": "{\"runtime\":\"codex\",\"accountContext\":\"minislively\",\"filesCreated\":[\".fooks/adapters/codex/adapter.json\",\".fooks/adapters/codex/context-template.md\"],\"contractProof\":{\"passed\":true,\"details\":[\"filePath\",\"fileHash\",\"mode\",\"exports\",\"meta.generatedAt\"]},\"runtimeProof\":{\"status\":\"passed\",\"attemptedAt\":\"2026-04-19T16:05:20.006Z\",\"artifactPath\":\"<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/.codex/fooks/attachments/bm-t4-fooks-1776614715.json\",\"details\":[\"account-context=minislively\",\"account-source=env\",\"runtime-manifest=<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/.codex/fooks/attachments/bm-t4-fooks-1776614715.json\",\"codex adapter artifacts created\"]},\"trustStatus\":{\"runtime\":\"codex\",\"connectionState\":\"connected\",\"lifecycleState\":\"ready\",\"updatedAt\":\"2026-04-19T16:05:19.996Z\",\"attachedAt\":\"2026-04-19T16:05:19.993Z\",\"lastScanAt\":\"2026-04-19T16:05:19.993Z\",\"lastRefreshAt\":\"2026-04-19T16:05:19.993Z\"}}\n",
               "stderr_tail": ""
             }
           ],
@@ -966,8 +966,8 @@
         "command": {
           "runner": "codex exec --full-auto",
           "runner_key": "codex",
-          "cwd": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715",
-          "codex_home": "/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/.codex",
+          "cwd": "<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715",
+          "codex_home": "<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/.codex",
           "prompt_sha256": "be873c525d0c0d116bfdc5c29345218ab2990bb2428255f40d68a09b4a6641a8",
           "codex_bin": "codex"
         },
@@ -981,7 +981,7 @@
         },
         "contextPolicyVersion": "context-policy.v1",
         "contextBudgetSource": "expected-policy",
-        "stdout_tail": "Extracted the settings card section header into a local typed `Header` component in [SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16). It keeps the same title, description, beta/coming-soon badges, optional action button, classes, and translation behavior. I also replaced the previous inline prop object with typed `HeaderProps` and `SettingsCardProps`.\n\nModified:\n- [apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx](/Users/veluga/Workspace/fooks-test-repos/.worktrees/bm-T4-fooks-1776614715/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:1)\n\nCreated:\n- None\n\nVerification:\n- `git diff --check` passed.\n- ESLint/TypeScript could not be run because this checkout has no installed `node_modules/.bin` tools, so `eslint` was not found.\n- The required Next docs bootstrap command from `AGENTS.md` failed due blocked network DNS (`ENOTFOUND registry.npmjs.org`) and did not modify `AGENTS.md`.\n",
+        "stdout_tail": "Extracted the settings card section header into a local typed `Header` component in [SettingsCard.tsx](<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:16). It keeps the same title, description, beta/coming-soon badges, optional action button, classes, and translation behavior. I also replaced the previous inline prop object with typed `HeaderProps` and `SettingsCardProps`.\n\nModified:\n- [apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx](<fooks-test-repos>/.worktrees/bm-T4-fooks-1776614715/apps/web/app/(app)/environments/[environmentId]/settings/components/SettingsCard.tsx:1)\n\nCreated:\n- None\n\nVerification:\n- `git diff --check` passed.\n- ESLint/TypeScript could not be run because this checkout has no installed `node_modules/.bin` tools, so `eslint` was not found.\n- The required Next docs bootstrap command from `AGENTS.md` failed due blocked network DNS (`ENOTFOUND registry.npmjs.org`) and did not modify `AGENTS.md`.\n",
         "stderr_tail": "le}>\n-      <div className=\"flex justify-between border-b border-slate-200 px-4 pb-4\">\n-        <div>\n-          <H4 className=\"font-medium tracking-normal\">{title}</H4>\n-          <div className=\"ml-2\">\n-            {beta && <Badge size=\"normal\" type=\"warning\" text=\"Beta\" />}\n-            {soon && (\n-              <Badge size=\"normal\" type=\"success\" text={t(\"environments.settings.enterprise.coming_soon\")} />\n-            )}\n-          </div>\n-          <Small color=\"muted\" margin=\"headerDescription\">\n-            {description}\n-          </Small>\n-        </div>\n-        {buttonInfo && (\n-          <Button type=\"button\" onClick={buttonInfo?.onClick} variant={buttonInfo?.variant ?? \"default\"}>\n-            {buttonInfo?.text}\n-          </Button>\n-        )}\n-      </div>\n+      <Header title={title} description={description} soon={soon} beta={beta} buttonInfo={buttonInfo} />\n       <div className={cn(noPadding ? \"\" : \"px-4 pt-4\")}>{children}</div>\n     </div>\n   );\n\ntokens used\n85,063\n",
         "error": null,
         "validation": {
@@ -1004,8 +1004,8 @@
           }
         },
         "artifact": {
-          "patch_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-fooks.patch",
-          "diffstat_path": "/Users/veluga/Documents/Workspace_Minseol/fooks/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-fooks.diffstat",
+          "patch_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-fooks.patch",
+          "diffstat_path": "<fooks-repo>/benchmarks/frontend-harness/reports/artifacts/benchmark-full-1776613131/formbricks-T4-iter3-fooks.diffstat",
           "patch_bytes": 3385,
           "diffstat": " .../settings/components/SettingsCard.tsx           | 73 +++++++++++++---------\n 1 file changed, 43 insertions(+), 30 deletions(-)\n",
           "diff_check": {

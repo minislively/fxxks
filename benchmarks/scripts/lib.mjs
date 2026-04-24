@@ -24,6 +24,7 @@ const helperServerPath = path.join(benchmarksRoot, "scripts", "scan-helper-serve
 const helperClientPath = path.join(benchmarksRoot, "scripts", "scan-helper-client.mjs");
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
 const { decideMode } = require(path.join(repoRoot, "dist", "core", "decide.js"));
+const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 
 function runProcess(command, args, { cwd = repoRoot, env = process.env } = {}) {
   const startedAt = performance.now();
@@ -699,6 +700,8 @@ export function runExtractSuite() {
     const extraction = measure(() => extractFile(absolutePath));
     const decide = measure(() => decideMode(baseExtractionResult(extraction.value)));
     const extractBytes = Buffer.byteLength(JSON.stringify(extraction.value), "utf8");
+    const modelPayload = toModelFacingPayload(extraction.value, repoRoot);
+    const modelPayloadBytes = Buffer.byteLength(JSON.stringify(modelPayload), "utf8");
 
     return {
       kind: "extract-bench",
@@ -709,6 +712,8 @@ export function runExtractSuite() {
       rawBytes: sourceBytes,
       extractBytes,
       reductionPct: round((1 - (extractBytes / sourceBytes)) * 100),
+      modelPayloadBytes,
+      modelPayloadReductionPct: round((1 - (modelPayloadBytes / sourceBytes)) * 100),
       extractMs: extraction.durationMs,
       decideMs: decide.durationMs,
       mode: extraction.value.mode,
@@ -848,9 +853,9 @@ export function computeFinalGates({ scanCache, extract, gateSuite }) {
           return null;
         }
         return {
-          name: `${fixture.fixtureId} reductionPct >= lowerBound`,
-          passed: fixture.reductionPct >= lowerBound,
-          actual: fixture.reductionPct,
+          name: `${fixture.fixtureId} modelPayloadReductionPct >= lowerBound`,
+          passed: (fixture.modelPayloadReductionPct ?? fixture.reductionPct) >= lowerBound,
+          actual: fixture.modelPayloadReductionPct ?? fixture.reductionPct,
           expected: `>= ${lowerBound}`,
         };
       })

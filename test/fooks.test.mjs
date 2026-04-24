@@ -3321,9 +3321,14 @@ test("attach claude pairs manual handoff proof with reduced model-facing artifac
     const manifestText = fs.readFileSync(manifestPath, "utf8");
     const manifest = JSON.parse(manifestText);
     assert.equal(manifest.runtime, "claude");
-    assert.equal(manifest.runtimeBridge, undefined);
-    assert.equal(manifest.supportedHookEvents, undefined);
-    assert.doesNotMatch(manifestText, /codex-runtime-hook|UserPromptSubmit|SessionStart|Stop/);
+    assert.equal(manifest.runtimeBridge.command, "fooks claude-runtime-hook --native-hook");
+    assert.deepEqual(manifest.runtimeBridge.supportedHookEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
+    assert.deepEqual(manifest.runtimeBridge.scope.extensions, [".tsx", ".jsx"]);
+    assert.equal(manifest.runtimeBridge.scope.strategy, "project-local-context-hook");
+    assert.deepEqual(manifest.runtimeBridge.escapeHatches, ["#fooks-full-read", "#fooks-disable-pre-read"]);
+    assert.match(manifest.runtimeBridge.claimBoundary, /no Claude Read interception or runtime-token savings claim/);
+    assert.doesNotMatch(manifestText, /codex-runtime-hook/);
+    assert.ok(result.runtimeProof.details.includes("runtime-token-telemetry=not-collected"));
   });
 
   const fullResult = extractFile(samplePath);

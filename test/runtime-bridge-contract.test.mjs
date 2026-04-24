@@ -13,6 +13,7 @@ const {
   CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
   handleClaudeRuntimeHook,
 } = await import(path.join(repoRoot, "dist", "adapters", "claude-runtime-hook.js"));
+const { readSessionMetricSummary } = await import(path.join(repoRoot, "dist", "core", "session-metrics.js"));
 
 function cleanupRuntimeSessions(repoRoot, runtime, prefixes) {
   const root = path.join(repoRoot, ".fooks", "state", runtime);
@@ -145,6 +146,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
 test("claude runtime bridge follows record-then-inject repeated same-file contract", () => {
   const target = path.join("fixtures", "compressed", "FormSection.tsx");
+  const linkedTsTarget = path.join("fixtures", "compressed", "FormSection.utils.ts");
+  const missingJsTarget = path.join("src", "cli", "index.js");
   const otherTarget = path.join("fixtures", "raw", "SimpleButton.tsx");
   const readState = (statePath) => JSON.parse(fs.readFileSync(statePath, "utf8"));
 
@@ -177,11 +180,98 @@ test("claude runtime bridge follows record-then-inject repeated same-file contra
   );
   assert.equal(second.action, "inject");
   assert.equal(second.filePath, target);
+  assert.equal(second.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.ok(second.reasons.includes("edit-guidance-opt-in"));
   assert.ok(second.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
   assert.match(second.additionalContext, /fixtures\/compressed\/FormSection\.tsx/);
+  assert.match(second.additionalContext, /does not intercept Claude Read or claim runtime-token savings/);
+  assert.equal(second.additionalContext.includes("\"editGuidance\""), true);
+  assert.deepEqual(second.debug.decision.payload.editGuidance.freshness, second.debug.decision.payload.sourceFingerprint);
   assert.doesNotMatch(second.additionalContext, /Claude Read interception is enabled/i);
   assert.equal(second.debug.repeatedFile, true);
   assert.equal(readState(second.statePath).seenFiles[target].seenCount, 2);
+  const editGuidanceMetricSummary = readSessionMetricSummary(repoRoot, injectSession, {
+    runtime: "claude",
+    measurementSource: "project-local-context-hook",
+  });
+  assert.equal(editGuidanceMetricSummary.runtime, "claude");
+  assert.equal(editGuidanceMetricSummary.measurementSource, "project-local-context-hook");
+  assert.equal(editGuidanceMetricSummary.eventCount, 2);
+  assert.equal(editGuidanceMetricSummary.comparableEventCount, 0);
+
+  const readOnlySession = `bridge-contract-claude-readonly-${Date.now()}`;
+  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);
+  handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: readOnlySession,
+      prompt: `Please inspect ${target}`,
+    },
+    repoRoot,
+  );
+  const readOnlySecond = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: readOnlySession,
+      prompt: `Again, summarize ${target}`,
+    },
+    repoRoot,
+  );
+  assert.equal(readOnlySecond.action, "inject");
+  assert.equal(readOnlySecond.contextModeReason, "repeated-exact-file-payload");
+  assert.equal(readOnlySecond.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal("editGuidance" in readOnlySecond.debug.decision.payload, false);
+  assert.equal(readOnlySecond.reasons.includes("edit-guidance-opt-in"), false);
+
+  const multiFileSession = `bridge-contract-claude-multifile-${Date.now()}`;
+  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: multiFileSession }, repoRoot);
+  handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: multiFileSession,
+      prompt: `Please update ${target} and ${otherTarget}`,
+    },
+    repoRoot,
+  );
+  const multiFileSecond = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: multiFileSession,
+      prompt: `Again, fix ${target} and ${otherTarget}`,
+    },
+    repoRoot,
+  );
+  assert.equal(multiFileSecond.action, "inject");
+  assert.equal(multiFileSecond.additionalContext.includes("\"editGuidance\""), false);
+  assert.equal(multiFileSecond.reasons.includes("edit-guidance-opt-in"), false);
+
+  for (const [label, extraTarget] of [
+    ["mixed-ts", linkedTsTarget],
+    ["mixed-js", missingJsTarget],
+  ]) {
+    const mixedCodeSession = `bridge-contract-claude-${label}-${Date.now()}`;
+    handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: mixedCodeSession }, repoRoot);
+    handleClaudeRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId: mixedCodeSession,
+        prompt: `Please update ${target} and ${extraTarget}`,
+      },
+      repoRoot,
+    );
+    const mixedCodeSecond = handleClaudeRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId: mixedCodeSession,
+        prompt: `Again, fix ${target} and ${extraTarget}`,
+      },
+      repoRoot,
+    );
+    assert.equal(mixedCodeSecond.action, "inject");
+    assert.equal(mixedCodeSecond.contextModeReason, "repeated-exact-file-payload");
+    assert.equal(mixedCodeSecond.additionalContext.includes("\"editGuidance\""), false);
+    assert.equal(mixedCodeSecond.reasons.includes("edit-guidance-opt-in"), false);
+  }
 
   const differentFile = handleClaudeRuntimeHook(
     {

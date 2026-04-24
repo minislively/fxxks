@@ -476,7 +476,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
   let claude: RuntimeReadiness;
   if (sample.sampleKind === "react-component") {
     try {
-      const claudeAttach = attachClaude(sample.filePath, cwd);
+      const claudeAttach = attachClaude(sample.filePath, cwd, `${displayCliName} claude-runtime-hook --native-hook`);
       const claudeHooks = installClaudeHookPreset(cwd, displayCliName);
       const claudeStatus = readClaudeRuntimeStatus(cwd);
       claude = claudeRuntimeReadiness(claudeAttach, claudeHooks, claudeStatus);
@@ -889,7 +889,11 @@ async function run(): Promise<void> {
               process.cwd(),
               `${displayCliName} codex-runtime-hook --native-hook`,
             )
-          : (await import("../adapters/claude.js")).attachClaude(sample.filePath);
+          : (await import("../adapters/claude.js")).attachClaude(
+              sample.filePath,
+              process.cwd(),
+              `${displayCliName} claude-runtime-hook --native-hook`,
+            );
       print(result);
       return;
     }

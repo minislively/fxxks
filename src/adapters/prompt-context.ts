@@ -1,5 +1,7 @@
 export {
+  extractPromptTargets,
   hasFullReadEscapeHatch,
+  runtimeEscapeHatches,
   resolvePromptFileContext,
 } from "../core/context-policy";
 

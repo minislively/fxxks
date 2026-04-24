@@ -41,7 +41,7 @@ yarn build
 ### type error 0 확인 방법
 ```bash
 # TypeScript 컴파일 체크
-cd /home/bellman/Workspace/fooks-test-repos/ui
+cd <fooks-test-repos>/ui
 npx tsc --noEmit
 
 # 또는
@@ -83,7 +83,7 @@ ls -la combobox/types/index.ts
 ### 각 파일 200라인 이하 확인
 ```bash
 wc -l combobox/components/*.tsx
-cd /home/bellman/Workspace/fooks-test-repos/ui
+cd <fooks-test-repos>/ui
 wc -l combobox/components/Combobox.tsx
 wc -l combobox/components/ComboboxInput.tsx
 wc -l combobox/components/ComboboxList.tsx

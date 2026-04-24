@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const BASE_DIR = resolve(__dirname, '..');
-const REPOS_DIR = resolve('/home/bellman/Workspace/fooks-test-repos');
-const FOOKS_CLI = resolve('/home/bellman/Workspace/fooks/dist/cli/index.js');
+const REPOS_DIR = resolve(process.env.FOOKS_TEST_REPOS_DIR ?? join(BASE_DIR, '..', '..', '..', 'fooks-test-repos'));
+const FOOKS_CLI = resolve(process.env.FOOKS_CLI ?? join(BASE_DIR, '..', '..', 'dist', 'cli', 'index.js'));
 
 // Load task definitions
 const tasks = JSON.parse(

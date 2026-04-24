@@ -3,14 +3,14 @@ import path from "node:path";
 import { decidePreRead } from "./pre-read";
 import { clearClaudeRuntimeSession, initializeClaudeRuntimeSession, markClaudeRuntimeSeenFile, resolveClaudeRuntimeSessionKey } from "./claude-runtime-session";
 import { clearClaudeActiveFile, ensureFreshClaudeContextForTarget, markClaudeAttachPrepared } from "./claude-runtime-trust";
-import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
+import { extractPromptTargets, hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
 import {
   clampAdditionalContext,
   boundedFallbackContext,
   sessionStartContext,
   CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
 } from "./claude-runtime-status";
-import type { ContextBudget, ContextMode, PromptSpecificity } from "../core/schema";
+import type { ContextBudget, ContextMode, ModelFacingPayload, PromptSpecificity } from "../core/schema";
 import {
   estimateFileBytes,
   estimateTextBytes,
@@ -49,6 +49,7 @@ export type ClaudeRuntimeHookDecision = {
     eligible: boolean;
     bounded: boolean;
     escapeHatchUsed?: boolean;
+    decision?: ReturnType<typeof decidePreRead>;
   };
   fallback?: {
     action: "full-read";
@@ -85,13 +86,62 @@ function buildPayloadContext(
     }
   }
 
-  const truncated = removedSections.length > 0;
-  const context = clampAdditionalContext(`${prefix}${json}`);
+  const rawContext = `${prefix}${json}`;
+  const truncated = removedSections.length > 0 || rawContext.length > CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS;
+  const context = clampAdditionalContext(rawContext);
   return { context, truncated, removedSections };
 }
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
   return estimateFileBytes(path.join(cwd, filePath));
+}
+
+function truncatedReason(removedSections: string[]): string {
+  return removedSections.length > 0 ? `truncated: ${removedSections.join(", ")}` : "truncated: max-additional-context";
+}
+
+const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
+const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
+
+export function isClaudeEditIntentPrompt(prompt: string): boolean {
+  return EDIT_INTENT_PATTERN.test(prompt);
+}
+
+function hasSingleExactFrontendTarget(
+  prompt: string,
+  policy: ReturnType<typeof resolvePromptFileContext>["policy"],
+  target: string,
+  cwd: string,
+): boolean {
+  const allExplicitCodeTargets = extractPromptTargets(prompt, cwd, "codex-ts-js-beta");
+  if (allExplicitCodeTargets.length !== 1 || allExplicitCodeTargets[0]?.filePath !== target) return false;
+  if (policy.promptSpecificity !== "exact-file") return false;
+  if (policy.targets.length !== 1) return false;
+  if (policy.targets[0]?.filePath !== target || !policy.targets[0]?.exists) return false;
+  if (!FRONTEND_EXTENSIONS.has(path.extname(target))) return false;
+  return fs.existsSync(path.join(cwd, target));
+}
+
+function hasPositiveFreshness(target: string, cwd: string, freshness: ReturnType<typeof ensureFreshClaudeContextForTarget>): boolean {
+  return fs.existsSync(path.join(cwd, target)) && Boolean(freshness.scannedAt);
+}
+
+function canAttemptRuntimeEditGuidance(
+  prompt: string,
+  target: string,
+  cwd: string,
+  policy: ReturnType<typeof resolvePromptFileContext>["policy"],
+  freshness: ReturnType<typeof ensureFreshClaudeContextForTarget>,
+): boolean {
+  return hasSingleExactFrontendTarget(prompt, policy, target, cwd) && isClaudeEditIntentPrompt(prompt) && hasPositiveFreshness(target, cwd, freshness);
+}
+
+function hasMatchingEditGuidance(payload: ModelFacingPayload): boolean {
+  return Boolean(
+    payload.sourceFingerprint &&
+      payload.editGuidance?.freshness.fileHash === payload.sourceFingerprint.fileHash &&
+      payload.editGuidance.freshness.lineCount === payload.sourceFingerprint.lineCount,
+  );
 }
 
 function recordClaudeMetric(
@@ -363,12 +413,37 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     return runtimeDecision;
   }
 
+  const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+  const editGuidanceAllowed =
+    decision.decision === "payload" &&
+    Boolean(decision.payload?.sourceFingerprint) &&
+    canAttemptRuntimeEditGuidance(prompt, target, cwd, policy, freshness);
+  if (editGuidanceAllowed) {
+    try {
+      const optInDecision = decidePreRead(resolvedTarget, cwd, "claude", { includeEditGuidance: true });
+      if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
+        const optInContextMode = payloadContextMode(optInDecision.payload);
+        const optInPayloadContext = buildPayloadContext(target, optInDecision.payload, optInContextMode);
+        if (!optInPayloadContext.truncated && optInPayloadContext.context.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS) {
+          decision = optInDecision;
+        }
+      }
+    } catch {
+      // Optional edit guidance must never make the Claude hook fail.
+    }
+  }
+
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
     const { context: additionalContext, truncated, removedSections } = buildPayloadContext(target, decision.payload, contextMode);
-    const reasons = refreshed ? ["repeated-file", "refreshed-before-inject"] : ["repeated-file"];
+    const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
+    const reasons = [
+      "repeated-file",
+      ...(refreshed ? ["refreshed-before-inject"] : []),
+      ...(editGuidanceIncluded ? ["edit-guidance-opt-in"] : []),
+    ];
     if (truncated) {
-      reasons.push(`truncated: ${removedSections.join(", ")}`);
+      reasons.push(truncatedReason(removedSections));
     }
     const runtimeDecision: ClaudeRuntimeHookDecision = {
       runtime: "claude",
@@ -379,7 +454,11 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       additionalContext,
       statePath,
       contextMode,
-      contextModeReason: contextMode === "light-minimal" ? "repeated-exact-file-tiny-raw-original" : "repeated-exact-file-payload",
+      contextModeReason: editGuidanceIncluded
+        ? "repeated-exact-file-edit-guidance"
+        : contextMode === "light-minimal"
+          ? "repeated-exact-file-tiny-raw-original"
+          : "repeated-exact-file-payload",
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
@@ -388,20 +467,19 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
         eligible: true,
         bounded: true,
         escapeHatchUsed: false,
+        decision,
       },
     };
     markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-    const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
     recordClaudeMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
       actualEstimatedBytes: estimateTextBytes(additionalContext),
-      comparableForSavings: originalEstimatedBytes !== undefined,
+      comparableForSavings: editGuidanceIncluded ? false : originalEstimatedBytes !== undefined,
     });
     return runtimeDecision;
   }
 
   markClaudeAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
-  const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
   const runtimeDecision: ClaudeRuntimeHookDecision = {
     runtime: "claude",
     hookEventName,

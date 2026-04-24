@@ -48,7 +48,7 @@ This ensures the latest directory always has a readable copy even if the history
 ### Verification
 ```bash
 # Verify real fooks path
-node -e "require('/home/bellman/Workspace/fooks/dist/index.js').extractFile('<file>')"
+node -e "require('<fooks-repo>/dist/index.js').extractFile('<file>')"
 
 # Check extractorPath in result
 cat current-real-benchmark.json | grep -A2 '"extractorPath"'

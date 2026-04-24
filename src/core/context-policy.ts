@@ -108,8 +108,12 @@ export function hasFullReadEscapeHatch(prompt: string): boolean {
   return ESCAPE_HATCH_TOKENS.some((token) => prompt.includes(token));
 }
 
-export function codexRuntimeEscapeHatches(): readonly string[] {
+export function runtimeEscapeHatches(): readonly string[] {
   return ESCAPE_HATCH_TOKENS;
+}
+
+export function codexRuntimeEscapeHatches(): readonly string[] {
+  return runtimeEscapeHatches();
 }
 
 export function classifyPromptContext(prompt: string, cwd = process.cwd(), capability: ContextCapability = "react-only"): PromptContextPolicy {

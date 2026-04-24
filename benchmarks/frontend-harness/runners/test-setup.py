@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Quick validation test for benchmark setup"""
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-OMX_BIN = Path("/home/bellman/Workspace/oh-my-codex/dist/cli/omx.js")
-FOOKS_DIR = Path("/home/bellman/Workspace/fooks")
-REPOS_DIR = Path("/home/bellman/Workspace/fooks-test-repos")
+REPO_ROOT = Path(__file__).resolve().parents[3]
+OMX_BIN = Path(os.environ.get("OMX_BIN", REPO_ROOT.parent / "oh-my-codex" / "dist" / "cli" / "omx.js"))
+FOOKS_DIR = Path(os.environ.get("FOOKS_DIR", REPO_ROOT))
+REPOS_DIR = Path(os.environ.get("FOOKS_TEST_REPOS_DIR", REPO_ROOT.parent / "fooks-test-repos"))
 
 def check_omx():
     """Test OMX can be invoked"""

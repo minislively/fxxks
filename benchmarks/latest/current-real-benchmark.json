@@ -2,7 +2,7 @@
   "timestamp": "2026-04-15T06:40:57.664293",
   "label": "real-benchmark-result",
   "extractorPath": "real",
-  "command": "node -e \"require('/home/bellman/Workspace/fooks/dist/index.js').extractFile('<file>')\"",
+  "command": "node -e \"require('<fooks-repo>/dist/index.js').extractFile('<file>')\"",
   "target": "nextjs + tailwindcss",
   "nextjs": {
     "requested": 5,
