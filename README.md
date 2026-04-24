@@ -6,6 +6,8 @@ Smaller model-facing context for repeated same-file work in Codex.
 
 `fooks` is for Codex users who repeatedly work on the same supported file in one repo. The strongest path is still React `.tsx` / `.jsx`, and there is now an experimental Codex-first `.ts` / `.js` same-file beta. On the first eligible mention, fooks records the file context; on later same-file prompts, it can send a compact model-facing payload instead of the full source when safe.
 
+If your first question is “What about Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP rename/reference safety, or Claude/opencode parity?”, treat those as roadmap asks, not current support.
+
 - Public npm package: `oh-my-fooks`
 - CLI command: `fooks`
 
@@ -15,6 +17,7 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 
 - **Best today:** Codex + repeated same-file `.tsx` / `.jsx` work.
 - **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
+- **Roadmap asks, not current support:** Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
 - **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
 - **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
 
@@ -31,22 +34,24 @@ Then open Codex in that repo and work normally. `fooks compare` gives an immedia
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
 
-## Best today / not today
+## Strongest path / beta path / not today
 
-| Best today | Not today |
-| --- | --- |
-| Repeated same-file React `.tsx` / `.jsx` work in Codex, plus experimental Codex-first `.ts` / `.js` same-file beta. | Universal file-read interception for every language, framework, runtime, or file type. |
-| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
-| Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior. |
+| Strongest path today | Narrow beta path | Not today |
+| --- | --- | --- |
+| Repeated same-file React `.tsx` / `.jsx` work in Codex. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
+| Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior or read-interception parity. |
+| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
 
-## Not supported yet
+## Deferred asks / not supported yet
 
 These are useful future directions, but they are not required for the current Codex repeated React workflow:
 
-- Vue, Svelte, or non-React framework support.
+- Vue/SFC, Svelte, or broader non-React framework support.
+- Broader `.ts` / `.js` coverage beyond the same-file beta.
 - Multi-file refactor context compression.
-- Universal runtime file-read interception.
+- Universal runtime file-read interception or provider-native read-hook parity.
 - LSP-backed semantic rename/reference safety.
+- Claude/opencode parity with the Codex automatic path.
 - Provider invoice/dashboard or billing-grade charge proof.
 
 Experimental `.ts` / `.js` support is **not** a claim of backend/framework semantic understanding, multi-file refactor support, Vue/SFC support, Claude/opencode parity, read interception, or LSP rename/reference safety. Unsupported or weak TS/JS files fall back to normal full-source behavior.
