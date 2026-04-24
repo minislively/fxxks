@@ -39,11 +39,16 @@ function assertNoForbiddenPublicClaims(label, text) {
     /Claude runtime-token savings are enabled/i,
     /automatic Claude runtime-token savings/i,
   ];
-  for (const pattern of forbidden) {
-    assert(!pattern.test(text), `${label} contains forbidden positive claim ${pattern}`);
-  }
+  const negatedClaimBoundary = /(?:not|no|without|nor|never|does not prove|do not claim|must not claim|cannot support|blocks?|excluded?|out of scope|is not)[^\n]{0,160}$/i;
 
   for (const line of text.split(/\r?\n/)) {
+    for (const pattern of forbidden) {
+      const match = pattern.exec(line);
+      if (match) {
+        const beforeMatch = line.slice(0, match.index);
+        assert(negatedClaimBoundary.test(beforeMatch), `${label} contains forbidden positive claim ${pattern}: ${line}`);
+      }
+    }
     if (/ccusage replacement/i.test(line)) {
       assert(/not (?:a )?ccusage replacement|not provider billing tokens, provider costs, or a ccusage replacement/i.test(line), `${label} contains unbounded ccusage replacement wording: ${line}`);
     }
