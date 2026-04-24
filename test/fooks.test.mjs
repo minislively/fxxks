@@ -43,10 +43,13 @@ const {
   hasPositiveFreshness,
 } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const {
+  estimateTextBytes,
+  estimateTokensFromBytes,
   readProjectMetricSummary,
   readSessionMetricSummary,
   refreshProjectMetricSummaryFromSession,
 } = require(path.join(repoRoot, "dist", "core", "session-metrics.js"));
+const { FOOKS_COMPARE_CLAIM_BOUNDARY } = require(path.join(repoRoot, "dist", "core", "compare.js"));
 const {
   sessionEventsPath,
   sessionSummaryPath,
@@ -545,6 +548,73 @@ function assertDesignCaps(metadata) {
   assert.ok(metadata.styleReferences.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.styleReferences);
 }
 
+function designMetadataCounts(metadata) {
+  return {
+    visualRegions: metadata.visualRegions.length,
+    variantAxes: metadata.variantAxes.length,
+    stateAxes: metadata.stateAxes.length,
+    interactionAnchors: metadata.interactionAnchors.length,
+    styleReferences: metadata.styleReferences.length,
+  };
+}
+
+function estimateJsonPayload(value) {
+  const text = JSON.stringify(value);
+  const bytes = estimateTextBytes(text);
+  return {
+    bytes,
+    estimatedTokens: estimateTokensFromBytes(bytes),
+  };
+}
+
+function designReviewLocalValueEvidence(filePath) {
+  const result = extractFile(filePath);
+  const sourceText = fs.readFileSync(filePath, "utf8");
+  const defaultPayload = toModelFacingPayload(result, repoRoot);
+  const optInPayload = toModelFacingPayload(result, repoRoot, { includeDesignReviewMetadata: true });
+  const sourceBytes = estimateTextBytes(sourceText);
+  const defaultEstimate = estimateJsonPayload(defaultPayload);
+  const optInEstimate = estimateJsonPayload(optInPayload);
+  const metadata = optInPayload.designReviewMetadata;
+
+  return {
+    filePath: path.relative(repoRoot, filePath),
+    mode: result.mode,
+    sourceContext: {
+      bytes: sourceBytes,
+      estimatedTokens: estimateTokensFromBytes(sourceBytes),
+    },
+    defaultModelFacingContext: {
+      ...defaultEstimate,
+      hasDesignReviewMetadata: "designReviewMetadata" in defaultPayload,
+    },
+    optInModelFacingContext: {
+      ...optInEstimate,
+      hasDesignReviewMetadata: "designReviewMetadata" in optInPayload,
+    },
+    metadataSummary: metadata
+      ? {
+          available: true,
+          schemaVersion: metadata.schemaVersion,
+          confidence: metadata.confidence,
+          freshnessMatchesExtraction: metadata.freshness.fileHash === result.fileHash && metadata.freshness.lineCount === result.meta.lineCount,
+          counts: designMetadataCounts(metadata),
+          caps: metadata.compressionContract.maxItems,
+          capsRespected: Object.entries(designMetadataCounts(metadata)).every(([key, count]) => count <= metadata.compressionContract.maxItems[key]),
+          allItemsHaveEvidence: allDesignEvidenceLists(metadata).every((evidence) => evidence.length > 0),
+          compressionContract: metadata.compressionContract,
+        }
+      : {
+          available: false,
+          reason: "unsupported-or-no-design-review-metadata",
+        },
+    claimBoundary: [
+      FOOKS_COMPARE_CLAIM_BOUNDARY,
+      "Design-review metadata value-proof is source-derived local structure only: not visual/Figma proof, not an accessibility audit, not LSP rename/reference proof, not provider-tokenizer output, not billing tokens, and not runtime hook envelope proof.",
+    ].join(" "),
+  };
+}
+
 function designStressItems(count, factory) {
   return Array.from({ length: count }, (_, index) => factory(index));
 }
@@ -684,6 +754,59 @@ test("design-review metadata covers planned fixture categories conservatively", 
     assertAllDesignItemsHaveEvidence(metadata);
     assertDesignCaps(metadata);
   }
+});
+
+test("design-review local value-proof helper reports bounded source-derived evidence", () => {
+  const evidenceItems = [
+    designReviewLocalValueEvidence(designReviewFixture("TailwindVariantCard.tsx")),
+    designReviewLocalValueEvidence(designReviewFixture("FormStateReview.tsx")),
+  ];
+
+  assert.equal(evidenceItems.length, 2);
+
+  for (const evidence of evidenceItems) {
+    assert.ok(evidence.sourceContext.bytes > 0);
+    assert.ok(evidence.sourceContext.estimatedTokens > 0);
+    assert.equal(evidence.defaultModelFacingContext.hasDesignReviewMetadata, false);
+    assert.equal(evidence.optInModelFacingContext.hasDesignReviewMetadata, true);
+    assert.ok(evidence.optInModelFacingContext.bytes >= evidence.defaultModelFacingContext.bytes);
+    assert.ok(evidence.optInModelFacingContext.estimatedTokens >= evidence.defaultModelFacingContext.estimatedTokens);
+
+    assert.equal(evidence.metadataSummary.available, true);
+    assert.equal(evidence.metadataSummary.schemaVersion, DESIGN_REVIEW_METADATA_SCHEMA_VERSION);
+    assert.equal(evidence.metadataSummary.freshnessMatchesExtraction, true);
+    assert.equal(evidence.metadataSummary.capsRespected, true);
+    assert.equal(evidence.metadataSummary.allItemsHaveEvidence, true);
+    assert.ok(Object.values(evidence.metadataSummary.counts).some((count) => count > 0));
+    assert.equal(evidence.metadataSummary.compressionContract.sourceDerivedOnly, true);
+    assert.equal(evidence.metadataSummary.compressionContract.notVisualProof, true);
+    assert.equal(evidence.metadataSummary.compressionContract.notFigmaBacked, true);
+    assert.equal(evidence.metadataSummary.compressionContract.notAccessibilityAudit, true);
+    assert.equal(evidence.metadataSummary.compressionContract.notLspBacked, true);
+    assert.equal(evidence.metadataSummary.compressionContract.notProviderTokenized, true);
+
+    assert.match(evidence.claimBoundary, /local/);
+    assert.match(evidence.claimBoundary, /not provider tokenizer output/);
+    assert.match(evidence.claimBoundary, /not provider billing tokens|not billing tokens/);
+    assert.match(evidence.claimBoundary, /not provider costs/);
+    assert.match(evidence.claimBoundary, /not runtime hook envelope/);
+    assert.match(evidence.claimBoundary, /not visual\/Figma proof/);
+    assert.match(evidence.claimBoundary, /not an accessibility audit/);
+    assert.match(evidence.claimBoundary, /not LSP rename\/reference proof/);
+  }
+});
+
+test("design-review local value-proof helper reports unsupported TS modules without false metadata", () => {
+  const evidence = designReviewLocalValueEvidence(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"));
+
+  assert.equal(evidence.defaultModelFacingContext.hasDesignReviewMetadata, false);
+  assert.equal(evidence.optInModelFacingContext.hasDesignReviewMetadata, false);
+  assert.deepEqual(evidence.metadataSummary, {
+    available: false,
+    reason: "unsupported-or-no-design-review-metadata",
+  });
+  assert.match(evidence.claimBoundary, /not provider tokenizer output/);
+  assert.match(evidence.claimBoundary, /not visual\/Figma proof/);
 });
 
 test("design-review metadata enforces item caps on over-cap extraction signals", () => {
