@@ -333,6 +333,27 @@ catalog pricing:
   - task median reductions: Utilities summary `78.992%`, Variants refactor
     plan `38.238%`, CSS Parser test strategy `33.582%`.
 
+### Diagnostic OMX payload-surface pilot, 2026-04-24
+
+A separate single-pair diagnostic checked whether the payload-size effect also
+survives the `omx exec` command surface. This was not an installed-hook
+repeated-session benchmark and is not launch-grade runtime evidence. It used one
+Tailwind large file (`packages/tailwindcss/src/utilities.ts`), `gpt-5.4-mini`,
+no tool calls, and compared prompts containing either the full source
+(`213,836` bytes) or real `fooks extract --model-payload` output (`3,517`
+bytes).
+
+| Surface | Full-source input tokens | Fooks-payload input tokens | Input-token reduction | Total-token reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Plain `codex exec` | `65,497` | `13,593` | `79.246%` | `78.996%` |
+| `omx exec` | `63,122` | `11,218` | `82.228%` | `81.962%` |
+
+This supports only a diagnostic command-surface statement: fooks' compact
+model-facing payload stayed much smaller through both plain Codex and OMX command
+surfaces in this controlled no-tool pilot. It does not prove ordinary interactive
+OMX-session savings, installed-hook savings, provider invoices, or stable runtime
+cost reductions.
+
 These larger-profile runs explain why the small fixture lane had only a weak
 cost signal: Codex requests include a fixed wrapper/system overhead, so a small
 local prompt reduction can be diluted. On larger Next.js/Tailwind payloads, the
