@@ -336,7 +336,7 @@ catalog pricing:
 ### Diagnostic OMX payload-surface pilot, 2026-04-24
 
 A separate single-pair diagnostic checked whether the payload-size effect also
-survives the `omx exec` command surface. This was not an installed-hook
+survives the [`omx exec`](https://github.com/Yeachan-Heo/oh-my-codex) command surface from [oh-my-codex (OMX)](https://github.com/Yeachan-Heo/oh-my-codex). This was not an installed-hook
 repeated-session benchmark and is not launch-grade runtime evidence. It used one
 Tailwind large file (`packages/tailwindcss/src/utilities.ts`), `gpt-5.4-mini`,
 no tool calls, and compared prompts containing either the full source
@@ -348,7 +348,7 @@ bytes).
 | Plain `codex exec` | `65,497` | `13,593` | `79.246%` | `78.996%` |
 | `omx exec` | `63,122` | `11,218` | `82.228%` | `81.962%` |
 
-This supports only a diagnostic command-surface statement: fooks' compact
+This is secondary evidence behind the provider-cost snapshot above. It supports only a diagnostic command-surface statement: fooks' compact
 model-facing payload stayed much smaller through both plain Codex and OMX command
 surfaces in this controlled no-tool pilot. It does not prove ordinary interactive
 OMX-session savings, installed-hook savings, provider invoices, or stable runtime
