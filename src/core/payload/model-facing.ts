@@ -1,4 +1,5 @@
 import path from "node:path";
+import { deriveDesignReviewMetadata } from "../design-review-metadata";
 import type { EditGuidance, ExtractionResult, ModelFacingPayload, PatchTarget, PatchTargetKind, SourceFingerprint, SourceRange } from "../schema";
 
 const PATCH_TARGET_LIMIT = 12;
@@ -11,6 +12,7 @@ const EDIT_GUIDANCE_INSTRUCTIONS = [
 
 export type ModelFacingPayloadOptions = {
   includeEditGuidance?: boolean;
+  includeDesignReviewMetadata?: boolean;
 };
 
 function supportsEditGuidance(result: ExtractionResult): boolean {
@@ -184,6 +186,9 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
   const editGuidance = options.includeEditGuidance && supportsEditGuidance(result)
     ? buildEditGuidance(result, fingerprint)
     : undefined;
+  const designReviewMetadata = options.includeDesignReviewMetadata
+    ? deriveDesignReviewMetadata(result)
+    : undefined;
 
   return {
     mode: result.mode,
@@ -193,6 +198,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
     ...(result.componentLoc ? { componentLoc: result.componentLoc } : {}),
     ...(fingerprint ? { sourceFingerprint: fingerprint } : {}),
     ...(editGuidance ? { editGuidance } : {}),
+    ...(designReviewMetadata ? { designReviewMetadata } : {}),
     ...(result.exports.length > 0 ? { exports: result.exports } : {}),
     ...(contract ? { contract } : {}),
     ...(behavior ? { behavior } : {}),

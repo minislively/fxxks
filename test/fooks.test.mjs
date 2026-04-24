@@ -730,15 +730,64 @@ test("design-review helper remains internal and default model-facing payloads st
   const guidedPayload = toModelFacingPayload(tailwindResult, repoRoot, { includeEditGuidance: true });
   const cliPayload = run(["extract", "fixtures/design-review/TailwindVariantCard.tsx", "--model-payload"]);
   const modulePayload = run(["extract", "fixtures/ts-js-beta/module-utils.ts", "--model-payload"]);
-  const rawPayload = toModelFacingPayload(extractFile(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx")), repoRoot);
+  const moduleResult = extractFile(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"));
+  const moduleOptInPayload = toModelFacingPayload(moduleResult, repoRoot, { includeDesignReviewMetadata: true });
+  const rawResult = extractFile(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx"));
+  const rawPayload = toModelFacingPayload(rawResult, repoRoot);
+  const rawOptInPayload = toModelFacingPayload(rawResult, repoRoot, { includeDesignReviewMetadata: true });
 
-  for (const payload of [defaultPayload, guidedPayload, cliPayload, modulePayload, rawPayload]) {
+  const payloadsWithoutDesignMetadata = [
+    defaultPayload,
+    guidedPayload,
+    cliPayload,
+    modulePayload,
+    moduleOptInPayload,
+    rawPayload,
+    rawOptInPayload,
+  ];
+  for (const payload of payloadsWithoutDesignMetadata) {
     assert.equal("designReviewMetadata" in payload, false);
   }
+  assert.deepEqual(rawOptInPayload, rawPayload);
   assert.equal("editGuidance" in defaultPayload, false);
   assert.equal("editGuidance" in guidedPayload, true);
   assert.equal("editGuidance" in cliPayload && "designReviewMetadata" in cliPayload.editGuidance, false);
   assert.equal("editGuidance" in modulePayload, false);
+});
+
+test("model-facing payload can explicitly opt into design-review metadata", () => {
+  const result = extractFile(designReviewFixture("TailwindVariantCard.tsx"));
+  const payload = toModelFacingPayload(result, repoRoot, { includeDesignReviewMetadata: true });
+
+  assert.ok(payload.designReviewMetadata);
+  assert.equal(payload.designReviewMetadata.schemaVersion, DESIGN_REVIEW_METADATA_SCHEMA_VERSION);
+  assert.deepEqual(payload.designReviewMetadata.freshness, {
+    fileHash: result.fileHash,
+    lineCount: result.meta.lineCount,
+  });
+  assert.deepEqual(payload.designReviewMetadata.scope, {
+    kind: "same-component",
+    filePath: result.filePath,
+    componentName: "TailwindVariantCard",
+    componentLoc: result.componentLoc,
+  });
+  assert.equal(payload.designReviewMetadata.compressionContract.sourceDerivedOnly, true);
+  assert.equal(payload.designReviewMetadata.compressionContract.notVisualProof, true);
+  assert.equal(payload.designReviewMetadata.compressionContract.notFigmaBacked, true);
+  assert.equal(payload.designReviewMetadata.compressionContract.notAccessibilityAudit, true);
+  assert.equal(payload.designReviewMetadata.compressionContract.notLspBacked, true);
+  assert.equal(payload.designReviewMetadata.compressionContract.notProviderTokenized, true);
+  assertAllDesignItemsHaveEvidence(payload.designReviewMetadata);
+  assertDesignCaps(payload.designReviewMetadata);
+  assert.equal("editGuidance" in payload, false);
+
+  const guidedPayload = toModelFacingPayload(result, repoRoot, {
+    includeEditGuidance: true,
+    includeDesignReviewMetadata: true,
+  });
+  assert.ok(guidedPayload.editGuidance);
+  assert.ok(guidedPayload.designReviewMetadata);
+  assert.equal("designReviewMetadata" in guidedPayload.editGuidance, false);
 });
 
 test("model-facing payload uses original source for tiny raw fixtures", () => {

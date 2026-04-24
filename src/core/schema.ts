@@ -1,3 +1,5 @@
+import type { DesignReviewMetadataV0 } from "./design-review-metadata";
+
 export type OutputMode = "raw" | "compressed" | "hybrid";
 export type Language = "tsx" | "jsx" | "ts" | "js";
 export type DecisionConfidence = "high" | "medium" | "low";
@@ -182,6 +184,7 @@ export type ModelFacingPayload = {
   };
   snippets?: ExtractionResult["snippets"];
   editGuidance?: EditGuidance;
+  designReviewMetadata?: DesignReviewMetadataV0;
 };
 
 export type PayloadReadiness = {
