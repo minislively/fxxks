@@ -7,6 +7,7 @@ import { runtimeManifestPath } from "../adapters/shared";
 import { CacheMonitor } from "../core/cache-monitor";
 import { adapterDir, canonicalProjectDataDir } from "../core/paths";
 import { discoverProjectFiles } from "../core/discover";
+import { discoverSetupEligibleSources } from "../core/setup-eligibility";
 
 export type DoctorTarget = "all" | "codex" | "claude";
 export type DoctorRuntime = "core" | "codex" | "claude";
@@ -260,15 +261,49 @@ function cacheHealthCheck(cwd: string): DoctorCheck {
 
 function eligibleSourceFilesCheck(cwd: string): DoctorCheck {
   try {
+    const eligible = discoverSetupEligibleSources(cwd);
     const targets = discoverProjectFiles(cwd);
     const components = targets.filter((item) => item.kind === "component");
+    const betaCandidates = eligible.codexTsJsBetaFiles;
+
+    if (components.length > 0) {
+      return {
+        runtime: "core",
+        name: "Eligible source files",
+        status: "pass",
+        message: `Found ${components.length} React .tsx/.jsx component file(s)`,
+        evidence: {
+          componentFileCount: components.length,
+          codexTsJsBetaFileCount: betaCandidates.length,
+          targetCount: targets.length,
+          examples: components.slice(0, 5).map((item) => path.relative(cwd, item.filePath)),
+        },
+      };
+    }
+
+    if (betaCandidates.length > 0) {
+      return {
+        runtime: "core",
+        name: "Eligible source files",
+        status: "pass",
+        message: `Found ${betaCandidates.length} strong Codex .ts/.js beta file(s); Claude/opencode helper setup still requires React .tsx/.jsx components`,
+        fix: "Add a React component if you also want Claude/opencode helper setup, or keep using Codex-only setup for the TS/JS beta path",
+        evidence: {
+          componentFileCount: components.length,
+          codexTsJsBetaFileCount: betaCandidates.length,
+          targetCount: targets.length,
+          examples: betaCandidates.slice(0, 5).map((item) => path.relative(cwd, item)),
+        },
+      };
+    }
+
     return {
       runtime: "core",
       name: "Eligible source files",
-      status: components.length > 0 ? "pass" : "warn",
-      message: components.length > 0 ? `Found ${components.length} React .tsx/.jsx component file(s)` : "No React .tsx/.jsx component files found",
-      fix: components.length > 0 ? undefined : "Add a supported React component or use fooks extract manually for supported files",
-      evidence: { componentFileCount: components.length, targetCount: targets.length, examples: components.slice(0, 5).map((item) => path.relative(cwd, item.filePath)) },
+      status: "warn",
+      message: "No React .tsx/.jsx component files or strong Codex .ts/.js beta files found",
+      fix: "Add a supported React component or a strong TS/JS beta file, or use fooks extract manually for supported files",
+      evidence: { componentFileCount: components.length, codexTsJsBetaFileCount: betaCandidates.length, targetCount: targets.length, examples: [] },
     };
   } catch (error) {
     return {

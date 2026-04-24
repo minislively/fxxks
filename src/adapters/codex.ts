@@ -24,7 +24,7 @@ export function attachCodex(sampleFile: string, cwd = process.cwd(), runtimeBrid
         command: runtimeBridgeCommand,
         supportedHookEvents: ["SessionStart", "UserPromptSubmit", "Stop"],
         scope: {
-          extensions: [".tsx", ".jsx"],
+          extensions: [".tsx", ".jsx", ".ts", ".js"],
           strategy: "session-repeated-read",
         },
         escapeHatches: [...codexRuntimeEscapeHatches()],

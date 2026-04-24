@@ -20,7 +20,7 @@ import {
 } from "../core/session-metrics";
 import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
 
-const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify)\b/i;
+const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const EDIT_GUIDANCE_CONTEXT_MAX_BYTES = 8_192;
 

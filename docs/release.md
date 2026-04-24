@@ -17,7 +17,7 @@ Before a public release, keep the public claim surface aligned to this matrix:
 
 | Environment | Release-ready wording | Do not claim |
 | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup`; strongest path remains repeated same-file React `.tsx` / `.jsx`, with an experimental Codex-first `.ts` / `.js` same-file beta after supported setup when module signals are strong enough | Universal file-read interception, Vue/SFC support, multi-file refactors, Claude/opencode parity, stable/GA TS/JS support, or LSP semantic safety |
+| Codex | Automatic repeated-file hook path through `fooks setup`; strongest path remains repeated same-file React `.tsx` / `.jsx`, with an experimental Codex-first `.ts` / `.js` same-file beta after supported setup when module signals are strong enough, including Codex-only setup for TS/JS repos with a strong beta module | Universal file-read interception, Vue/SFC support, multi-file refactors, Claude/opencode parity, stable/GA TS/JS support, or LSP semantic safety |
 | Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | `Read` interception, full prompt interception parity, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 

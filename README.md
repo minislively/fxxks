@@ -57,7 +57,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 
 | Environment | Current path | Automation level | Do not assume |
 | --- | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Strongest path: repeated same-file `.tsx` / `.jsx` prompts can reuse compact context when safe; experimental same-file `.ts` / `.js` beta is available after supported Codex setup when module signals are strong enough | Universal file-read interception, stable runtime-token wins, provider billing/cost proof, Vue/SFC support, multi-file refactors, or LSP semantic safety |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Strongest path: repeated same-file `.tsx` / `.jsx` prompts can reuse compact context when safe; experimental same-file `.ts` / `.js` beta is available after supported Codex setup, including Codex-only TS/JS setup when a strong beta module exists | Universal file-read interception, stable runtime-token wins, provider billing/cost proof, Vue/SFC support, multi-file refactors, or LSP semantic safety |
 | Claude | Project-local `SessionStart` / `UserPromptSubmit` context hooks plus manual/shared handoff artifacts | Narrower path: first eligible explicit frontend-file prompt is recorded/prepared; a repeated same-file prompt may receive bounded context | `Read` interception, full prompt-interception parity with Codex, or runtime-token savings proof |
 | opencode | Project-local `fooks_extract` tool and `/fooks-extract` slash command | Manual/semi-automatic tool steering | Built-in `read` interception or automatic runtime-token savings |
 

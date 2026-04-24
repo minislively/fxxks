@@ -585,7 +585,6 @@ test("R4 repeated runner success still requires verifier to inspect candidate st
 
 test("Codex wrapper artifacts include structured runtime usage without billing semantics", async () => {
   const tempBin = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-bin-"));
-  const realPath = process.env.PATH;
   const codexPath = path.join(tempBin, "codex");
   try {
     fs.writeFileSync(
@@ -601,9 +600,7 @@ test("Codex wrapper artifacts include structured runtime usage without billing s
       ].join("\n"),
       { mode: 0o755 },
     );
-    process.env.PATH = `${tempBin}${path.delimiter}${realPath}`;
-
-    const wrapper = new CodexWrapper({ model: "test-model", timeoutMs: 1000 });
+    const wrapper = new CodexWrapper({ model: "test-model", timeoutMs: 1000, command: codexPath });
     const result = await wrapper.run("context", "task");
 
     assert.equal(result.success, true);
@@ -623,7 +620,6 @@ test("Codex wrapper artifacts include structured runtime usage without billing s
     );
     assert.match(result.runtimeUsage.claimBoundary, /not provider billing tokens or costs/);
   } finally {
-    process.env.PATH = realPath;
     fs.rmSync(tempBin, { recursive: true, force: true });
   }
 });

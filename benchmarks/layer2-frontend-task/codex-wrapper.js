@@ -14,6 +14,7 @@ class CodexWrapper {
   constructor(options = {}) {
     this.model = options.model || process.env.CODEX_MODEL || 'gpt-5.4-mini';
     this.timeoutMs = Number(options.timeoutMs || process.env.CODEX_TIMEOUT_MS || 300000);
+    this.command = options.command || 'codex';
   }
 
   /**
@@ -45,9 +46,9 @@ class CodexWrapper {
         '-',
       ];
 
-      console.log(`[CodexWrapper] Executing: codex ${args.slice(0, -1).join(' ')} -`);
+      console.log(`[CodexWrapper] Executing: ${this.command} ${args.slice(0, -1).join(' ')} -`);
 
-      const codex = spawn('codex', args, {
+      const codex = spawn(this.command, args, {
         env: { ...process.env },
         timeout: this.timeoutMs,
         stdio: ['pipe', 'pipe', 'pipe'],

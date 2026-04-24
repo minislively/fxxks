@@ -1,6 +1,6 @@
 # Setup fooks
 
-Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, where the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary. Experimental Codex-first `.ts` / `.js` same-file beta depends on an already-supported Codex setup in this release slice; TS/JS-only project setup eligibility is still deferred.
+Use this when you want one explicit command to prepare fooks for a supported frontend repo. Codex remains the automatic repeated-file hook path. Claude setup is narrower: it installs project-local context hooks for `SessionStart` and `UserPromptSubmit`, where the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context, plus manual/shared handoff artifacts. opencode setup remains a bounded project-local tool readiness summary. Experimental Codex-first `.ts` / `.js` same-file beta can now qualify a **Codex-only** setup when a strong beta module exists, but Claude/opencode helper setup is still React-only in this release slice.
 
 ## 1. Install
 
@@ -18,7 +18,7 @@ which fooks
 
 ## 2. Activate a repo
 
-Run this from your React project root:
+Run this from your supported project root:
 
 ```bash
 fooks setup
@@ -119,7 +119,7 @@ When source ranges are present, `fooks extract <file> --model-payload` also emit
 
 Run setup from the project root and confirm the repo has `.tsx` or `.jsx` component files.
 
-Experimental `.ts` / `.js` same-file beta does **not** yet make TS/JS-only projects setup-eligible by themselves. In this release slice, TS/JS beta works after an already-supported Codex setup or through explicit CLI extraction/comparison commands.
+If the repo has no React component files, `fooks setup` can still make **Codex-only** progress when the repo contains a strong same-file `.ts` / `.js` beta module. Claude/opencode helper setup still requires React `.tsx` / `.jsx` components in this release slice.
 
 ### Account context
 

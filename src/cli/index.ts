@@ -71,13 +71,18 @@ function asBase(result: ExtractionResult): Omit<ExtractionResult, "mode"> {
   return rest;
 }
 
-async function resolveAttachSampleFile(cwd = process.cwd()): Promise<string> {
-  const { discoverProjectFiles } = await import("../core/discover.js");
-  const target = discoverProjectFiles(cwd).find((item) => item.kind === "component");
-  if (!target) {
-    throw new Error("No React/TSX component file found for attach contract check");
+async function resolveAttachSampleFile(
+  cwd = process.cwd(),
+): Promise<{ filePath: string; sampleKind: "react-component" | "codex-ts-js-beta" }> {
+  const { discoverSetupEligibleSources } = await import("../core/setup-eligibility.js");
+  const eligible = discoverSetupEligibleSources(cwd);
+  if (!eligible.sampleFile || !eligible.sampleKind) {
+    throw new Error("No React/TSX component file or strong TS/JS beta file found for attach contract check");
   }
-  return target.filePath;
+  return {
+    filePath: eligible.sampleFile,
+    sampleKind: eligible.sampleKind,
+  };
 }
 
 async function initializeProject(cwd = process.cwd()): Promise<{ config: string; cacheDir: string; created: boolean }> {
@@ -246,7 +251,7 @@ function setupClaimBoundaries(): string[] {
     "Codex setup installs the automatic fooks hook path when Codex trust checks pass.",
     "Claude setup installs project-local context hooks for SessionStart/UserPromptSubmit when handoff artifacts and local settings are valid; first eligible frontend-file prompts are recorded/prepared and repeated same-file prompts may receive bounded context; it does not intercept Read/tool calls or claim runtime-token savings.",
     "opencode setup prepares a manual/semi-automatic custom tool and slash command only; it does not intercept read calls or prove runtime-token savings.",
-    "Projects without supported React .tsx/.jsx component candidates stay blocked for automatic setup instead of pretending unrelated files are ready.",
+    "Codex automatic setup requires either a supported React .tsx/.jsx component or a strong same-file TS/JS beta candidate; Claude/opencode helper setup still requires React .tsx/.jsx components.",
   ];
 }
 
@@ -391,14 +396,14 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
   const initialized = await initializeProject(cwd);
   const blockers: string[] = [];
 
-  let sampleFile: string | null = null;
+  let sample: { filePath: string; sampleKind: "react-component" | "codex-ts-js-beta" } | null = null;
   try {
-    sampleFile = await resolveAttachSampleFile(cwd);
+    sample = await resolveAttachSampleFile(cwd);
   } catch (error) {
     blockers.push(error instanceof Error ? error.message : String(error));
   }
 
-  if (!sampleFile) {
+  if (!sample) {
     const { readCodexTrustStatus } = await import("../adapters/codex-runtime-trust.js");
     const status = readCodexTrustStatus(cwd);
     const runtimes: Record<RuntimeName, RuntimeReadiness> = {
@@ -422,8 +427,8 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
       claimBoundaries: setupClaimBoundaries(),
       blockers,
       nextSteps: [
-        "Add a React/TSX component to this project, then run fooks setup again.",
-        "For non-React projects, use fooks extract/scan manually only if you know the files are supported.",
+        "Add a React/TSX component or a strong same-file TS/JS beta file to this project, then run fooks setup again.",
+        "Claude/opencode helper setup still needs a React/TSX component; otherwise use Codex-only setup or fooks extract/compare manually for supported files.",
       ],
     };
   }
@@ -447,7 +452,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
   ]);
 
   const bridgeCommand = `${displayCliName} codex-runtime-hook --native-hook`;
-  const attach = attachCodex(sampleFile, cwd, bridgeCommand);
+  const attach = attachCodex(sample.filePath, cwd, bridgeCommand);
   if (attach.runtimeProof.status === "blocked") {
     blockers.push(attach.runtimeProof.blocker ?? "Codex attach blocked");
   }
@@ -469,20 +474,28 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
   const state: SetupState = ready ? "ready" : "partial";
 
   let claude: RuntimeReadiness;
-  try {
-    const claudeAttach = attachClaude(sampleFile, cwd);
-    const claudeHooks = installClaudeHookPreset(cwd, displayCliName);
-    const claudeStatus = readClaudeRuntimeStatus(cwd);
-    claude = claudeRuntimeReadiness(claudeAttach, claudeHooks, claudeStatus);
-  } catch (error) {
-    claude = blockedClaudeReadiness([`Claude setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+  if (sample.sampleKind === "react-component") {
+    try {
+      const claudeAttach = attachClaude(sample.filePath, cwd);
+      const claudeHooks = installClaudeHookPreset(cwd, displayCliName);
+      const claudeStatus = readClaudeRuntimeStatus(cwd);
+      claude = claudeRuntimeReadiness(claudeAttach, claudeHooks, claudeStatus);
+    } catch (error) {
+      claude = blockedClaudeReadiness([`Claude setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+    }
+  } else {
+    claude = blockedClaudeReadiness(["No React/TSX component file found for Claude handoff check"]);
   }
 
   let opencode: RuntimeReadiness;
-  try {
-    opencode = opencodeRuntimeReadiness(installOpenCodeToolPreset(cwd, displayCliName));
-  } catch (error) {
-    opencode = manualOpenCodeReadiness([`opencode helper setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+  if (sample.sampleKind === "react-component") {
+    try {
+      opencode = opencodeRuntimeReadiness(installOpenCodeToolPreset(cwd, displayCliName));
+    } catch (error) {
+      opencode = manualOpenCodeReadiness([`opencode helper setup failed: ${error instanceof Error ? error.message : String(error)}`]);
+    }
+  } else {
+    opencode = manualOpenCodeReadiness(["No React/TSX component file found for opencode helper check"]);
   }
 
   const runtimes: Record<RuntimeName, RuntimeReadiness> = {
@@ -509,12 +522,16 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
       ? [
           "Open Codex in this repo and work normally; fooks will run through the installed Codex hooks.",
           "Use fooks status codex if you want to inspect the runtime trust state.",
-          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
+          sample.sampleKind === "codex-ts-js-beta"
+            ? "This setup was qualified by a strong Codex TS/JS beta file; Claude/opencode helper setup remains React-only in this slice."
+            : "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
         ]
       : [
           "Fix setup blockers, then run fooks setup again.",
           "Use fooks status codex for current runtime state and inspect the blockers field above.",
-          "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
+          sample.sampleKind === "codex-ts-js-beta"
+            ? "Codex can qualify through a strong TS/JS beta file, but Claude/opencode helper setup still needs a React/TSX component."
+            : "Claude and opencode entries under runtimes are non-fatal readiness summaries; Claude P0 records/prepares first prompts, then uses repeated same-file context hooks only; it is not Read interception or token savings.",
         ],
   };
 }
@@ -525,7 +542,7 @@ function printHelp(displayCliName: string): void {
 Everyday commands:
   ${displayCliName} setup
       Prepare one-command readiness for supported runtimes:
-      - Codex: automatic repeated-file runtime hook path when trust checks pass.
+      - Codex: automatic repeated-file runtime hook path when trust checks pass; strongest React path plus guarded same-file TS/JS beta.
       - Claude: project-local context hooks; first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may receive bounded context; no Read interception or runtime-token claim.
       - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
 
@@ -861,15 +878,18 @@ async function run(): Promise<void> {
       if (runtime !== "codex" && runtime !== "claude") {
         throw new Error("attach expects 'codex' or 'claude'");
       }
-      const sampleFile = await resolveAttachSampleFile();
+      const sample = await resolveAttachSampleFile();
+      if (runtime === "claude" && sample.sampleKind !== "react-component") {
+        throw new Error("attach claude requires a React/TSX component file for handoff check");
+      }
       const result =
         runtime === "codex"
           ? (await import("../adapters/codex.js")).attachCodex(
-              sampleFile,
+              sample.filePath,
               process.cwd(),
               `${displayCliName} codex-runtime-hook --native-hook`,
             )
-          : (await import("../adapters/claude.js")).attachClaude(sampleFile);
+          : (await import("../adapters/claude.js")).attachClaude(sample.filePath);
       print(result);
       return;
     }

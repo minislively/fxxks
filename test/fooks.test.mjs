@@ -178,6 +178,14 @@ function makeTempProject(repositoryUrl = "https://github.com/minislively/temp-pr
   return tempDir;
 }
 
+function makeTempTsJsBetaProject(repositoryUrl = "https://github.com/minislively/temp-ts-js-project.git") {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ts-js-"));
+  fs.mkdirSync(path.join(tempDir, "src", "lib"), { recursive: true });
+  fs.copyFileSync(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"), path.join(tempDir, "src", "lib", "module-utils.ts"));
+  fs.writeFileSync(path.join(tempDir, "package.json"), JSON.stringify({ name: "temp-ts-js-project", repository: { url: repositoryUrl } }, null, 2));
+  return tempDir;
+}
+
 function reductionMetrics(filePath) {
   const result = extractFile(path.resolve(filePath));
   const payload = toModelFacingPayload(result, repoRoot);
@@ -977,6 +985,77 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   );
   assert.equal(afterCorruptState.action, "record");
   assert.equal(afterCorruptState.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+});
+
+test("edit intent detection includes common exact-file coding verbs used by Codex prompts", () => {
+  for (const prompt of [
+    "Please implement fixtures/compressed/FormSection.tsx",
+    "Rename a prop in fixtures/compressed/FormSection.tsx",
+    "Replace the validation branch in fixtures/compressed/FormSection.tsx",
+    "Adjust fixtures/compressed/FormSection.tsx",
+    "Simplify fixtures/compressed/FormSection.tsx",
+    "Rewrite fixtures/compressed/FormSection.tsx",
+  ]) {
+    assert.equal(isEditIntentPrompt(prompt), true, prompt);
+  }
+
+  for (const prompt of [
+    "Explain fixtures/compressed/FormSection.tsx",
+    "Review only fixtures/compressed/FormSection.tsx",
+    "Summarize fixtures/compressed/FormSection.tsx",
+  ]) {
+    assert.equal(isEditIntentPrompt(prompt), false, prompt);
+  }
+});
+
+test("runtime hook treats implement and rename prompts as safe edit-intent guidance candidates", () => {
+  const target = path.join("fixtures", "compressed", "FormSection.tsx");
+
+  const implementSession = `hook-implement-edit-guidance-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: implementSession }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: implementSession,
+      prompt: `Please implement a new validation path in ${target}`,
+    },
+    repoRoot,
+  );
+  const implementSecond = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: implementSession,
+      prompt: `Again, implement the validation change in ${target}`,
+    },
+    repoRoot,
+  );
+  assert.equal(implementSecond.action, "inject");
+  assert.equal(implementSecond.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.equal(implementSecond.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(implementSecond.reasons.includes("edit-guidance-opt-in"), true);
+
+  const renameSession = `hook-rename-edit-guidance-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: renameSession }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: renameSession,
+      prompt: `Please rename a prop in ${target}`,
+    },
+    repoRoot,
+  );
+  const renameSecond = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: renameSession,
+      prompt: `Again, rename the prop in ${target}`,
+    },
+    repoRoot,
+  );
+  assert.equal(renameSecond.action, "inject");
+  assert.equal(renameSecond.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.equal(renameSecond.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(renameSecond.reasons.includes("edit-guidance-opt-in"), true);
 });
 
 test("runtime hook gates edit guidance to repeated exact-file edit intent prompts", () => {
@@ -1971,8 +2050,38 @@ test("setup reports blocked state for projects without React components", () => 
   assert.ok(result.scope.projectLocal.paths.includes(path.join(setupProjectRoot, ".fooks", "config.json")));
   assert.deepEqual(result.scope.userRuntime.paths, []);
   assert.ok(result.scope.nonGoals.some((item) => item.includes("No interactive setup prompt")));
-  assert.ok(result.blockers.some((item) => item.includes("No React/TSX component file found")));
-  assert.ok(result.nextSteps.some((item) => item.includes("Add a React/TSX component")));
+  assert.ok(result.blockers.some((item) => item.includes("No React/TSX component file or strong TS/JS beta file found")));
+  assert.ok(result.nextSteps.some((item) => item.includes("Add a React/TSX component or a strong same-file TS/JS beta file")));
+});
+
+test("setup can become Codex-ready for TS/JS-only beta projects while Claude and opencode stay React-only", () => {
+  const tempDir = makeTempTsJsBetaProject("https://github.com/example-org/temp-ts-js-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const env = {
+    FOOKS_ACTIVE_ACCOUNT: "",
+    FOOKS_TARGET_ACCOUNT: "",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  };
+
+  const result = run(["setup"], tempDir, env);
+
+  assert.equal(result.ready, true);
+  assert.equal(result.state, "ready");
+  assert.equal(result.runtimes.codex.ready, true);
+  assert.equal(result.runtimes.codex.state, "automatic-ready");
+  assert.equal(result.runtimes.claude.ready, false);
+  assert.equal(result.runtimes.claude.state, "blocked");
+  assert.equal(result.runtimes.opencode.ready, false);
+  assert.equal(result.runtimes.opencode.state, "manual-step-required");
+  assert.equal(fs.existsSync(path.join(tempDir, ".opencode")), false);
+  assert.ok(result.nextSteps.some((item) => item.includes("Codex TS/JS beta file")));
+
+  const codexAttach = result.attach ?? result.runtimes.codex.details?.attach;
+  assert.ok(codexAttach);
+  const manifest = JSON.parse(fs.readFileSync(runtimeManifestPath(codexAttach), "utf8"));
+  assert.deepEqual(manifest.runtimeBridge.scope.extensions, [".tsx", ".jsx", ".ts", ".js"]);
 });
 
 test("cli help advertises setup and package install has no auto hook side effects", () => {
@@ -2089,6 +2198,29 @@ test("doctor codex passes after isolated setup and reports readiness evidence", 
   assert.equal(manifest.evidence.bridgeCommandPlausible, true);
   assert.equal(result.checks.find((item) => item.name === "Codex trust status").status, "pass");
   assert.equal(result.checks.find((item) => item.name === "Eligible source files").status, "pass");
+});
+
+test("doctor codex recognizes TS/JS-only beta setup candidates", () => {
+  const tempDir = makeTempTsJsBetaProject("https://github.com/example-org/temp-ts-js-project.git");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+  const env = {
+    FOOKS_ACTIVE_ACCOUNT: "",
+    FOOKS_TARGET_ACCOUNT: "",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  };
+
+  const setup = run(["setup"], tempDir, env);
+  assert.equal(setup.ready, true);
+
+  const result = run(["doctor", "codex", "--json"], tempDir, env);
+  const eligible = result.checks.find((item) => item.name === "Eligible source files");
+  assert.equal(result.healthy, true);
+  assert.equal(eligible.status, "pass");
+  assert.match(eligible.message, /strong Codex \.ts\/\.js beta file/);
+  assert.equal(eligible.evidence.componentFileCount, 0);
+  assert.equal(eligible.evidence.codexTsJsBetaFileCount >= 1, true);
 });
 
 test("doctor aggregate treats Claude-only blockers as warnings when Codex is ready", () => {
@@ -2999,7 +3131,8 @@ test("docs describe local compare estimates without billing-cost claims", () => 
 ${setup}
 ${release}`;
 
-  assert.match(readme, /Smaller model-facing context for.*Codex/);
+  assert.match(readme, /Smaller model-facing context for repeated same-file work in Codex\./);
+  assert.match(readme, /Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization\./);
   assert.match(combined, /fooks compare src\/components\/Button\.tsx/);
   assert.match(combined, /local model-facing payload estimate|local file-level estimate/);
   assert.match(combined, /TypeScript AST-derived/);
@@ -3119,6 +3252,41 @@ test("attach codex proves contract and runtime under minislively account context
   assert.equal(status.lifecycleState, "ready");
   assert.ok(status.attachedAt);
   assert.ok(status.lastScanAt);
+});
+
+test("attach claude rejects Codex-only TS/JS beta projects before handoff check", () => {
+  const tempDir = makeTempProject();
+  for (const file of [
+    path.join(tempDir, "src", "components", "SimpleButton.tsx"),
+    path.join(tempDir, "src", "components", "FormSection.tsx"),
+    path.join(tempDir, "src", "components", "DashboardPanel.tsx"),
+    path.join(tempDir, "src", "components", "DateBadge.tsx"),
+  ]) {
+    fs.rmSync(file, { force: true });
+  }
+
+  assert.throws(
+    () => run(["attach", "claude"], tempDir),
+    /attach claude requires a React\/TSX component file for handoff check/,
+  );
+});
+
+test("attach codex can still use a strong TS/JS beta project sample", () => {
+  const tempDir = makeTempProject();
+  for (const file of [
+    path.join(tempDir, "src", "components", "SimpleButton.tsx"),
+    path.join(tempDir, "src", "components", "FormSection.tsx"),
+    path.join(tempDir, "src", "components", "DashboardPanel.tsx"),
+    path.join(tempDir, "src", "components", "DateBadge.tsx"),
+  ]) {
+    fs.rmSync(file, { force: true });
+  }
+
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const result = run(["attach", "codex"], tempDir, { FOOKS_CODEX_HOME: codexHome });
+  assert.equal(result.runtime, "codex");
+  assert.equal(result.contractProof.passed, true);
+  assert.equal(result.runtimeProof.status, "passed");
 });
 
 test("attach claude can report blocker without failing contract proof", () => {
