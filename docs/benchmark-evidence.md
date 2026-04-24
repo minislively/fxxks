@@ -29,7 +29,8 @@ claim boundaries:
 
 | Level | Evidence source | What it can support | What it cannot support yet |
 | --- | --- | --- | --- |
-| L0 | Local prompt/context-size estimates such as `promptTokensApprox`, `fooks status`, `fooks compare`, and prepared-context benchmark payload accounting | Prepared-context / prompt-size reduction wording | Provider billing tokens, billed costs, or stable runtime-token/time wins |
+| L0 | Local prompt/context-size estimates such as `promptTokensApprox`, `fooks status`, `fooks compare`, and prepared-context benchmark payload accounting | Prepared-context / prompt-size reduction wording | Provider billing tokens, billed costs, provider-tokenizer behavior, or stable runtime-token/time wins |
+| L0p | Optional provider/model tokenizer proof for an isolated fixture/payload, if added later under the [provider tokenizer boundary](provider-tokenizer-boundary.md) | Provider/model-tokenizer accounting for that named provider/model and payload shape | Default `fooks compare`, provider billing tokens, billed costs, runtime hook envelope overhead, or invoice/dashboard proof |
 | L1 | Codex CLI runtime-reported telemetry parsed from matched run artifacts | Narrow internal runtime-token candidate evidence for one task/model/setup identity when accepted-pair gates pass | Provider billing-token/cost claims or stable public runtime-win wording |
 | L2a | Provider usage-token artifacts converted into estimated API cost under explicit pricing assumptions | Estimate-scoped provider-usage / estimated API-cost wording with pricing caveats | Invoice/dashboard/billed-cost claims |
 | L2b | Provider invoice, billing export, dashboard, or matched billed-usage telemetry | Billing-grade provider token/cost wording | Any broader product win beyond the measured scope |

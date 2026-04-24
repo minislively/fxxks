@@ -33,7 +33,7 @@ If the answer you want sounds like “Vue?”, “broader TS/JS?”, “multi-fi
 
 | Lane | Stronger claim it could unlock | Current boundary |
 | --- | --- | --- |
-| Provider tokenizer parity | Better provider-tokenized prompt accounting. | `fooks compare` remains a local model-facing estimate, not provider tokenizer behavior. |
+| Provider tokenizer parity | Optional proof-only provider/model tokenizer accounting for isolated fixtures/payloads; see [Provider tokenizer proof boundary](provider-tokenizer-boundary.md). | `fooks compare` remains a local, dependency-free model-facing estimate; provider-tokenizer proof is not billing/cost/runtime-envelope proof. |
 | Billing/dashboard reconciliation | Billing-grade wording for a measured scope. | Current benchmark evidence is not provider invoice/dashboard or actual charged-cost proof. |
 | ccusage-style usage-log import boundaries | Better review bridges between local estimates, provider usage logs, and billing exports. | `fooks status` is local context-size telemetry only and is not a `ccusage` replacement. |
 | Stable runtime-token/time benchmark class | Public runtime-token or latency wording if repeated quality-gated runs support it. | Existing direct runtime-token/time evidence is unstable or negative in documented diagnostics. |
