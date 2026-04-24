@@ -151,6 +151,17 @@ pair order.
 
 Task-median reductions for the larger profiles were Next.js App Router summary `30.681%`, Layout Router refactor plan `28.699%`, Error Boundary test strategy `19.447%`; Tailwind Utilities summary `78.992%`, Variants refactor plan `38.238%`, CSS Parser test strategy `33.582%`.
 
+### Diagnostic OMX payload-surface pilot
+
+A 2026-04-24 single-pair diagnostic checked whether the same fooks payload advantage survives the `omx exec` command surface. This is **not** an installed-hook repeated-session benchmark and is **not** stable public runtime evidence yet. It compared one Tailwind large file (`packages/tailwindcss/src/utilities.ts`) as full source (`213,836` bytes) versus real `fooks extract --model-payload` output (`3,517` bytes), with no tool calls, using `gpt-5.4-mini`.
+
+| Surface | Full-source input tokens | Fooks-payload input tokens | Input-token reduction | Total-token reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Plain `codex exec` | `65,497` | `13,593` | 79.246% | 78.996% |
+| `omx exec` | `63,122` | `11,218` | 82.228% | 81.962% |
+
+This supports only a narrow diagnostic statement: for this controlled no-tool Tailwind payload pilot, fooks' model-facing payload stayed much smaller through both plain Codex and OMX command surfaces. It does **not** prove that ordinary interactive OMX sessions, installed hooks, provider invoices, or stable runtime costs drop by the same amount.
+
 Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
 The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider billing-token proof, and not a Claude or opencode automatic savings claim.
