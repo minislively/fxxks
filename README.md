@@ -21,6 +21,7 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 - **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
 - **Benchmark impact:** the latest launch-grade evidence is estimate-scoped API cost, not billing proof: the corrected 2026-04-22 Codex OAuth campaign accepted 15/15 matched pairs and reduced median estimated OpenAI API cost by 4.171% under recorded pricing assumptions; larger Next.js and Tailwind profiles reported 26.492% and 38.238% median estimated API-cost reductions.
 - **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
+- **Usage-log boundary:** fooks is not a `ccusage` replacement and does not parse private usage logs by default; see [`docs/usage-log-boundary.md`](docs/usage-log-boundary.md).
 
 ## Quick start and local proof
 

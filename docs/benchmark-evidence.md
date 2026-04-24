@@ -139,6 +139,8 @@ charge, or billing-grade savings proof. It also does not establish stable
 runtime-token or wall-clock wins. Public summaries must label this tier as
 `estimated-api-cost-only` until a separate billing-grade validation lane exists.
 
+Provider-cost evidence is also separate from ccusage-style usage-log reporting. fooks does not parse private runtime/provider usage logs by default; the product decision and optional future local-only import constraints are documented in [`usage-log-boundary.md`](usage-log-boundary.md).
+
 The billing import reconciliation lane is intentionally offline and local. It
 accepts provider invoice/dashboard/export/manual data that has already been
 redacted by the operator, compares provider/model/period/source/usage/billed
