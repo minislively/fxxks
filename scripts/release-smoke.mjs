@@ -245,7 +245,7 @@ fs.writeFileSync(
     "",
   ].join("\n"),
 );
-const setupStdout = execFileSync(fooksBin, ["setup"], {
+const setupStdout = execFileSync(fooksBin, ["setup", "--json"], {
   cwd: project,
   encoding: "utf8",
   env: {

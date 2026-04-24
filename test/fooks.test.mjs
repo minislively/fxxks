@@ -2263,7 +2263,7 @@ test("setup prepares explicit one-time Codex activation", () => {
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
   const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
 
-  const result = run(["setup"], tempDir, {
+  const result = run(["setup", "--json"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "minislively",
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,
@@ -2299,12 +2299,36 @@ test("setup prepares explicit one-time Codex activation", () => {
   assert.equal(hooks.hooks.Stop[0].hooks[0].command, "fooks codex-runtime-hook --native-hook");
 });
 
+test("setup default output is human-readable and points to --json for details", () => {
+  const tempDir = makeTempProject();
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
+  const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
+
+  const output = runText(["setup"], tempDir, {
+    FOOKS_ACTIVE_ACCOUNT: "minislively",
+    FOOKS_CODEX_HOME: codexHome,
+    FOOKS_CLAUDE_HOME: claudeHome,
+  });
+
+  assert.match(output, /^fooks setup: ready/m);
+  assert.match(output, /Runtimes/);
+  assert.match(output, /Codex: ready \(automatic-ready\)/);
+  assert.match(output, /Claude: ready \(context-hook-ready\)/);
+  assert.match(output, /opencode: ready \(tool-ready\)/);
+  assert.match(output, /fooks setup --json/);
+  assert.doesNotMatch(output.trim(), /^\{/);
+  assert.doesNotMatch(output, /"runtimeProof"/);
+  assert.doesNotMatch(output, /"runtimes"/);
+  assert.doesNotMatch(output, /Claude P0/);
+  assert.doesNotMatch(output, /runtime-token savings/);
+});
+
 test("setup can become ready for a public repo without an active account override", () => {
   const tempDir = makeTempProject("https://github.com/example-org/temp-project.git");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
   const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
 
-  const result = run(["setup"], tempDir, {
+  const result = run(["setup", "--json"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "",
     FOOKS_TARGET_ACCOUNT: "",
     FOOKS_CODEX_HOME: codexHome,
@@ -2334,13 +2358,13 @@ test("setup is idempotent and preserves unrelated Codex hooks", () => {
   }, null, 2));
 
   const env = { FOOKS_ACTIVE_ACCOUNT: "minislively", FOOKS_CODEX_HOME: codexHome, FOOKS_CLAUDE_HOME: claudeHome };
-  const first = run(["setup"], tempDir, env);
+  const first = run(["setup", "--json"], tempDir, env);
   assert.equal(first.ready, true);
   assert.equal(first.runtimes.opencode.state, "tool-ready");
   assert.equal(first.hooks.modified, true);
   assert.ok(first.hooks.backupPath);
 
-  const second = run(["setup"], tempDir, env);
+  const second = run(["setup", "--json"], tempDir, env);
   assert.equal(second.ready, true);
   assert.equal(second.runtimes.opencode.state, "tool-ready");
   assert.equal(second.hooks.modified, false);
@@ -2361,7 +2385,7 @@ test("setup reports partial activation without false ready claims when attach is
   // Use invalid codex home to trigger actual blocking (not account-based)
   const codexHome = path.join(tempDir, ".nonexistent-codex-home");
 
-  const result = run(["setup"], tempDir, {
+  const result = run(["setup", "--json"], tempDir, {
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: path.join(tempDir, ".missing-claude-home"),
   });
@@ -2387,7 +2411,7 @@ test("setup reports partial activation when Codex hooks cannot be parsed", () =>
   const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
   fs.writeFileSync(path.join(codexHome, "hooks.json"), "{not-json");
 
-  const result = run(["setup"], tempDir, {
+  const result = run(["setup", "--json"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "minislively",
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,
@@ -2415,7 +2439,7 @@ test("setup reports partial activation when the Codex runtime manifest path cann
   fs.mkdirSync(path.dirname(blockedAttachmentsPath), { recursive: true });
   fs.writeFileSync(blockedAttachmentsPath, "blocked");
 
-  const result = run(["setup"], tempDir, {
+  const result = run(["setup", "--json"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "minislively",
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,
@@ -2439,7 +2463,7 @@ test("setup reports blocked state for projects without React components", () => 
   fs.writeFileSync(path.join(tempDir, "package.json"), JSON.stringify({ name: "empty", repository: { url: "https://github.com/minislively/empty.git" } }, null, 2));
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
 
-  const result = run(["setup"], tempDir, { FOOKS_CODEX_HOME: codexHome });
+  const result = run(["setup", "--json"], tempDir, { FOOKS_CODEX_HOME: codexHome });
 
   assert.equal(result.ready, false);
   assert.equal(result.state, "blocked");
@@ -2473,7 +2497,7 @@ test("setup can become Codex-ready for TS/JS-only beta projects while Claude and
     FOOKS_CLAUDE_HOME: claudeHome,
   };
 
-  const result = run(["setup"], tempDir, env);
+  const result = run(["setup", "--json"], tempDir, env);
 
   assert.equal(result.ready, true);
   assert.equal(result.state, "ready");
@@ -2591,7 +2615,7 @@ test("doctor codex passes after isolated setup and reports readiness evidence", 
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,
   };
-  const setup = run(["setup"], tempDir, env);
+  const setup = run(["setup", "--json"], tempDir, env);
   assert.equal(setup.ready, true);
 
   const result = run(["doctor", "codex", "--json"], tempDir, env);
@@ -2619,7 +2643,7 @@ test("doctor codex recognizes TS/JS-only beta setup candidates", () => {
     FOOKS_CLAUDE_HOME: claudeHome,
   };
 
-  const setup = run(["setup"], tempDir, env);
+  const setup = run(["setup", "--json"], tempDir, env);
   assert.equal(setup.ready, true);
 
   const result = run(["doctor", "codex", "--json"], tempDir, env);
@@ -2641,7 +2665,7 @@ test("doctor aggregate treats Claude-only blockers as warnings when Codex is rea
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,
   };
-  const setup = run(["setup"], tempDir, env);
+  const setup = run(["setup", "--json"], tempDir, env);
   assert.equal(setup.ready, true);
   assert.equal(setup.runtimes.claude.blocksOverall, false);
 
@@ -2700,7 +2724,7 @@ test("doctor is read-only for prepared project, Codex, and Claude paths", () => 
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,
   };
-  run(["setup"], tempDir, env);
+  run(["setup", "--json"], tempDir, env);
   const beforeProject = fileSnapshot(tempDir);
   const beforeCodex = fileSnapshot(codexHome);
   const beforeClaude = fileSnapshot(claudeHome);
@@ -2720,7 +2744,7 @@ test("setup runtime summary keeps Claude and opencode claims bounded", () => {
   const tempDir = makeTempProject();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
   const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-claude-home-"));
-  const result = run(["setup"], tempDir, {
+  const result = run(["setup", "--json"], tempDir, {
     FOOKS_ACTIVE_ACCOUNT: "minislively",
     FOOKS_CODEX_HOME: codexHome,
     FOOKS_CLAUDE_HOME: claudeHome,

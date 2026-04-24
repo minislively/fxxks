@@ -102,9 +102,11 @@ When source ranges are present, `fooks extract <file> --model-payload` also emit
 | `partial` | Some setup work succeeded, but a blocker remains. Read `blockers` / `nextSteps`, fix, then rerun `fooks setup`. |
 | `blocked` | fooks could not activate this repo, usually because no supported React component was found. |
 
-`fooks setup` also returns a `scope` object that summarizes global CLI install boundaries, current-project paths, and user-runtime/home paths. The `scope.packageInstall.mutatedBySetup` flag is `false` because `setup` does not run `npm install`; project-local paths are under the current repo, while runtime-home paths identify files such as Codex hooks/manifests.
+By default, `fooks setup` prints a short human-readable readiness summary. Use `fooks setup --json` for the full machine-readable setup result.
 
-`fooks setup` also returns a `runtimes` object:
+`fooks setup --json` returns a `scope` object that summarizes global CLI install boundaries, current-project paths, and user-runtime/home paths. The `scope.packageInstall.mutatedBySetup` flag is `false` because `setup` does not run `npm install`; project-local paths are under the current repo, while runtime-home paths identify files such as Codex hooks/manifests.
+
+`fooks setup --json` also returns a `runtimes` object:
 
 | Runtime field | Ready state | Meaning |
 | --- | --- | --- |

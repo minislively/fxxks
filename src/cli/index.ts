@@ -130,6 +130,10 @@ type RuntimeReadiness = {
   notes: string[];
 };
 
+type SetupCliOptions = {
+  json: boolean;
+  help: boolean;
+};
 
 type SetupScopeSummary = {
   schemaVersion: 1;
@@ -261,6 +265,85 @@ function setupSummary(runtimes: Record<RuntimeName, RuntimeReadiness>): string[]
     `claude:${runtimes.claude.state}${runtimes.claude.ready ? ":ready" : ":not-ready"}`,
     `opencode:${runtimes.opencode.state}${runtimes.opencode.ready ? ":ready" : ":not-ready"}`,
   ];
+}
+
+function parseSetupArgs(args: string[]): SetupCliOptions {
+  let json = false;
+  let help = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      help = true;
+      continue;
+    }
+    throw new Error(`Unexpected setup argument: ${arg}`);
+  }
+
+  return { json, help };
+}
+
+function setupHelp(displayCliName: string): string {
+  return `Usage: ${displayCliName} setup [--json]\n\nPrepare fooks for this project.\n\nDefault output is a short human-readable readiness summary.\nUse --json for full machine-readable setup details, including paths and runtime manifests.\n`;
+}
+
+function formatRuntimeReadiness(label: string, runtime: RuntimeReadiness | undefined): string {
+  if (!runtime) {
+    return `  - ${label}: not checked`;
+  }
+  const status = runtime.ready ? "ready" : runtime.blocksOverall ? "blocked" : "not ready";
+  return `  - ${label}: ${status} (${runtime.state})`;
+}
+
+function setupResultStringArray(result: Record<string, unknown>, key: string): string[] {
+  const value = result[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function formatSetupResult(result: Record<string, unknown>): string {
+  const ready = result.ready === true;
+  const state = typeof result.state === "string" ? result.state : ready ? "ready" : "unknown";
+  const runtimes = isRecord(result.runtimes)
+    ? (result.runtimes as Partial<Record<RuntimeName, RuntimeReadiness>>)
+    : {};
+  const blockers = setupResultStringArray(result, "blockers");
+  const rawNextSteps = setupResultStringArray(result, "nextSteps");
+  const nextSteps = ready
+    ? [
+        "Open your agent in this repo and work normally.",
+        "Run `fooks doctor` only if you want a local health check.",
+      ]
+    : rawNextSteps.slice(0, 3);
+
+  const lines = [
+    `fooks setup: ${state}`,
+    "",
+    "Runtimes",
+    formatRuntimeReadiness("Codex", runtimes.codex),
+    formatRuntimeReadiness("Claude", runtimes.claude),
+    formatRuntimeReadiness("opencode", runtimes.opencode),
+    "",
+    "What this means",
+    ready
+      ? "  - This project is prepared. Open your agent in this repo and work normally."
+      : "  - Setup did not fully finish. Fix the blocker(s), then run `fooks setup` again.",
+    "  - Package install is separate; setup does not run npm install or update the global CLI.",
+  ];
+
+  if (blockers.length > 0) {
+    lines.push("", "Blockers", ...blockers.map((blocker) => `  - ${blocker}`));
+  }
+
+  if (nextSteps.length > 0) {
+    lines.push("", "Next", ...nextSteps.map((step) => `  - ${step}`));
+  }
+
+  lines.push("", "Details", "  - Run `fooks setup --json` for full paths, manifests, and hook evidence.");
+
+  return `${lines.join("\n")}\n`;
 }
 
 function codexRuntimeReadiness(
@@ -545,6 +628,7 @@ Everyday commands:
       - Codex: automatic repeated-file runtime hook path when trust checks pass; strongest React path plus guarded same-file TS/JS beta.
       - Claude: project-local context hooks; first eligible frontend-file prompts are recorded/prepared, repeated same-file prompts may receive bounded context; no Read interception or runtime-token claim.
       - opencode: manual/semi-automatic custom tool and slash command; no read interception or runtime-token claim.
+      Use ${displayCliName} setup --json for full machine-readable setup details.
 
   ${displayCliName} doctor [codex|claude] [--json]
       Read-only local setup and runtime hook readiness diagnostics.
@@ -779,7 +863,25 @@ async function run(): Promise<void> {
       return;
     }
     case "setup": {
-      print(await runSetup(displayCliName, process.cwd()));
+      let options: SetupCliOptions;
+      try {
+        options = parseSetupArgs(rest);
+      } catch (error) {
+        console.error(`fooks setup: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(setupHelp(displayCliName));
+        process.exitCode = 1;
+        return;
+      }
+      if (options.help) {
+        process.stdout.write(setupHelp(displayCliName));
+        return;
+      }
+      const result = await runSetup(displayCliName, process.cwd());
+      if (options.json) {
+        print(result);
+      } else {
+        process.stdout.write(formatSetupResult(result));
+      }
       return;
     }
     case "doctor": {

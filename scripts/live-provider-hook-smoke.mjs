@@ -284,7 +284,7 @@ const codexHooksBackup = path.join(project, ".fooks", "codex-hooks.backup.json")
 const codexHooksExisted = copyIfExists(codexHooksPath, codexHooksBackup);
 
 try {
-  const setup = parseJson(run(fooksBin, ["setup"], { cwd: project, env }), "fooks setup");
+  const setup = parseJson(run(fooksBin, ["setup", "--json"], { cwd: project, env }), "fooks setup");
   assert(setup.runtimes?.codex?.state === "automatic-ready", `Codex setup was not automatic-ready: ${setup.runtimes?.codex?.state}`);
   assert(setup.runtimes?.claude?.state === "context-hook-ready", `Claude setup was not context-hook-ready: ${setup.runtimes?.claude?.state}`);
 
