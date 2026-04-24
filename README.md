@@ -19,6 +19,7 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 - **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
 - **Roadmap asks, not current support:** Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
 - **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
+- **Benchmark impact:** the latest launch-grade evidence is estimate-scoped API cost, not billing proof: the corrected 2026-04-22 Codex OAuth campaign accepted 15/15 matched pairs and reduced median estimated OpenAI API cost by 4.171% under recorded pricing assumptions; larger Next.js and Tailwind profiles reported 26.492% and 38.238% median estimated API-cost reductions.
 - **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
 
 ## Quick start and local proof
@@ -126,7 +127,9 @@ Current public summary:
 
 - Local commands support **model-facing context / prompt-size estimate** wording.
 - The 2026-04-14 Codex-oriented proxy snapshot showed a prepared-context estimate reduction from roughly 2.1M to 450K estimated context tokens in a 5-task sample, with no success-rate regression in that sample.
-- Later benchmark lanes include estimate-scoped API-cost evidence, but that wording must stay qualified as **estimated API cost under explicit pricing assumptions**.
+- The corrected 2026-04-22 Codex OAuth provider-cost campaign reached launch-grade estimated-cost evidence for the small fixture lane: 3 task classes × 5 accepted matched pairs, 0 command-execution events, 15/15 accepted, an overall median estimated API-cost reduction of 4.171%, and aggregate estimated API cost of `$0.588855` baseline vs `$0.5547775` fooks (`$0.0340775`, 5.787% lower) under the recorded pricing assumption. Provider-reported usage tokens in that campaign were `376,104` baseline vs `372,065` fooks; 4/15 individual pairs still regressed.
+- Larger corrected public-code profiles made the impact easier to see under the same estimate-scoped boundary: the Next.js profile reported 15/15 accepted pairs, 0 regressions, median estimated API-cost reduction of 26.492%, provider-reported usage tokens `446,275` baseline vs `382,139` fooks, and aggregate estimated API cost `$0.88386` vs `$0.64497`; the Tailwind profile reported 15/15 accepted pairs, 0 regressions, median estimated API-cost reduction of 38.238%, provider-reported usage tokens `718,616` baseline vs `381,583` fooks, and aggregate estimated API cost `$1.598875` vs `$0.64853`.
+- These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove invoice/dashboard savings, actual charged-cost savings, provider billing-token savings, stable runtime-token savings, or stable wall-clock/latency savings.
 - Direct runtime-token/time evidence remains unstable or negative in some diagnostics, so fooks does not claim stable runtime-token, wall-clock, or latency wins.
 
 Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md

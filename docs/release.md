@@ -84,6 +84,21 @@ acceptance in both modes, so it remained `insufficient-accepted-pairs` and
 produced no comparable accepted-pair medians. Do not use this rerun as a win
 claim; it only reinforces the current release boundary.
 
+Release copy should also keep the positive L2a impact visible when it is labeled
+correctly. The curated benchmark evidence records a corrected 2026-04-22 Codex
+OAuth provider-cost campaign with `launch-grade-estimated-cost-evidence`: 3 task
+classes × 5 accepted matched pairs, 0 command-execution events, 15/15 accepted,
+and a 4.171% overall median estimated API-cost reduction under the recorded
+pricing assumption. Larger corrected public-code profiles also reached
+launch-grade estimated-cost evidence: Next.js reported a 26.492% median
+estimated API-cost reduction with provider-reported usage tokens `446,275`
+baseline vs `382,139` fooks, and Tailwind reported a 38.238% median estimated
+API-cost reduction with provider-reported usage tokens `718,616` baseline vs
+`381,583` fooks. This is L2a estimated-cost evidence only: it is not provider
+invoice/dashboard proof, actual charged-cost proof, provider billing-token
+savings, stable runtime-token/time proof, or a Claude/opencode automatic savings
+claim.
+
 A user who already has another global `fooks` binary may see command conflicts. Ask them to inspect their global npm binaries before installing or reinstall into a clean prefix when debugging:
 
 ```bash
@@ -97,7 +112,7 @@ npm ls -g --depth=0 | grep -E 'fooks|oh-my-fooks'
 | Risk | Current disposition | Release implication |
 | --- | --- | --- |
 | `npm publish` not run | Keep unresolved until explicit human approval; use `npm run release:smoke` and `npm publish --dry-run` only for proof. | Blocks real publication, not docs/code PR merge. |
-| Layer 2 stable applied-code / multi-task evidence absent | Applied repeated diagnostics exist but are negative/insufficient: the pre-launch run accepted only 4/7 pairs and regressed on CLI runtime/time medians; the same-day risk-closure rerun accepted 0/3 pairs before stopping. Multi-task evidence still does not exist. | Blocks stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording. |
+| Layer 2 stable applied-code / runtime-token evidence absent | Applied repeated diagnostics exist but are negative/insufficient: the pre-launch run accepted only 4/7 pairs and regressed on CLI runtime/time medians; the same-day risk-closure rerun accepted 0/3 pairs before stopping. Separate corrected provider-cost campaigns do show launch-grade L2a estimated API-cost reductions under recorded pricing assumptions, including larger Next.js/Tailwind profiles, but they are not applied-code, runtime-token/time, or billing-grade proof. | Blocks stable Layer 2 runtime-token/time win claims and applied-code benchmark-win wording; allows only estimate-scoped API-cost wording. |
 | Direct-Codex runtime-token regression | Negative/unstable Formbricks evidence is documented and linked. | Blocks stable runtime-token/time win claims. |
 | Local `fooks status` estimates | Bare status is documented as local context-size telemetry only. | Blocks billing-token, provider-cost, or `ccusage` replacement wording. |
 | Claude/opencode automatic savings | Claude now has bounded project-local context hooks that record/prepare the first eligible frontend-file prompt, then add repeated same-file context, but no measured runtime-token savings and no `Read` interception. opencode remains a manual/semi-automatic tool bridge. | Keep Claude context-hook wording and opencode tool wording only. |
