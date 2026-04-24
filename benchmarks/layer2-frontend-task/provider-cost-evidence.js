@@ -352,8 +352,12 @@ function formatValue(value, suffix = '') {
 }
 
 function renderProviderCostEvidenceMarkdown(evidence) {
-  const total = evidence.deltas.estimatedApiCostTotal;
-  const token = evidence.deltas.totalTokens;
+  const inputToken = evidence.deltas.inputTokens;
+  const outputToken = evidence.deltas.outputTokens;
+  const totalToken = evidence.deltas.totalTokens;
+  const inputCost = evidence.deltas.estimatedApiCostInput;
+  const outputCost = evidence.deltas.estimatedApiCostOutput;
+  const totalCost = evidence.deltas.estimatedApiCostTotal;
   const currency = evidence.pricingAssumption.currency;
 
   return [
@@ -372,8 +376,12 @@ function renderProviderCostEvidenceMarkdown(evidence) {
     '',
     '## Estimated deltas',
     '',
-    `- Total tokens reduction: ${formatPct(token.reductionPct)} (${formatValue(token.absolute, ' tokens')})`,
-    `- Estimated total API cost reduction: ${formatPct(total.reductionPct)} (${formatValue(total.absolute, ` ${currency}`)})`,
+    `- Input tokens reduction: ${formatPct(inputToken.reductionPct)} (${formatValue(inputToken.absolute, ' tokens')})`,
+    `- Output tokens reduction: ${formatPct(outputToken.reductionPct)} (${formatValue(outputToken.absolute, ' tokens')})`,
+    `- Total tokens reduction: ${formatPct(totalToken.reductionPct)} (${formatValue(totalToken.absolute, ' tokens')})`,
+    `- Estimated input API cost reduction: ${formatPct(inputCost.reductionPct)} (${formatValue(inputCost.absolute, ` ${currency}`)})`,
+    `- Estimated output API cost reduction: ${formatPct(outputCost.reductionPct)} (${formatValue(outputCost.absolute, ` ${currency}`)})`,
+    `- Estimated total API cost reduction: ${formatPct(totalCost.reductionPct)} (${formatValue(totalCost.absolute, ` ${currency}`)})`,
     '',
     '## Claim boundary',
     '',

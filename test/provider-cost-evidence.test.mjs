@@ -741,9 +741,15 @@ test("provider cost evidence accepts successful live usage artifacts", () => {
   assert.equal(evidence.sourceKind, "live-openai-usage");
 });
 
-test("provider cost evidence markdown keeps billing and runtime claims blocked", () => {
+test("provider cost evidence markdown surfaces split input and output deltas without overclaiming", () => {
   const markdown = renderProviderCostEvidenceMarkdown(sampleEvidence());
 
+  assert.match(markdown, /Input tokens reduction: 60% \(60000 tokens\)/i);
+  assert.match(markdown, /Output tokens reduction: 20% \(2000 tokens\)/i);
+  assert.match(markdown, /Total tokens reduction: 56\.364% \(62000 tokens\)/i);
+  assert.match(markdown, /Estimated input API cost reduction: 60% \(0\.15 USD\)/i);
+  assert.match(markdown, /Estimated output API cost reduction: 20% \(0\.02 USD\)/i);
+  assert.match(markdown, /Estimated total API cost reduction: 48\.571% \(0\.17 USD\)/i);
   assert.match(markdown, /not provider invoice\/billing savings evidence/i);
   assert.match(markdown, /not stable runtime-token, wall-clock, or latency savings evidence/i);
   assert.doesNotMatch(markdown, /reduces provider billing cost/i);
