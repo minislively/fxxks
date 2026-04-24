@@ -27,7 +27,7 @@ If the answer you want sounds like “Vue?”, “broader TS/JS?”, “multi-fi
 | Claude/opencode parity | Would make non-Codex runtimes feel closer to the current strongest automatic path. | Claude/opencode remain narrower helper/manual paths and should not be described as Codex-equivalent automatic support. |
 | Multi-file refactor context compression | Would support broader agentic refactors where several files must stay in view. | Current strongest path is repeated same-file work. |
 | Read interception / provider-native read hooks | Would make runtime behavior broader than Codex repeated-file hooks. | Not claimed; unsupported cases should fall back to normal source reading. |
-| LSP-backed semantic locations | Would strengthen rename/reference/edit safety beyond line-aware hints. | Current source ranges and patch targets are AST-derived edit aids, not LSP semantic proof. |
+| LSP-backed semantic locations | Would strengthen rename/reference/edit safety beyond line-aware hints. | Decided in [`docs/lsp-extraction-boundary.md`](lsp-extraction-boundary.md): product extraction stays AST-only by default; LSP remains optional evaluation/proof work, not current support. |
 
 ## Future evidence lanes
 

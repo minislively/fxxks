@@ -52,13 +52,13 @@ These are useful future directions, but they are not required for the current Co
 - Broader `.ts` / `.js` coverage beyond the same-file beta.
 - Multi-file refactor context compression.
 - Universal runtime file-read interception or provider-native read-hook parity.
-- LSP-backed semantic rename/reference safety.
+- LSP-backed semantic rename/reference safety; see [`docs/lsp-extraction-boundary.md`](docs/lsp-extraction-boundary.md) for the issue #110 decision that product extraction stays AST-only by default.
 - Claude/opencode parity with the Codex automatic path.
 - Provider invoice/dashboard or billing-grade charge proof.
 
 Experimental `.ts` / `.js` support is **not** a claim of backend/framework semantic understanding, multi-file refactor support, Vue/SFC support, Claude/opencode parity, read interception, or LSP rename/reference safety. Unsupported or weak TS/JS files fall back to normal full-source behavior.
 
-See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stronger support or stronger evidence claims.
+See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stronger support or stronger evidence claims, and [`docs/lsp-extraction-boundary.md`](docs/lsp-extraction-boundary.md) for the LSP extraction decision boundary.
 
 ## Runtime support at a glance
 
