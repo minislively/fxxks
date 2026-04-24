@@ -137,7 +137,7 @@ type SetupScopeSummary = {
   projectRoot: string;
   packageInstall: {
     scope: "global-cli";
-    command: "npm install -g fooks-frontend-hooks";
+    command: "npm install -g fxxk-frontned-hooks";
     installsCommand: string;
     mutatedBySetup: false;
     note: string;
@@ -222,7 +222,7 @@ function buildSetupScopeSummary(options: {
     projectRoot: options.cwd,
     packageInstall: {
       scope: "global-cli",
-      command: "npm install -g fooks-frontend-hooks",
+      command: "npm install -g fxxk-frontned-hooks",
       installsCommand: options.displayCliName,
       mutatedBySetup: false,
       note: "The npm package install makes the fooks command available globally; fooks setup does not install or update the npm package.",
@@ -566,7 +566,7 @@ Everyday commands:
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} claude-runtime-hook --native-hook
 
-Install: npm install -g fooks-frontend-hooks
+Install: npm install -g fxxk-frontned-hooks
 CLI command: ${displayCliName}`);
 }
 

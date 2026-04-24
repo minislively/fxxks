@@ -1,6 +1,6 @@
 {
-  "name": "fooks-frontend-hooks",
-  "version": "0.1.1",
+  "name": "fxxk-frontned-hooks",
+  "version": "0.1.2",
   "type": "commonjs",
   "bin": {
     "fooks": "dist/cli/index.js"
@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/node": "^24.5.2"
   },
-  "description": "Frontend context compression CLI for React/TSX projects; npm package fooks-frontend-hooks installs the fooks command.",
+  "description": "Frontend context compression CLI for React/TSX projects; npm package fxxk-frontned-hooks installs the fooks command.",
   "main": "dist/index.js",
   "files": [
     "dist",
