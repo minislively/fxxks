@@ -18,6 +18,12 @@ const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
 const require = createRequire(import.meta.url);
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
+const {
+  DESIGN_REVIEW_METADATA_ITEM_CAPS,
+  DESIGN_REVIEW_METADATA_SCHEMA_VERSION,
+  assessDesignReviewMetadataFreshness,
+  deriveDesignReviewMetadata,
+} = require(path.join(repoRoot, "dist", "core", "design-review-metadata.js"));
 const { RAW_ORIGINAL_SIZE_THRESHOLD_BYTES } = require(path.join(repoRoot, "dist", "core", "decide.js"));
 const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 const { assessPayloadReadiness } = require(path.join(repoRoot, "dist", "core", "payload", "readiness.js"));
@@ -503,6 +509,236 @@ test("model-facing payload keeps hybrid snippets and prunes unknown style noise"
   assert.equal("meta" in payload, false);
   assert.ok(payload.behavior.eventHandlers.includes("handleAcknowledge"));
   assert.ok(payload.structure.conditionalRenders.length >= 1);
+});
+
+function designReviewFixture(name) {
+  return path.join(repoRoot, "fixtures", "design-review", name);
+}
+
+function allDesignEvidenceLists(metadata) {
+  return [
+    ...metadata.visualRegions.map((item) => item.evidence),
+    ...metadata.variantAxes.map((item) => item.evidence),
+    ...metadata.stateAxes.map((item) => item.evidence),
+    ...metadata.interactionAnchors.map((item) => item.evidence),
+    ...metadata.styleReferences.map((item) => item.evidence),
+  ];
+}
+
+function assertAllDesignItemsHaveEvidence(metadata) {
+  for (const evidence of allDesignEvidenceLists(metadata)) {
+    assert.ok(Array.isArray(evidence));
+    assert.ok(evidence.length > 0);
+    for (const ref of evidence) {
+      assert.match(ref.source, /^(contract|behavior|structure|style|snippet)$/);
+      assert.equal(typeof ref.field, "string");
+      assert.ok(ref.field.length > 0);
+    }
+  }
+}
+
+function assertDesignCaps(metadata) {
+  assert.ok(metadata.visualRegions.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.visualRegions);
+  assert.ok(metadata.variantAxes.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.variantAxes);
+  assert.ok(metadata.stateAxes.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.stateAxes);
+  assert.ok(metadata.interactionAnchors.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.interactionAnchors);
+  assert.ok(metadata.styleReferences.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.styleReferences);
+}
+
+function designStressItems(count, factory) {
+  return Array.from({ length: count }, (_, index) => factory(index));
+}
+
+function syntheticCapStressExtraction(baseResult) {
+  const manyControls = designStressItems(20, (index) => ({
+    tag: index % 2 === 0 ? "input" : "textarea",
+    name: `field${index}`,
+    loc: { startLine: index + 10, endLine: index + 10 },
+  }));
+  const manyHandlers = designStressItems(20, (index) => ({
+    name: `handleAction${index}`,
+    trigger: `onClick${index}`,
+    loc: { startLine: index + 40, endLine: index + 40 },
+  }));
+  const manySubmitHandlers = designStressItems(20, (index) => ({
+    value: `handleSubmit${index}`,
+    loc: { startLine: index + 70, endLine: index + 70 },
+  }));
+  const manyValidationAnchors = designStressItems(20, (index) => ({
+    value: `validate${index}`,
+    loc: { startLine: index + 100, endLine: index + 100 },
+  }));
+
+  return {
+    ...baseResult,
+    mode: "hybrid",
+    contract: {
+      ...baseResult.contract,
+      propsSummary: [
+        'variant?: "primary" | "secondary"',
+        'tone?: "info" | "warning"',
+        'size?: "sm" | "lg"',
+        "disabled?: boolean",
+        "selected?: boolean",
+        "loading?: boolean",
+        "compact?: boolean",
+      ],
+    },
+    behavior: {
+      ...baseResult.behavior,
+      stateSummary: designStressItems(20, (index) => `loading${index}, error${index}`),
+      eventHandlerSignals: manyHandlers,
+      formSurface: {
+        controls: manyControls,
+        submitHandlers: manySubmitHandlers,
+        validationAnchors: manyValidationAnchors,
+      },
+    },
+    structure: {
+      ...baseResult.structure,
+      sections: designStressItems(30, (index) => `section${index}`),
+      repeatedBlocks: designStressItems(20, (index) => `list${index}`),
+      conditionalRenders: designStressItems(20, (index) => `loading${index} || error${index} || selected`),
+    },
+    style: {
+      ...baseResult.style,
+      system: "tailwind",
+      summary: designStressItems(30, (index) => `tailwind-token-group-${index}`),
+      hasStyleBranching: true,
+    },
+    snippets: designStressItems(20, (index) => ({
+      label: `conditional-${index}`,
+      code: `{condition${index} ? <span /> : null}`,
+      reason: "conditional-render",
+      loc: { startLine: index + 130, endLine: index + 130 },
+    })),
+  };
+}
+
+test("design-review metadata derives source-only schema with freshness and contract boundaries", () => {
+  const result = extractFile(designReviewFixture("TailwindVariantCard.tsx"));
+  const metadata = deriveDesignReviewMetadata(result);
+
+  assert.ok(metadata);
+  assert.equal(metadata.schemaVersion, DESIGN_REVIEW_METADATA_SCHEMA_VERSION);
+  assert.deepEqual(metadata.freshness, {
+    fileHash: result.fileHash,
+    lineCount: result.meta.lineCount,
+  });
+  assert.deepEqual(metadata.scope, {
+    kind: "same-component",
+    filePath: result.filePath,
+    componentName: "TailwindVariantCard",
+    componentLoc: result.componentLoc,
+  });
+  assert.equal(metadata.confidence, "high");
+  assert.equal(metadata.compressionContract.sourceDerivedOnly, true);
+  assert.equal(metadata.compressionContract.notVisualProof, true);
+  assert.equal(metadata.compressionContract.notFigmaBacked, true);
+  assert.equal(metadata.compressionContract.notAccessibilityAudit, true);
+  assert.equal(metadata.compressionContract.notLspBacked, true);
+  assert.equal(metadata.compressionContract.notProviderTokenized, true);
+  assert.deepEqual(metadata.compressionContract.maxItems, DESIGN_REVIEW_METADATA_ITEM_CAPS);
+  assert.ok(metadata.compressionContract.staleWhen.includes("sourceFingerprint.fileHash changes"));
+  assert.equal(metadata.compressionContract.requiredUserActionOnStale, "rerun extraction or read current source before editing");
+  assertAllDesignItemsHaveEvidence(metadata);
+  assertDesignCaps(metadata);
+});
+
+test("design-review metadata covers planned fixture categories conservatively", () => {
+  const tailwind = deriveDesignReviewMetadata(extractFile(designReviewFixture("TailwindVariantCard.tsx")));
+  assert.ok(tailwind);
+  assert.equal(tailwind.confidence, "high");
+  assert.deepEqual(
+    ["variant", "size", "selected", "disabled"].every((name) => tailwind.variantAxes.some((axis) => axis.name === name)),
+    true,
+  );
+  assert.ok(tailwind.styleReferences.some((item) => item.kind === "tailwind-group"));
+  assert.ok(tailwind.visualRegions.some((item) => item.label === "section" || item.label === "TailwindVariantCard"));
+
+  const form = deriveDesignReviewMetadata(extractFile(designReviewFixture("FormStateReview.tsx")));
+  assert.ok(form);
+  assert.ok(["medium", "high"].includes(form.confidence));
+  assert.ok(form.interactionAnchors.some((item) => item.kind === "form-control" && item.label.includes("email")));
+  assert.ok(form.interactionAnchors.some((item) => item.kind === "form-control" && item.label.includes("notes")));
+  assert.ok(form.interactionAnchors.some((item) => item.kind === "submit-handler"));
+  assert.ok(form.stateAxes.some((item) => item.name === "loading"));
+  assert.ok(form.stateAxes.some((item) => item.name === "error"));
+  assert.ok(form.visualRegions.some((item) => item.kind === "form" || item.kind === "control"));
+
+  const styled = deriveDesignReviewMetadata(extractFile(designReviewFixture("StyledPanel.tsx")));
+  assert.ok(styled);
+  assert.ok(["medium", "high"].includes(styled.confidence));
+  assert.ok(styled.styleReferences.some((item) => item.kind === "styled-component"));
+  assert.ok(styled.variantAxes.some((axis) => axis.name === "tone"));
+  assert.ok(styled.variantAxes.some((axis) => axis.name === "compact"));
+  assert.ok(styled.visualRegions.some((item) => item.label === "PanelRoot" || item.label === "StyledPanel"));
+
+  const generic = deriveDesignReviewMetadata(extractFile(designReviewFixture("GenericLayout.tsx")));
+  assert.ok(generic);
+  assert.notEqual(generic.confidence, "high");
+  assert.deepEqual(generic.variantAxes, []);
+  assert.deepEqual(generic.stateAxes, []);
+
+  for (const metadata of [tailwind, form, styled, generic]) {
+    assertAllDesignItemsHaveEvidence(metadata);
+    assertDesignCaps(metadata);
+  }
+});
+
+test("design-review metadata enforces item caps on over-cap extraction signals", () => {
+  const baseResult = extractFile(designReviewFixture("TailwindVariantCard.tsx"));
+  const metadata = deriveDesignReviewMetadata(syntheticCapStressExtraction(baseResult));
+
+  assert.ok(metadata);
+  assert.equal(metadata.visualRegions.length, DESIGN_REVIEW_METADATA_ITEM_CAPS.visualRegions);
+  assert.ok(metadata.variantAxes.length <= DESIGN_REVIEW_METADATA_ITEM_CAPS.variantAxes);
+  assert.equal(metadata.stateAxes.length, DESIGN_REVIEW_METADATA_ITEM_CAPS.stateAxes);
+  assert.equal(metadata.interactionAnchors.length, DESIGN_REVIEW_METADATA_ITEM_CAPS.interactionAnchors);
+  assert.equal(metadata.styleReferences.length, DESIGN_REVIEW_METADATA_ITEM_CAPS.styleReferences);
+  assertAllDesignItemsHaveEvidence(metadata);
+  assertDesignCaps(metadata);
+});
+
+test("design-review metadata blocks stale freshness from edit-safe use", () => {
+  const result = extractFile(designReviewFixture("TailwindVariantCard.tsx"));
+  const metadata = deriveDesignReviewMetadata(result);
+  assert.ok(metadata);
+
+  const changed = assessDesignReviewMetadataFreshness(metadata, {
+    fileHash: metadata.freshness.fileHash === "0".repeat(64) ? "1".repeat(64) : "0".repeat(64),
+    lineCount: metadata.freshness.lineCount + 1,
+  });
+
+  assert.equal(changed.fresh, false);
+  assert.equal(changed.usableForEditing, false);
+  assert.ok(changed.reasons.includes("stale-fileHash"));
+  assert.ok(changed.reasons.includes("stale-lineCount"));
+  assert.equal(changed.requiredUserActionOnStale, "rerun extraction or read current source before editing");
+
+  const fresh = assessDesignReviewMetadataFreshness(metadata, metadata.freshness);
+  assert.deepEqual(fresh, {
+    fresh: true,
+    usableForEditing: true,
+    reasons: ["fresh"],
+  });
+});
+
+test("design-review helper remains internal and default model-facing payloads stay unchanged", () => {
+  const tailwindResult = extractFile(designReviewFixture("TailwindVariantCard.tsx"));
+  const defaultPayload = toModelFacingPayload(tailwindResult, repoRoot);
+  const guidedPayload = toModelFacingPayload(tailwindResult, repoRoot, { includeEditGuidance: true });
+  const cliPayload = run(["extract", "fixtures/design-review/TailwindVariantCard.tsx", "--model-payload"]);
+  const modulePayload = run(["extract", "fixtures/ts-js-beta/module-utils.ts", "--model-payload"]);
+  const rawPayload = toModelFacingPayload(extractFile(path.join(repoRoot, "fixtures", "raw", "SimpleButton.tsx")), repoRoot);
+
+  for (const payload of [defaultPayload, guidedPayload, cliPayload, modulePayload, rawPayload]) {
+    assert.equal("designReviewMetadata" in payload, false);
+  }
+  assert.equal("editGuidance" in defaultPayload, false);
+  assert.equal("editGuidance" in guidedPayload, true);
+  assert.equal("editGuidance" in cliPayload && "designReviewMetadata" in cliPayload.editGuidance, false);
+  assert.equal("editGuidance" in modulePayload, false);
 });
 
 test("model-facing payload uses original source for tiny raw fixtures", () => {
