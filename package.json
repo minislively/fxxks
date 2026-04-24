@@ -58,5 +58,17 @@
   "dependencies": {
     "typescript": "^5.9.2"
   },
+  "author": "minislively",
+  "keywords": [
+    "codex",
+    "cli",
+    "frontend",
+    "context-compression",
+    "react",
+    "tsx",
+    "typescript",
+    "jsx"
+  ],
+  "private": false,
   "license": "MIT"
 }
