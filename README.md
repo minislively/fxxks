@@ -134,9 +134,9 @@ Current public summary:
 - These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove invoice/dashboard savings, actual charged-cost savings, provider billing-token savings, stable runtime-token savings, or stable wall-clock/latency savings.
 - Direct runtime-token/time evidence remains unstable or negative in some diagnostics, so fooks does not claim stable runtime-token, wall-clock, or latency wins.
 
-### Public-code benchmark snapshot
+### Provider-cost benchmark snapshot (primary evidence)
 
-These figures are **not OMX-session benchmarks** and not a full interactive
+This is the main benchmark section most readers should evaluate first: it answers whether matched full-source vs fooks-payload runs used less provider-reported usage and lower estimated API cost under explicit pricing assumptions. These figures are **not OMX-session benchmarks** and not a full interactive
 "install fooks, work normally" session benchmark. They come from a Codex OAuth
 no-tool benchmark harness that compares matched baseline prompts containing
 real full-source context against matched fooks prompts containing real
@@ -151,16 +151,16 @@ pair order.
 
 Task-median reductions for the larger profiles were Next.js App Router summary `30.681%`, Layout Router refactor plan `28.699%`, Error Boundary test strategy `19.447%`; Tailwind Utilities summary `78.992%`, Variants refactor plan `38.238%`, CSS Parser test strategy `33.582%`.
 
-### Diagnostic OMX payload-surface pilot
+### OMX command-surface diagnostic (secondary evidence)
 
-A 2026-04-24 single-pair diagnostic checked whether the same fooks payload advantage survives the `omx exec` command surface. This is **not** an installed-hook repeated-session benchmark and is **not** stable public runtime evidence yet. It compared one Tailwind large file (`packages/tailwindcss/src/utilities.ts`) as full source (`213,836` bytes) versus real `fooks extract --model-payload` output (`3,517` bytes), with no tool calls, using `gpt-5.4-mini`.
+A 2026-04-24 single-pair diagnostic checked whether the same fooks payload advantage survives the [`omx exec`](https://github.com/Yeachan-Heo/oh-my-codex) command surface from [oh-my-codex (OMX)](https://github.com/Yeachan-Heo/oh-my-codex). This is **not** an installed-hook repeated-session benchmark and is **not** stable public runtime evidence yet. It compared one Tailwind large file (`packages/tailwindcss/src/utilities.ts`) as full source (`213,836` bytes) versus real `fooks extract --model-payload` output (`3,517` bytes), with no tool calls, using `gpt-5.4-mini`.
 
 | Surface | Full-source input tokens | Fooks-payload input tokens | Input-token reduction | Total-token reduction |
 | --- | ---: | ---: | ---: | ---: |
 | Plain `codex exec` | `65,497` | `13,593` | 79.246% | 78.996% |
 | `omx exec` | `63,122` | `11,218` | 82.228% | 81.962% |
 
-This supports only a narrow diagnostic statement: for this controlled no-tool Tailwind payload pilot, fooks' model-facing payload stayed much smaller through both plain Codex and OMX command surfaces. It does **not** prove that ordinary interactive OMX sessions, installed hooks, provider invoices, or stable runtime costs drop by the same amount.
+This is secondary evidence: it explains that the compact payload advantage survives the OMX command surface, but the provider-cost snapshot above is the stronger product-facing evidence. This controlled no-tool Tailwind payload pilot shows fooks' model-facing payload stayed much smaller through both plain Codex and OMX command surfaces. It does **not** prove that ordinary interactive OMX sessions, installed hooks, provider invoices, or stable runtime costs drop by the same amount.
 
 Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
