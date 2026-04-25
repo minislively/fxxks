@@ -2,7 +2,7 @@
 
 This page frames common "does fooks support X?" questions as future support or evidence lanes. These items are **not required** for the current strongest workflow: Codex repeated same-file React `.tsx` / `.jsx` context reduction, with a narrower experimental Codex-first `.ts` / `.js` same-file beta.
 
-If the answer you want sounds like “React Native?”, “WebView?”, “Vue?”, “broader TS/JS?”, “multi-file?”, “read interception?”, “LSP rename/reference?”, or “provider parity?”, read that as a roadmap question unless another public doc explicitly says it already shipped.
+If the answer you want sounds like “React Native?”, “WebView?”, “TUI/CLI?”, “Vue?”, “broader TS/JS?”, “multi-file?”, “read interception?”, “LSP rename/reference?”, or “provider parity?”, read that as a roadmap question unless another public doc explicitly says it already shipped.
 
 ## Current strongest workflow
 
@@ -22,7 +22,8 @@ If the answer you want sounds like “React Native?”, “WebView?”, “Vue?�
 
 | Lane | Why it matters | Current boundary |
 | --- | --- | --- |
-| React Native / embedded WebView | Would require evidence for native component primitives, platform-specific semantics, bridge behavior, and WebView boundary/security assumptions rather than DOM/form/Tailwind-oriented React web signals. | Deferred. TSX parsing is syntax-level only and must not be read as RN/WebView support. Obvious RN/WebView files should use normal source reading unless future fixtures, benchmarks, and public evidence explicitly add this lane. |
+| React Native / embedded WebView | Requires the shared TypeScript AST core to feed separate domain signal profiles instead of folding native/WebView semantics into the current web React profile. | Deferred. TSX parsing is syntax-level only and must not be read as RN/WebView support. Obvious RN/WebView files should use normal source reading unless future fixtures, benchmarks, and public evidence explicitly add this lane. WebView starts as a boundary/fallback profile, not default compact extraction. |
+| TUI / React CLI profiles | Ink-style React files can fit the same shared-AST/profile-split architecture if future evidence shows profile-specific signals are useful. | Future profile candidate only; no implementation or support promise from the RN/WebView design work. |
 | Vue / Svelte / broader frontend frameworks | Would expand the component extraction model beyond React. | Not part of the current automatic path. |
 | Broader `.ts` / `.js` coverage beyond the beta | Would make fooks useful outside React component loops more consistently. | Experimental Codex-first same-file `.ts` / `.js` beta exists, but it is module-signal gated, same-file only, and not provider-parity, multi-file, or semantic-safety support. |
 | Claude/opencode parity | Would make non-Codex runtimes feel closer to the current strongest automatic path. | Claude/opencode remain narrower helper/manual paths and should not be described as Codex-equivalent automatic support. |
@@ -32,17 +33,17 @@ If the answer you want sounds like “React Native?”, “WebView?”, “Vue?�
 
 ### React Native / WebView promotion ladder
 
-React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” Treat this as a `frontend-family candidate` ladder:
+React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” The architecture direction is documented in [React Native / WebView architecture direction](rn-webview-architecture.md): keep the shared TypeScript AST core, split web/RN/WebView/TUI into domain signal profiles, and start WebView as a boundary/fallback profile. Treat this as a `frontend-family candidate` ladder:
 
 | Level | Name | What must be true | Public wording allowed |
 | --- | --- | --- | --- |
 | 0 | Deferred/fallback boundary | Obvious RN/WebView markers fall back to normal source reading and docs say TSX parsing is syntax-only evidence. | “Deferred lane”; “not current support.” |
-| 1 | Evidence-lane design | Fixture categories, pass/fail rules, claim boundaries, and benchmark commands are specified before extractor changes. | “Evidence candidate”; no runtime/support claim. |
+| 1 | Evidence-lane design | Domain signal profiles, fixture categories, pass/fail rules, claim boundaries, and benchmark commands are specified before extractor changes. | Architecture direction and staged gates only; no runtime/support promise or timeline. |
 | 2 | Fixture/benchmark evidence | Public RN/WebView fixtures exercise native primitives, interaction handlers, StyleSheet/style tokens, platform branches, navigation surfaces, and WebView source/injection boundaries without misleading compact payloads. | “Validated evidence lane” for the measured fixture scope only. |
-| 3 | Experimental extractor candidate | RN/WebView-specific signals are implemented behind narrow tests and safe fallback rules, with no provider/runtime parity claim. | “Experimental same-file RN/WebView TSX candidate” if evidence remains green. |
+| 3 | Experimental extractor candidate | Profile-specific detector/signals are implemented behind opt-in policy, narrow tests, and safe fallback rules, with WebView fallback retained by default and no provider/runtime parity claim. | “Experimental same-file RN candidate” or “WebView boundary profile” only if evidence remains green. |
 | 4 | Narrow support wording | Repeated benchmark evidence and docs/tests prove the exact supported scope. | Narrow support wording for the measured same-file scope only. |
 
-Promotion must stop at the first failed gate. WebView-related files deserve extra caution because URL/source, injected JavaScript, bridge behavior, and sandbox/security assumptions are semantic boundaries, not just JSX structure. Candidate repositories for the first evidence pass are tracked in [React Native / WebView fixture candidate survey](rn-webview-fixture-candidates.md).
+Promotion must stop at the first failed gate. What can be roadmap-committed now is the architecture direction and staged gates; what must not be committed is a public support promise, delivery timeline, or default WebView compact extraction. WebView-related files deserve extra caution because URL/source, injected JavaScript, bridge behavior, and sandbox/security assumptions are semantic boundaries, not just JSX structure. Candidate repositories for the first evidence pass are tracked in [React Native / WebView fixture candidate survey](rn-webview-fixture-candidates.md).
 
 Recommended fixture categories before Level 3:
 

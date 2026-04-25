@@ -38,6 +38,7 @@
     "docs/setup.md",
     "docs/release.md",
     "docs/roadmap.md",
+    "docs/rn-webview-architecture.md",
     "docs/usage-log-boundary.md",
     "docs/provider-tokenizer-boundary.md",
     "docs/lsp-extraction-boundary.md",

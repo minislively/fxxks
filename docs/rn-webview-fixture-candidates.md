@@ -2,7 +2,7 @@
 
 _Last reviewed: 2026-04-25 via GitHub repository metadata and tree inspection._
 
-This survey is the next step after the [React Native / WebView promotion ladder](roadmap.md#react-native--webview-promotion-ladder). It does **not** make React Native or embedded WebView a supported fooks lane. It only identifies public repositories that could seed a future evidence lane.
+This survey is the next step after the [React Native / WebView promotion ladder](roadmap.md#react-native--webview-promotion-ladder) and the [React Native / WebView architecture direction](rn-webview-architecture.md). It does **not** make React Native or embedded WebView a supported fooks lane. It only identifies public repositories that could seed a future evidence lane for the shared TypeScript AST core plus separate web/RN/WebView/TUI domain signal profiles. WebView starts as a boundary/fallback profile, not default compact extraction.
 
 ## Selection criteria
 
@@ -11,7 +11,7 @@ A repository is a good candidate when it satisfies most of these gates:
 1. **Public and inspectable** — open source repository with a clear license or public contribution model.
 2. **Recently active** — updated recently enough that fixture shape reflects current React Native practice.
 3. **TS/TSX surface** — enough `.tsx` / `.ts` files to exercise fooks' TypeScript parser without inventing synthetic examples.
-4. **Signal coverage** — covers at least one RN/WebView signal family:
+4. **Signal coverage** — covers at least one future domain-profile signal family:
    - native primitives: `View`, `Text`, `Image`, `ScrollView`;
    - interactions: `Pressable`, `TouchableOpacity`, gesture/event handlers;
    - styles: `StyleSheet.create`, inline styles, theme/token references;
@@ -59,10 +59,11 @@ Start with a small corpus before any extractor behavior change:
 Do not start RN/WebView extractor behavior until a candidate PR can show:
 
 - fixture corpus selected with stable commit SHAs or pinned snapshots;
-- each fixture mapped to a signal family and expected fallback/extract behavior;
+- each fixture mapped to a domain signal profile, signal family, and expected fallback/extract behavior;
 - tests prove current unsupported/fallback wording remains intact;
 - benchmark/evidence commands are documented;
-- WebView files are reviewed for URL/source, injected JavaScript, and message-bridge boundaries before compact-payload reuse is allowed.
+- WebView files are reviewed for URL/source, injected JavaScript, and message-bridge boundaries before any opt-in compact-payload experiment is allowed;
+- roadmap wording remains limited to architecture direction and staged gates, with no public support promise, timeline, or default WebView compact extraction.
 
 ## Non-goals
 
@@ -70,3 +71,4 @@ Do not start RN/WebView extractor behavior until a candidate PR can show:
 - No provider-token, billing, runtime-token, or native platform correctness claim.
 - No setup/doctor support promotion without fixture evidence.
 - No extractor changes until a separate plan selects the experimental extractor lane.
+- No default WebView compact extraction; WebView remains a boundary/fallback profile until separate evidence and claim gates pass.

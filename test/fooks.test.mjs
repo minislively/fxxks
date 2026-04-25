@@ -3585,6 +3585,7 @@ test("package release surface keeps internal docs out of the npm tarball", () =>
   assert.ok(pkg.files.includes("dist"));
   assert.ok(pkg.files.includes("docs/setup.md"));
   assert.ok(pkg.files.includes("docs/release.md"));
+  assert.ok(pkg.files.includes("docs/rn-webview-architecture.md"));
   assert.equal(pkg.files.includes("docs"), false);
   assert.equal(pkg.files.some((entry) => entry.startsWith("docs/internal")), false);
   assert.equal(pkg.files.some((entry) => entry.startsWith("benchmarks")), false);
@@ -3626,15 +3627,21 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
   const taxonomy = fs.readFileSync(path.join(repoRoot, "docs", "frontend-scope-taxonomy.md"), "utf8");
   const candidates = fs.readFileSync(path.join(repoRoot, "docs", "rn-webview-fixture-candidates.md"), "utf8");
+  const architecture = fs.readFileSync(path.join(repoRoot, "docs", "rn-webview-architecture.md"), "utf8");
   const preRead = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}`;
+  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}\n${architecture}`;
 
   assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
   assert.match(combined, /TSX parsing is (?:syntax-level|only syntax-level)|\.tsx` parse is not semantic evidence/);
   assert.match(combined, /normal source reading/);
   assert.match(combined, /React Native \/ WebView promotion ladder/);
   assert.match(roadmap, /React Native \/ WebView fixture candidate survey/);
+  assert.match(roadmap, /React Native \/ WebView architecture direction/);
   assert.match(candidates, /React Native \/ WebView fixture candidate survey/);
+  assert.match(candidates, /React Native \/ WebView architecture direction/);
+  assert.match(architecture, /shared TypeScript AST core, separate domain signal profiles/);
+  assert.match(architecture, /WebView boundary\/fallback profile/);
+  assert.match(architecture, /TUI\/CLI profile candidate/);
   assert.match(candidates, /Tier A: preferred seed candidates/);
   assert.match(candidates, /Recommended first fixture slice/);
   assert.match(candidates, /react-native-webview\/react-native-webview/);
@@ -3648,9 +3655,14 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(combined, /Platform\.select/);
   assert.match(combined, /react-native-webview/);
   assert.match(combined, /fixture corpus, signal model, benchmark evidence, and claim-boundary wording/);
+  assert.match(combined, /domain signal profiles/);
+  assert.match(combined, /architecture direction and staged gates/);
+  assert.match(combined, /not default compact extraction|not default WebView compact extraction|default WebView compact extraction/);
   assert.match(preRead, /unsupported-react-native-webview-boundary/);
   assert.doesNotMatch(combined, /React Native support is available/i);
   assert.doesNotMatch(combined, /React Native(?: \/ WebView)? is supported today/i);
+  assert.doesNotMatch(combined, /default WebView compact extraction is enabled/i);
+  assert.doesNotMatch(combined, /React Native(?: \/ WebView)? support will ship/i);
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {
