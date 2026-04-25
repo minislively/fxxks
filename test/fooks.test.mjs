@@ -3631,6 +3631,13 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
   assert.match(combined, /TSX parsing is (?:syntax-level|only syntax-level)|\.tsx` parse is not semantic evidence/);
   assert.match(combined, /normal source reading/);
+  assert.match(combined, /React Native \/ WebView promotion ladder/);
+  assert.match(combined, /frontend-family candidate/);
+  assert.match(combined, /Fixture\/benchmark evidence/);
+  assert.match(combined, /StyleSheet\.create/);
+  assert.match(combined, /Platform\.select/);
+  assert.match(combined, /react-native-webview/);
+  assert.match(combined, /fixture corpus, signal model, benchmark evidence, and claim-boundary wording/);
   assert.match(preRead, /unsupported-react-native-webview-boundary/);
   assert.doesNotMatch(combined, /React Native support is available/i);
 });

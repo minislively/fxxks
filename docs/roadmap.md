@@ -30,6 +30,28 @@ If the answer you want sounds like “React Native?”, “WebView?”, “Vue?�
 | Read interception / provider-native read hooks | Would make runtime behavior broader than Codex repeated-file hooks. | Not claimed; unsupported cases should fall back to normal source reading. |
 | LSP-backed semantic locations | Would strengthen rename/reference/edit safety beyond line-aware hints. | Decided in [`docs/lsp-extraction-boundary.md`](lsp-extraction-boundary.md): product extraction stays AST-only by default; LSP remains optional evaluation/proof work, not current support. |
 
+### React Native / WebView promotion ladder
+
+React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” Treat this as a `frontend-family candidate` ladder:
+
+| Level | Name | What must be true | Public wording allowed |
+| --- | --- | --- | --- |
+| 0 | Deferred/fallback boundary | Obvious RN/WebView markers fall back to normal source reading and docs say TSX parsing is syntax-only evidence. | “Deferred lane”; “not current support.” |
+| 1 | Evidence-lane design | Fixture categories, pass/fail rules, claim boundaries, and benchmark commands are specified before extractor changes. | “Evidence candidate”; no runtime/support claim. |
+| 2 | Fixture/benchmark evidence | Public RN/WebView fixtures exercise native primitives, interaction handlers, StyleSheet/style tokens, platform branches, navigation surfaces, and WebView source/injection boundaries without misleading compact payloads. | “Validated evidence lane” for the measured fixture scope only. |
+| 3 | Experimental extractor candidate | RN/WebView-specific signals are implemented behind narrow tests and safe fallback rules, with no provider/runtime parity claim. | “Experimental same-file RN/WebView TSX candidate” if evidence remains green. |
+| 4 | Narrow support wording | Repeated benchmark evidence and docs/tests prove the exact supported scope. | Narrow support wording for the measured same-file scope only. |
+
+Promotion must stop at the first failed gate. WebView-related files deserve extra caution because URL/source, injected JavaScript, bridge behavior, and sandbox/security assumptions are semantic boundaries, not just JSX structure.
+
+Recommended fixture categories before Level 3:
+
+- React Native primitives: `View`, `Text`, `Image`, `ScrollView`.
+- Interaction components: `Pressable`, `TouchableOpacity`, gesture/event handlers.
+- Styling: `StyleSheet.create`, inline styles, theme/token references.
+- Platform/navigation: `Platform.select`, route params, navigation hooks.
+- Embedded WebView: `react-native-webview`, `source`, injected JavaScript, message bridge boundaries.
+
 ## Future evidence lanes
 
 | Lane | Stronger claim it could unlock | Current boundary |

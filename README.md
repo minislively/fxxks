@@ -68,7 +68,7 @@ Then open Codex in that repo and work normally. `fooks doctor` is the read-only 
 These are useful future directions, but they are not required for the current Codex repeated React workflow:
 
 - Vue/SFC, Svelte, or broader non-React framework support.
-- React Native or embedded WebView support. A `.tsx` parse is not semantic evidence for RN primitives, native platform behavior, bridge behavior, or WebView security/runtime boundaries.
+- React Native or embedded WebView support. A `.tsx` parse is not semantic evidence for RN primitives, native platform behavior, bridge behavior, or WebView security/runtime boundaries; see the [`docs/roadmap.md`](docs/roadmap.md#react-native--webview-promotion-ladder) promotion ladder before changing public support wording.
 - Broader `.ts` / `.js` coverage beyond the same-file beta.
 - Multi-file refactor context compression.
 - Universal runtime file-read interception or provider-native read-hook parity.

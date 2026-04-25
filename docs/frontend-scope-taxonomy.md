@@ -79,6 +79,8 @@ These lanes are visible during planning but default to defer unless explicitly s
 
 This taxonomy controls PR scope; it does not expand fooks' runtime or framework support claims. React Native and embedded WebView remain a deferred support lane. For fooks claim work, TSX parsing is only syntax-level evidence and must not be treated as semantic support for RN primitives, native platform behavior, bridge behavior, or WebView boundaries. Until dedicated RN/WebView fixtures and evidence exist, RN/WebView files should use normal source reading.
 
+For RN/WebView claim work, classify the first implementation handoff as a Layer 3 `benchmark/evidence` or `docs/process` lane unless an approved plan explicitly selects extractor behavior. The minimum promotion gates are fixture corpus, signal model, benchmark evidence, and claim-boundary wording; failing any gate keeps the lane deferred.
+
 ## Scope classifier template
 
 Use this before implementation:
