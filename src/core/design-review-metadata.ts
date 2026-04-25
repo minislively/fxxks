@@ -161,6 +161,7 @@ function classifyRegion(label: string): DesignReviewVisualRegionV0["kind"] {
   if (["form", "fieldset", "label"].includes(normalized)) return "form";
   if (["ul", "ol", "li", "table", "tbody", "tr"].includes(normalized) || normalized.includes("list")) return "list";
   if (["button", "input", "select", "textarea"].includes(normalized)) return "control";
+  if (["h1", "h2", "h3", "h4", "h5", "h6", "p", "span"].includes(normalized)) return "content";
   if (["section", "header", "footer", "main", "nav", "aside", "article"].includes(normalized) || normalized.includes("card") || normalized.includes("panel")) return "layout";
   if (/^[A-Z]/.test(label)) return "content";
   return "unknown";

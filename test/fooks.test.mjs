@@ -727,6 +727,10 @@ test("design-review metadata covers planned fixture categories conservatively", 
   );
   assert.ok(tailwind.styleReferences.some((item) => item.kind === "tailwind-group"));
   assert.ok(tailwind.visualRegions.some((item) => item.label === "section" || item.label === "TailwindVariantCard"));
+  assert.ok(
+    tailwind.visualRegions.filter((item) => item.kind === "unknown").length <= 1,
+    "TailwindVariantCard design metadata should classify text content regions instead of leaving noisy unknown visual regions",
+  );
 
   const form = deriveDesignReviewMetadata(extractFile(designReviewFixture("FormStateReview.tsx")));
   assert.ok(form);
