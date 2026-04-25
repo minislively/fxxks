@@ -32,7 +32,7 @@ The architecture direction is therefore: **shared TypeScript AST core, separate 
    - **Web React profile (current default):** keep the existing web-oriented component, behavior, structure, form/control, style, and edit-guidance signals.
    - **React Native primitive profile (future):** model native primitives, interaction components, RN style tokens, platform branches, navigation/route surfaces, and native-safe fallback rules.
    - **WebView boundary/fallback profile (start here):** initially classify and preserve WebView files as fallback-only. A later experimental profile may summarize `source`, injected JavaScript, bridge/message handlers, URL/trust assumptions, and security-sensitive boundaries only after fixtures and claim gates pass.
-   - **TUI/CLI profile candidate (future):** Ink and other React TUI files can naturally fit the profile split, but this issue only commits the architecture direction. No TUI implementation is scoped here.
+   - **TUI/CLI profile candidate (future):** Ink and other React TUI files can naturally fit the profile split, with candidate fixture categories tracked in [TUI / Ink fixture candidate survey](tui-fixture-candidates.md). This architecture note does not scope TUI implementation.
 
 3. **Fixture corpus / evidence harness lane**
    - Promote only from pinned public fixtures with stable SHAs or snapshots.
