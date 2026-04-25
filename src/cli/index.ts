@@ -645,6 +645,7 @@ Everyday commands:
   ${displayCliName} status claude
   ${displayCliName} status cache
   ${displayCliName} status worktree
+  ${displayCliName} status artifacts
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -1045,7 +1046,12 @@ async function run(): Promise<void> {
         print(currentWorktreeEvidenceStatus(process.cwd()));
         return;
       }
-      throw new Error("status expects no argument, 'codex', 'claude', 'cache', or 'worktree'");
+      if (arg1 === "artifacts") {
+        const { auditArtifacts } = await import("../core/artifact-audit.js");
+        print(auditArtifacts(process.cwd()));
+        return;
+      }
+      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', or 'artifacts'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");

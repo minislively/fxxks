@@ -53,3 +53,26 @@ export type {
   WorktreeSnapshot,
   WorktreeStatusRunner,
 } from "./core/worktree-evidence";
+
+export {
+  ARTIFACT_AUDIT_CLAIM_BOUNDARY,
+  ARTIFACT_AUDIT_COMMAND,
+  ARTIFACT_AUDIT_SCHEMA_VERSION,
+  ARTIFACT_AUDIT_SCOPE,
+  auditArtifacts,
+  defaultArtifactAuditCommandRunner,
+  parseGitBranchList,
+  parseGitWorktreePorcelain,
+  parseTmuxPaneList,
+} from "./core/artifact-audit";
+export type {
+  ArtifactAuditBranch,
+  ArtifactAuditCommandRunner,
+  ArtifactAuditOptions,
+  ArtifactAuditPathExists,
+  ArtifactAuditResult,
+  ArtifactAuditSession,
+  ArtifactAuditSessionPane,
+  ArtifactAuditStatus,
+  ArtifactAuditWorktree,
+} from "./core/artifact-audit";

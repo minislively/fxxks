@@ -42,7 +42,7 @@ Then open Codex in that repo and work normally. `fooks doctor` is the read-only 
 1. Install the package: `npm install -g fxxk-frontned-hooks`.
 2. Confirm the command resolves to the package you expect: `which fooks` and `fooks --help`.
 3. Activate only the repo you are inside: `fooks setup`. The default output should be a short `ready`, `partial`, or `blocked` summary, not a debug JSON wall.
-4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, and `fooks compare <file> --json` for one-file payload proof.
+4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file> --json` for one-file payload proof.
 5. Use `fooks setup --json` only when you need support/debug paths, runtime manifests, or issue-report evidence.
 
 ## Strongest path / beta path / not today
@@ -96,6 +96,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 | `fooks setup` | current project + runtime homes | Creates project-local `.fooks/` state, may add project-local `.opencode/` helper files, and may update runtime-home files such as Codex hooks/manifests or Claude handoff manifests. |
 | `fooks doctor` | current project + runtime-home inspection | Reads local setup and hook-readiness artifacts without writing files; it is not live provider health, billing-token, cost, or `ccusage` proof. |
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
+| `fooks status artifacts` | current project + local git/tmux inspection | Read-only audit of fooks-scoped tmux sessions, git worktrees, and branches that may be merged into the selected base; it does not prove inactivity and never deletes artifacts. |
 
 By default, `fooks setup` prints a short readiness summary so the command does not look like a wall of debug JSON. Use `fooks setup --json` when you need the full `scope` object and support/debug paths that show what is project-local versus user-runtime/home scoped.
 
@@ -217,6 +218,7 @@ fooks status          # local estimated context-size telemetry for this repo
 fooks status codex   # check Codex attach/hook state
 fooks status claude  # check Claude project-local context hook / handoff health
 fooks status cache   # check local fooks cache health
+fooks status artifacts # read-only fooks tmux/worktree/branch artifact audit
 fooks compare src/components/Button.tsx --json  # local original-vs-fooks payload estimate
 ```
 
@@ -228,6 +230,8 @@ fooks scan
 ```
 
 `fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider billing tokens, provider costs, or a `ccusage` replacement.
+
+`fooks status artifacts` is a read-only dogfood cleanup audit for local fooks artifacts after PRs merge. It inspects local git worktrees/branches and tmux panes, scopes results to fooks-like names or `.omx-worktrees` paths, and uses conservative labels such as `activeOrUnknown`, `likelyMerged`, `missingPath`, and `candidateCleanup`. The command does not run `git fetch`, `git worktree prune`, `git worktree remove`, `git branch -d`, or `tmux kill-session`; any `manualCleanupCommands` in the JSON are copy/paste suggestions only. Missing worktree paths only suggest `git worktree prune --dry-run` so operators can inspect before deciding whether to run cleanup manually. Verify the PR is merged and the session/worktree is inactive before copying any command.
 
 ## opencode support
 
@@ -269,6 +273,7 @@ fooks doctor codex
 fooks status codex
 fooks status claude
 fooks status cache
+fooks status artifacts
 ```
 
 `fooks doctor` is the safest first diagnostic after setup because it is read-only and summarizes local setup artifacts, missing hook events, manifests, adapter files, trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also reports the optional TypeScript language server as a warning-only host-tooling hint. It does not prove live provider health; it is not a ccusage replacement and not provider billing telemetry or provider costs.

@@ -2569,6 +2569,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks doctor \[codex\|claude\] \[--json\]/);
   assert.match(help, /fooks compare <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
+  assert.match(help, /fooks status artifacts/);
   assert.match(help, /Codex: automatic repeated-file runtime hook path/);
   assert.match(help, /Claude: project-local context hooks/);
   assert.match(help, /opencode: manual\/semi-automatic custom tool/);
@@ -2590,6 +2591,27 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.equal(pkg.scripts?.prepare, undefined);
   assert.match(pkg.scripts?.["release:smoke"], /scripts\/release-smoke\.mjs/);
   assert.doesNotMatch(pkg.scripts?.["release:smoke"], /publish|version|tag/);
+});
+
+test("status artifacts route reports read-only audit JSON", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-status-artifacts-"));
+  const before = fileSnapshot(tempDir);
+
+  const result = run(["status", "artifacts"], tempDir);
+
+  assert.equal(result.command, "status artifacts");
+  assert.equal(result.scope, "fooks");
+  assert.match(result.claimBoundary, /never deletes/);
+  assert.ok(Array.isArray(result.manualCleanupCommands));
+  assert.deepEqual(fileSnapshot(tempDir), before);
+
+  let output = "";
+  try {
+    runText(["status", "unknown"], tempDir);
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  assert.match(output, /artifacts/);
 });
 
 test("doctor rejects unknown targets and exposes bounded command help", () => {
