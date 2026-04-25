@@ -3625,13 +3625,23 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   const roadmap = fs.readFileSync(path.join(repoRoot, "docs", "roadmap.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
   const taxonomy = fs.readFileSync(path.join(repoRoot, "docs", "frontend-scope-taxonomy.md"), "utf8");
+  const candidates = fs.readFileSync(path.join(repoRoot, "docs", "rn-webview-fixture-candidates.md"), "utf8");
   const preRead = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}`;
+  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}`;
 
   assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
   assert.match(combined, /TSX parsing is (?:syntax-level|only syntax-level)|\.tsx` parse is not semantic evidence/);
   assert.match(combined, /normal source reading/);
   assert.match(combined, /React Native \/ WebView promotion ladder/);
+  assert.match(roadmap, /React Native \/ WebView fixture candidate survey/);
+  assert.match(candidates, /React Native \/ WebView fixture candidate survey/);
+  assert.match(candidates, /Tier A: preferred seed candidates/);
+  assert.match(candidates, /Recommended first fixture slice/);
+  assert.match(candidates, /react-native-webview\/react-native-webview/);
+  assert.match(candidates, /mattermost\/mattermost-mobile/);
+  assert.match(candidates, /RocketChat\/Rocket\.Chat\.ReactNative/);
+  assert.match(candidates, /Expensify\/App/);
+  assert.match(candidates, /gronxb\/webview-bridge/);
   assert.match(combined, /frontend-family candidate/);
   assert.match(combined, /Fixture\/benchmark evidence/);
   assert.match(combined, /StyleSheet\.create/);
@@ -3640,6 +3650,7 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(combined, /fixture corpus, signal model, benchmark evidence, and claim-boundary wording/);
   assert.match(preRead, /unsupported-react-native-webview-boundary/);
   assert.doesNotMatch(combined, /React Native support is available/i);
+  assert.doesNotMatch(combined, /React Native(?: \/ WebView)? is supported today/i);
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {

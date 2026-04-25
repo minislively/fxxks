@@ -42,7 +42,7 @@ React Native and embedded WebView should move through explicit evidence gates in
 | 3 | Experimental extractor candidate | RN/WebView-specific signals are implemented behind narrow tests and safe fallback rules, with no provider/runtime parity claim. | “Experimental same-file RN/WebView TSX candidate” if evidence remains green. |
 | 4 | Narrow support wording | Repeated benchmark evidence and docs/tests prove the exact supported scope. | Narrow support wording for the measured same-file scope only. |
 
-Promotion must stop at the first failed gate. WebView-related files deserve extra caution because URL/source, injected JavaScript, bridge behavior, and sandbox/security assumptions are semantic boundaries, not just JSX structure.
+Promotion must stop at the first failed gate. WebView-related files deserve extra caution because URL/source, injected JavaScript, bridge behavior, and sandbox/security assumptions are semantic boundaries, not just JSX structure. Candidate repositories for the first evidence pass are tracked in [React Native / WebView fixture candidate survey](rn-webview-fixture-candidates.md).
 
 Recommended fixture categories before Level 3:
 
