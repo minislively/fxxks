@@ -56,15 +56,24 @@ Package install alone does not edit Codex hooks, Claude files, or opencode proje
 | Project-local | `.fooks/config.json`, `.fooks/cache/`, `.opencode/tools/fooks_extract.ts`, `.opencode/commands/fooks-extract.md` | These apply to the current project root where you run `fooks setup`. |
 | User runtime/home | `~/.codex/hooks.json`, Codex attachment manifests, Claude handoff manifests | These are runtime integration files. Tests and smoke checks can isolate them with `FOOKS_CODEX_HOME` and `FOOKS_CLAUDE_HOME`. |
 
-The setup JSON includes an additive `scope` object with `packageInstall`, `projectLocal`, `userRuntime`, and `nonGoals` sections so issue reports can show exactly which paths were considered. There is no separate `--scope` option today, and setup does not ask interactive scope questions.
+The default setup output is intentionally short. `fooks setup --json` includes an additive `scope` object with `packageInstall`, `projectLocal`, `userRuntime`, and `nonGoals` sections so issue reports can show exactly which paths were considered. There is no separate `--scope` option today, and setup does not ask interactive scope questions.
 
 ## 3. Check status
 
+A first run should be understandable without reading JSON:
+
 ```bash
-fooks doctor
+fooks setup          # short ready / partial / blocked summary
+fooks doctor         # read-only readiness diagnosis
+fooks status         # local estimated session telemetry after use
+fooks compare src/components/Button.tsx --json
+```
+
+Use focused diagnostics when needed:
+
+```bash
 fooks doctor codex
 fooks doctor claude
-fooks status
 fooks status codex
 fooks status claude
 fooks status cache
@@ -93,6 +102,15 @@ fooks compare src/components/Button.tsx --json
 `fooks compare` compares the original source bytes with the compact base model-facing payload used for context-reduction estimates. For compressed/hybrid frontend files, that payload comes from fooks' TypeScript AST-derived component contract, behavior, structure, style, bounded source-line ranges, a source fingerprint for freshness checks, hook/effect intent, and form/control signals rather than the full source text. The line ranges are AST-derived edit aids and should be treated as valid only for the matching source fingerprint. The token values are estimated from local byte counts, so this is a local model-facing payload estimate only; it excludes optional edit-guidance overhead. It is not provider tokenizer behavior, not runtime hook envelope overhead, not provider billing tokens, not provider costs, and not a `ccusage` replacement.
 
 When source ranges are present, `fooks extract <file> --model-payload` also emits compact `editGuidance`. Its `patchTargets` point agents at likely edit anchors such as component declarations, props, effects, callbacks, event handlers, form controls, submit handlers, validation anchors, and representative snippets. Treat those targets as valid only while `sourceFingerprint.fileHash` and `sourceFingerprint.lineCount` still match the current file; if either freshness value changes, rerun `fooks extract` or read the file before editing. This is AST-derived line-aware patch guidance, not LSP-backed semantic resolution and not provider-tokenizer, billing-token, or provider-cost proof.
+
+## Supported project shapes
+
+| Project shape | `fooks setup` behavior | What to run next | Boundary |
+| --- | --- | --- | --- |
+| React / Next.js `.tsx` or `.jsx` components | Codex automatic path can become ready; Claude/opencode helper paths may also be prepared. | `fooks doctor` and `fooks compare src/components/Button.tsx --json` | Strongest path is repeated same-file Codex work. |
+| Ink / React CLI `.tsx` or `.jsx` components | Treated as TSX/JSX React source for Codex same-file reuse. | `fooks compare path/to/App.tsx --json` | Web-specific DOM/form/style signals may be weaker, so fallback behavior is normal. |
+| Pure `.ts` / `.js` library modules | Codex-only setup can qualify when a strong same-file TS/JS beta module is found. | `fooks doctor codex` and `fooks compare path/to/module.ts --json` | Claude/opencode helper setup remains React `.tsx` / `.jsx` only. |
+| Vue/Svelte/SFC or arbitrary backend source | Not a current support claim unless a strong `.ts` / `.js` beta module qualifies for Codex. | Use normal source reading or explicit `fooks compare` experiments. | Roadmap only; no universal read interception or framework parity. |
 
 ## What the setup result means
 

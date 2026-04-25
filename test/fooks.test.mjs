@@ -3598,6 +3598,25 @@ ${release}`;
   assert.doesNotMatch(combined, /automatic Claude Read\/tool interception/i);
 });
 
+test("docs give first-run users a clear support and diagnosis path", () => {
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
+  const combined = `${readme}\n${setup}`;
+
+  assert.match(readme, /npm install -g fxxk-frontned-hooks/);
+  assert.match(readme, /First-run checklist/);
+  assert.match(combined, /fooks setup\s+# short ready \/ partial \/ blocked summary/);
+  assert.match(combined, /fooks doctor/);
+  assert.match(combined, /fooks status/);
+  assert.match(combined, /fooks setup --json/);
+  assert.match(combined, /React \/ Next\.js/);
+  assert.match(combined, /Ink .*React CLI/s);
+  assert.match(combined, /Pure (?:TypeScript\/JavaScript|`\\.ts` \/ `\\.js` library)/);
+  assert.match(combined, /Codex-only setup can qualify/);
+  assert.match(combined, /Claude\/opencode helper setup remains React `\.tsx` \/ `\.jsx` only/);
+  assert.match(combined, /no universal read interception|Universal file-read interception/);
+});
+
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");

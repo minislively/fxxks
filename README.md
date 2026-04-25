@@ -27,22 +27,40 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 
 ```bash
 npm install -g fxxk-frontned-hooks
-cd your-react-project
+cd your-supported-project
 fooks setup
+fooks doctor
 fooks compare src/components/Button.tsx --json
 ```
 
-Then open Codex in that repo and work normally. `fooks compare` gives an immediate local estimate for one supported frontend file by comparing original source size with the compact fooks model-facing payload.
+Then open Codex in that repo and work normally. `fooks doctor` is the read-only health check for setup/hook readiness, and `fooks compare` gives an immediate local estimate for one supported file by comparing original source size with the compact fooks model-facing payload.
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
+
+### First-run checklist
+
+1. Install the package: `npm install -g fxxk-frontned-hooks`.
+2. Confirm the command resolves to the package you expect: `which fooks` and `fooks --help`.
+3. Activate only the repo you are inside: `fooks setup`. The default output should be a short `ready`, `partial`, or `blocked` summary, not a debug JSON wall.
+4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, and `fooks compare <file> --json` for one-file payload proof.
+5. Use `fooks setup --json` only when you need support/debug paths, runtime manifests, or issue-report evidence.
 
 ## Strongest path / beta path / not today
 
 | Strongest path today | Narrow beta path | Not today |
 | --- | --- | --- |
-| Repeated same-file React `.tsx` / `.jsx` work in Codex. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
+| Repeated same-file React `.tsx` / `.jsx` work in Codex. This includes normal React apps, Next.js components, and Ink-style React CLI components when the target file is real TSX/JSX. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
 | Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior or read-interception parity. |
 | Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
+
+## Project/file support matrix
+
+| Project shape | Setup expectation | Best verification command | Boundary |
+| --- | --- | --- | --- |
+| React / Next.js with `.tsx` or `.jsx` components | Full Codex setup path; Claude/opencode helpers can also be prepared when their homes/settings are available. | `fooks doctor` then `fooks compare src/components/Button.tsx --json` | Same-file repeated Codex work is the strongest supported workflow. |
+| Ink or other React-based CLI with `.tsx` / `.jsx` components | Treated like TSX/JSX React source for Codex repeated same-file work. | `fooks compare path/to/App.tsx --json` | DOM/form/style signals may be weaker than web UI components; unsupported cases fall back safely. |
+| Pure TypeScript/JavaScript library | Codex-only setup may qualify if a `.ts` / `.js` file passes the strong beta readiness gate. | `fooks doctor codex` and `fooks compare path/to/module.ts --json` | No Claude/opencode helper parity and no broad semantic/framework claim. |
+| Vue/Svelte/SFC or arbitrary backend repo | Not a current support claim. | Use normal source reading unless a strong `.ts` / `.js` beta module qualifies for Codex. | Roadmap only; no universal read interception. |
 
 ## Deferred asks / not supported yet
 
@@ -253,7 +271,7 @@ fooks status cache
 
 Common causes:
 
-- You are not in a React/TSX/JSX project root.
+- You are not in a project with supported `.tsx` / `.jsx` files, and you also do not have a strong Codex-only `.ts` / `.js` beta candidate.
 - Another global `fooks` binary is earlier in your PATH.
 - `~/.codex/hooks.json` is invalid JSON or not writable.
 - Your Codex runtime home is missing or not writable; use `FOOKS_CODEX_HOME` for an isolated smoke test.
