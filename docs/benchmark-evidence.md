@@ -105,6 +105,29 @@ medians were intentionally absent because there were no comparable accepted
 pairs. Treat this as additional negative diagnostic evidence, not as a win or a
 replacement for a later multi-task applied-code benchmark.
 
+
+### Layer 2 R4 bounded applied-code rerun, 2026-04-25
+
+A bounded live rerun used the repeated R4 applied-code path with
+`requiredAccepted=5`, `maxPairs=8`, Codex provider mode, and model
+`gpt-5.4-mini`. It attempted seven matched vanilla/fooks pairs and accepted
+five pairs, but the summary classification remained `diagnostic-only` because
+the candidate threshold was not met.
+
+Accepted-pair medians were directionally positive: fooks supplied an 86.4%
+smaller prompt, CLI-reported runtime tokens were 22.4% lower, and latency was
+8.3% lower. The same summary still recorded one runtime-token regression, one
+severe runtime-token regression, and one latency regression, so stable
+claimability flags stayed false for provider invoice/billing savings, provider
+billing-token savings, stable runtime-token savings, and stable time/latency
+savings.
+
+The local evidence artifact was written under
+`.fooks/evidence/runtime/runtime-r4-rerun-20260425/summary.json`. Treat it as
+internal repeated local telemetry only: it is not provider billing telemetry,
+not an applied-code benchmark win, not a stable runtime-token/time win, and not
+a replacement for broader multi-task repeated evidence.
+
 ### L2 provider usage estimated-cost evidence, 2026-04-22
 
 The L2 evidence tier is an OpenAI direct benchmark pipeline that converts
