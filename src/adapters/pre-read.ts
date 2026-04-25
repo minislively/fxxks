@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { extractFile } from "../core/extract";
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
@@ -6,6 +7,7 @@ import type { PreReadDecision } from "../core/schema";
 
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
+export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 
 export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
 
@@ -16,6 +18,16 @@ function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<st
 function relativePath(filePath: string, cwd: string): string {
   const relative = path.relative(cwd, filePath);
   return relative || path.basename(filePath);
+}
+
+export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
+  return (
+    /\bfrom\s+["']react-native(?:\/[^"']*)?["']/.test(sourceText) ||
+    /\brequire\(\s*["']react-native(?:\/[^"']*)?["']\s*\)/.test(sourceText) ||
+    /\bfrom\s+["']react-native-webview["']/.test(sourceText) ||
+    /\brequire\(\s*["']react-native-webview["']\s*\)/.test(sourceText) ||
+    /<WebView(?:\s|>|\/)/.test(sourceText)
+  );
 }
 
 export function decidePreRead(
@@ -39,6 +51,22 @@ export function decidePreRead(
       fallback: {
         action: "full-read",
         reason: "ineligible-extension",
+      },
+    };
+  }
+
+  const sourceText = fs.readFileSync(resolvedPath, "utf8");
+  if (hasReactNativeWebViewBoundaryMarker(sourceText)) {
+    return {
+      runtime,
+      filePath: outputPath,
+      eligible: true,
+      decision: "fallback",
+      reasons: [REACT_NATIVE_WEBVIEW_BOUNDARY_REASON],
+      debug: {},
+      fallback: {
+        action: "full-read",
+        reason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
       },
     };
   }

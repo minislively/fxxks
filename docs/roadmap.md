@@ -2,7 +2,7 @@
 
 This page frames common "does fooks support X?" questions as future support or evidence lanes. These items are **not required** for the current strongest workflow: Codex repeated same-file React `.tsx` / `.jsx` context reduction, with a narrower experimental Codex-first `.ts` / `.js` same-file beta.
 
-If the answer you want sounds like “Vue?”, “broader TS/JS?”, “multi-file?”, “read interception?”, “LSP rename/reference?”, or “provider parity?”, read that as a roadmap question unless another public doc explicitly says it already shipped.
+If the answer you want sounds like “React Native?”, “WebView?”, “Vue?”, “broader TS/JS?”, “multi-file?”, “read interception?”, “LSP rename/reference?”, or “provider parity?”, read that as a roadmap question unless another public doc explicitly says it already shipped.
 
 ## Current strongest workflow
 
@@ -16,12 +16,13 @@ If the answer you want sounds like “Vue?”, “broader TS/JS?”, “multi-fi
 - Runtime: still Codex-first; this beta is not a provider-parity expansion.
 - Files: same-file `.ts` / `.js` modules only when module signals are strong enough.
 - Setup: strong TS/JS repos can qualify a Codex-only setup path, while Claude/opencode helper setup remains React-only in this release slice.
-- Boundary: the beta does **not** imply Vue/SFC support, broader framework understanding, multi-file refactors, read interception, or LSP semantic safety.
+- Boundary: the beta does **not** imply React Native/WebView support, Vue/SFC support, broader framework understanding, multi-file refactors, read interception, or LSP semantic safety.
 
 ## Deferred support lanes
 
 | Lane | Why it matters | Current boundary |
 | --- | --- | --- |
+| React Native / embedded WebView | Would require evidence for native component primitives, platform-specific semantics, bridge behavior, and WebView boundary/security assumptions rather than DOM/form/Tailwind-oriented React web signals. | Deferred. TSX parsing is syntax-level only and must not be read as RN/WebView support. Obvious RN/WebView files should use normal source reading unless future fixtures, benchmarks, and public evidence explicitly add this lane. |
 | Vue / Svelte / broader frontend frameworks | Would expand the component extraction model beyond React. | Not part of the current automatic path. |
 | Broader `.ts` / `.js` coverage beyond the beta | Would make fooks useful outside React component loops more consistently. | Experimental Codex-first same-file `.ts` / `.js` beta exists, but it is module-signal gated, same-file only, and not provider-parity, multi-file, or semantic-safety support. |
 | Claude/opencode parity | Would make non-Codex runtimes feel closer to the current strongest automatic path. | Claude/opencode remain narrower helper/manual paths and should not be described as Codex-equivalent automatic support. |

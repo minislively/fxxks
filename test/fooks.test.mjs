@@ -1037,6 +1037,28 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.equal(linkedTs.debug.language, "ts");
 });
 
+test("pre-read treats React Native and WebView markers as unsupported source-reading boundary", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-rn-webview-"));
+  const rnWebViewPath = path.join(tempDir, "CheckoutWebView.tsx");
+  fs.writeFileSync(
+    rnWebViewPath,
+    `import { View } from "react-native";
+import { WebView } from "react-native-webview";
+
+export function CheckoutWebView() {
+  return <WebView source={{ uri: "https://example.test/checkout" }} />;
+}
+`,
+  );
+
+  const result = preReadModule.decidePreRead(rnWebViewPath, tempDir, "codex", { includeEditGuidance: true });
+  assert.equal(result.eligible, true);
+  assert.equal(result.decision, "fallback");
+  assert.deepEqual(result.reasons, ["unsupported-react-native-webview-boundary"]);
+  assert.equal(result.fallback.reason, "unsupported-react-native-webview-boundary");
+  assert.equal("payload" in result, false);
+});
+
 test("codex pre-read falls back for larger raw files past the original-source threshold", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-large-raw-"));
   const largeRawPath = path.join(tempDir, "LargeRawButton.tsx");
@@ -3596,6 +3618,21 @@ ${release}`;
   assert.doesNotMatch(combined, /fooks reduces your actual provider bill/i);
   assert.doesNotMatch(combined, /measured Codex\/Claude billing tokens/i);
   assert.doesNotMatch(combined, /automatic Claude Read\/tool interception/i);
+});
+
+test("docs and pre-read boundary keep React Native and WebView unsupported", () => {
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const roadmap = fs.readFileSync(path.join(repoRoot, "docs", "roadmap.md"), "utf8");
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const taxonomy = fs.readFileSync(path.join(repoRoot, "docs", "frontend-scope-taxonomy.md"), "utf8");
+  const preRead = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
+  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}`;
+
+  assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
+  assert.match(combined, /TSX parsing is (?:syntax-level|only syntax-level)|\.tsx` parse is not semantic evidence/);
+  assert.match(combined, /normal source reading/);
+  assert.match(preRead, /unsupported-react-native-webview-boundary/);
+  assert.doesNotMatch(combined, /React Native support is available/i);
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {
