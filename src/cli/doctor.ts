@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { readCodexHookPresetStatus, type CodexHookPresetStatus } from "../adapters/codex-hook-preset";
@@ -328,6 +329,113 @@ function claudeTypeScriptLspCheck(): DoctorCheck {
   };
 }
 
+function worktreeHealthCheck(cwd: string): DoctorCheck {
+  try {
+    const result = spawnSync("git", ["worktree", "list", "--porcelain"], { cwd, encoding: "utf8" });
+    if (result.error || result.status !== 0) {
+      return {
+        runtime: "core",
+        name: "Worktree health",
+        status: "pass",
+        message: "Worktree check skipped (not a git repository or git unavailable)",
+        evidence: { status: result.status, stderr: result.stderr },
+      };
+    }
+    const blocks = result.stdout.split("\n\n").filter(Boolean);
+    const issues: string[] = [];
+    let deletedCount = 0;
+
+    for (const block of blocks) {
+      const lines = block.split("\n");
+      const worktreePath = lines.find((l) => l.startsWith("worktree "))?.slice(9);
+      if (worktreePath && !fs.existsSync(worktreePath)) {
+        deletedCount++;
+        issues.push(`deleted: ${worktreePath}`);
+      }
+    }
+
+    if (issues.length === 0) {
+      return {
+        runtime: "core",
+        name: "Worktree health",
+        status: "pass",
+        message: "All worktrees are healthy",
+        evidence: { worktreeCount: blocks.length },
+      };
+    }
+
+    return {
+      runtime: "core",
+      name: "Worktree health",
+      status: "warn",
+      message: `Found ${issues.length} worktree issue(s): ${issues.join("; ")}`,
+      fix: "Run: git worktree prune && rm -rf <deleted-worktree-path>",
+      evidence: { deletedCount, issues, worktreeCount: blocks.length },
+    };
+  } catch (error) {
+    return {
+      runtime: "core",
+      name: "Worktree health",
+      status: "pass",
+      message: `Worktree check skipped: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+function tmuxSessionHealthCheck(): DoctorCheck {
+  try {
+    const result = spawnSync("tmux", ["ls"], { encoding: "utf8", timeout: 5000 });
+    if (result.error || result.status !== 0) {
+      return {
+        runtime: "core",
+        name: "Tmux session health",
+        status: "pass",
+        message: "Tmux session check skipped (tmux unavailable)",
+        evidence: { status: result.status, stderr: result.stderr },
+      };
+    }
+    const sessions = result.stdout.split("\n").filter(Boolean);
+    const zombieSessions: string[] = [];
+
+    for (const sessionLine of sessions) {
+      const sessionName = sessionLine.split(":")[0];
+      if (!sessionName) continue;
+      const paneResult = spawnSync("tmux", ["display-message", "-t", sessionName, "-p", "#{pane_current_path}"], { encoding: "utf8", timeout: 5000 });
+      if (paneResult.error || paneResult.status !== 0) continue;
+      const panePath = paneResult.stdout.trim();
+      if (panePath.includes("(deleted)") || (panePath && !fs.existsSync(panePath))) {
+        zombieSessions.push(sessionName);
+      }
+    }
+
+    if (zombieSessions.length === 0) {
+      return {
+        runtime: "core",
+        name: "Tmux session health",
+        status: "pass",
+        message: `All ${sessions.length} tmux session(s) are healthy`,
+        evidence: { sessionCount: sessions.length },
+      };
+    }
+
+    return {
+      runtime: "core",
+      name: "Tmux session health",
+      status: "warn",
+      message: `Found ${zombieSessions.length} zombie tmux session(s): ${zombieSessions.join(", ")}`,
+      fix: "Run: tmux kill-session -t <session-name>",
+      evidence: { zombieSessions, sessionCount: sessions.length },
+    };
+  } catch (error) {
+    return {
+      runtime: "core",
+      name: "Tmux session health",
+      status: "pass",
+      message: `Tmux session check skipped: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
 function codexDoctorChecks(cwd: string, cliName: string): DoctorCheck[] {
   const hooks = readCodexHookPresetStatus(cliName);
   return [
@@ -401,10 +509,15 @@ function claudeDoctorChecks(cwd: string, focused = true): DoctorCheck[] {
 }
 
 function aggregateChecks(cwd: string, cliName: string): DoctorCheck[] {
-  return [
+  const checks = [
     ...codexDoctorChecks(cwd, cliName),
     ...claudeDoctorChecks(cwd, false),
   ];
+  if (process.env.FOOKS_OPERATOR === "1") {
+    checks.push(worktreeHealthCheck(cwd));
+    checks.push(tmuxSessionHealthCheck());
+  }
+  return checks;
 }
 
 function summaryFor(checks: DoctorCheck[]): DoctorResult["summary"] {
