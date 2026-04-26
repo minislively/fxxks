@@ -113,7 +113,7 @@ function shellQuote(value: string): string {
 function includesFooksSignal(value: string, cwd: string): boolean {
   const lower = value.replace(/\\/g, "/").toLowerCase();
   const cwdBase = path.basename(cwd).toLowerCase();
-  return lower.includes("fooks") || lower.includes(".omx-worktrees") || (cwdBase.includes("fooks") && lower.includes(cwdBase));
+  return lower.includes("fooks") || (cwdBase.includes("fooks") && lower.includes(cwdBase));
 }
 
 function safeResolve(targetPath: string): string {

@@ -43,6 +43,27 @@ test("artifact audit parsers handle git worktrees, branches, and tmux panes", ()
   ]);
 });
 
+test("artifact audit excludes non-fooks omx worktree tmux panes by default", () => {
+  const cwd = "/work/fooks.omx-worktrees/fooks-current";
+  const result = auditArtifacts(cwd, {
+    pathExists: (target) => target === cwd || target === "/work/VibeQuant.omx-worktrees/vibequant-feature",
+    runner: makeRunner({
+      "git worktree list --porcelain": `worktree ${cwd}\nHEAD 111\nbranch refs/heads/fooks-current\n`,
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch --format=%(refname:short)": "fooks-current\n",
+      "git branch --merged origin/main": "main\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": [
+        `fooks-current\t${cwd}`,
+        "vibequant\t/work/VibeQuant.omx-worktrees/vibequant-feature",
+      ].join("\n"),
+    }),
+  });
+
+  assert.deepEqual(result.sessions.map((item) => item.session), ["fooks-current"]);
+  assert.equal(result.sessions.find((item) => item.session === "vibequant"), undefined);
+  assert.ok(!result.manualCleanupCommands.some((command) => command.includes("vibequant")));
+});
+
 test("artifact audit reports conservative candidates and only manual cleanup commands", () => {
   const cwd = "/repo/fooks-main";
   const existing = new Set([
