@@ -217,7 +217,7 @@ test('edit guidance evidence pair keeps variants matched and claim-bounded', () 
   for (const variant of [evidence.withGuidance, evidence.withoutGuidance]) {
     assert.equal(variant.claimBoundary, EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY);
     assert.match(variant.claimBoundary, /not provider tokenizer proof/);
-    assert.match(variant.claimBoundary, /not provider billing\/cost proof/);
+    assert.match(variant.claimBoundary, /not provider usage\/billing or charged-cost proof/);
     assert.match(variant.claimBoundary, /not LSP semantic safety/);
     assert.equal(
       variant.targetLocalizationSteps.every(step => typeof step === 'string' && step.length > 0),

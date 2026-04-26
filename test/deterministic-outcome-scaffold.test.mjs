@@ -50,9 +50,9 @@ test('deterministic outcome scaffold stays design-only and claim-bounded', () =>
 
   const combined = JSON.stringify(scaffold).toLowerCase();
   assert.match(combined, /design contract only/);
-  assert.match(combined, /provider billing-token/);
+  assert.match(combined, /provider usage\/billing-token/);
   assert.match(combined, /automatic runtime defaults/);
-  assert.doesNotMatch(combined, /provider billing-token savings are proven/);
+  assert.doesNotMatch(combined, /provider usage\/billing-token savings are proven/);
   assert.doesNotMatch(combined, /live codex outcome win/);
 });
 
@@ -92,8 +92,8 @@ test('deterministic outcome scaffold CLI writes JSON and Markdown without live e
   const md = fs.readFileSync(markdown, 'utf8');
   assert.match(md, /Design.*Scaffold/i);
   assert.match(md, /does not run live models|design contract only/i);
-  assert.match(md, /provider billing-token/i);
-  assert.doesNotMatch(md, /provider billing-token savings are proven/i);
+  assert.match(md, /provider usage\/billing-token/i);
+  assert.doesNotMatch(md, /provider usage\/billing-token savings are proven/i);
 });
 
 test('deterministic outcome scaffold markdown reports validation blockers', () => {
@@ -300,7 +300,7 @@ test('deterministic fixture replay CLI writes JSON and Markdown without live exe
   assert.match(md, /local deterministic target-localization evidence only/i);
   assert.match(md, /not live Codex\/Claude model outcome proof/i);
   assert.match(md, /providerTokenizerParity: false/);
-  assert.doesNotMatch(md, /provider billing-token savings are proven/i);
+  assert.doesNotMatch(md, /provider usage\/billing-token savings are proven/i);
   assert.doesNotMatch(md, /public edit win/i);
 });
 

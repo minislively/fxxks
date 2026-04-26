@@ -205,5 +205,5 @@ test("worktree evidence implementation is read-only and keeps claim boundaries l
     assert.doesNotMatch(source, new RegExp(`\\bgit\\s+${term}\\b`));
   }
   assert.doesNotMatch(source, /FOOKS_SESSION_METRICS_SCHEMA_VERSION\\s*=\\s*2/);
-  assert.doesNotMatch(source, /provider billing proof|provider cost proof|token savings proof/i);
+  assert.doesNotMatch(source, /provider usage\/billing proof|charged-cost proof|token savings proof/i);
 });

@@ -264,7 +264,7 @@ if (!runProvider) {
     cliVersions,
     runCommand: "FOOKS_LIVE_PROVIDER_SMOKE=1 node scripts/live-provider-hook-smoke.mjs --run-provider",
     optionalFlags: ["--skip-codex", "--skip-claude"],
-    claimBoundary: "This script can gather live CLI hook evidence, but it is not provider billing-token or provider-cost proof.",
+    claimBoundary: "This script can gather live CLI hook evidence, but it is not provider usage/billing-token or provider-cost proof.",
   }, null, 2));
   process.exit(0);
 }
@@ -294,7 +294,7 @@ try {
 
   const status = parseJson(run(fooksBin, ["status"], { cwd: project, env }), "fooks status");
   assert(status.metricTier === "estimated", `status metricTier should be estimated, got ${status.metricTier}`);
-  assert(status.claimBoundary?.includes("not provider billing tokens"), "status should preserve provider billing-token boundary");
+  assert(status.claimBoundary?.includes("not provider usage/billing tokens"), "status should preserve provider usage/billing-token boundary");
 
   console.log(JSON.stringify({
     ok: true,
@@ -309,7 +309,7 @@ try {
       runtimeSources: Object.keys(status.breakdown?.byRuntimeAndSource ?? {}).sort(),
       claimBoundary: status.claimBoundary,
     },
-    claimBoundary: "Live CLI smoke proves installed CLI hook activation and local estimated status evidence only; it is not provider billing-token or provider-cost proof.",
+    claimBoundary: "Live CLI smoke proves installed CLI hook activation and local estimated status evidence only; it is not provider usage/billing-token or provider-cost proof.",
   }, null, 2));
 } finally {
   restoreBackup(codexHooksBackup, codexHooksPath, codexHooksExisted);

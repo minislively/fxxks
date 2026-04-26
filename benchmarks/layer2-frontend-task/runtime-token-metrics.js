@@ -3,7 +3,7 @@
 /**
  * Parse Codex CLI runtime token telemetry from stdout/stderr text.
  *
- * This is CLI-reported runtime usage only. It is not provider billing telemetry,
+ * This is CLI-reported runtime usage only. It is not provider usage/billing-token telemetry,
  * not a provider cost source, and not sufficient for public billing-token claims.
  */
 function parseCodexRuntimeTokens(...chunks) {
@@ -26,7 +26,7 @@ function parseCodexRuntimeUsage(...chunks) {
     outputTokens: null,
     totalTokens: null,
     source: null,
-    claimBoundary: 'Codex CLI runtime-reported tokens are not provider billing tokens or costs.',
+    claimBoundary: 'Codex CLI runtime-reported tokens are not provider usage/billing tokens, invoices, dashboards, or charged costs.',
   };
   if (!text) return empty;
 
@@ -73,7 +73,7 @@ function parseClaudeRuntimeUsage(...chunks) {
     outputTokens: null,
     totalTokens: null,
     source: null,
-    claimBoundary: 'Anthropic API usage fields are not provider billing tokens or costs.',
+    claimBoundary: 'Anthropic API usage fields are not provider usage/billing tokens, invoices, dashboards, or charged costs.',
   };
 
   // If the first chunk is an object with usage, read directly

@@ -465,8 +465,8 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.ok(result.savedEstimatedTokens > 0);
   assert.ok(result.reductionPercent > 0);
   assert.equal(result.payloadLarger, false);
-  assert.match(result.claimBoundary, /not provider billing tokens/);
-  assert.match(result.claimBoundary, /not provider costs/);
+  assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
+  assert.match(result.claimBoundary, /not provider usage\/billing tokens, invoices, dashboards, charged costs/);
   assert.ok(result.excludes.includes("provider-tokenizer-behavior"));
   assert.ok(result.excludes.includes("runtime-hook-envelope-overhead"));
   assert.ok(result.excludes.includes("optional-edit-guidance-overhead"));
@@ -483,7 +483,7 @@ test("compare keeps tiny raw fallback from reporting false positive savings", ()
   assert.equal(result.reductionPercent, 0);
   assert.equal(result.payloadLarger, true);
   assert.equal(result.nonSavingReason, "original-source-preserved-for-small-raw-file");
-  assert.match(result.claimBoundary, /not provider billing tokens/);
+  assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
 });
 
 test("extract produces compressed output for boilerplate-heavy fixture", () => {
@@ -793,8 +793,8 @@ test("design-review local value-proof helper reports bounded source-derived evid
 
     assert.match(evidence.claimBoundary, /local/);
     assert.match(evidence.claimBoundary, /not provider tokenizer output/);
-    assert.match(evidence.claimBoundary, /not provider billing tokens|not billing tokens/);
-    assert.match(evidence.claimBoundary, /not provider costs/);
+    assert.match(evidence.claimBoundary, /not provider usage\/billing tokens|not billing tokens/);
+    assert.match(evidence.claimBoundary, /not provider usage\/billing tokens|invoices, dashboards, charged costs|not provider invoice\/dashboard\/charged-cost proof/);
     assert.match(evidence.claimBoundary, /not runtime hook envelope/);
     assert.match(evidence.claimBoundary, /not visual\/Figma proof/);
     assert.match(evidence.claimBoundary, /not an accessibility audit/);
@@ -1583,7 +1583,9 @@ test("bare status reports fast estimated session savings without exposing sessio
   assert.deepEqual(empty.breakdown.byRuntimeAndSource, {});
   assert.equal("sessions" in empty, false);
   assert.equal("latestSessionKeys" in empty, false);
-  assert.match(empty.claimBoundary, /not provider billing tokens/);
+  assert.match(empty.claimBoundary, /not provider usage\/billing tokens/);
+  assert.match(empty.claimBoundary, /invoices, dashboards, charged costs/);
+  assert.match(empty.claimBoundary, /ccusage replacement/);
 });
 
 test("legacy unqualified metric summaries migrate to codex automatic hook identity", () => {
@@ -2129,7 +2131,7 @@ test("native hook bridge maps payload-build failures to full-read guidance", () 
       output.hookSpecificOutput.additionalContext,
       /^fooks: fallback \(payload-build-failed\) · file: src\/components\/FormSection\.tsx · Read the full source file for this turn\.$/,
     );
-    assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /provider billing tokens/i);
+    assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /provider usage\/billing tokens/i);
     assert.doesNotMatch(output.hookSpecificOutput.additionalContext, /token savings/i);
   });
 });
@@ -2766,7 +2768,7 @@ test("doctor claude focused target fails independently and keeps claim boundarie
   assert.match(text, /Doctor does not prove provider health/);
   assert.doesNotMatch(text, /Claude Read interception is enabled/i);
   assert.doesNotMatch(text, /Claude runtime-token savings are enabled/i);
-  assert.doesNotMatch(text, /provider billing-token reduction is enabled/i);
+  assert.doesNotMatch(text, /provider usage\/billing-token reduction is enabled/i);
 });
 
 test("doctor human output is readable and includes fixes plus boundaries", () => {
@@ -3155,7 +3157,7 @@ test("codex and claude estimated metrics are runtime/source-qualified without se
   const claudeEvents = fs.readFileSync(sessionEventsPath(tempDir, claudeSummary.metricSessionKey), "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
   assert.equal(claudeEvents.length, 2);
   assert.ok(claudeEvents.every((event) => event.metricTier === "estimated"));
-  assert.ok(claudeEvents.every((event) => event.claimBoundary.includes("not provider billing tokens")));
+  assert.ok(claudeEvents.every((event) => event.claimBoundary.includes("not provider usage\/billing tokens")));
   assert.ok(claudeEvents.every((event) => event.runtime === "claude"));
   assert.ok(claudeEvents.every((event) => event.measurementSource === "project-local-context-hook"));
   assert.ok(claudeEvents.every((event) => event.rawSessionKey === sessionId));
@@ -3641,8 +3643,8 @@ ${release}`;
   assert.match(combined, /local model-facing payload estimate|local file-level estimate/);
   assert.match(combined, /TypeScript AST-derived/);
   assert.match(combined, /estimated input-token load|estimated input-token/);
-  assert.match(combined, /not provider billing tokens/);
-  assert.match(combined, /not provider costs/);
+  assert.match(combined, /not provider usage\/billing tokens/);
+  assert.match(combined, /not provider usage\/billing tokens|invoices, dashboards, charged costs|not provider invoice\/dashboard\/charged-cost proof/);
   assert.match(combined, /Claude.*project-local context hooks|project-local `SessionStart` \/ `UserPromptSubmit` hooks/s);
   assert.doesNotMatch(combined, /fooks reduces your actual provider bill/i);
   assert.doesNotMatch(combined, /measured Codex\/Claude billing tokens/i);
@@ -3803,7 +3805,7 @@ test("Layer 2 runner uses current Codex exec path instead of legacy configured g
   assert.equal(r4Validation.aggregate.allPairsPassed, true);
   assert.equal(r4Validation.aggregate.promptTokensApproxReductionPct.median, 92.4);
   assert.ok(r4Validation.checks.every((check) => check.passed));
-  assert.match(`${status}\n${release}`, /not provider billing telemetry|not enough for stable runtime-token\/time win claims/);
+  assert.match(`${status}\n${release}`, /not provider usage\/billing-token telemetry|not enough for stable runtime-token\/time win claims/);
   assert.match(status, /two matched pairs|2\/2 matched pairs/i);
   assert.doesNotMatch(`${wrapper}\n${runner}`, /OPENAI_BASE_URL|api-base-url|gpt-4o|temperature|maxTokens/);
 });

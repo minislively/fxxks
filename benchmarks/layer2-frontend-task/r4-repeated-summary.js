@@ -300,10 +300,10 @@ function summarizeRepeatedPairs(input) {
     pairs,
     claimBoundary: [
       'Accepted pairs require both vanilla and fooks to pass local applied acceptance gates.',
-      'Runtime-token comparisons are Level 1 CLI runtime-reported telemetry only, not provider billing tokens or costs.',
+      'Runtime-token comparisons are Level 1 CLI runtime-reported telemetry only, not provider usage/billing tokens, invoices, dashboards, or charged costs.',
       'Telemetry availability/comparability is not product claimability.',
       'A candidate evidence summary is internal evidence only, not a stable public runtime-token/time savings claim.',
-      'A narrow L1 candidate still does not support provider billing-token, cost-savings, broad multi-task, Claude, or opencode savings claims.',
+      'A narrow L1 candidate still does not support provider usage/billing-token, charged-cost-savings, broad multi-task, Claude, or opencode savings claims.',
       'Broad/stable claims require later multi-task repeated evidence.',
     ],
     claimability: {

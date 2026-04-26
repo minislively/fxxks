@@ -211,7 +211,7 @@ combobox-example.tsx (1,249 lines)
 - ✅ R4 기준 2회 matched vanilla/fooks proposal-only smoke validation
 
 **현재 불가 / non-goal:**
-- ❌ provider billing-token telemetry 확보
+- ❌ provider usage/billing-token telemetry 확보
 - ❌ 생성 코드 적용 후 unit/type/e2e acceptance 판정
 - ❌ multi-task 반복 실행 기반 stable runtime/time win 주장
 

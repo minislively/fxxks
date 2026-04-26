@@ -418,7 +418,7 @@ function validate(root, options = {}) {
     claimBoundary: passed
       ? [
           'This validates an applied file tree on disk for the supplied candidate root.',
-          'This does not by itself prove provider billing-token savings.',
+          'This does not by itself prove provider usage/billing-token savings.',
           'This does not prove stable runtime-token/time wins without matched repeated runs.',
         ]
       : [

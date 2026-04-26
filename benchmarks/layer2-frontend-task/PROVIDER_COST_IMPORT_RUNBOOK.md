@@ -83,7 +83,7 @@ The reconciliation status is intentionally narrow:
   estimated evidence is not `estimated-api-cost-only`.
 
 Claim boundary: this is still **not** provider invoice/dashboard savings proof,
-actual charged-cost savings proof, or provider billing-token savings proof. The
+actual charged-cost savings proof, or provider usage/billing-token savings proof. The
 artifact always keeps `providerInvoiceOrBillingSavings=false` and
 `providerBillingTokenSavings=false`; it only makes the future billing review
 lane auditable without collecting credentials or calling billing APIs.
@@ -332,7 +332,7 @@ Not allowed from this lane:
 
 - provider invoice/dashboard billing savings;
 - actual charged-cost savings;
-- provider billing-token savings;
+- provider usage/billing-token savings;
 - stable runtime-token savings;
 - stable wall-clock/time/latency savings;
 - Claude/opencode automatic cost savings.

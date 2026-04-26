@@ -22,7 +22,7 @@ These artifacts may support local context-size, prompt-size, and estimate-scoped
 - No runtime parser for private Codex, Claude, provider, or shell usage logs.
 - No automatic reading of private usage logs from user home directories, runtime homes, provider cache folders, or unrelated projects.
 - No telemetry upload, remote collection, account scraping, or background sync.
-- No claim that `fooks status`, `fooks compare`, or provider-cost benchmark evidence is provider billing telemetry.
+- No claim that `fooks status`, `fooks compare`, or provider-cost benchmark evidence is provider usage/billing-token telemetry.
 - No bundled `ccusage` integration or replacement CLI behavior.
 
 ## Why fooks is not ccusage

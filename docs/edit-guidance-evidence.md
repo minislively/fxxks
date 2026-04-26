@@ -27,7 +27,7 @@ Required fields:
   "patchTargetsCount": 1,
   "freshnessChecked": true,
   "targetLocalizationSteps": ["read-model-payload", "verify-sourceFingerprint", "select-patchTarget"],
-  "claimBoundary": "local/dry-run edit targeting evidence only; not provider tokenizer proof, not provider billing/cost proof, and not LSP semantic safety"
+  "claimBoundary": "local/dry-run edit targeting evidence only; not provider tokenizer proof, not provider usage/billing-token, invoice/dashboard, or charged-cost proof, and not LSP semantic safety"
 }
 ```
 

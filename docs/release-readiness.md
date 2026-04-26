@@ -36,7 +36,7 @@ Observed `release:smoke` summary:
 - Temporary installed binary: `fooks`.
 - Setup summary: `codex:automatic-ready:ready`, `claude:context-hook-ready:ready`, `opencode:tool-ready:ready`.
 - Doctor summary: 11 pass, 0 warn, 0 fail.
-- Compare smoke remained local estimated context-size telemetry; it is not provider billing tokens, provider costs, or a `ccusage` replacement.
+- Compare smoke remained local estimated context-size telemetry; it is not provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement.
 
 Observed `npm pack --dry-run` summary:
 
@@ -58,7 +58,7 @@ The following remain unresolved until a human-approved publish step:
 
 ## Claim boundaries to preserve
 
-- Do not claim stable runtime-token, latency, provider billing-token, invoice, or actual charged-cost savings from the local smoke results above.
+- Do not claim stable runtime-token, latency, provider usage/billing-token, invoice, or actual charged-cost savings from the local smoke results above.
 - Keep Codex wording scoped to supported repeated-file hook behavior through `fooks setup`.
 - Keep Claude wording scoped to project-local `SessionStart` / `UserPromptSubmit` context hooks; do not claim Claude `Read` interception.
 - Keep opencode wording scoped to the prepared tool/slash-command bridge; do not claim automatic `read` interception or automatic runtime-token savings.

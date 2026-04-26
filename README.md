@@ -51,7 +51,7 @@ Then open Codex in that repo and work normally. `fooks doctor` is the read-only 
 | --- | --- | --- |
 | Repeated same-file React `.tsx` / `.jsx` work in Codex. This includes normal React apps, Next.js components, and Ink-style React CLI components when the target file is real TSX/JSX. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
 | Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior or read-interception parity. |
-| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider billing telemetry, provider tokenizer behavior, provider invoice/dashboard proof, or a `ccusage` replacement. |
+| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider usage/billing-token telemetry, provider tokenizer behavior, provider invoice/dashboard/charged-cost proof, or a `ccusage` replacement. |
 
 ## Project/file support matrix
 
@@ -84,7 +84,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 
 | Environment | Current path | Automation level | Do not assume |
 | --- | --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Strongest path: repeated same-file `.tsx` / `.jsx` prompts can reuse compact context when safe; experimental same-file `.ts` / `.js` beta is available after supported Codex setup, including Codex-only TS/JS setup when a strong beta module exists | Universal file-read interception, stable runtime-token wins, provider billing/cost proof, React Native/WebView support, Vue/SFC support, multi-file refactors, or LSP semantic safety |
+| Codex | Automatic repeated-file hook path through `fooks setup` | Strongest path: repeated same-file `.tsx` / `.jsx` prompts can reuse compact context when safe; experimental same-file `.ts` / `.js` beta is available after supported Codex setup, including Codex-only TS/JS setup when a strong beta module exists | Universal file-read interception, stable runtime-token wins, provider usage/billing-token, invoice/dashboard, or charged-cost proof, React Native/WebView support, Vue/SFC support, multi-file refactors, or LSP semantic safety |
 | Claude | Project-local `SessionStart` / `UserPromptSubmit` context hooks plus manual/shared handoff artifacts | Narrower path: first eligible explicit frontend-file prompt is recorded/prepared; a repeated same-file prompt may receive bounded context | `Read` interception, full prompt-interception parity with Codex, or runtime-token savings proof |
 | opencode | Project-local `fooks_extract` tool and `/fooks-extract` slash command | Manual/semi-automatic tool steering | Built-in `read` interception or automatic runtime-token savings |
 
@@ -130,7 +130,7 @@ fooks compare src/components/Button.tsx --json
 
 The command compares the original source bytes with the compact base fooks model-facing payload used for context-reduction estimates. For compressed/hybrid frontend files, that payload is built from fooks' TypeScript AST-derived component contract, behavior, structure, style, bounded source-line ranges, source fingerprint, hook/effect intent, and form/control signals instead of the full source text. The line ranges are AST-derived edit aids and should be treated as valid only for the matching source fingerprint.
 
-`fooks compare` reports estimated source/model-facing tokens, estimated saved bytes/tokens, and a reduction percent. This is a **local model-facing payload estimate**: it excludes optional edit-guidance overhead and is not provider tokenizer behavior, runtime hook envelope overhead, provider billing tokens, provider costs, or a `ccusage` replacement. Small raw files may show zero savings because fooks intentionally preserves the original source when that is safer. Optional provider/model tokenizer accounting, including Claude `count_tokens` or OpenAI/tiktoken proof lanes, is design-scoped separately in [Provider tokenizer proof boundary](docs/provider-tokenizer-boundary.md) and is not default `fooks compare`.
+`fooks compare` reports estimated source/model-facing tokens, estimated saved bytes/tokens, and a reduction percent. This is a **local model-facing payload estimate**: it excludes optional edit-guidance overhead and is not provider tokenizer behavior, runtime hook envelope overhead, provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement. Small raw files may show zero savings because fooks intentionally preserves the original source when that is safer. Optional provider/model tokenizer accounting, including Claude `count_tokens` or OpenAI/tiktoken proof lanes, is design-scoped separately in [Provider tokenizer proof boundary](docs/provider-tokenizer-boundary.md) and is not default `fooks compare`.
 
 `fooks extract <file> --model-payload` also includes compact `editGuidance` when source ranges are available. Agents should use its `patchTargets` as line-aware hints for likely edit anchors such as component declarations, props, effects, callbacks, event handlers, form controls, submit handlers, validation anchors, and representative snippets. Before applying a patch from those hints, confirm the current source still matches `sourceFingerprint.fileHash` and `sourceFingerprint.lineCount`; if either changed, rerun `fooks extract` or read the file first. These patch targets are AST-derived edit aids, not LSP-backed rename/reference resolution, provider-tokenizer evidence, or billing evidence.
 
@@ -141,7 +141,7 @@ The evidence ladder is intentionally split so public wording does not collapse p
 | Level | Evidence | Supports | Does not support |
 | --- | --- | --- | --- |
 | Local estimate | `fooks compare`, `fooks status`, prepared payload accounting | Model-facing context / prompt-size estimate wording | Provider tokenizer, billing, or invoice wording |
-| Optional provider-tokenizer proof | Future explicit proof lane scoped to a named provider/model tokenizer; see [Provider tokenizer proof boundary](docs/provider-tokenizer-boundary.md) | Provider/model-tokenizer accounting for an isolated fixture/payload | Default compare behavior, provider billing tokens/costs, runtime hook envelope overhead, invoice/dashboard proof |
+| Optional provider-tokenizer proof | Future explicit proof lane scoped to a named provider/model tokenizer; see [Provider tokenizer proof boundary](docs/provider-tokenizer-boundary.md) | Provider/model-tokenizer accounting for an isolated fixture/payload | Default compare behavior, provider usage/billing tokens, invoices, dashboards, or charged costs, runtime hook envelope overhead, invoice/dashboard proof |
 | Runtime telemetry | Codex CLI-reported matched-run diagnostics | Narrow internal runtime candidate evidence when quality gates pass | Stable public runtime-token or latency claims |
 | Estimated API cost | Provider usage tokens converted under explicit pricing assumptions | Estimate-scoped API-cost wording with caveats | Invoice/dashboard or actual charged-cost proof |
 | Billing-grade proof | Provider invoice, dashboard, or billed-usage exports | Future billing-grade wording for the measured scope | Not claimed today |
@@ -152,7 +152,7 @@ Current public summary:
 - The 2026-04-14 Codex-oriented proxy snapshot showed a prepared-context estimate reduction from roughly 2.1M to 450K estimated context tokens in a 5-task sample, with no success-rate regression in that sample.
 - The corrected 2026-04-22 Codex OAuth provider-cost campaign reached launch-grade estimated-cost evidence for the small fixture lane: 3 task classes × 5 accepted matched pairs, 0 command-execution events, 15/15 accepted, an overall median estimated API-cost reduction of 4.171%, and aggregate estimated API cost of `$0.588855` baseline vs `$0.5547775` fooks (`$0.0340775`, 5.787% lower) under the recorded pricing assumption. Provider-reported usage tokens in that campaign were `376,104` baseline vs `372,065` fooks; 4/15 individual pairs still regressed.
 - Larger corrected public-code profiles made the impact easier to see under the same estimate-scoped boundary: the Next.js profile reported 15/15 accepted pairs, 0 regressions, median estimated API-cost reduction of 26.492%, provider-reported usage tokens `446,275` baseline vs `382,139` fooks, and aggregate estimated API cost `$0.88386` vs `$0.64497`; the Tailwind profile reported 15/15 accepted pairs, 0 regressions, median estimated API-cost reduction of 38.238%, provider-reported usage tokens `718,616` baseline vs `381,583` fooks, and aggregate estimated API cost `$1.598875` vs `$0.64853`.
-- These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove invoice/dashboard savings, actual charged-cost savings, provider billing-token outcomes, stable runtime-token savings, or stable wall-clock/latency savings.
+- These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove invoice/dashboard savings, actual charged-cost savings, provider usage/billing-token outcomes, stable runtime-token savings, or stable wall-clock/latency savings.
 - Direct runtime-token/time evidence remains unstable or negative in some diagnostics, so fooks does not claim stable runtime-token, wall-clock, or latency wins.
 
 ### Provider-cost benchmark snapshot (primary evidence)
@@ -185,7 +185,7 @@ This is secondary evidence: it explains that the compact payload advantage survi
 
 Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
-The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider billing-token proof, and not a Claude or opencode automatic savings claim.
+The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider usage/billing-token proof, and not a Claude or opencode automatic savings claim.
 
 ## Common questions
 
@@ -229,7 +229,7 @@ fooks extract src/components/Button.tsx --model-payload
 fooks scan
 ```
 
-`fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider billing tokens, provider costs, or a `ccusage` replacement.
+`fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement.
 
 `fooks status artifacts` is a read-only dogfood cleanup audit for local fooks artifacts after PRs merge. It inspects local git worktrees/branches and tmux panes, scopes results to fooks-like names or `.omx-worktrees` paths, and uses conservative labels such as `activeOrUnknown`, `likelyMerged`, `missingPath`, and `candidateCleanup`. The command does not run `git fetch`, `git worktree prune`, `git worktree remove`, `git branch -d`, or `tmux kill-session`; any `manualCleanupCommands` in the JSON are copy/paste suggestions only. Missing worktree paths only suggest `git worktree prune --dry-run` so operators can inspect before deciding whether to run cleanup manually. Verify the PR is merged and the session/worktree is inactive before copying any command.
 
@@ -276,7 +276,7 @@ fooks status cache
 fooks status artifacts
 ```
 
-`fooks doctor` is the safest first diagnostic after setup because it is read-only and summarizes local setup artifacts, missing hook events, manifests, adapter files, trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also reports the optional TypeScript language server as a warning-only host-tooling hint. It does not prove live provider health; it is not a ccusage replacement and not provider billing telemetry or provider costs.
+`fooks doctor` is the safest first diagnostic after setup because it is read-only and summarizes local setup artifacts, missing hook events, manifests, adapter files, trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also reports the optional TypeScript language server as a warning-only host-tooling hint. It does not prove live provider health; it is not a ccusage replacement and not provider usage/billing-token telemetry, invoices, dashboards, or charged costs.
 
 Common causes:
 

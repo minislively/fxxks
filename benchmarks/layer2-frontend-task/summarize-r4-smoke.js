@@ -3,7 +3,7 @@
  * Build a bounded, reviewable summary from two Layer 2 R4 runner outputs.
  *
  * This intentionally validates only proposal-smoke properties. It does not
- * execute generated code, run TypeScript, or claim provider billing telemetry.
+ * execute generated code, run TypeScript, or claim provider usage/billing-token telemetry.
  */
 
 const fs = require('fs');
@@ -161,7 +161,7 @@ function main() {
     validation,
     claimBoundary: [
       'proposal/skeleton output only',
-      'promptTokensApprox is prompt-size accounting, not provider billing telemetry',
+      'promptTokensApprox is prompt-size accounting, not provider usage/billing-token telemetry',
       'proposal-smoke validation checks output shape and boundary only',
       'acceptance/quality validation remains not-run until generated files are applied and typechecked',
       'not enough evidence for stable runtime-token or latency claims',

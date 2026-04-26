@@ -456,7 +456,7 @@ function buildBillingImportReconciliation({
     claimBoundaryNotes: [
       'This artifact reconciles a local/redacted billing import with existing estimated API cost evidence for review only.',
       'It does not prove provider invoice/dashboard savings or actual charged-cost savings.',
-      'It does not prove provider billing-token savings.',
+      'It does not prove provider usage/billing-token savings.',
       'It does not collect provider credentials or call billing dashboards/APIs.',
     ],
   };
@@ -491,7 +491,7 @@ function renderBillingReconciliationMarkdown(reconciliation) {
     '',
     '- This is a local billing import reconciliation artifact only.',
     '- This is not provider invoice/billing savings proof and does not prove actual charged-cost savings.',
-    '- This does not unlock provider billing-token savings claims.',
+    '- This does not unlock provider usage/billing-token savings claims.',
     '- This does not collect credentials or call provider billing APIs.',
     '',
   ].join('\n');

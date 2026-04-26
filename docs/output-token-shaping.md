@@ -81,7 +81,7 @@ Example safe wording for a future experiment:
 ## Non-goals
 
 - Do not tune prompts to hide work or validation from the transcript.
-- Do not use output-token deltas to imply provider billing savings.
+- Do not use output-token deltas to imply provider usage/billing-token, invoice/dashboard, or charged-cost savings.
 - Do not collapse input and output token deltas into a single public win.
 - Do not enable runtime answer shaping before the benchmark/reporting lane can
   show accepted-pair quality and token evidence side by side.

@@ -18,8 +18,8 @@ Run the smaller checks first while iterating (`npm run lint`, then targeted test
 
 Keep public wording conservative:
 
-- Prepared-context estimates are not provider billing-token savings.
-- Bare `fooks status` reports local estimated context-size telemetry only; it is not provider billing data, provider cost data, or a `ccusage` replacement.
+- Prepared-context estimates are not provider usage/billing-token savings.
+- Bare `fooks status` reports local estimated context-size telemetry only; it is not provider usage/billing-token data, invoice/dashboard data, charged-cost data, or a `ccusage` replacement.
 - Claude and opencode support are handoff/tool paths unless a future bridge proves otherwise.
 - Do not claim stable runtime-token/time wins or applied-code benchmark wins without a committed benchmark artifact and matching documentation update.
 

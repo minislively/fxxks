@@ -10,7 +10,7 @@ model-facing payload estimate.
 A provider-tokenizer proof may be added later only as an explicit, opt-in path.
 It must not change the default compare command, must not install tokenizer or
 provider SDK dependencies by default, and must not be described as provider
-billing tokens, provider costs, runtime hook envelope overhead, or a `ccusage`
+billing tokens, provider invoice/dashboard/charged-cost proof, runtime hook envelope overhead, or a `ccusage`
 replacement.
 
 ## What the default compare command proves
@@ -101,7 +101,7 @@ accepted.
 ## Non-goals
 
 - Replacing dependency-free local `fooks compare` defaults.
-- Claiming provider billing tokens or costs.
+- Claiming provider usage/billing tokens, invoices, dashboards, or charged costs.
 - Claiming runtime token savings from hook execution.
 - Measuring optional edit-guidance or runtime hook envelope overhead.
 - Replacing usage-log, invoice, billing export, or dashboard tooling.

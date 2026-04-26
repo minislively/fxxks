@@ -2,7 +2,7 @@
 
 This is a **claim-bounded deterministic evidence** lane for outcome benchmark work. It is
 intentionally separated from the release-safe runtime opt-in work so that it can run in a
-parallel worktree without changing runtime defaults, provider billing claims, or live model
+parallel worktree without changing runtime defaults, provider usage/billing-token, invoice/dashboard, or charged-cost claims, or live model
 outcome claims.
 
 ## Scope
@@ -24,7 +24,7 @@ Neither pass may modify runtime adapter behavior, public win claims, provider-co
 
 - No default runtime behavior change.
 - No automatic `editGuidance.patchTargets` behavior change; patch targets remain opt-in.
-- No provider tokenizer, provider billing-token, provider invoice, or provider cost claim.
+- No provider tokenizer, provider usage/billing-token, provider invoice, or provider charged-cost claim.
 - No live Codex/Claude model outcome claim.
 - No LSP implementation and no new dependency.
 - No edits to existing public claim surfaces until the runtime opt-in guardrail work lands.
@@ -93,8 +93,8 @@ The only supported classification is local deterministic target-localization evi
 
 | Phase | Allowed output | Still forbidden |
 | --- | --- | --- |
-| Scaffold | Contract JSON/Markdown and local validator tests | Live model claims, provider billing/cost claims, runtime default changes |
-| Fixture replay | Deterministic local target-localization deltas for the same file/component | Public outcome wins, provider billing/cost claims |
+| Scaffold | Contract JSON/Markdown and local validator tests | Live model claims, provider usage/billing-token, invoice/dashboard, or charged-cost claims, runtime default changes |
+| Fixture replay | Deterministic local target-localization deltas for the same file/component | Public outcome wins, provider usage/billing-token, invoice/dashboard, or charged-cost claims |
 | Live smoke | Internal Codex/Claude smoke artifacts | Public win claims unless later repeated evidence gates pass |
 | Provider proof | Imported/provider-backed evidence under explicit billing lanes | Any unqualified runtime-token or cost claim |
 
@@ -124,5 +124,5 @@ Avoid while release-safe runtime opt-in work is active:
 
 This lane can only say that a deterministic outcome benchmark contract/scaffold or local
 fixture-replay target-localization artifact exists. It cannot say that fooks improves live
-Codex/Claude outcomes, reduces provider billing tokens, reduces provider costs, improves edit
+Codex/Claude outcomes, reduces provider usage/billing tokens, reduces charged costs, improves edit
 accuracy, or provides stable runtime-token/time savings.

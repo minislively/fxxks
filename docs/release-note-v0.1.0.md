@@ -35,7 +35,7 @@ fooks v0.1.0 introduces frontend context compression for iterative React/TSX wor
 
 - Lower model-facing input/context load for supported repeated frontend work only
 - `fooks setup` is explicit by design; installing the npm package does not auto-mutate hooks
-- Local estimates only; not provider billing tokens, not provider costs, not a `ccusage` replacement
+- Local estimates only; not provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement
 
 ### Explicitly out of scope
 

@@ -5,8 +5,8 @@
  * Run repeated matched R4 applied-code pairs and summarize the narrow L1 signal.
  *
  * The output is deliberately conservative: it can identify a same-task L1
- * candidate or a diagnostic failure, but it never proves provider billing-token
- * savings, provider costs, broad multi-task wins, Claude wins, or opencode wins.
+ * candidate or a diagnostic failure, but it never proves provider usage/billing-token
+ * savings, provider charged-cost claims, broad multi-task wins, Claude wins, or opencode wins.
  */
 
 const fs = require('fs');

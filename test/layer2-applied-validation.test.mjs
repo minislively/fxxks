@@ -175,7 +175,7 @@ test("Codex runtime-token parser extracts CLI tokens used without billing semant
       source: "codex-cli-output",
     },
   );
-  assert.match(usage.claimBoundary, /not provider billing tokens or costs/);
+  assert.match(usage.claimBoundary, /not provider usage\/billing tokens, invoices, dashboards, or charged costs/);
 });
 
 test("R4 repeated summary can classify a narrow L1 candidate", () => {
@@ -201,7 +201,7 @@ test("R4 repeated summary can classify a narrow L1 candidate", () => {
   assert.equal(summary.pairs[0].vanilla.runtimeTokenSource, "codex-cli-output");
   assert.equal(summary.claimability.stableRuntimeTokenSavings, false);
   assert.equal(summary.claimability.stableTimeOrLatencySavings, false);
-  assert.match(summary.claimBoundary.join("\n"), /not provider billing tokens or costs/);
+  assert.match(summary.claimBoundary.join("\n"), /not provider usage\/billing tokens, invoices, dashboards, or charged costs/);
   assert.match(summary.claimBoundary.join("\n"), /not product claimability/i);
 });
 
@@ -618,7 +618,7 @@ test("Codex wrapper artifacts include structured runtime usage without billing s
         source: "codex-cli-output",
       },
     );
-    assert.match(result.runtimeUsage.claimBoundary, /not provider billing tokens or costs/);
+    assert.match(result.runtimeUsage.claimBoundary, /not provider usage\/billing tokens, invoices, dashboards, or charged costs/);
   } finally {
     fs.rmSync(tempBin, { recursive: true, force: true });
   }

@@ -15,7 +15,7 @@ import { BucketClassifier, DEFAULT_BUCKETS } from './bucket-classifier.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const EDIT_GUIDANCE_EVIDENCE_CLAIM_BOUNDARY =
-  'local/dry-run edit targeting evidence only; not provider tokenizer proof, not provider billing/cost proof, and not LSP semantic safety';
+  'local/dry-run edit targeting evidence only; not provider tokenizer proof, not provider usage/billing or charged-cost proof, and not LSP semantic safety';
 const WITH_GUIDANCE_LOCALIZATION_STEPS = Object.freeze([
   'read-model-payload',
   'verify-sourceFingerprint',

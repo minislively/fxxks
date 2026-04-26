@@ -53,7 +53,7 @@
 | 3 | Retry Reduction | vanilla - fooks | — | — | — | ⏸️ Pending |
 | 4 | Success Rate Diff | fooks - vanilla | — | — | — | ⏸️ Pending |
 
-**참고:** 위 수치는 proposal-only smokes의 local prompt-size/latency 관찰값이다. provider billing telemetry나 acceptance-validated 품질 결과가 아니며, 안정적인 runtime-token/time win claim은 validation + 반복 실행 전까지 금지.
+**참고:** 위 수치는 proposal-only smokes의 local prompt-size/latency 관찰값이다. provider usage/billing telemetry나 acceptance-validated 품질 결과가 아니며, 안정적인 runtime-token/time win claim은 validation + 반복 실행 전까지 금지.
 
 ---
 

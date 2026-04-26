@@ -30,7 +30,7 @@ claim boundaries:
 | Level | Evidence source | What it can support | What it cannot support yet |
 | --- | --- | --- | --- |
 | L0 | Local prompt/context-size estimates such as `promptTokensApprox`, `fooks status`, `fooks compare`, and prepared-context benchmark payload accounting | Prepared-context / prompt-size reduction wording | Provider billing tokens, billed costs, provider-tokenizer behavior, or stable runtime-token/time wins |
-| L0p | Optional provider/model tokenizer proof for an isolated fixture/payload, if added later under the [provider tokenizer boundary](provider-tokenizer-boundary.md) | Provider/model-tokenizer accounting for that named provider/model and payload shape | Default `fooks compare`, provider billing tokens, billed costs, runtime hook envelope overhead, or invoice/dashboard proof |
+| L0p | Optional provider/model tokenizer proof for an isolated fixture/payload, if added later under the [provider tokenizer boundary](provider-tokenizer-boundary.md) | Provider/model-tokenizer accounting for that named provider/model and payload shape | Default `fooks compare`, provider usage/billing tokens, invoices, dashboards, charged costs, runtime hook envelope overhead, or billing-grade proof |
 | L1 | Codex CLI runtime-reported telemetry parsed from matched run artifacts | Narrow internal runtime-token candidate evidence for one task/model/setup identity when accepted-pair gates pass | Provider billing-token/cost claims or stable public runtime-win wording |
 | L2a | Provider usage-token artifacts converted into estimated API cost under explicit pricing assumptions | Estimate-scoped provider-usage / estimated API-cost wording with pricing caveats | Invoice/dashboard/billed-cost claims |
 | L2b | Provider invoice, billing export, dashboard, or matched billed-usage telemetry | Billing-grade provider token/cost wording | Any broader product win beyond the measured scope |
@@ -93,8 +93,8 @@ applied acceptance gate. Only four pairs passed acceptance in both modes, so the
 `insufficient-accepted-pairs`. Within the accepted pairs, fooks supplied a much
 smaller prompt (median 88.2% reduction), but CLI-reported runtime tokens and
 latency regressed (median runtime-token reduction -25.5%; median latency
-reduction -14.4%). The CLI runtime-token field is not provider billing
-telemetry. This result blocks provider billing-token, stable runtime-token, and
+reduction -14.4%). The CLI runtime-token field is not provider usage/billing-token
+telemetry. This result blocks provider usage/billing-token, stable runtime-token, and
 stable time-win claims and motivates another repeated run after prompt/validator
 hardening.
 
@@ -182,7 +182,7 @@ npm run bench:layer2:billing-import -- \
 For mechanics-only local checks, use the synthetic redacted example at
 `benchmarks/layer2-frontend-task/fixtures/billing-import/redacted-openai-dashboard-export.example.json`.
 
-This closes the previous tooling gap around provider billing/cost connection,
+This closes the previous tooling gap around provider usage/billing-token and cost-evidence connection,
 but it does not change public claimability by itself. Reconciliation artifacts
 keep `providerInvoiceOrBillingSavings=false` and
 `providerBillingTokenSavings=false`; they are a review bridge, not billing-grade
@@ -310,7 +310,7 @@ This result unlocks only the estimate-scoped statement:
 > estimated OpenAI API cost under explicit pricing assumptions.
 
 It still does **not** prove provider invoice/dashboard savings, actual charged
-cost savings, provider billing-token savings, stable runtime-token savings, or
+cost savings, provider usage/billing-token savings, stable runtime-token savings, or
 stable wall-clock/latency savings.
 
 Larger public-code profiles are available for checking whether the observed
@@ -422,10 +422,10 @@ This tier separates three concepts:
    present and comparable;
 2. candidate evidence — whether the local repeated-pair threshold was met; and
 3. product claimability — which remains false for stable runtime-token/time and
-   provider billing claims.
+   provider usage/billing-token, invoice/dashboard, or charged-cost claims.
 
 A positive runtime candidate summary may be used as internal follow-up evidence,
-but it is still **not** provider billing-token evidence, actual cost-savings
+but it is still **not** provider usage/billing-token evidence, actual cost-savings
 evidence, stable runtime-token savings evidence, or stable latency/time savings
 evidence. Stable/public claims require a later higher-N and likely multi-task
 validation lane.

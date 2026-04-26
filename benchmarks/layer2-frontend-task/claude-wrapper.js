@@ -38,7 +38,7 @@ class ClaudeWrapper {
           outputTokens: null,
           totalTokens: null,
           source: null,
-          claimBoundary: 'Anthropic API usage is not provider billing telemetry.',
+          claimBoundary: 'Anthropic API usage is not provider usage/billing-token telemetry.',
         },
         metadata: {
           model: this.model,
@@ -94,7 +94,7 @@ class ClaudeWrapper {
             outputTokens: null,
             totalTokens: null,
             source: null,
-            claimBoundary: 'Anthropic API usage is not provider billing telemetry.',
+            claimBoundary: 'Anthropic API usage is not provider usage/billing-token telemetry.',
           },
           metadata: {
             model: this.model,
@@ -123,7 +123,7 @@ class ClaudeWrapper {
             ? usage.input_tokens + usage.output_tokens
             : null,
           source: 'anthropic-api-usage-field',
-          claimBoundary: 'Anthropic API usage fields are not provider billing tokens or costs.',
+          claimBoundary: 'Anthropic API usage fields are not provider usage/billing tokens, invoices, dashboards, or charged costs.',
         },
         metadata: {
           model: this.model,
@@ -147,7 +147,7 @@ class ClaudeWrapper {
           outputTokens: null,
           totalTokens: null,
           source: null,
-          claimBoundary: 'Anthropic API usage is not provider billing telemetry.',
+          claimBoundary: 'Anthropic API usage is not provider usage/billing-token telemetry.',
         },
         metadata: {
           model: this.model,

@@ -481,7 +481,7 @@ test("billing import reconciliation links redacted billing data beside estimated
   const markdown = renderBillingReconciliationMarkdown(reconciliation);
   assert.match(markdown, /Billing import reconciliation evidence/i);
   assert.match(markdown, /not provider invoice\/billing savings proof/i);
-  assert.match(markdown, /does not unlock provider billing-token savings claims/i);
+  assert.match(markdown, /does not unlock provider usage\/billing-token savings claims/i);
 });
 
 test("billing import reconciliation reports provider/model mismatches as non-claimable blockers", () => {

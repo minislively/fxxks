@@ -107,7 +107,7 @@ Validated smoke checks:
 Boundaries:
 
 - The runner is read-only and asks for proposed file trees/code skeletons only.
-- `promptTokensApprox` is local prompt-size accounting, not provider billing telemetry.
+- `promptTokensApprox` is local prompt-size accounting, not provider usage/billing telemetry.
 - These are two proposal-only pairs, so they still do not override the older unstable direct-runtime follow-up.
 - Generated code was not applied and acceptance-tested; do not publish this as a stable Layer 2 win.
 

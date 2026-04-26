@@ -27,7 +27,7 @@ const FIXTURE_REPLAY_CLAIM_BOUNDARY = [
   'local deterministic target-localization evidence only',
   'not live Codex/Claude model outcome proof',
   'not provider tokenizer proof',
-  'not provider billing/cost proof',
+  'not provider usage/billing-token, invoice/dashboard, or charged-cost proof',
   'not LSP semantic safety',
   'not runtime-token/latency proof',
   'not a public edit-win claim',
@@ -35,7 +35,7 @@ const FIXTURE_REPLAY_CLAIM_BOUNDARY = [
 
 const CLAIM_BOUNDARY = [
   'This scaffold is a design contract only, not live Codex or Claude outcome evidence.',
-  'This scaffold does not claim provider billing-token savings, provider tokenizer parity, provider invoice savings, or provider costs.',
+  'This scaffold does not claim provider usage/billing-token savings, provider tokenizer parity, provider invoice savings, or provider charged-cost claims.',
   'This scaffold does not change automatic runtime defaults or editGuidance.patchTargets default behavior.',
   'Future live smoke or provider-cost evidence must run in separate lanes after release-safe guardrails land.',
 ];
@@ -210,7 +210,7 @@ function validateDeterministicOutcomeScaffold(scaffold) {
   }
 
   const boundary = (scaffold?.claimBoundary || []).join(' ').toLowerCase();
-  for (const phrase of ['design contract only', 'provider billing-token', 'automatic runtime defaults', 'separate lanes']) {
+  for (const phrase of ['design contract only', 'provider usage/billing-token', 'automatic runtime defaults', 'separate lanes']) {
     if (!boundary.includes(phrase)) blockers.push(`missing-claim-boundary:${phrase}`);
   }
 
@@ -529,7 +529,7 @@ function validateDeterministicFixtureReplay(artifact) {
   const requiredBoundaryPhrases = [
     'not live codex/claude',
     'not provider tokenizer',
-    'not provider billing/cost',
+    'not provider usage/billing-token, invoice/dashboard, or charged-cost proof',
     'not lsp',
     'not runtime-token/latency',
     'not a public edit-win claim',

@@ -32,7 +32,7 @@ function parsePackJson(stdout) {
 
 function assertNoForbiddenPublicClaims(label, text) {
   const forbidden = [
-    /provider billing-token reduction/i,
+    /provider usage/billing-token reduction/i,
     /billing-token savings/i,
     /provider cost savings/i,
     /Claude Read interception is enabled/i,
@@ -50,7 +50,7 @@ function assertNoForbiddenPublicClaims(label, text) {
       }
     }
     if (/ccusage replacement/i.test(line)) {
-      assert(/not (?:a )?ccusage replacement|not provider billing tokens, provider costs, or a ccusage replacement/i.test(line), `${label} contains unbounded ccusage replacement wording: ${line}`);
+      assert(/not (?:a )?ccusage replacement|not provider usage/billing tokens, charged costs, or a ccusage replacement/i.test(line), `${label} contains unbounded ccusage replacement wording: ${line}`);
     }
     if (/\.omx\//i.test(line) || /\.omx\/state/i.test(line)) {
       assert(/internal|harness|planning/i.test(line), `${label} exposes .omx as product state: ${line}`);
@@ -321,15 +321,15 @@ assertPublicSurfaceClaimBoundaries({
 const compare = JSON.parse(compareStdout);
 assert(compare.metricTier === "estimated", `compare should expose estimated metric tier, got ${compare.metricTier}`);
 assert(compare.measurement === "local-model-facing-payload", `unexpected compare measurement ${compare.measurement}`);
-assert(compare.claimBoundary?.includes("not provider billing tokens"), "compare should keep provider billing boundary");
-assert(compare.claimBoundary?.includes("not provider costs"), "compare should keep provider cost boundary");
+assert(compare.claimBoundary?.includes("not provider usage/billing tokens"), "compare should keep provider billing boundary");
+assert(compare.claimBoundary?.includes("not charged costs"), "compare should keep provider cost boundary");
 assert(compare.excludes?.includes("provider-tokenizer-behavior"), "compare should exclude provider tokenizer behavior");
 assert(compare.excludes?.includes("runtime-hook-envelope-overhead"), "compare should exclude runtime hook envelope overhead");
 assert(compare.sourceBytes > compare.modelFacingBytes, "release compare fixture should show a local payload reduction");
 assert(compare.savedEstimatedTokens > 0, "release compare fixture should show positive estimated token reduction");
 const status = JSON.parse(statusStdout);
 assert(status.metricTier === "estimated", `status should expose estimated metric tier, got ${status.metricTier}`);
-assert(status.claimBoundary?.includes("not provider billing tokens"), "status should keep provider billing boundary");
+assert(status.claimBoundary?.includes("not provider usage/billing tokens"), "status should keep provider billing boundary");
 assert(status.breakdown && typeof status.breakdown === "object", "status should expose runtime/source breakdown");
 assert(!Object.prototype.hasOwnProperty.call(status, "sessions"), "CLI status should omit per-session contribution details");
 const doctor = JSON.parse(doctorStdout);
@@ -448,7 +448,7 @@ assertPublicSurfaceClaimBoundaries({
 });
 const postHookStatus = JSON.parse(postHookStatusStdout);
 assert(postHookStatus.metricTier === "estimated", `post-hook status should expose estimated metric tier, got ${postHookStatus.metricTier}`);
-assert(postHookStatus.claimBoundary?.includes("not provider billing tokens"), "post-hook status should keep provider billing boundary");
+assert(postHookStatus.claimBoundary?.includes("not provider usage/billing tokens"), "post-hook status should keep provider billing boundary");
 assert(!Object.prototype.hasOwnProperty.call(postHookStatus, "sessions"), "post-hook CLI status should omit per-session contribution details");
 assert(postHookStatus.breakdown?.byRuntime?.codex?.eventCount >= 2, "post-hook status should include Codex hook metric events");
 assert(postHookStatus.breakdown?.byRuntime?.claude?.eventCount >= 2, "post-hook status should include Claude hook metric events");

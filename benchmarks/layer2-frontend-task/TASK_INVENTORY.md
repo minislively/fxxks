@@ -187,7 +187,7 @@
 
 **Current boundary:**
 - T4/R4 proposal-only matched smoke는 2회 실행 및 validation artifact 수집 완료
-- generated code 적용/acceptance benchmark와 provider billing telemetry는 아직 없음
+- generated code 적용/acceptance benchmark와 provider usage/billing telemetry는 아직 없음
 
 **Next:** stable claim 전 applied-code validation 또는 multi-task evidence 수집
 

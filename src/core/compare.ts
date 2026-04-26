@@ -8,7 +8,7 @@ import {
 } from "./session-metrics";
 import type { OutputMode } from "./schema";
 
-export const FOOKS_COMPARE_CLAIM_BOUNDARY = `${FOOKS_METRIC_CLAIM_BOUNDARY} Compare values are local model-facing payload estimates, not provider tokenizer output, not runtime hook envelope overhead, and not provider costs.`;
+export const FOOKS_COMPARE_CLAIM_BOUNDARY = `${FOOKS_METRIC_CLAIM_BOUNDARY} Compare values are local model-facing payload estimates, not provider tokenizer output, not runtime hook envelope overhead, and not provider invoice/dashboard/charged-cost proof.`;
 
 export type FooksCompareResult = {
   filePath: string;

@@ -7,7 +7,7 @@ export const FOOKS_SESSION_METRICS_SCHEMA_VERSION = 1;
 export const FOOKS_SESSION_METRIC_TIER = "estimated" as const;
 export const ESTIMATED_BYTES_PER_TOKEN = 4;
 export const FOOKS_METRIC_CLAIM_BOUNDARY =
-  "Estimated local context-size telemetry only; values are not provider billing tokens, provider costs, or a ccusage replacement.";
+  "Estimated local context-size telemetry only; values are not provider usage/billing tokens, invoices, dashboards, charged costs, or a ccusage replacement.";
 
 export type FooksMetricRuntime = "codex" | "claude";
 export type FooksMeasurementSource = "automatic-hook" | "project-local-context-hook" | "manual-handoff" | "local-simulation";

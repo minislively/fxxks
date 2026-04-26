@@ -535,7 +535,7 @@ function unique(values: Array<string | undefined>): string[] {
 export function doctorClaimBoundaries(): string[] {
   return [
     "Doctor reports local fooks configuration and runtime hook readiness only.",
-    "Doctor does not prove provider health; it is not provider billing tokens, provider costs, or a ccusage replacement.",
+    "Doctor does not prove provider health; it is not provider usage/billing tokens, invoices, dashboards, charged costs, or a ccusage replacement.",
     "Claude diagnostics cover project-local SessionStart/UserPromptSubmit context hooks only; fooks does not intercept Claude Read/tool calls.",
   ];
 }
@@ -590,5 +590,5 @@ export function formatDoctor(result: DoctorResult): string {
 }
 
 export function doctorHelp(cliName = "fooks"): string {
-  return `Usage: ${cliName} doctor [codex|claude] [--json]\n\nRun read-only local diagnostics for fooks setup and runtime hook readiness.\n\nExamples:\n  ${cliName} doctor\n  ${cliName} doctor codex\n  ${cliName} doctor claude\n  ${cliName} doctor codex --json\n\nBoundaries:\n  - Reports local configuration and hook readiness only.\n  - Does not prove provider health; it is not provider billing tokens, provider costs, or a ccusage replacement.\n  - Does not enable Claude Read/tool-call interception.\n`;
+  return `Usage: ${cliName} doctor [codex|claude] [--json]\n\nRun read-only local diagnostics for fooks setup and runtime hook readiness.\n\nExamples:\n  ${cliName} doctor\n  ${cliName} doctor codex\n  ${cliName} doctor claude\n  ${cliName} doctor codex --json\n\nBoundaries:\n  - Reports local configuration and hook readiness only.\n  - Does not prove provider health; it is not provider usage/billing tokens, invoices, dashboards, charged costs, or a ccusage replacement.\n  - Does not enable Claude Read/tool-call interception.\n`;
 }
