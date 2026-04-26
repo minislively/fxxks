@@ -3658,8 +3658,10 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   const taxonomy = fs.readFileSync(path.join(repoRoot, "docs", "frontend-scope-taxonomy.md"), "utf8");
   const candidates = fs.readFileSync(path.join(repoRoot, "docs", "rn-webview-fixture-candidates.md"), "utf8");
   const architecture = fs.readFileSync(path.join(repoRoot, "docs", "rn-webview-architecture.md"), "utf8");
+  const domainProfiles = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-profiles.md"), "utf8");
+  const fixtureExpectations = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
   const preRead = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}\n${architecture}`;
+  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}\n${architecture}\n${domainProfiles}\n${fixtureExpectations}`;
 
   assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
   assert.match(combined, /TSX parsing is (?:syntax-level|only syntax-level)|\.tsx` parse is not semantic evidence/);
@@ -3667,6 +3669,15 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(combined, /React Native \/ WebView promotion ladder/);
   assert.match(roadmap, /React Native \/ WebView fixture candidate survey/);
   assert.match(roadmap, /React Native \/ WebView architecture direction/);
+  assert.match(domainProfiles, /Frontend domain profile roadmap/);
+  assert.match(domainProfiles, /Layer 0 — boundary and eligibility policy/);
+  assert.match(domainProfiles, /unsupported-react-native-webview-boundary/);
+  assert.match(domainProfiles, /WebView boundary profile/);
+  assert.match(domainProfiles, /TUI\/Ink candidate profile/);
+  assert.match(domainProfiles, /Frontend domain fixture expectations/);
+  assert.match(fixtureExpectations, /selected\/deferred fixture baseline|Selected fixture expectations/);
+  assert.match(fixtureExpectations, /public repository candidates .* reference-only/is);
+  assert.match(fixtureExpectations, /WebView compact-payload reuse or bridge safety promotion/);
   assert.match(candidates, /React Native \/ WebView fixture candidate survey/);
   assert.match(candidates, /React Native \/ WebView architecture direction/);
   assert.match(architecture, /shared TypeScript AST core, separate domain signal profiles/);
@@ -3693,8 +3704,12 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.doesNotMatch(combined, /React Native(?: \/ WebView)? is supported today/i);
   assert.doesNotMatch(combined, /default WebView compact extraction is enabled/i);
   assert.doesNotMatch(combined, /React Native(?: \/ WebView)? support will ship/i);
+  assert.doesNotMatch(combined, /WebView support is available/i);
+  assert.doesNotMatch(combined, /WebView is supported today/i);
+  assert.doesNotMatch(combined, /WebView compact payload reuse is supported/i);
+  assert.doesNotMatch(combined, /TUI support is available/i);
+  assert.doesNotMatch(combined, /TUI is supported today/i);
 });
-
 
 test("docs describe TUI/Ink fixture survey as future candidate evidence only", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
@@ -3730,6 +3745,57 @@ test("docs describe TUI/Ink fixture survey as future candidate evidence only", (
   assert.doesNotMatch(survey, /runtime-token savings/i);
   assert.doesNotMatch(survey, /provider cost savings/i);
   assert.doesNotMatch(survey, /billing savings/i);
+});
+
+test("frontend domain fixture expectations keep exact local outcomes", () => {
+  const expectationsPath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json");
+  const expectations = JSON.parse(fs.readFileSync(expectationsPath, "utf8"));
+  const selected = new Map(expectations.selected.map((item) => [item.slot, item]));
+  const deferred = new Map(expectations.deferred.map((item) => [item.slot, item]));
+
+  assert.deepEqual([...selected.keys()], ["F0", "F1", "F3", "F5", "F6"]);
+  assert.deepEqual([...deferred.keys()], ["F2", "F4"]);
+  assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
+
+  for (const item of selected.values()) {
+    assert.ok(["existing-local", "synthetic-local"].includes(item.sourceKind), `${item.id} must stay local/synthetic`);
+    assert.ok(["extract", "fallback", "unsupported"].includes(item.expectedOutcome), `${item.id} must have one expected outcome`);
+    assert.notEqual(item.sourceKind, "public-snapshot", `${item.id} must not use public snapshots in the first pass`);
+    assert.ok(!/github\.com|https?:\/\//i.test(item.sourceReference), `${item.id} must not depend on copied/vendor public repo source`);
+  }
+
+  assert.equal(selected.get("F0").expectedOutcome, "extract");
+  assert.equal(selected.get("F1").expectedOutcome, "fallback");
+  assert.equal(selected.get("F1").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F3").expectedOutcome, "fallback");
+  assert.equal(selected.get("F3").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F5").expectedOutcome, "extract");
+  assert.equal(selected.get("F6").expectedOutcome, "fallback");
+  assert.equal(selected.get("F6").expectedReason, "unsupported-react-native-webview-boundary");
+
+  for (const item of deferred.values()) {
+    assert.equal(item.sourceKind, "deferred");
+    assert.match(item.deferReason, /\S/);
+    assert.equal(item.doesNotBlockBaseline, true);
+  }
+
+  const reactWeb = extractFile(path.join(repoRoot, selected.get("F0").path));
+  assert.equal(reactWeb.language, "tsx");
+  assert.ok(["compressed", "hybrid", "raw"].includes(reactWeb.mode));
+  assert.ok(reactWeb.componentName || reactWeb.structure?.jsx?.length > 0);
+
+  const tuiInk = extractFile(path.join(repoRoot, selected.get("F5").path));
+  assert.equal(tuiInk.language, "tsx");
+  assert.ok(["compressed", "hybrid", "raw"].includes(tuiInk.mode));
+  assert.equal(tuiInk.componentName, "CommandPalette");
+
+  for (const slot of ["F1", "F3", "F6"]) {
+    const item = selected.get(slot);
+    const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
+    assert.equal(decision.decision, "fallback", `${item.id} should stay fallback-first`);
+    assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
+    assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
+  }
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {

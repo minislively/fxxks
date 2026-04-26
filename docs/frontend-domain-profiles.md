@@ -67,5 +67,5 @@ Do not introduce extractor behavior for RN, WebView, or TUI from an abstract pro
 ## Next executable lanes
 
 1. **Docs/process lane** — keep this document, `docs/roadmap.md`, and `docs/rn-webview-fixture-candidates.md` aligned.
-2. **Fixture/test-shape lane** — select a small fixture corpus and expected outcomes without changing extraction behavior.
+2. **Fixture/test-shape lane** — maintain the selected/deferred fixture baseline and expected outcomes in [`Frontend domain fixture expectations`](frontend-domain-fixture-expectations.md) without changing extraction behavior.
 3. **Experimental implementation lane** — only after fixture/test-shape evidence is explicit and current web/RN-WebView fallback regressions are protected.

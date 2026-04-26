@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Fixture expectation baseline for RN/WebView/TUI evidence planning; not runtime support.",
+  "selectedSourceKinds": ["existing-local", "synthetic-local"],
+  "forbiddenFirstPassSourceKinds": ["public-snapshot"],
+  "selected": [
+    {
+      "slot": "F0",
+      "id": "react-web-regression-form-controls",
+      "lane": "react-web",
+      "path": "fixtures/compressed/FormControls.tsx",
+      "sourceKind": "existing-local",
+      "sourceReference": "Existing local compressed React web fixture",
+      "expectedOutcome": "extract",
+      "requiredSignals": ["form", "input", "select", "textarea", "className"],
+      "forbiddenClaims": ["No RN/WebView/TUI support claim"],
+      "verification": "extractFile returns a non-empty React web extraction result"
+    },
+    {
+      "slot": "F1",
+      "id": "rn-primitive-basic",
+      "lane": "rn-primitive",
+      "path": "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": ["react-native import", "View", "Text", "TextInput", "Pressable"],
+      "forbiddenClaims": ["No React Native support claim", "No DOM/form semantic inference"],
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+    },
+    {
+      "slot": "F3",
+      "id": "webview-boundary-basic",
+      "lane": "webview-boundary",
+      "path": "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": ["react-native-webview import", "source", "injectedJavaScript", "onMessage"],
+      "forbiddenClaims": ["No WebView support claim", "No WebView compact payload reuse"],
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+    },
+    {
+      "slot": "F5",
+      "id": "tui-ink-basic",
+      "lane": "tui-ink",
+      "path": "test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local Ink-like TSX fixture, no ink dependency required for parsing",
+      "expectedOutcome": "extract",
+      "requiredSignals": ["Ink-like import", "Box", "Text", "useInput", "terminal layout"],
+      "forbiddenClaims": ["No broad TUI support claim", "No RN/WebView fallback boundary implied"],
+      "verification": "extractFile returns a non-empty TSX extraction result"
+    },
+    {
+      "slot": "F6",
+      "id": "negative-rn-webview-boundary",
+      "lane": "negative-fallback",
+      "path": "test/fixtures/frontend-domain-expectations/negative-rn-webview-boundary.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture combining RN and WebView boundary markers",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": ["react-native import", "react-native-webview import", "html source", "onMessage"],
+      "forbiddenClaims": ["No compact payload reuse", "No bridge safety claim"],
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+    }
+  ],
+  "deferred": [
+    {
+      "slot": "F2",
+      "id": "rn-style-platform-navigation",
+      "lane": "rn-style-platform",
+      "sourceKind": "deferred",
+      "deferReason": "StyleSheet, Platform.select, .ios/.android, and navigation semantics expand beyond the first evidence baseline.",
+      "doesNotBlockBaseline": true
+    },
+    {
+      "slot": "F4",
+      "id": "webview-bridge-pair",
+      "lane": "webview-bridge",
+      "sourceKind": "deferred",
+      "deferReason": "Paired native/web bridge fixtures require separate security and boundary review before compact-payload planning.",
+      "doesNotBlockBaseline": true
+    }
+  ]
+}
