@@ -2,6 +2,8 @@
 
 This document promotes the RN/WebView/TUI domain-profile plan into tracked project docs. It does **not** add runtime support. The current strongest fooks path remains repeated same-file React web `.tsx` / `.jsx` work in Codex, plus the documented same-file `.ts` / `.js` beta when module signals are strong enough.
 
+For the canonical cross-domain taxonomy, outcome vocabulary, claim boundaries, and shard triggers, see [Frontend domain contract](frontend-domain-contract.md).
+
 ## Design rule
 
 TSX/JSX parsing is syntax evidence, not domain semantic evidence. Future frontend-family work should separate:

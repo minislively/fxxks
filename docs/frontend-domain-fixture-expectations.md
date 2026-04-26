@@ -18,6 +18,8 @@ Selected first-pass fixtures are limited to `existing-local` or `synthetic-local
 
 The machine-readable fixture expectation manifest is `test/fixtures/frontend-domain-expectations/manifest.json`.
 
+That manifest remains the gate between the [Frontend domain contract](frontend-domain-contract.md) and any later detector/profile implementation plan; this baseline does not require a schema migration.
+
 ## Deferred fixture slots
 
 | Slot | ID | Lane | Reason |
