@@ -52,7 +52,10 @@
       "expectedOutcome": "extract",
       "requiredSignals": ["Ink-like import", "Box", "Text", "useInput", "terminal layout"],
       "forbiddenClaims": ["No broad TUI support claim", "No RN/WebView fallback boundary implied"],
-      "verification": "extractFile returns a non-empty TSX extraction result"
+      "verification": "extractFile returns a non-empty TSX extraction result",
+      "supportClaim": "none",
+      "evidenceScope": "syntax-evidence-only",
+      "relatedSourcePaths": ["test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx"]
     },
     {
       "slot": "F6",
@@ -83,6 +86,15 @@
       "lane": "webview-bridge",
       "sourceKind": "deferred",
       "deferReason": "Paired native/web bridge fixtures require separate security and boundary review before compact-payload planning.",
+      "doesNotBlockBaseline": true
+    },
+    {
+      "slot": "F7",
+      "id": "tui-non-ink-cli-renderer",
+      "lane": "tui-non-ink",
+      "sourceKind": "deferred",
+      "supportClaim": "none",
+      "deferReason": "Broad non-Ink terminal renderer semantics are not modeled by the current TSX fixture evidence lane.",
       "doesNotBlockBaseline": true
     }
   ]

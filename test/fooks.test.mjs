@@ -3749,12 +3749,33 @@ test("docs describe TUI/Ink fixture survey as future candidate evidence only", (
 
 test("frontend domain fixture expectations keep exact local outcomes", () => {
   const expectationsPath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json");
+  const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
   const expectations = JSON.parse(fs.readFileSync(expectationsPath, "utf8"));
   const selected = new Map(expectations.selected.map((item) => [item.slot, item]));
   const deferred = new Map(expectations.deferred.map((item) => [item.slot, item]));
+  const collectEvidencePaths = (item) => {
+    assert.equal(typeof item.path, "string", `${item.id} must have a primary path`);
+    const paths = [item.path];
+    if (item.relatedSourcePaths !== undefined) {
+      assert.ok(Array.isArray(item.relatedSourcePaths), `${item.id} relatedSourcePaths must be an array`);
+      for (const relatedPath of item.relatedSourcePaths) {
+        assert.equal(typeof relatedPath, "string", `${item.id} relatedSourcePaths entries must be strings`);
+        assert.match(relatedPath, /\S/, `${item.id} relatedSourcePaths entries must not be empty`);
+        paths.push(relatedPath);
+      }
+    }
+    return paths;
+  };
+  const resolveFixtureEvidencePath = (sourcePath) => {
+    assert.equal(path.isAbsolute(sourcePath), false, `${sourcePath} must be repo-relative`);
+    const resolved = path.resolve(repoRoot, sourcePath);
+    const relative = path.relative(fixtureRoot, resolved);
+    assert.ok(relative && !relative.startsWith("..") && !path.isAbsolute(relative), `${sourcePath} must stay under fixture root`);
+    return resolved;
+  };
 
   assert.deepEqual([...selected.keys()], ["F0", "F1", "F3", "F5", "F6"]);
-  assert.deepEqual([...deferred.keys()], ["F2", "F4"]);
+  assert.deepEqual([...deferred.keys()], ["F2", "F4", "F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
   for (const item of selected.values()) {
@@ -3762,6 +3783,10 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.ok(["extract", "fallback", "unsupported"].includes(item.expectedOutcome), `${item.id} must have one expected outcome`);
     assert.notEqual(item.sourceKind, "public-snapshot", `${item.id} must not use public snapshots in the first pass`);
     assert.ok(!/github\.com|https?:\/\//i.test(item.sourceReference), `${item.id} must not depend on copied/vendor public repo source`);
+    for (const evidencePath of collectEvidencePaths(item)) {
+      assert.ok(fs.existsSync(path.join(repoRoot, evidencePath)), `${item.id} evidence path must exist: ${evidencePath}`);
+      assert.ok(!/github\.com|https?:\/\//i.test(evidencePath), `${item.id} evidence path must stay local`);
+    }
   }
 
   assert.equal(selected.get("F0").expectedOutcome, "extract");
@@ -3770,6 +3795,8 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F3").expectedOutcome, "fallback");
   assert.equal(selected.get("F3").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F5").expectedOutcome, "extract");
+  assert.equal(selected.get("F5").supportClaim, "none");
+  assert.equal(selected.get("F5").evidenceScope, "syntax-evidence-only");
   assert.equal(selected.get("F6").expectedOutcome, "fallback");
   assert.equal(selected.get("F6").expectedReason, "unsupported-react-native-webview-boundary");
 
@@ -3778,6 +3805,9 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.match(item.deferReason, /\S/);
     assert.equal(item.doesNotBlockBaseline, true);
   }
+  assert.equal(deferred.get("F7").id, "tui-non-ink-cli-renderer");
+  assert.equal(deferred.get("F7").supportClaim, "none");
+  assert.equal(deferred.get("F7").path, undefined);
 
   const reactWeb = extractFile(path.join(repoRoot, selected.get("F0").path));
   assert.equal(reactWeb.language, "tsx");
@@ -3788,6 +3818,19 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(tuiInk.language, "tsx");
   assert.ok(["compressed", "hybrid", "raw"].includes(tuiInk.mode));
   assert.equal(tuiInk.componentName, "CommandPalette");
+
+  const tuiEvidencePaths = collectEvidencePaths(selected.get("F5"));
+  assert.equal(new Set(tuiEvidencePaths).size, tuiEvidencePaths.length, "TUI evidence paths must be distinct");
+  assert.ok(tuiEvidencePaths.length >= 2, "TUI evidence must include at least two local fixture files");
+  for (const evidencePath of tuiEvidencePaths) {
+    const resolved = resolveFixtureEvidencePath(evidencePath);
+    const source = fs.readFileSync(resolved, "utf8");
+    const extracted = extractFile(resolved);
+    assert.equal(extracted.language, "tsx", `${evidencePath} must remain TSX syntax evidence`);
+    assert.ok(["compressed", "hybrid", "raw"].includes(extracted.mode), `${evidencePath} must be extractable`);
+    assert.doesNotMatch(source, /github\.com|https?:\/\/|public-snapshot|live-fetch|vendor-external/i);
+    assert.doesNotMatch(source, /TUI support is available|TUI\/Ink is supported today|default TUI compact extraction is enabled/i);
+  }
 
   for (const slot of ["F1", "F3", "F6"]) {
     const item = selected.get(slot);
