@@ -3747,6 +3747,53 @@ test("docs describe TUI/Ink fixture survey as future candidate evidence only", (
   assert.doesNotMatch(survey, /billing savings/i);
 });
 
+test("frontend domain contract locks taxonomy and pre-detector promotion gates", () => {
+  const contract = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-contract.md"), "utf8");
+  const expectations = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
+  );
+  const selected = new Map(expectations.selected.map((item) => [item.id, item]));
+  const deferred = new Map(expectations.deferred.map((item) => [item.id, item]));
+
+  for (const domain of ["React Web", "React Native", "WebView", "TUI-Ink", "Mixed", "Unknown"]) {
+    assert.ok(contract.includes(`| ${domain} |`), `${domain} taxonomy row must exist`);
+  }
+
+  for (const outcome of ["`extract`", "`fallback`", "`deferred`"]) {
+    assert.ok(contract.includes(`| ${outcome} |`), `${outcome} meaning must exist`);
+  }
+
+  assert.match(contract, /WebView is fallback-first/);
+  assert.match(contract, /fallback-first posture/);
+  assert.match(contract, /React Native and TUI\/Ink fixtures .* are \*\*not support claims\*\*/s);
+  assert.match(contract, /RN primitives must not be reinterpreted as DOM controls/);
+  assert.match(contract, /TUI\/Ink fixtures must not be generalized into arbitrary terminal UI support/);
+  assert.match(contract, /fixture expectation manifest at `test\/fixtures\/frontend-domain-expectations\/manifest\.json` is the pre-detector\/profile gate/);
+  assert.match(contract, /This issue does not migrate the manifest schema/);
+  assert.match(contract, /Next detector\/profile promotion gate/);
+  assert.match(contract, /Promotion stops at the first failed gate/);
+  assert.match(contract, /documentation and regression protection only/);
+
+  assert.equal(expectations.schemaVersion, 1);
+  assert.equal(selected.get("react-web-regression-form-controls").lane, "react-web");
+  assert.equal(selected.get("react-web-regression-form-controls").expectedOutcome, "extract");
+  assert.equal(selected.get("rn-primitive-basic").expectedOutcome, "fallback");
+  assert.equal(selected.get("rn-primitive-basic").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("webview-boundary-basic").expectedOutcome, "fallback");
+  assert.equal(selected.get("webview-boundary-basic").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("negative-rn-webview-boundary").expectedOutcome, "fallback");
+  assert.equal(selected.get("negative-rn-webview-boundary").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("tui-ink-basic").supportClaim, "none");
+  assert.equal(selected.get("tui-ink-basic").evidenceScope, "syntax-evidence-only");
+  assert.equal(deferred.get("rn-style-platform-navigation").sourceKind, "deferred");
+  assert.equal(deferred.get("webview-bridge-pair").sourceKind, "deferred");
+
+  assert.doesNotMatch(contract, /React Native support is available/i);
+  assert.doesNotMatch(contract, /WebView support is available/i);
+  assert.doesNotMatch(contract, /TUI support is available/i);
+  assert.doesNotMatch(contract, /default WebView compact extraction is enabled/i);
+});
+
 test("frontend domain fixture expectations keep exact local outcomes", () => {
   const expectationsPath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json");
   const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
