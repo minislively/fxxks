@@ -143,6 +143,27 @@ test("artifact audit reports conservative candidates and only manual cleanup com
   assert.ok(calls.every(([command, args]) => command !== "git" || !["fetch", "prune", "worktree remove", "branch -d"].includes(args.join(" "))));
 });
 
+test("artifact audit marks stale runtime tmux sessions with deleted panes as cleanup candidates", () => {
+  const cwd = "/repo/fooks";
+  const staleRuntimeWorktree = "/repo/fooks/fooks.omx-worktrees/fooks-codex-exec-test";
+  const result = auditArtifacts(cwd, {
+    pathExists: (target) => target === cwd,
+    runner: makeRunner({
+      "git worktree list --porcelain": `worktree ${cwd}\nHEAD 111\nbranch refs/heads/main\n`,
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch --format=%(refname:short)": "main\n",
+      "git branch --merged origin/main": "main\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": `fooks-codex-exec-test\t${staleRuntimeWorktree} (deleted)\n`,
+    }),
+  });
+
+  const staleSession = result.sessions.find((item) => item.session === "fooks-codex-exec-test");
+  assert.equal(staleSession?.status, "candidateCleanup");
+  assert.ok(staleSession?.reasons.includes("all panes point at missing or deleted paths"));
+  assert.deepEqual(staleSession?.manualCleanupCommands, ["tmux kill-session -t 'fooks-codex-exec-test'"]);
+  assert.ok(result.manualCleanupCommands.includes("tmux kill-session -t 'fooks-codex-exec-test'"));
+});
+
 test("artifact audit falls back to local main and does not mark by name alone", () => {
   const cwd = "/repo/fooks-main";
   const result = auditArtifacts(cwd, {
@@ -163,7 +184,6 @@ test("artifact audit falls back to local main and does not mark by name alone", 
   assert.equal(result.sessions.find((item) => item.session === "fooks-name-only")?.status, "activeOrUnknown");
   assert.deepEqual(result.manualCleanupCommands, []);
 });
-
 
 test("artifact audit treats child cwd as the active worktree and suppresses cleanup", () => {
   const worktreeRoot = "/repo/fooks-current";
@@ -188,7 +208,6 @@ test("artifact audit treats child cwd as the active worktree and suppresses clea
   assert.deepEqual(result.sessions[0]?.manualCleanupCommands, []);
   assert.deepEqual(result.manualCleanupCommands, []);
 });
-
 
 test("status artifacts emits JSON and remains read-only when git and tmux are unavailable", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-artifact-audit-"));
