@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { extractFile } from "../core/extract";
+import { detectDomainFromSource } from "../core/domain-detector";
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import type { PreReadDecision } from "../core/schema";
@@ -56,6 +57,7 @@ export function decidePreRead(
   }
 
   const sourceText = fs.readFileSync(resolvedPath, "utf8");
+  const domainDetection = detectDomainFromSource(sourceText, resolvedPath);
   if (hasReactNativeWebViewBoundaryMarker(sourceText)) {
     return {
       runtime,
@@ -63,7 +65,7 @@ export function decidePreRead(
       eligible: true,
       decision: "fallback",
       reasons: [REACT_NATIVE_WEBVIEW_BOUNDARY_REASON],
-      debug: {},
+      debug: { domainDetection },
       fallback: {
         action: "full-read",
         reason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
@@ -82,6 +84,7 @@ export function decidePreRead(
     decideReason: result.meta.decideReason,
     decideConfidence: result.meta.decideConfidence,
     language: result.language,
+    domainDetection,
   };
 
   if (readiness.ready) {

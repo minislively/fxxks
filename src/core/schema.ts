@@ -1,4 +1,5 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
+import type { DomainDetectionResult } from "./domain-detector";
 
 export type OutputMode = "raw" | "compressed" | "hybrid";
 export type Language = "tsx" | "jsx" | "ts" | "js";
@@ -215,6 +216,7 @@ export type PreReadDecision = {
     decideReason?: string[];
     decideConfidence?: DecisionConfidence;
     language?: ExtractionResult["language"];
+    domainDetection?: DomainDetectionResult;
   };
   fallback?: {
     action: "full-read";

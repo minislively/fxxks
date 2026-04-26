@@ -27,6 +27,7 @@ const {
 const { RAW_ORIGINAL_SIZE_THRESHOLD_BYTES } = require(path.join(repoRoot, "dist", "core", "decide.js"));
 const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 const { assessPayloadReadiness } = require(path.join(repoRoot, "dist", "core", "payload", "readiness.js"));
+const { detectDomain, detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
 const codexPreReadModule = require(path.join(repoRoot, "dist", "adapters", "codex-pre-read.js"));
 const { decideCodexPreRead } = codexPreReadModule;
 const preReadModule = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
@@ -961,6 +962,82 @@ test("readiness helper uses stable reasons and ignores debug metadata", () => {
 
   assert.equal(compressedReadiness.signals.usedComplexityScore, false);
   assert.equal(compressedReadiness.signals.usedDecideReason, false);
+});
+
+test("frontend domain detector returns evidence-only classifications for Level 3 signals", () => {
+  const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
+
+  const rn = detectDomain(path.join(fixtureRoot, "rn-style-platform-navigation.tsx"));
+  assert.equal(rn.classification, "react-native");
+  assert.equal(rn.domain, "react-native");
+  assert.ok(rn.signals.includes("react-native:import:react-native"));
+  assert.ok(rn.signals.includes("react-native:primitive:View"));
+  assert.ok(rn.signals.includes("react-native:primitive:Text"));
+  assert.ok(rn.signals.includes("react-native:primitive:ScrollView"));
+  assert.ok(rn.signals.includes("react-native:style-factory:StyleSheet.create"));
+  assert.ok(rn.signals.includes("react-native:platform-select:Platform.select"));
+
+  const image = detectDomain(path.join(fixtureRoot, "rn-image-scrollview.tsx"));
+  assert.equal(image.classification, "react-native");
+  assert.ok(image.signals.includes("react-native:primitive:Image"));
+  assert.ok(image.signals.includes("react-native:primitive:ScrollView"));
+
+  const pressable = detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
+  assert.equal(pressable.classification, "react-native");
+  assert.ok(pressable.signals.includes("react-native:primitive:Pressable"));
+
+  const touchable = detectDomain(path.join(fixtureRoot, "rn-interaction-gesture.tsx"));
+  assert.equal(touchable.classification, "react-native");
+  assert.ok(touchable.signals.includes("react-native:primitive:TouchableOpacity"));
+
+  const webview = detectDomain(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
+  assert.equal(webview.classification, "webview");
+  assert.ok(webview.signals.includes("webview:import:react-native-webview"));
+  assert.ok(webview.signals.includes("webview:component:WebView"));
+  assert.ok(webview.signals.includes("webview:prop:source"));
+  assert.ok(webview.signals.includes("webview:prop:injectedJavaScript"));
+  assert.ok(webview.signals.includes("webview:prop:onMessage"));
+
+  const tui = detectDomain(path.join(fixtureRoot, "tui-ink-basic.tsx"));
+  assert.equal(tui.classification, "tui-ink");
+  assert.ok(tui.signals.includes("tui-ink:import:ink"));
+  assert.ok(tui.signals.includes("tui-ink:primitive:Box"));
+  assert.ok(tui.signals.includes("tui-ink:primitive:Text"));
+  assert.ok(tui.signals.includes("tui-ink:hook:useInput"));
+
+  const mixed = detectDomain(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx"));
+  assert.equal(mixed.classification, "mixed");
+  assert.ok(mixed.signals.some((signal) => signal.startsWith("react-native:")));
+  assert.ok(mixed.signals.some((signal) => signal.startsWith("webview:")));
+
+  const unknown = detectDomainFromSource("export const answer = 42;", "utility.ts");
+  assert.equal(unknown.classification, "unknown");
+  assert.deepEqual(unknown.evidence, []);
+});
+
+test("frontend domain detector and pre-read debug avoid RN WebView TUI support wording", () => {
+  const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled/i;
+  const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
+  const results = [
+    detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx")),
+    detectDomain(path.join(fixtureRoot, "webview-boundary-basic.tsx")),
+    detectDomain(path.join(fixtureRoot, "tui-ink-basic.tsx")),
+    detectDomain(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx")),
+    detectDomainFromSource("export const answer = 42;", "utility.ts"),
+    preReadModule.decidePreRead(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx"), repoRoot, "codex").debug.domainDetection,
+  ];
+
+  for (const result of results) {
+    assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
+    assert.ok(Array.isArray(result.evidence), "detector result must carry evidence");
+    assert.equal(typeof result.classification, "string");
+  }
+
+  const changedSource = [
+    fs.readFileSync(path.join(repoRoot, "src", "core", "domain-detector.ts"), "utf8"),
+    fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8"),
+  ].join("\n");
+  assert.doesNotMatch(changedSource, forbiddenSupportClaims);
 });
 
 test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise", () => {
