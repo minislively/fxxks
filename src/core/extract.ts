@@ -3,6 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import { hashText } from "./hash";
 import { decideMode } from "./decide";
+import { detectDomainFromSource } from "./domain-detector";
 import type { ExtractionResult, FormSurface, Language, SourceRange, StyleSystem } from "./schema";
 
 const HOOK_NAMES = new Set(["useState", "useEffect", "useMemo", "useCallback", "useRef", "useReducer", "useLayoutEffect", "useContext", "useId", "useTransition"]);
@@ -644,12 +645,14 @@ export function extractSource(filePath: string, sourceText: string): ExtractionR
   }
 
   const { mode, complexityScore, reasons, confidence, useOriginal } = decideMode(base);
+  const domainDetection = detectDomainFromSource(sourceText, filePath);
   const result: ExtractionResult = {
     ...base,
     mode,
     useOriginal,
     rawText: mode === "raw" ? sourceText : undefined,
     snippets: mode === "hybrid" ? base.snippets : undefined,
+    domainDetection,
     meta: {
       ...base.meta,
       complexityScore,

@@ -148,6 +148,7 @@ export type ExtractionResult = {
     decideReason?: string[];
     decideConfidence?: DecisionConfidence;
   };
+  domainDetection?: DomainDetectionResult;
 };
 
 export type ModelFacingPayload = {

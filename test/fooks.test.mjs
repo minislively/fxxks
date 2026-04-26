@@ -1015,6 +1015,33 @@ test("frontend domain detector returns evidence-only classifications for Level 3
   assert.deepEqual(unknown.evidence, []);
 });
 
+test("extract output includes domainDetection for frontend fixtures", () => {
+  const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
+
+  const rn = extractFile(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
+  assert.ok(rn.domainDetection);
+  assert.equal(rn.domainDetection.classification, "react-native");
+  assert.ok(rn.domainDetection.signals.includes("react-native:primitive:View"));
+
+  const webview = extractFile(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
+  assert.ok(webview.domainDetection);
+  assert.equal(webview.domainDetection.classification, "webview");
+  assert.ok(webview.domainDetection.signals.includes("webview:component:WebView"));
+
+  const tui = extractFile(path.join(fixtureRoot, "tui-ink-basic.tsx"));
+  assert.ok(tui.domainDetection);
+  assert.equal(tui.domainDetection.classification, "tui-ink");
+  assert.ok(tui.domainDetection.signals.includes("tui-ink:primitive:Box"));
+
+  const mixed = extractFile(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx"));
+  assert.ok(mixed.domainDetection);
+  assert.equal(mixed.domainDetection.classification, "mixed");
+
+  const unknown = extractFile(path.join(repoRoot, "package.json"));
+  assert.ok(unknown.domainDetection);
+  assert.equal(unknown.domainDetection.classification, "unknown");
+});
+
 test("frontend domain detector and pre-read debug avoid RN WebView TUI support wording", () => {
   const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled/i;
   const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
