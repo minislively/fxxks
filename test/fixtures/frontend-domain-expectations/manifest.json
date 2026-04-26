@@ -1,8 +1,13 @@
 {
   "schemaVersion": 1,
   "purpose": "Fixture expectation baseline for RN/WebView/TUI evidence planning; not runtime support.",
-  "selectedSourceKinds": ["existing-local", "synthetic-local"],
-  "forbiddenFirstPassSourceKinds": ["public-snapshot"],
+  "selectedSourceKinds": [
+    "existing-local",
+    "synthetic-local"
+  ],
+  "forbiddenFirstPassSourceKinds": [
+    "public-snapshot"
+  ],
   "selected": [
     {
       "slot": "F0",
@@ -12,8 +17,16 @@
       "sourceKind": "existing-local",
       "sourceReference": "Existing local compressed React web fixture",
       "expectedOutcome": "extract",
-      "requiredSignals": ["form", "input", "select", "textarea", "className"],
-      "forbiddenClaims": ["No RN/WebView/TUI support claim"],
+      "requiredSignals": [
+        "form",
+        "input",
+        "select",
+        "textarea",
+        "className"
+      ],
+      "forbiddenClaims": [
+        "No RN/WebView/TUI support claim"
+      ],
       "verification": "extractFile returns a non-empty React web extraction result"
     },
     {
@@ -25,8 +38,41 @@
       "sourceReference": "Synthetic local fixture, no external repository copy",
       "expectedOutcome": "fallback",
       "expectedReason": "unsupported-react-native-webview-boundary",
-      "requiredSignals": ["react-native import", "View", "Text", "TextInput", "Pressable"],
-      "forbiddenClaims": ["No React Native support claim", "No DOM/form semantic inference"],
+      "requiredSignals": [
+        "react-native import",
+        "View",
+        "Text",
+        "TextInput",
+        "Pressable"
+      ],
+      "forbiddenClaims": [
+        "No React Native support claim",
+        "No DOM/form semantic inference"
+      ],
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+    },
+    {
+      "slot": "F2",
+      "id": "rn-style-platform-navigation",
+      "lane": "rn-style-platform",
+      "sourceKind": "synthetic-local",
+      "deferReason": "StyleSheet, Platform.select, .ios/.android, and navigation semantics expand beyond the first evidence baseline.",
+      "doesNotBlockBaseline": true,
+      "path": "test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": [
+        "StyleSheet.create",
+        "Platform.select",
+        "navigation hooks",
+        "route.params"
+      ],
+      "forbiddenClaims": [
+        "No React Native support claim",
+        "No DOM/form semantic inference",
+        "No navigation runtime guarantee"
+      ],
       "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
     },
     {
@@ -38,8 +84,16 @@
       "sourceReference": "Synthetic local fixture, no external repository copy",
       "expectedOutcome": "fallback",
       "expectedReason": "unsupported-react-native-webview-boundary",
-      "requiredSignals": ["react-native-webview import", "source", "injectedJavaScript", "onMessage"],
-      "forbiddenClaims": ["No WebView support claim", "No WebView compact payload reuse"],
+      "requiredSignals": [
+        "react-native-webview import",
+        "source",
+        "injectedJavaScript",
+        "onMessage"
+      ],
+      "forbiddenClaims": [
+        "No WebView support claim",
+        "No WebView compact payload reuse"
+      ],
       "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
     },
     {
@@ -50,12 +104,23 @@
       "sourceKind": "synthetic-local",
       "sourceReference": "Synthetic local Ink-like TSX fixture, no ink dependency required for parsing",
       "expectedOutcome": "extract",
-      "requiredSignals": ["Ink-like import", "Box", "Text", "useInput", "terminal layout"],
-      "forbiddenClaims": ["No broad TUI support claim", "No RN/WebView fallback boundary implied"],
+      "requiredSignals": [
+        "Ink-like import",
+        "Box",
+        "Text",
+        "useInput",
+        "terminal layout"
+      ],
+      "forbiddenClaims": [
+        "No broad TUI support claim",
+        "No RN/WebView fallback boundary implied"
+      ],
       "verification": "extractFile returns a non-empty TSX extraction result",
       "supportClaim": "none",
       "evidenceScope": "syntax-evidence-only",
-      "relatedSourcePaths": ["test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx"]
+      "relatedSourcePaths": [
+        "test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx"
+      ]
     },
     {
       "slot": "F6",
@@ -66,20 +131,63 @@
       "sourceReference": "Synthetic local fixture combining RN and WebView boundary markers",
       "expectedOutcome": "fallback",
       "expectedReason": "unsupported-react-native-webview-boundary",
-      "requiredSignals": ["react-native import", "react-native-webview import", "html source", "onMessage"],
-      "forbiddenClaims": ["No compact payload reuse", "No bridge safety claim"],
+      "requiredSignals": [
+        "react-native import",
+        "react-native-webview import",
+        "html source",
+        "onMessage"
+      ],
+      "forbiddenClaims": [
+        "No compact payload reuse",
+        "No bridge safety claim"
+      ],
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+    },
+    {
+      "slot": "F9",
+      "id": "rn-interaction-gesture",
+      "lane": "rn-interaction",
+      "path": "test/fixtures/frontend-domain-expectations/rn-interaction-gesture.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": [
+        "TouchableOpacity",
+        "PanResponder",
+        "gesture handlers",
+        "activeOpacity"
+      ],
+      "forbiddenClaims": [
+        "No React Native support claim",
+        "No gesture runtime safety claim"
+      ],
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+    },
+    {
+      "slot": "F10",
+      "id": "rn-image-scrollview",
+      "lane": "rn-image-scrollview",
+      "path": "test/fixtures/frontend-domain-expectations/rn-image-scrollview.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": [
+        "Image",
+        "ScrollView",
+        "Dimensions",
+        "resizeMode",
+        "pagingEnabled"
+      ],
+      "forbiddenClaims": [
+        "No React Native support claim",
+        "No image loading safety claim"
+      ],
       "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
     }
   ],
   "deferred": [
-    {
-      "slot": "F2",
-      "id": "rn-style-platform-navigation",
-      "lane": "rn-style-platform",
-      "sourceKind": "deferred",
-      "deferReason": "StyleSheet, Platform.select, .ios/.android, and navigation semantics expand beyond the first evidence baseline.",
-      "doesNotBlockBaseline": true
-    },
     {
       "slot": "F4",
       "id": "webview-bridge-pair",

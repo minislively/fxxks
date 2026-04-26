@@ -3779,13 +3779,14 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.equal(selected.get("react-web-regression-form-controls").expectedOutcome, "extract");
   assert.equal(selected.get("rn-primitive-basic").expectedOutcome, "fallback");
   assert.equal(selected.get("rn-primitive-basic").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("rn-style-platform-navigation").expectedOutcome, "fallback");
+  assert.equal(selected.get("rn-style-platform-navigation").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("webview-boundary-basic").expectedOutcome, "fallback");
   assert.equal(selected.get("webview-boundary-basic").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("negative-rn-webview-boundary").expectedOutcome, "fallback");
   assert.equal(selected.get("negative-rn-webview-boundary").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("tui-ink-basic").supportClaim, "none");
   assert.equal(selected.get("tui-ink-basic").evidenceScope, "syntax-evidence-only");
-  assert.equal(deferred.get("rn-style-platform-navigation").sourceKind, "deferred");
   assert.equal(deferred.get("webview-bridge-pair").sourceKind, "deferred");
 
   assert.doesNotMatch(contract, /React Native support is available/i);
@@ -3821,8 +3822,8 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     return resolved;
   };
 
-  assert.deepEqual([...selected.keys()], ["F0", "F1", "F3", "F5", "F6"]);
-  assert.deepEqual([...deferred.keys()], ["F2", "F4", "F7"]);
+  assert.deepEqual([...selected.keys()], ["F0", "F1", "F2", "F3", "F5", "F6", "F9", "F10"]);
+  assert.deepEqual([...deferred.keys()], ["F4", "F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
   for (const item of selected.values()) {
@@ -3839,6 +3840,8 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F0").expectedOutcome, "extract");
   assert.equal(selected.get("F1").expectedOutcome, "fallback");
   assert.equal(selected.get("F1").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F2").expectedOutcome, "fallback");
+  assert.equal(selected.get("F2").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F3").expectedOutcome, "fallback");
   assert.equal(selected.get("F3").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F5").expectedOutcome, "extract");
@@ -3846,6 +3849,10 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F5").evidenceScope, "syntax-evidence-only");
   assert.equal(selected.get("F6").expectedOutcome, "fallback");
   assert.equal(selected.get("F6").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F9").expectedOutcome, "fallback");
+  assert.equal(selected.get("F9").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F10").expectedOutcome, "fallback");
+  assert.equal(selected.get("F10").expectedReason, "unsupported-react-native-webview-boundary");
 
   for (const item of deferred.values()) {
     assert.equal(item.sourceKind, "deferred");
