@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function run(command, args, options = {}) {
-  return execFileSync(command, args, {
+  const output = execFileSync(command, args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     ...options,
-  }).trimEnd();
+  });
+  return output === null ? "" : output.trimEnd();
 }
 
 function tryRun(command, args, fallback = "") {
