@@ -14,6 +14,7 @@ function parseArgs(argv) {
   const options = {
     input: "",
     output: "",
+    alertsInput: "",
     limit: DEFAULT_LIMIT,
     branch: "",
     workflow: "",
@@ -23,6 +24,7 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--input") options.input = argv[++index];
+    else if (arg === "--alerts-input" || arg === "--alerts") options.alertsInput = argv[++index];
     else if (arg === "--output") options.output = argv[++index];
     else if (arg === "--limit") options.limit = Number.parseInt(argv[++index], 10);
     else if (arg === "--branch") options.branch = argv[++index];
@@ -45,7 +47,11 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/triage-ci-alerts.mjs [options]\n\nClassifies recent GitHub Actions CI runs so replayed alert buffers can be skimmed\nfor only the latest actionable failures. Cancelled/skipped runs and older runs\nsuperseded by newer runs on the same workflow+branch are marked stale.\n\nOptions:\n  --input <path>     Read gh run list JSON from a file instead of invoking gh\n  --limit <n>        Number of runs to fetch when using gh (default: ${DEFAULT_LIMIT})\n  --branch <name>    Restrict to a branch/head branch\n  --workflow <name>  Restrict to a workflow display name\n  --json             Emit machine-readable JSON instead of markdown\n  --markdown         Emit markdown (default)\n  --output <path>    Write output to a file instead of stdout\n  -h, --help         Show this help\n\nLive usage:\n  npm run --silent ci:alerts -- --branch main\n\nOffline/replay usage:\n  gh run list --limit 100 --json databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url > /tmp/runs.json\n  npm run --silent ci:alerts -- --input /tmp/runs.json --json`);
+  console.log(`Usage: node scripts/triage-ci-alerts.mjs [options]\n\nClassifies recent GitHub Actions CI runs so replayed alert buffers can be skimmed\nfor only the latest actionable failures. Cancelled/skipped runs and older runs\nsuperseded by newer runs on the same workflow+branch are marked stale.\n\nOptions:\n  --input <path>     Read gh run list JSON from a file instead of invoking gh\n  --alerts <path>    Read pasted alert text / run URLs from a file, or - for stdin\n  --limit <n>        Number of runs to fetch when using gh (default: ${DEFAULT_LIMIT})\n  --branch <name>    Restrict to a branch/head branch\n  --workflow <name>  Restrict to a workflow display name\n  --json             Emit machine-readable JSON instead of markdown\n  --markdown         Emit markdown (default)\n  --output <path>    Write output to a file instead of stdout\n  -h, --help         Show this help\n\nLive usage:\n  npm run --silent ci:alerts -- --branch main\n\nOffline/replay usage:\n  gh run list --limit 100 --json databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url > /tmp/runs.json\n  npm run --silent ci:alerts -- --input /tmp/runs.json --json
+
+Pasted alert URL usage:
+  pbpaste > /tmp/discord-alerts.txt
+  npm run --silent ci:alerts -- --alerts /tmp/discord-alerts.txt --branch main`);
 }
 
 function readRuns(options) {
@@ -72,6 +78,33 @@ function readRuns(options) {
   return JSON.parse(stdout);
 }
 
+function readAlertText(alertsInput) {
+  if (!alertsInput) return "";
+  if (alertsInput === "-") return fs.readFileSync(0, "utf8");
+  return fs.readFileSync(path.resolve(repoRoot, alertsInput), "utf8");
+}
+
+function extractAlertRunRefs(alertText) {
+  const refsById = new Map();
+  const urlPattern = /https:\/\/github\.com\/[^\s<>)\]]+\/actions\/runs\/(\d+)(?:[^\s<>)\]]*)?/gi;
+
+  for (const match of alertText.matchAll(urlPattern)) {
+    const id = match[1];
+    const existing = refsById.get(id);
+    if (existing) {
+      existing.appearances += 1;
+    } else {
+      refsById.set(id, {
+        id,
+        url: match[0].replace(/[.,;:!?]+$/, ""),
+        appearances: 1,
+      });
+    }
+  }
+
+  return [...refsById.values()];
+}
+
 function normalizeRun(run) {
   return {
     id: run.databaseId ?? run.id ?? null,
@@ -85,6 +118,37 @@ function normalizeRun(run) {
     updatedAt: run.updatedAt || run.createdAt || "",
     url: run.url || "",
   };
+}
+
+function alertEvidenceState(row) {
+  if (!row) return "missing";
+  if (row.bucket === "actionable") return "actionable";
+  if (row.bucket === "watch") return "watch";
+  if (row.bucket === "stale") return "stale";
+  return "current";
+}
+
+function buildAlertEvidence(alertRefs, rows) {
+  if (alertRefs.length === 0) return [];
+
+  const rowsById = new Map(rows.map((row) => [String(row.id), row]));
+  return alertRefs.map((ref) => {
+    const row = rowsById.get(ref.id);
+    return {
+      alertedRunId: ref.id,
+      alertedUrl: ref.url,
+      appearances: ref.appearances,
+      evidence: alertEvidenceState(row),
+      reason: row?.reason ?? "run URL was not present in the inspected gh run list window",
+      currentRunId: row?.latestRunId ?? null,
+      workflow: row?.workflow ?? "",
+      branch: row?.branch ?? "",
+      status: row?.status ?? "",
+      conclusion: row?.conclusion ?? "",
+      updatedAt: row?.updatedAt ?? "",
+      runUrl: row?.url ?? ref.url,
+    };
+  });
 }
 
 function runKey(run) {
@@ -158,10 +222,28 @@ function markdownTable(rows) {
   return `${lines.join("\n")}\n`;
 }
 
+function alertEvidenceTable(alerts) {
+  if (!alerts || alerts.length === 0) return "";
+  const lines = [
+    "## Pasted alert URL evidence",
+    "",
+    "| Evidence | Alerted run | Current run | Workflow | Branch | Status | Conclusion | Reason | Seen |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  ];
+
+  for (const alert of alerts) {
+    const alertedRun = alert.runUrl ? `[${alert.alertedRunId}](${alert.runUrl})` : `\`${alert.alertedRunId}\``;
+    const currentRun = alert.currentRunId ? `\`${alert.currentRunId}\`` : "-";
+    lines.push(`| ${alert.evidence} | ${alertedRun} | ${currentRun} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(alert.reason)} | ${alert.appearances} |`);
+  }
+
+  return `${lines.join("\n")}\n\n`;
+}
+
 function renderMarkdown(result) {
   const actionable = result.rows.filter((row) => row.bucket === "actionable" || row.bucket === "watch");
   const stale = result.rows.filter((row) => row.bucket === "stale");
-  return `# CI alert replay triage\n\nGenerated: ${result.generatedAt}\n\nUse this report to collapse replayed GitHub Actions alert buffers: inspect only \`actionable\` and \`watch\` rows, and treat \`stale\` rows as already superseded/cancelled unless a new run appears.\n\n## Summary\n\n- Total runs inspected: ${result.totalRuns}\n- Actionable latest failures: ${result.counts.actionable ?? 0}\n- Latest runs still in flight: ${result.counts.watch ?? 0}\n- Stale replay rows: ${result.counts.stale ?? 0}\n- Informational successes/neutral rows: ${result.counts.informational ?? 0}\n\n## Actionable / watch\n\n${markdownTable(actionable)}\n## Stale replay rows\n\n${markdownTable(stale)}`;
+  return `# CI alert replay triage\n\nGenerated: ${result.generatedAt}\n\nUse this report to collapse replayed GitHub Actions alert buffers: inspect only \`actionable\` and \`watch\` rows, and treat \`stale\` rows as already superseded/cancelled unless a new run appears.\n\n## Summary\n\n- Total runs inspected: ${result.totalRuns}\n- Actionable latest failures: ${result.counts.actionable ?? 0}\n- Latest runs still in flight: ${result.counts.watch ?? 0}\n- Stale replay rows: ${result.counts.stale ?? 0}\n- Informational successes/neutral rows: ${result.counts.informational ?? 0}\n- Pasted alert URLs inspected: ${result.alerts?.length ?? 0}\n\n${alertEvidenceTable(result.alerts)}## Actionable / watch\n\n${markdownTable(actionable)}\n## Stale replay rows\n\n${markdownTable(stale)}`;
 }
 
 function main() {
@@ -169,6 +251,8 @@ function main() {
   const rawRuns = readRuns(options);
   if (!Array.isArray(rawRuns)) throw new Error("Expected an array of GitHub Actions runs");
   const result = classifyRuns(rawRuns);
+  const alertRefs = extractAlertRunRefs(readAlertText(options.alertsInput));
+  result.alerts = buildAlertEvidence(alertRefs, result.rows);
   const output = options.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : renderMarkdown(result);
 
   if (options.output) fs.writeFileSync(path.resolve(repoRoot, options.output), output);
