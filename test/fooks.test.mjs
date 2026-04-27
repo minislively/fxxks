@@ -3829,6 +3829,15 @@ test("package release surface keeps internal docs out of the npm tarball", () =>
   assert.match(gitignore, /\.opencode\//);
 });
 
+test("red-team report marks cache corruption finding as historical after recovery fix", () => {
+  const redTeam = fs.readFileSync(path.join(repoRoot, "RED_TEAM_REPORT.md"), "utf8");
+
+  assert.match(redTeam, /historical red-team snapshot, not the current release state/);
+  assert.match(redTeam, /cache-corruption scan blocker is now covered by PR #213 \(`799c135`\)/);
+  assert.match(redTeam, /unreadable extraction cache entries and persisted scan indexes as cache misses/);
+  assert.match(redTeam, /do not reuse it as a current open P0 claim without rerunning the red-team scenario/);
+});
+
 test("docs describe local compare estimates without billing-cost claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");

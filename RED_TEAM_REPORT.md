@@ -5,11 +5,13 @@
 **Tester:** Codex CLI (OMX)  
 **Target:** fooks v0.1.0 (frontend context compression engine)
 
+> **Status note (2026-04-27):** This is a historical red-team snapshot, not the current release state. The cache-corruption scan blocker is now covered by PR #213 (`799c135`), which treats unreadable extraction cache entries and persisted scan indexes as cache misses and adds corrupt-index regression coverage. Keep the original finding text below as provenance only; do not reuse it as a current open P0 claim without rerunning the red-team scenario.
+
 ---
 
 ## Executive Summary
 
-Fooks is a frontend context compression engine that generally handles edge cases gracefully but has **critical vulnerabilities** in cache corruption handling and moderate issues with tiny file inflation.
+Fooks is a frontend context compression engine that generally handles edge cases gracefully. At the time of this historical run it still had **critical vulnerabilities** in cache corruption handling and moderate issues with tiny file inflation.
 
 | Risk Level | Count | Issues |
 |------------|-------|--------|
