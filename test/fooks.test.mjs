@@ -327,6 +327,30 @@ test("extract keeps small fixture raw", () => {
   assert.ok(result.style.summary.some((item) => item.includes("tailwind")));
 });
 
+test("extract accepts --json before and after the file path", () => {
+  for (const args of [
+    ["extract", "--json", "fixtures/raw/SimpleButton.tsx"],
+    ["extract", "fixtures/raw/SimpleButton.tsx", "--json"],
+  ]) {
+    const result = run(args);
+    assert.equal(result.mode, "raw");
+    assert.equal(path.relative(repoRoot, result.filePath), path.join("fixtures", "raw", "SimpleButton.tsx"));
+    assert.equal(result.componentName, "SimpleButton");
+  }
+});
+
+test("compare accepts --json before and after the file path", () => {
+  for (const args of [
+    ["compare", "--json", "fixtures/compressed/FormSection.tsx"],
+    ["compare", "fixtures/compressed/FormSection.tsx", "--json"],
+  ]) {
+    const result = run(args);
+    assert.equal(result.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+    assert.equal(result.mode, "compressed");
+    assert.equal(result.metricTier, "estimated");
+  }
+});
+
 test("extract can return model-facing payload without engine metadata", () => {
   const result = run(["extract", "fixtures/compressed/FormSection.tsx", "--model-payload"]);
   assert.equal(result.mode, "compressed");
@@ -342,6 +366,20 @@ test("extract can return model-facing payload without engine metadata", () => {
   assert.ok(result.structure.sections.includes("section"));
   assert.ok(result.structure.repeatedBlocks.includes("array-map-render"));
   assert.equal(result.style.system, "tailwind");
+});
+
+test("file commands accept --json before or after the file path", () => {
+  const compareAfter = run(["compare", "fixtures/compressed/FormSection.tsx", "--json"]);
+  const compareBefore = run(["compare", "--json", "fixtures/compressed/FormSection.tsx"]);
+  assert.deepEqual(compareBefore, compareAfter);
+
+  const inspectAfter = run(["inspect-domain", "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx", "--json"]);
+  const inspectBefore = run(["inspect-domain", "--json", "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx"]);
+  assert.deepEqual(inspectBefore, inspectAfter);
+
+  const extractAfter = run(["extract", "fixtures/compressed/FormSection.tsx", "--model-payload", "--json"]);
+  const extractBefore = run(["extract", "--json", "fixtures/compressed/FormSection.tsx", "--model-payload"]);
+  assert.deepEqual(extractBefore, extractAfter);
 });
 
 test("extract adds source ranges and hook intent signals to frontend payloads", () => {
@@ -2352,12 +2390,40 @@ test("scan indexes component and qualifying linked ts but excludes generic utils
   assert.equal(secondRun.observability.counters.metadataReuseCount, secondRun.files.length);
 });
 
+test("scan recovers from a corrupt persisted index", () => {
+  const tempDir = makeTempProject();
+  run(["scan"], tempDir);
+  fs.writeFileSync(path.join(tempDir, ".fooks", "index.json"), "{not-json");
+
+  const recovered = run(["scan"], tempDir);
+
+  assert.ok(recovered.files.length >= 5);
+  assert.equal(recovered.observability.counters.metadataReuseCount, 0);
+  const persistedIndex = JSON.parse(fs.readFileSync(path.join(tempDir, ".fooks", "index.json"), "utf8"));
+  assert.equal(persistedIndex.observability, undefined);
+  assert.equal(persistedIndex.files.length, recovered.files.length);
+});
+
 test("scan excludes cross-folder linked ts even when directly imported", () => {
   const tempDir = makeTempProject();
   const result = run(["scan"], tempDir);
   const filePaths = result.files.map((item) => item.filePath);
   assert.ok(filePaths.includes(path.join("src", "components", "DateBadge.tsx")));
   assert.ok(!filePaths.includes(path.join("src", "date-utils.ts")));
+});
+
+test("scan regenerates when the persisted scan index is corrupt", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, ".fooks", "index.json"), "{ invalid json");
+
+  const result = run(["scan"], tempDir);
+  const persistedIndex = JSON.parse(fs.readFileSync(path.join(tempDir, ".fooks", "index.json"), "utf8"));
+
+  assert.ok(result.files.length >= 5);
+  assert.ok(result.refreshedEntries >= 5);
+  assert.equal(persistedIndex.observability, undefined);
+  assert.equal(persistedIndex.projectRoot, tempDir);
 });
 
 test("scan only refreshes changed files after cache warm-up", () => {

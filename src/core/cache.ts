@@ -6,7 +6,11 @@ import type { ExtractionResult, ScanResult } from "./schema";
 export function readCachedExtraction(hash: string, cwd = process.cwd()): ExtractionResult | null {
   const file = cacheFilePath(hash, cwd);
   if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, "utf8")) as ExtractionResult;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as ExtractionResult;
+  } catch {
+    return null;
+  }
 }
 
 export function writeCachedExtraction(result: ExtractionResult, cwd = process.cwd()): void {
@@ -27,7 +31,11 @@ export function writeScanIndex(result: ScanResult, cwd = process.cwd()): void {
 export function readScanIndex(cwd = process.cwd()): ScanResult | null {
   const file = indexPath(cwd);
   if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, "utf8")) as ScanResult;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as ScanResult;
+  } catch {
+    return null;
+  }
 }
 
 export function ensureParentDir(filePath: string): void {

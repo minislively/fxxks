@@ -175,6 +175,28 @@ test("changed detector source does not introduce forbidden support wording", () 
   assert.doesNotMatch(source, forbiddenSupportClaims);
 });
 
+test("CLI inspect-domain accepts --json before and after the file path", () => {
+  const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
+
+  for (const args of [
+    ["inspect-domain", "--json", fixture],
+    ["inspect-domain", fixture, "--json"],
+  ]) {
+    const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), ...args], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    assert.equal(cli.status, 0, cli.stderr);
+    const result = JSON.parse(cli.stdout);
+    assert.equal(result.command, "inspect-domain");
+    assert.equal(result.filePath, path.relative(repoRoot, fixture));
+    assert.equal(result.domainDetection.classification, "webview");
+    assert.deepEqual(result.fallbackFirst, { applies: true, reason: "unsupported-react-native-webview-boundary" });
+    assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
+  }
+});
+
 test("CLI inspect-domain prints detector evidence without support claims", () => {
   const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
   const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
