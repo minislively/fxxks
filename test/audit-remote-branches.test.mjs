@@ -47,6 +47,12 @@ case "$args" in
   "rev-parse --short=12 origin/feature-a")
     printf '%s\n' 'bbbbbbbbbbbb'
     ;;
+  "diff --name-status origin/main origin/feature-a")
+    printf '%s\n' 'M	README.md' 'D	scripts/audit-remote-branches.mjs' 'D	test/domain-detector.test.mjs' 'A	docs/new-note.md'
+    ;;
+  "diff --shortstat origin/main origin/feature-a")
+    printf '%s\n' '4 files changed, 12 insertions(+), 98 deletions(-)'
+    ;;
   *)
     printf 'unexpected git args: %s\n' "$args" >&2
     exit 64
@@ -70,6 +76,18 @@ printf '%s\n' '[]'
     assert.equal(result.summary.totalBranches, 1);
     assert.equal(result.branches[0].branch, "feature-a");
     assert.equal(result.branches[0].classification, "valid-candidate");
+    assert.deepEqual(result.branches[0].currentTreeImpact, {
+      addedFiles: 1,
+      modifiedFiles: 1,
+      deletedFiles: 2,
+      renamedFiles: 0,
+      shortstat: "4 files changed, 12 insertions(+), 98 deletions(-)",
+      destructiveStaleTree: true,
+      deletedPathEvidence: [
+        "scripts/audit-remote-branches.mjs",
+        "test/domain-detector.test.mjs",
+      ],
+    });
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

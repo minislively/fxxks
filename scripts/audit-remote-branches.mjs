@@ -103,6 +103,53 @@ function listRemoteBranches(remote, base) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+function parseCurrentTreeImpact(nameStatusOutput, shortstat) {
+  const impact = {
+    addedFiles: 0,
+    modifiedFiles: 0,
+    deletedFiles: 0,
+    renamedFiles: 0,
+    shortstat: shortstat.trim() || "0 files changed",
+    destructiveStaleTree: false,
+    deletedPathEvidence: [],
+  };
+
+  const deletedPaths = [];
+  for (const line of nameStatusOutput.split(/\r?\n/).filter(Boolean)) {
+    const [status, ...paths] = line.split(/\t/);
+    const code = status[0];
+    if (code === "A") impact.addedFiles += 1;
+    else if (code === "D") {
+      impact.deletedFiles += 1;
+      deletedPaths.push(paths.at(-1) ?? "");
+    } else if (code === "R") impact.renamedFiles += 1;
+    else impact.modifiedFiles += 1;
+  }
+
+  const highSignalDeletedPaths = deletedPaths.filter((filePath) =>
+    /(^|\/)(scripts\/audit-remote-branches\.mjs|docs\/remote-branch-audit\.md|test\/|tests\/|src\/core\/domain-|docs\/frontend-domain|fixtures\/)/.test(filePath),
+  );
+  const evidenceSource = highSignalDeletedPaths.length > 0 ? highSignalDeletedPaths : deletedPaths;
+
+  impact.destructiveStaleTree = impact.deletedFiles > 0;
+  impact.deletedPathEvidence = evidenceSource.filter(Boolean).slice(0, 5);
+  return impact;
+}
+
+function formatCurrentTreeImpact(impact) {
+  const counts = `A:${impact.addedFiles} M:${impact.modifiedFiles} D:${impact.deletedFiles}`;
+  const renameSuffix = impact.renamedFiles > 0 ? ` R:${impact.renamedFiles}` : "";
+  return `${counts}${renameSuffix}; ${impact.shortstat}`;
+}
+
+function formatCurrentTreeRisk(impact) {
+  if (!impact.destructiveStaleTree) return "no current-file deletes";
+  const evidence = impact.deletedPathEvidence.length > 0
+    ? `; deletes ${impact.deletedPathEvidence.map((filePath) => `\`${filePath}\``).join(", ")}`
+    : "";
+  return `destructive-stale-tree (${impact.deletedFiles} current-file deletes${evidence})`;
+}
+
 function branchAudit(branch, options, openPrHeads) {
   const branchName = branch.slice(`${options.remote}/`.length);
   const [baseOnly, branchOnly] = run("git", ["rev-list", "--left-right", "--count", `${options.base}...${branch}`])
@@ -117,6 +164,10 @@ function branchAudit(branch, options, openPrHeads) {
   const lastCommitDate = run("git", ["log", "-1", "--format=%cs", branch]);
   const lastSubject = run("git", ["log", "-1", "--format=%s", branch]);
   const lastSha = run("git", ["rev-parse", "--short=12", branch]);
+  const currentTreeImpact = parseCurrentTreeImpact(
+    tryRun("git", ["diff", "--name-status", options.base, branch]),
+    tryRun("git", ["diff", "--shortstat", options.base, branch]),
+  );
 
   let classification = "valid-candidate";
   if (hasOpenPr) classification = "open-pr";
@@ -134,6 +185,7 @@ function branchAudit(branch, options, openPrHeads) {
     lastCommitDate,
     lastSha,
     lastSubject,
+    currentTreeImpact,
   };
 }
 
@@ -159,11 +211,11 @@ function markdownTable(rows, classification) {
   if (filtered.length === 0) return `No ${classification} branches.\n`;
 
   const lines = [
-    "| Branch | Ahead | Behind | Unique patches | Patch-equivalent | Last commit | Tip | Subject |",
-    "| --- | ---: | ---: | ---: | ---: | --- | --- | --- |",
+    "| Branch | Ahead | Behind | Unique patches | Patch-equivalent | Current-tree impact | Current-tree risk | Last commit | Tip | Subject |",
+    "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |",
   ];
   for (const row of filtered) {
-    lines.push(`| \`${row.branch}\` | ${row.aheadOfBaseCommits} | ${row.behindBaseCommits} | ${row.uniquePatchCommits} | ${row.patchEquivalentCommits} | ${row.lastCommitDate} | \`${row.lastSha}\` | ${escapeMarkdown(row.lastSubject)} |`);
+    lines.push(`| \`${row.branch}\` | ${row.aheadOfBaseCommits} | ${row.behindBaseCommits} | ${row.uniquePatchCommits} | ${row.patchEquivalentCommits} | ${escapeMarkdown(formatCurrentTreeImpact(row.currentTreeImpact))} | ${escapeMarkdown(formatCurrentTreeRisk(row.currentTreeImpact))} | ${row.lastCommitDate} | \`${row.lastSha}\` | ${escapeMarkdown(row.lastSubject)} |`);
   }
   return `${lines.join("\n")}\n`;
 }
