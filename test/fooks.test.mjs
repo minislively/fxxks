@@ -3974,10 +3974,29 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.deepEqual([...deferred.keys()], ["F4", "F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
+  const selectedDeferredOnlyFields = ["deferReason", "doesNotBlockBaseline"];
+  const deferredSelectedOnlyFields = [
+    "path",
+    "sourceReference",
+    "expectedOutcome",
+    "expectedReason",
+    "requiredSignals",
+    "verification",
+    "relatedSourcePaths",
+  ];
+
   for (const item of selected.values()) {
+    for (const field of selectedDeferredOnlyFields) {
+      assert.equal(item[field], undefined, `${item.id} selected fixture must not carry deferred-only ${field}`);
+    }
     assert.ok(["existing-local", "synthetic-local"].includes(item.sourceKind), `${item.id} must stay local/synthetic`);
     assert.ok(["extract", "fallback", "unsupported"].includes(item.expectedOutcome), `${item.id} must have one expected outcome`);
     assert.notEqual(item.sourceKind, "public-snapshot", `${item.id} must not use public snapshots in the first pass`);
+    if (item.expectedOutcome === "fallback") {
+      assert.equal(item.expectedReason, "unsupported-react-native-webview-boundary", `${item.id} fallback fixtures must keep the explicit boundary reason`);
+    } else {
+      assert.equal(item.expectedReason, undefined, `${item.id} non-fallback fixtures must not carry a fallback reason`);
+    }
     assert.ok(!/github\.com|https?:\/\//i.test(item.sourceReference), `${item.id} must not depend on copied/vendor public repo source`);
     for (const evidencePath of collectEvidencePaths(item)) {
       assert.ok(fs.existsSync(path.join(repoRoot, evidencePath)), `${item.id} evidence path must exist: ${evidencePath}`);
@@ -4006,6 +4025,9 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(item.sourceKind, "deferred");
     assert.match(item.deferReason, /\S/);
     assert.equal(item.doesNotBlockBaseline, true);
+    for (const field of deferredSelectedOnlyFields) {
+      assert.equal(item[field], undefined, `${item.id} deferred fixture must not carry selected-only ${field}`);
+    }
   }
   assert.equal(deferred.get("F7").id, "tui-non-ink-cli-renderer");
   assert.equal(deferred.get("F7").supportClaim, "none");
@@ -4078,6 +4100,8 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   }
 
   assert.match(docs, /F2[\s\S]*current fallback expectation[\s\S]*navigation semantics remain non-promoted/);
+  assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
+  assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
   assert.doesNotMatch(docs, /React Native support is available|React Native is supported today/i);
   assert.doesNotMatch(docs, /WebView support is available|WebView is supported today/i);
   assert.doesNotMatch(docs, /TUI support is available|TUI is supported today/i);

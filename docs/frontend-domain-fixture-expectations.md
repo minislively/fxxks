@@ -23,6 +23,10 @@ The machine-readable fixture expectation manifest at `test/fixtures/frontend-dom
 
 The selected baseline does not require a schema migration. `F2` is selected because today's expected behavior is a fallback boundary; its richer platform/navigation meaning remains outside the current support and extraction scope.
 
+## Manifest shape guard
+
+Selected fixtures must not carry deferred-only fields such as `deferReason` or `doesNotBlockBaseline`. Deferred fixtures must not carry executable fixture paths, expected outcomes, fallback reasons, required signals, or verification instructions. This keeps the manifest from describing the same slot as both selected and deferred while later RN/WebView/TUI/React Web work is split across branches.
+
 ## Deferred fixture slots
 
 | Slot | ID | Lane | Reason |

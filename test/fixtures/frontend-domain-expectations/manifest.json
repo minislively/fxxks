@@ -56,8 +56,6 @@
       "id": "rn-style-platform-navigation",
       "lane": "rn-style-platform",
       "sourceKind": "synthetic-local",
-      "deferReason": "StyleSheet, Platform.select, .ios/.android, and navigation semantics expand beyond the first evidence baseline.",
-      "doesNotBlockBaseline": true,
       "path": "test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx",
       "sourceReference": "Synthetic local fixture, no external repository copy",
       "expectedOutcome": "fallback",
