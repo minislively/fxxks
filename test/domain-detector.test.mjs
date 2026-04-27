@@ -102,6 +102,43 @@ test("classifies mixed and unknown fallback cases", () => {
   assert.doesNotMatch(JSON.stringify([mixed, unknown]), forbiddenSupportClaims);
 });
 
+test("classifies web DOM mixed with non-web frontend signals as fallback", () => {
+  const rnDom = detectDomainFromSource(
+    `import { View } from "react-native";
+     export function Mixed() { return <div><View /></div>; }`,
+    "MixedRnDom.tsx",
+  );
+  assert.equal(rnDom.classification, "mixed");
+  assert.equal(rnDom.outcome, "fallback");
+  assert.equal(rnDom.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(rnDom.signals.includes("react-native:import:react-native"));
+  assert.ok(rnDom.signals.includes("react-native:primitive:View"));
+
+  const webviewDom = detectDomainFromSource(
+    `import { WebView } from "react-native-webview";
+     export function Mixed() { return <form><WebView source={{ html: "<p>checkout</p>" }} /></form>; }`,
+    "MixedWebViewDom.tsx",
+  );
+  assert.equal(webviewDom.classification, "mixed");
+  assert.equal(webviewDom.outcome, "fallback");
+  assert.equal(webviewDom.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(webviewDom.signals.includes("webview:import:react-native-webview"));
+  assert.ok(webviewDom.signals.includes("webview:component:WebView"));
+
+  const tuiDom = detectDomainFromSource(
+    `import { Box } from "ink";
+     export function Mixed() { return <div><Box /></div>; }`,
+    "MixedTuiDom.tsx",
+  );
+  assert.equal(tuiDom.classification, "mixed");
+  assert.equal(tuiDom.outcome, "fallback");
+  assert.equal(tuiDom.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(tuiDom.signals.includes("tui-ink:import:ink"));
+  assert.ok(tuiDom.signals.includes("tui-ink:primitive:Box"));
+
+  assert.doesNotMatch(JSON.stringify([rnDom, webviewDom, tuiDom]), forbiddenSupportClaims);
+});
+
 test("treats bare WebView JSX as a fallback-first boundary signal", () => {
   const result = detectDomainFromSource(`export function Preview() { return <WebView source={{ uri: "https://example.test" }} />; }`, "Preview.tsx");
   assert.equal(result.classification, "webview");
