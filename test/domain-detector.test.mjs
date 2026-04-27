@@ -12,12 +12,22 @@ const require = createRequire(import.meta.url);
 const { detectDomain, detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
 
 const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
+const manifestPath = path.join(fixtureRoot, "manifest.json");
 const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled/i;
 
 function assertSignals(result, expectedSignals) {
   for (const signal of expectedSignals) {
     assert.ok(result.signals.includes(signal), `missing signal ${signal}`);
   }
+}
+
+function expectedClassificationForLane(lane) {
+  if (lane === "react-web") return "react-web";
+  if (lane === "tui-ink") return "tui-ink";
+  if (lane.startsWith("rn-")) return "react-native";
+  if (lane === "webview-boundary") return "webview";
+  if (lane === "negative-fallback") return "mixed";
+  throw new Error(`No detector classification expectation for lane: ${lane}`);
 }
 
 test("detects React Native evidence signals without support wording", () => {
@@ -98,6 +108,28 @@ test("treats bare WebView JSX as a fallback-first boundary signal", () => {
   assert.equal(result.outcome, "fallback");
   assert.equal(result.reason, "unsupported-react-native-webview-boundary");
   assert.ok(result.signals.includes("webview:component:WebView"));
+});
+
+test("selected fixture manifest stays aligned with detector classifications and outcomes", () => {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+  for (const item of manifest.selected) {
+    const result = detectDomain(path.join(repoRoot, item.path));
+    assert.equal(result.classification, expectedClassificationForLane(item.lane), `${item.id} classification must match manifest lane`);
+    assert.equal(result.domain, result.classification, `${item.id} deprecated domain alias must mirror classification`);
+    assert.equal(result.outcome, item.expectedOutcome, `${item.id} detector outcome must match manifest`);
+
+    if (item.expectedReason !== undefined) {
+      assert.equal(result.reason, item.expectedReason, `${item.id} detector fallback reason must match manifest`);
+    } else {
+      assert.equal(result.reason, undefined, `${item.id} must not invent a fallback reason`);
+    }
+
+    if (result.classification !== "react-web") {
+      assert.ok(result.evidence.length > 0, `${item.id} detector should keep evidence for non-web lanes`);
+    }
+    assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims, `${item.id} detector evidence must not include support claims`);
+  }
 });
 
 test("changed detector source does not introduce forbidden support wording", () => {
