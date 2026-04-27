@@ -31,7 +31,7 @@ Selected fixtures must not carry deferred-only fields such as `deferReason` or `
 
 | Slot | ID | Lane | Reason |
 | --- | --- | --- | --- |
-| F4 | `webview-bridge-pair` | `webview-bridge` | Paired native/web bridge fixtures require separate security and boundary review before compact-payload planning. |
+| F4 | `webview-bridge-pair` | `webview-bridge` | Paired native/web bridge fixtures require the [WebView bridge boundary plan](webview-bridge-boundary-plan.md) before compact-payload planning. |
 | F7 | `tui-non-ink-cli-renderer` | `tui-non-ink` | Broad non-Ink terminal renderer semantics are not modeled by the current TSX fixture evidence lane. |
 
 These deferrals do not block the current evidence baseline. They prevent bridge/security semantics and broad non-Ink terminal UI semantics from being mixed into the fixture expectation lock.

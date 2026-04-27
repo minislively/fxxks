@@ -2423,7 +2423,7 @@ test("scan regenerates when the persisted scan index is corrupt", () => {
   assert.ok(result.files.length >= 5);
   assert.ok(result.refreshedEntries >= 5);
   assert.equal(persistedIndex.observability, undefined);
-  assert.equal(persistedIndex.projectRoot, tempDir);
+  assert.equal(persistedIndex.projectRoot, fs.realpathSync(tempDir));
 });
 
 test("scan only refreshes changed files after cache warm-up", () => {
@@ -3860,8 +3860,9 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   const architecture = fs.readFileSync(path.join(repoRoot, "docs", "rn-webview-architecture.md"), "utf8");
   const domainProfiles = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-profiles.md"), "utf8");
   const fixtureExpectations = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
+  const webviewBridgePlan = fs.readFileSync(path.join(repoRoot, "docs", "webview-bridge-boundary-plan.md"), "utf8");
   const preRead = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}\n${architecture}\n${domainProfiles}\n${fixtureExpectations}`;
+  const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}\n${architecture}\n${domainProfiles}\n${fixtureExpectations}\n${webviewBridgePlan}`;
 
   assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
   assert.match(combined, /TSX parsing is (?:syntax-level|only syntax-level)|\.tsx` parse is not semantic evidence/);
@@ -3878,6 +3879,9 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(fixtureExpectations, /selected\/deferred fixture baseline|Selected fixture expectations/);
   assert.match(fixtureExpectations, /public repository candidates .* reference-only/is);
   assert.match(fixtureExpectations, /WebView compact-payload reuse or bridge safety promotion/);
+  assert.match(webviewBridgePlan, /WebView bridge boundary plan/);
+  assert.match(webviewBridgePlan, /fallback-first behavior is still preserved/);
+  assert.match(webviewBridgePlan, /No automatic extraction across native\/web message boundaries/);
   assert.match(candidates, /React Native \/ WebView fixture candidate survey/);
   assert.match(candidates, /React Native \/ WebView architecture direction/);
   assert.match(architecture, /shared TypeScript AST core, separate domain signal profiles/);
@@ -4138,6 +4142,7 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
     fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
   );
   const docs = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
+  const webviewBridgePlan = fs.readFileSync(path.join(repoRoot, "docs", "webview-bridge-boundary-plan.md"), "utf8");
   const selectedRows = parseMarkdownTableRows(docs, "Selected fixture expectations");
   const deferredRows = parseMarkdownTableRows(docs, "Deferred fixture slots");
   const selectedDocs = new Map(selectedRows.map(([slot, id, lane, sourceKind, fixturePath, outcome]) => [slot, { id, lane, sourceKind, fixturePath, outcome }]));
@@ -4170,10 +4175,25 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(docs, /F2[\s\S]*current fallback expectation[\s\S]*navigation semantics remain non-promoted/);
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
+  assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);
+  assert.match(webviewBridgePlan, /`F4` \(`webview-bridge-pair`\) deferred/);
+  assert.match(webviewBridgePlan, /Native side fixture/);
+  assert.match(webviewBridgePlan, /Web side fixture/);
+  assert.match(webviewBridgePlan, /Boundary contract note/);
+  assert.match(webviewBridgePlan, /unsupported-react-native-webview-boundary/);
+  assert.match(webviewBridgePlan, /expected outcome is `fallback`/);
+  assert.match(webviewBridgePlan, /No WebView compact-payload reuse/);
+  assert.match(webviewBridgePlan, /No bridge safety claim/);
+  assert.match(webviewBridgePlan, /No automatic extraction across native\/web message boundaries/);
   assert.doesNotMatch(docs, /React Native support is available|React Native is supported today/i);
   assert.doesNotMatch(docs, /WebView support is available|WebView is supported today/i);
   assert.doesNotMatch(docs, /TUI support is available|TUI is supported today/i);
   assert.doesNotMatch(docs, /default WebView compact extraction is enabled/i);
+  assert.doesNotMatch(webviewBridgePlan, /React Native support is available|React Native is supported today/i);
+  assert.doesNotMatch(webviewBridgePlan, /WebView support is available|WebView is supported today/i);
+  assert.doesNotMatch(webviewBridgePlan, /WebView compact payload reuse is supported/i);
+  assert.doesNotMatch(webviewBridgePlan, /bridge safety is guaranteed/i);
+  assert.doesNotMatch(webviewBridgePlan, /default WebView compact extraction is enabled/i);
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {
