@@ -27,7 +27,8 @@
     "bench:layer2:provider-cost": "node benchmarks/layer2-frontend-task/run-provider-cost-evidence.js",
     "bench:layer2:provider-cost:repeated": "node benchmarks/layer2-frontend-task/run-provider-cost-repeated.js",
     "bench:layer2:provider-cost:corrected-manifest": "npm run build && node benchmarks/layer2-frontend-task/build-provider-cost-corrected-manifest.js",
-    "bench:layer2:billing-import": "node benchmarks/layer2-frontend-task/billing-import-evidence.js"
+    "bench:layer2:billing-import": "node benchmarks/layer2-frontend-task/billing-import-evidence.js",
+    "branch:audit": "node scripts/audit-remote-branches.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
