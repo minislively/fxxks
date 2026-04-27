@@ -27,6 +27,7 @@ function expectedClassificationForLane(lane) {
   if (lane === "tui-ink") return "tui-ink";
   if (lane.startsWith("rn-")) return "react-native";
   if (lane === "webview-boundary") return "webview";
+  if (lane === "webview-bridge") return "mixed";
   if (lane === "negative-fallback") return "mixed";
   throw new Error(`No detector classification expectation for lane: ${lane}`);
 }

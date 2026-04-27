@@ -95,6 +95,34 @@
       "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
     },
     {
+      "slot": "F4",
+      "id": "webview-bridge-pair",
+      "lane": "webview-bridge",
+      "path": "test/fixtures/frontend-domain-expectations/webview/checkout-bridge-native.tsx",
+      "relatedSourcePaths": [
+        "test/fixtures/frontend-domain-expectations/webview/checkout-bridge-web.html"
+      ],
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local paired WebView bridge fixtures, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": [
+        "react-native-webview import",
+        "WebView source",
+        "onMessage",
+        "postMessage",
+        "checkout.submit"
+      ],
+      "forbiddenClaims": [
+        "No WebView support claim",
+        "No bridge safety claim",
+        "No compact payload reuse"
+      ],
+      "supportClaim": "none",
+      "evidenceScope": "fallback-boundary-evidence-only",
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary and docs/tests prove the native/web fixtures stay paired and local"
+    },
+    {
       "slot": "F5",
       "id": "tui-ink-basic",
       "lane": "tui-ink",
@@ -186,14 +214,6 @@
     }
   ],
   "deferred": [
-    {
-      "slot": "F4",
-      "id": "webview-bridge-pair",
-      "lane": "webview-bridge",
-      "sourceKind": "deferred",
-      "deferReason": "Paired native/web bridge fixtures require separate security and boundary review before compact-payload planning.",
-      "doesNotBlockBaseline": true
-    },
     {
       "slot": "F7",
       "id": "tui-non-ink-cli-renderer",

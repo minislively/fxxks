@@ -16,12 +16,13 @@ The machine-readable fixture expectation manifest at `test/fixtures/frontend-dom
 | F1 | `rn-primitive-basic` | `rn-primitive` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | RN primitives do not become DOM/form semantics. |
 | F2 | `rn-style-platform-navigation` | `rn-style-platform` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | Selected for the current fallback expectation only; `StyleSheet.create`, `Platform.select`, and navigation semantics remain non-promoted. |
 | F3 | `webview-boundary-basic` | `webview-boundary` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | WebView `source`, injected JS, and `onMessage` remain boundary-first. |
+| F4 | `webview-bridge-pair` | `webview-bridge` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/webview/checkout-bridge-native.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | Paired native/web checkout bridge fixtures remain fallback-boundary evidence only; the paired web source is recorded in `relatedSourcePaths`. |
 | F5 | `tui-ink-basic` | `tui-ink` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | `extract` | This is only TSX/JSX syntax evidence for an Ink-like file; it is not a broad TUI support claim. |
 | F6 | `negative-rn-webview-boundary` | `negative-fallback` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/negative-rn-webview-boundary.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | RN/WebView bridge-like markers do not receive compact payload reuse. |
 | F9 | `rn-interaction-gesture` | `rn-interaction` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/rn-interaction-gesture.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | Touchable and gesture markers remain RN evidence only; no gesture runtime safety claim. |
 | F10 | `rn-image-scrollview` | `rn-image-scrollview` | `synthetic-local` | `test/fixtures/frontend-domain-expectations/rn-image-scrollview.tsx` | `fallback` with `unsupported-react-native-webview-boundary` | Image, ScrollView, and Dimensions markers remain RN evidence only; no image loading safety claim. |
 
-The selected baseline does not require a schema migration. `F2` is selected because today's expected behavior is a fallback boundary; its richer platform/navigation meaning remains outside the current support and extraction scope.
+The selected baseline does not require a schema migration. `F2` is selected because today's expected behavior is a fallback boundary; its richer platform/navigation meaning remains outside the current support and extraction scope. `F4` is selected only as paired fallback-boundary evidence under the [WebView bridge boundary plan](webview-bridge-boundary-plan.md): its native fixture is the primary `path`, and its paired web fixture is recorded in `relatedSourcePaths`.
 
 ## Manifest shape guard
 
@@ -31,10 +32,9 @@ Selected fixtures must not carry deferred-only fields such as `deferReason` or `
 
 | Slot | ID | Lane | Reason |
 | --- | --- | --- | --- |
-| F4 | `webview-bridge-pair` | `webview-bridge` | Paired native/web bridge fixtures require the [WebView bridge boundary plan](webview-bridge-boundary-plan.md) before compact-payload planning. |
 | F7 | `tui-non-ink-cli-renderer` | `tui-non-ink` | Broad non-Ink terminal renderer semantics are not modeled by the current TSX fixture evidence lane. |
 
-These deferrals do not block the current evidence baseline. They prevent bridge/security semantics and broad non-Ink terminal UI semantics from being mixed into the fixture expectation lock.
+These deferrals do not block the current evidence baseline. They prevent broad non-Ink terminal UI semantics from being mixed into the fixture expectation lock; WebView bridge extraction, bridge safety, and compact-payload reuse remain out of scope even though `F4` now has paired fallback evidence.
 
 ## Forbidden claims
 

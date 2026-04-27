@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <button id="submit-checkout">Submit checkout</button>
+    <script>
+      const checkoutMessage = {
+        type: "checkout.submit",
+        cartId: "synthetic-cart-001",
+        totalCents: 4200,
+      };
+
+      document.getElementById("submit-checkout").addEventListener("click", () => {
+        window.ReactNativeWebView.postMessage(JSON.stringify(checkoutMessage));
+      });
+
+      window.addEventListener("message", (event) => {
+        const acknowledgement = JSON.parse(event.data);
+        if (acknowledgement.type === "checkout.ack") {
+          document.body.dataset.checkoutAck = acknowledgement.cartId;
+        }
+      });
+    </script>
+  </body>
+</html>

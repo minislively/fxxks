@@ -3998,9 +3998,16 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.equal(selected.get("webview-boundary-basic").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("negative-rn-webview-boundary").expectedOutcome, "fallback");
   assert.equal(selected.get("negative-rn-webview-boundary").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("webview-bridge-pair").expectedOutcome, "fallback");
+  assert.equal(selected.get("webview-bridge-pair").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("webview-bridge-pair").supportClaim, "none");
+  assert.equal(selected.get("webview-bridge-pair").evidenceScope, "fallback-boundary-evidence-only");
+  assert.deepEqual(selected.get("webview-bridge-pair").relatedSourcePaths, [
+    "test/fixtures/frontend-domain-expectations/webview/checkout-bridge-web.html",
+  ]);
+  assert.equal(deferred.get("webview-bridge-pair"), undefined);
   assert.equal(selected.get("tui-ink-basic").supportClaim, "none");
   assert.equal(selected.get("tui-ink-basic").evidenceScope, "syntax-evidence-only");
-  assert.equal(deferred.get("webview-bridge-pair").sourceKind, "deferred");
 
   assert.doesNotMatch(contract, /React Native support is available/i);
   assert.doesNotMatch(contract, /WebView support is available/i);
@@ -4051,8 +4058,8 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     return resolved;
   };
 
-  assert.deepEqual([...selected.keys()], ["F0", "F1", "F2", "F3", "F5", "F6", "F9", "F10"]);
-  assert.deepEqual([...deferred.keys()], ["F4", "F7"]);
+  assert.deepEqual([...selected.keys()], ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F9", "F10"]);
+  assert.deepEqual([...deferred.keys()], ["F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
   const selectedDeferredOnlyFields = ["deferReason", "doesNotBlockBaseline"];
@@ -4092,6 +4099,14 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F2").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F3").expectedOutcome, "fallback");
   assert.equal(selected.get("F3").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F4").id, "webview-bridge-pair");
+  assert.equal(selected.get("F4").expectedOutcome, "fallback");
+  assert.equal(selected.get("F4").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F4").supportClaim, "none");
+  assert.equal(selected.get("F4").evidenceScope, "fallback-boundary-evidence-only");
+  assert.deepEqual(selected.get("F4").relatedSourcePaths, [
+    "test/fixtures/frontend-domain-expectations/webview/checkout-bridge-web.html",
+  ]);
   assert.equal(selected.get("F5").expectedOutcome, "extract");
   assert.equal(selected.get("F5").supportClaim, "none");
   assert.equal(selected.get("F5").evidenceScope, "syntax-evidence-only");
@@ -4110,14 +4125,23 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
       assert.equal(item[field], undefined, `${item.id} deferred fixture must not carry selected-only ${field}`);
     }
   }
-  const webviewBridgePair = deferred.get("F4");
-  assert.equal(webviewBridgePair.id, "webview-bridge-pair");
-  assert.equal(webviewBridgePair.lane, "webview-bridge");
-  assert.equal(webviewBridgePair.path, undefined);
-  assert.equal(webviewBridgePair.expectedOutcome, undefined);
-  assert.equal(webviewBridgePair.expectedReason, undefined);
-  assert.equal(webviewBridgePair.requiredSignals, undefined);
-  assert.equal(webviewBridgePair.verification, undefined);
+  assert.equal(deferred.get("F4"), undefined, "webview bridge pair must not be both selected and deferred");
+  const webviewBridgePaths = collectEvidencePaths(selected.get("F4"));
+  assert.equal(new Set(webviewBridgePaths).size, webviewBridgePaths.length, "WebView bridge evidence paths must be distinct");
+  assert.equal(webviewBridgePaths.length, 2, "WebView bridge evidence must include native and web sides");
+  for (const evidencePath of webviewBridgePaths) {
+    const resolved = resolveFixtureEvidencePath(evidencePath);
+    const source = fs.readFileSync(resolved, "utf8");
+    assert.doesNotMatch(source, /github\.com|https?:\/\/|public-snapshot|live-fetch|vendor-external/i);
+  }
+  const webviewBridgeNative = fs.readFileSync(path.join(repoRoot, selected.get("F4").path), "utf8");
+  const webviewBridgeWeb = fs.readFileSync(path.join(repoRoot, selected.get("F4").relatedSourcePaths[0]), "utf8");
+  assert.match(webviewBridgeNative, /checkout\.submit/);
+  assert.match(webviewBridgeNative, /onMessage/);
+  assert.match(webviewBridgeNative, /postMessage/);
+  assert.match(webviewBridgeWeb, /checkout\.submit/);
+  assert.match(webviewBridgeWeb, /ReactNativeWebView\.postMessage/);
+  assert.doesNotMatch(webviewBridgeNative + webviewBridgeWeb, /WebView support is available|bridge safety is guaranteed|compact[- ]payload reuse is (?:available|enabled|safe)/i);
   assert.equal(deferred.get("F7").id, "tui-non-ink-cli-renderer");
   assert.equal(deferred.get("F7").supportClaim, "none");
   assert.equal(deferred.get("F7").path, undefined);
@@ -4145,7 +4169,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.doesNotMatch(source, /TUI support is available|TUI\/Ink is supported today|default TUI compact extraction is enabled/i);
   }
 
-  for (const slot of ["F1", "F2", "F3", "F6", "F9", "F10"]) {
+  for (const slot of ["F1", "F2", "F3", "F4", "F6", "F9", "F10"]) {
     const item = selected.get(slot);
     const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
     assert.equal(decision.decision, "fallback", `${item.id} should stay fallback-first`);
@@ -4193,14 +4217,14 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
   assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);
-  assert.match(webviewBridgePlan, /`F4` \(`webview-bridge-pair`\) deferred/);
+  assert.match(webviewBridgePlan, /`F4` \(`webview-bridge-pair`\) as \*\*selected fallback-boundary evidence\*\*/);
+  assert.match(webviewBridgePlan, /checkout\.submit/);
   assert.match(webviewBridgePlan, /Native side fixture/);
   assert.match(webviewBridgePlan, /Web side fixture/);
   assert.match(webviewBridgePlan, /Boundary contract note/);
-  assert.match(webviewBridgePlan, /readiness-gate-only PR/);
-  assert.match(webviewBridgePlan, /later synthetic-local bridge-pair PR is a separate lane/);
-  assert.match(webviewBridgePlan, /must not add native\/web fixture files/);
-  assert.match(webviewBridgePlan, /move `F4` from deferred to selected/);
+  assert.match(webviewBridgePlan, /Selected fallback-evidence boundary/);
+  assert.match(webviewBridgePlan, /synthetic bridge pair remains a separate lane/);
+  assert.match(webviewBridgePlan, /expected outcome is `fallback`/);
   assert.match(webviewBridgePlan, /detector, extractor, runtime, pre-read, setup, or CLI behavior/);
   assert.match(webviewBridgePlan, /unsupported-react-native-webview-boundary/);
   assert.match(webviewBridgePlan, /expected outcome is `fallback`/);
