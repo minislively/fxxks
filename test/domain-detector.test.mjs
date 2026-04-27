@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
 
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
@@ -86,4 +87,40 @@ test("classifies mixed and unknown fallback cases", () => {
 test("changed detector source does not introduce forbidden support wording", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "core", "domain-detector.ts"), "utf8");
   assert.doesNotMatch(source, forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain prints detector evidence without support claims", () => {
+  const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
+  const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(cli.status, 0, cli.stderr);
+  const result = JSON.parse(cli.stdout);
+
+  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.command, "inspect-domain");
+  assert.equal(result.filePath, path.relative(repoRoot, fixture));
+  assert.deepEqual(Object.keys(result.domainDetection).sort(), ["classification", "evidence"]);
+  assert.equal(result.domainDetection.classification, "webview");
+  assert.ok(result.domainDetection.evidence.some((item) => item.domain === "webview" && item.signal === "component" && item.detail === "WebView"));
+  assert.deepEqual(result.fallbackFirst, { applies: true, reason: "unsupported-react-native-webview-boundary" });
+  assert.equal("signals" in result.domainDetection, false);
+  assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain keeps non-WebView fixture output as evidence-only non-fallback inspection", () => {
+  const fixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
+  const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(cli.status, 0, cli.stderr);
+  const result = JSON.parse(cli.stdout);
+  assert.equal(result.domainDetection.classification, "react-native");
+  assert.deepEqual(result.fallbackFirst, { applies: false });
+  assert.ok(result.domainDetection.evidence.some((item) => item.domain === "react-native" && item.signal === "primitive" && item.detail === "View"));
+  assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });

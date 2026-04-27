@@ -21,6 +21,7 @@
     "bench:gate": "npm run build && node benchmarks/scripts/gate.mjs",
     "lint": "npm run typecheck -- --pretty false",
     "smoke:claude": "npm run build && node scripts/smoke-claude-hook.mjs",
+    "smoke:domain-detector": "npm run build && node dist/cli/index.js inspect-domain test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx --json",
     "release:smoke": "npm run build && node scripts/release-smoke.mjs",
     "bench:layer2:r4:repeated": "npm run build && node benchmarks/layer2-frontend-task/run-r4-repeated.js",
     "bench:layer2:provider-cost": "node benchmarks/layer2-frontend-task/run-provider-cost-evidence.js",

@@ -620,7 +620,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|run|scan|extract|compare|decide|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|run|scan|extract|compare|decide|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -636,6 +636,7 @@ Everyday commands:
   ${displayCliName} run <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
+  ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
@@ -692,6 +693,45 @@ function parseCompareArgs(args: string[]): { filePath: string } {
   }
 
   return { filePath: requireFilePath(filePath) };
+}
+
+type InspectDomainCliResult = {
+  schemaVersion: 1;
+  command: "inspect-domain";
+  filePath: string;
+  domainDetection: {
+    classification: string;
+    evidence: Array<{ domain: string; signal: string; detail: string }>;
+  };
+  fallbackFirst: {
+    applies: boolean;
+    reason?: string;
+  };
+};
+
+function hasWebViewEvidence(evidence: Array<{ domain: string }>): boolean {
+  return evidence.some((item) => item.domain === "webview");
+}
+
+function buildInspectDomainResult(options: {
+  filePath: string;
+  cwd: string;
+  detection: { classification: string; evidence: Array<{ domain: string; signal: string; detail: string }> };
+}): InspectDomainCliResult {
+  const relative = path.relative(options.cwd, options.filePath) || path.basename(options.filePath);
+  const webViewFallbackFirst = hasWebViewEvidence(options.detection.evidence);
+  return {
+    schemaVersion: 1,
+    command: "inspect-domain",
+    filePath: relative,
+    domainDetection: {
+      classification: options.detection.classification,
+      evidence: options.detection.evidence,
+    },
+    fallbackFirst: webViewFallbackFirst
+      ? { applies: true, reason: "unsupported-react-native-webview-boundary" }
+      : { applies: false },
+  };
 }
 
 function parseDoctorArgs(args: string[]): { target: "all" | "codex" | "claude"; json: boolean; help: boolean } {
@@ -974,6 +1014,14 @@ async function run(): Promise<void> {
       const extracted = extractFile(file);
       const result = decideMode(asBase(extracted));
       print({ filePath: file, ...result });
+      return;
+    }
+
+    case "inspect-domain": {
+      const { detectDomain } = await import("../core/domain-detector.js");
+      const { filePath: file } = parseCompareArgs(rest);
+      const detection = detectDomain(file);
+      print(buildInspectDomainResult({ filePath: file, cwd: process.cwd(), detection }));
       return;
     }
     case "attach": {

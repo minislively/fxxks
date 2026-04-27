@@ -105,6 +105,15 @@ fooks compare src/components/Button.tsx --json
 
 `fooks compare` compares the original source bytes with the compact base model-facing payload used for context-reduction estimates. For compressed/hybrid frontend files, that payload comes from fooks' TypeScript AST-derived component contract, behavior, structure, style, bounded source-line ranges, a source fingerprint for freshness checks, hook/effect intent, and form/control signals rather than the full source text. The line ranges are AST-derived edit aids and should be treated as valid only for the matching source fingerprint. The token values are estimated from local byte counts, so this is a local model-facing payload estimate only; it excludes optional edit-guidance overhead. It is not provider tokenizer behavior, not runtime hook envelope overhead, not provider usage/billing tokens, invoices, dashboards, or charged costs, and not a `ccusage` replacement.
 
+To inspect the frontend domain detector evidence for one fixture or file without invoking extractor/profile behavior, run:
+
+```bash
+fooks inspect-domain test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx --json
+npm run smoke:domain-detector
+```
+
+The smoke script builds the local CLI and runs the same WebView fixture inspection as a quick docs-test hook. `fooks inspect-domain` emits only the detector classification, structured `domainDetection.evidence`, and a WebView fallback-first boundary marker when WebView evidence is present. It does not make RN/WebView/TUI support claims, does not enable compact payload reuse, and does not change runtime or pre-read behavior. Use it as a dogfood/debugging surface before any later profile-promotion work.
+
 When source ranges are present, `fooks extract <file> --model-payload` also emits compact `editGuidance`. Its `patchTargets` point agents at likely edit anchors such as component declarations, props, effects, callbacks, event handlers, form controls, submit handlers, validation anchors, and representative snippets. Treat those targets as valid only while `sourceFingerprint.fileHash` and `sourceFingerprint.lineCount` still match the current file; if either freshness value changes, rerun `fooks extract` or read the file before editing. This is AST-derived line-aware patch guidance, not LSP-backed semantic resolution and not provider-tokenizer, billing-token, or provider-cost proof.
 
 ## Supported project shapes
