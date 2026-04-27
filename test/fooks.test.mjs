@@ -2703,6 +2703,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks setup/);
   assert.match(help, /fooks doctor \[codex\|claude\] \[--json\]/);
   assert.match(help, /fooks compare <file> \[--json\]/);
+  assert.match(help, /fooks inspect-domain <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /fooks status artifacts/);
   assert.match(help, /Codex: automatic repeated-file runtime hook path/);
@@ -2721,6 +2722,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(usage, /fooks setup/);
 
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  assert.match(pkg.scripts?.["smoke:domain-detector"], /inspect-domain test\/fixtures\/frontend-domain-expectations\/webview-boundary-basic\.tsx --json/);
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
@@ -4118,6 +4120,9 @@ test("docs give first-run users a clear support and diagnosis path", () => {
   assert.match(combined, /fooks setup\s+# short ready \/ partial \/ blocked summary/);
   assert.match(combined, /fooks doctor/);
   assert.match(combined, /fooks status/);
+  assert.match(combined, /fooks inspect-domain test\/fixtures\/frontend-domain-expectations\/webview-boundary-basic\.tsx --json/);
+  assert.match(combined, /npm run smoke:domain-detector/);
+  assert.match(combined, /domainDetection\.evidence/);
   assert.match(combined, /fooks setup --json/);
   assert.match(combined, /React \/ Next\.js/);
   assert.match(combined, /Ink .*React CLI/s);
