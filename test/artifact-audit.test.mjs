@@ -136,6 +136,8 @@ test("artifact audit reports conservative candidates and only manual cleanup com
   assert.equal(sessionByName.get("fooks-current")?.status, "activeOrUnknown");
   assert.deepEqual(sessionByName.get("fooks-current")?.manualCleanupCommands, []);
   assert.equal(sessionByName.get("fooks-missing")?.status, "candidateCleanup");
+  assert.deepEqual(result.staleRuntimeCleanups.map((item) => item.session), ["fooks-missing"]);
+  assert.deepEqual(result.staleRuntimeCleanups[0]?.stalePaths, ["/gone/fooks-path"]);
 
   assert.ok(result.manualCleanupCommands.includes("git worktree prune --dry-run"));
   assert.ok(result.manualCleanupCommands.includes("git branch -d 'fooks-loose'"));
@@ -161,6 +163,28 @@ test("artifact audit marks stale runtime tmux sessions with deleted panes as cle
   assert.equal(staleSession?.status, "candidateCleanup");
   assert.ok(staleSession?.reasons.includes("all panes point at missing or deleted paths"));
   assert.deepEqual(staleSession?.manualCleanupCommands, ["tmux kill-session -t 'fooks-codex-exec-test'"]);
+  assert.deepEqual(staleSession?.panes, [
+    {
+      path: `${staleRuntimeWorktree} (deleted)`,
+      exists: false,
+      deleted: true,
+      current: false,
+      worktreePath: undefined,
+    },
+  ]);
+  assert.deepEqual(result.staleRuntimeCleanups, [
+    {
+      session: "fooks-codex-exec-test",
+      stalePaths: [staleRuntimeWorktree],
+      reason: "tmux/OMX/Codex session panes point only at missing or deleted worktree paths",
+      cleanupOrder: [
+        "Verify the PR/worktree is no longer active",
+        "Stop the stale tmux session so child OMX/Codex processes release the deleted path",
+        "Run any git worktree prune/remove follow-up only after the runtime is stopped",
+      ],
+      manualCleanupCommands: ["tmux kill-session -t 'fooks-codex-exec-test'"],
+    },
+  ]);
   assert.ok(result.manualCleanupCommands.includes("tmux kill-session -t 'fooks-codex-exec-test'"));
 });
 

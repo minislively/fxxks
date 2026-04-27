@@ -51,6 +51,14 @@ export type ArtifactAuditSession = {
   manualCleanupCommands: string[];
 };
 
+export type ArtifactAuditStaleRuntimeCleanup = {
+  session: string;
+  stalePaths: string[];
+  reason: string;
+  cleanupOrder: string[];
+  manualCleanupCommands: string[];
+};
+
 export type ArtifactAuditResult = {
   schemaVersion: typeof ARTIFACT_AUDIT_SCHEMA_VERSION;
   command: typeof ARTIFACT_AUDIT_COMMAND;
@@ -60,6 +68,7 @@ export type ArtifactAuditResult = {
   claimBoundary: typeof ARTIFACT_AUDIT_CLAIM_BOUNDARY;
   blockers: string[];
   sessions: ArtifactAuditSession[];
+  staleRuntimeCleanups: ArtifactAuditStaleRuntimeCleanup[];
   worktrees: ArtifactAuditWorktree[];
   branches: ArtifactAuditBranch[];
   manualCleanupCommands: string[];
@@ -139,6 +148,15 @@ function panePathDeleted(panePath: string): boolean {
 
 function panePathWithoutDeletedMarker(panePath: string): string {
   return panePath.replace(/ \(deleted\)$/u, "").trim();
+}
+
+function stalePanePaths(panes: ArtifactAuditSessionPane[]): string[] {
+  return uniqueSorted(
+    panes
+      .filter((pane) => pane.deleted || !pane.exists)
+      .map((pane) => panePathWithoutDeletedMarker(pane.path))
+      .filter(Boolean),
+  );
 }
 
 export function defaultArtifactAuditCommandRunner(command: string, args: string[], cwd: string): string {
@@ -315,8 +333,8 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
     const cleanPanePath = panePathWithoutDeletedMarker(pane.path);
     const deleted = panePathDeleted(pane.path);
     const exists = !deleted && pathExists(cleanPanePath);
-    const current = pathContainsCwd(cleanPanePath, currentCwd) || pathContainsCwd(currentCwd, cleanPanePath);
-    const mappedWorktree = worktreeByPath.find((worktree) => isInsidePath(cleanPanePath, worktree.path));
+    const current = exists && (pathContainsCwd(cleanPanePath, currentCwd) || pathContainsCwd(currentCwd, cleanPanePath));
+    const mappedWorktree = exists ? worktreeByPath.find((worktree) => isInsidePath(cleanPanePath, worktree.path)) : undefined;
     if (!includesFooksSignal(pane.session, cwd) && !includesFooksSignal(cleanPanePath, cwd) && !mappedWorktree) continue;
     const panes = panesBySession.get(pane.session) ?? [];
     panes.push({
@@ -367,6 +385,20 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
       };
     });
 
+  const staleRuntimeCleanups: ArtifactAuditStaleRuntimeCleanup[] = sessions
+    .filter((session) => session.status === "candidateCleanup" && session.panes.every((pane) => pane.deleted || !pane.exists))
+    .map((session) => ({
+      session: session.session,
+      stalePaths: stalePanePaths(session.panes),
+      reason: "tmux/OMX/Codex session panes point only at missing or deleted worktree paths",
+      cleanupOrder: [
+        "Verify the PR/worktree is no longer active",
+        "Stop the stale tmux session so child OMX/Codex processes release the deleted path",
+        "Run any git worktree prune/remove follow-up only after the runtime is stopped",
+      ],
+      manualCleanupCommands: session.manualCleanupCommands,
+    }));
+
   const manualCleanupCommands = uniqueSorted([
     ...sessions.flatMap((session) => session.manualCleanupCommands),
     ...worktrees.flatMap((worktree) => worktree.manualCleanupCommands),
@@ -382,6 +414,7 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
     claimBoundary: ARTIFACT_AUDIT_CLAIM_BOUNDARY,
     blockers: uniqueSorted(blockers),
     sessions,
+    staleRuntimeCleanups,
     worktrees,
     branches,
     manualCleanupCommands,

@@ -73,6 +73,7 @@ export type {
   ArtifactAuditResult,
   ArtifactAuditSession,
   ArtifactAuditSessionPane,
+  ArtifactAuditStaleRuntimeCleanup,
   ArtifactAuditStatus,
   ArtifactAuditWorktree,
 } from "./core/artifact-audit";
