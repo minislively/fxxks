@@ -3927,6 +3927,22 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.doesNotMatch(contract, /default WebView compact extraction is enabled/i);
 });
 
+function parseMarkdownTableRows(markdown, heading) {
+  const start = markdown.indexOf(`## ${heading}`);
+  assert.notEqual(start, -1, `${heading} heading must exist`);
+  const next = markdown.indexOf("\n## ", start + 1);
+  const section = markdown.slice(start, next === -1 ? undefined : next);
+  return section
+    .split("\n")
+    .filter((line) => line.startsWith("| "))
+    .slice(2)
+    .map((line) => line.slice(1, -1).split("|").map((cell) => cell.trim()));
+}
+
+function stripMarkdownCode(value) {
+  return value.replace(/`/g, "");
+}
+
 test("frontend domain fixture expectations keep exact local outcomes", () => {
   const expectationsPath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json");
   const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
@@ -4018,13 +4034,54 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.doesNotMatch(source, /TUI support is available|TUI\/Ink is supported today|default TUI compact extraction is enabled/i);
   }
 
-  for (const slot of ["F1", "F3", "F6"]) {
+  for (const slot of ["F1", "F2", "F3", "F6", "F9", "F10"]) {
     const item = selected.get(slot);
     const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
     assert.equal(decision.decision, "fallback", `${item.id} should stay fallback-first`);
     assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
     assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
   }
+});
+
+test("frontend domain fixture docs mirror manifest slot expectations", () => {
+  const expectations = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
+  );
+  const docs = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
+  const selectedRows = parseMarkdownTableRows(docs, "Selected fixture expectations");
+  const deferredRows = parseMarkdownTableRows(docs, "Deferred fixture slots");
+  const selectedDocs = new Map(selectedRows.map(([slot, id, lane, sourceKind, fixturePath, outcome]) => [slot, { id, lane, sourceKind, fixturePath, outcome }]));
+  const deferredDocs = new Map(deferredRows.map(([slot, id, lane, reason]) => [slot, { id, lane, reason }]));
+  const selectedManifest = new Map(expectations.selected.map((item) => [item.slot, item]));
+  const deferredManifest = new Map(expectations.deferred.map((item) => [item.slot, item]));
+
+  assert.deepEqual([...selectedDocs.keys()], [...selectedManifest.keys()]);
+  assert.deepEqual([...deferredDocs.keys()], [...deferredManifest.keys()]);
+
+  for (const [slot, item] of selectedManifest) {
+    const row = selectedDocs.get(slot);
+    assert.equal(stripMarkdownCode(row.id), item.id, `${slot} docs id must match manifest`);
+    assert.equal(stripMarkdownCode(row.lane), item.lane, `${slot} docs lane must match manifest`);
+    assert.equal(stripMarkdownCode(row.sourceKind), item.sourceKind, `${slot} docs source kind must match manifest`);
+    assert.equal(stripMarkdownCode(row.fixturePath), item.path, `${slot} docs path must match manifest`);
+    assert.ok(row.outcome.includes(item.expectedOutcome), `${slot} docs outcome must include ${item.expectedOutcome}`);
+    if (item.expectedReason !== undefined) {
+      assert.ok(row.outcome.includes(item.expectedReason), `${slot} docs outcome must include ${item.expectedReason}`);
+    }
+  }
+
+  for (const [slot, item] of deferredManifest) {
+    const row = deferredDocs.get(slot);
+    assert.equal(stripMarkdownCode(row.id), item.id, `${slot} deferred docs id must match manifest`);
+    assert.equal(stripMarkdownCode(row.lane), item.lane, `${slot} deferred docs lane must match manifest`);
+    assert.match(row.reason, /\S/, `${slot} deferred docs reason must be non-empty`);
+  }
+
+  assert.match(docs, /F2[\s\S]*current fallback expectation[\s\S]*navigation semantics remain non-promoted/);
+  assert.doesNotMatch(docs, /React Native support is available|React Native is supported today/i);
+  assert.doesNotMatch(docs, /WebView support is available|WebView is supported today/i);
+  assert.doesNotMatch(docs, /TUI support is available|TUI is supported today/i);
+  assert.doesNotMatch(docs, /default WebView compact extraction is enabled/i);
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {
