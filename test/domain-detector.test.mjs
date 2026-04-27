@@ -24,10 +24,13 @@ test("detects React Native evidence signals without support wording", () => {
   const primitive = detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
   assert.equal(primitive.classification, "react-native");
   assert.equal(primitive.domain, "react-native");
+  assert.equal(primitive.outcome, "fallback");
+  assert.equal(primitive.reason, "unsupported-react-native-webview-boundary");
   assertSignals(primitive, [
     "react-native:import:react-native",
     "react-native:primitive:View",
     "react-native:primitive:Text",
+    "react-native:primitive:TextInput",
     "react-native:primitive:Pressable",
   ]);
 
@@ -53,6 +56,8 @@ test("detects React Native evidence signals without support wording", () => {
 test("detects WebView evidence signals without support wording", () => {
   const result = detectDomain(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
   assert.equal(result.classification, "webview");
+  assert.equal(result.outcome, "fallback");
+  assert.equal(result.reason, "unsupported-react-native-webview-boundary");
   assertSignals(result, [
     "webview:import:react-native-webview",
     "webview:component:WebView",
@@ -66,6 +71,7 @@ test("detects WebView evidence signals without support wording", () => {
 test("detects TUI Ink evidence signals without support wording", () => {
   const result = detectDomain(path.join(fixtureRoot, "tui-ink-basic.tsx"));
   assert.equal(result.classification, "tui-ink");
+  assert.equal(result.outcome, "extract");
   assertSignals(result, ["tui-ink:import:ink", "tui-ink:primitive:Box", "tui-ink:primitive:Text", "tui-ink:hook:useInput"]);
   assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });
@@ -73,14 +79,25 @@ test("detects TUI Ink evidence signals without support wording", () => {
 test("classifies mixed and unknown fallback cases", () => {
   const mixed = detectDomain(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx"));
   assert.equal(mixed.classification, "mixed");
+  assert.equal(mixed.outcome, "fallback");
+  assert.equal(mixed.reason, "unsupported-react-native-webview-boundary");
   assert.ok(mixed.signals.some((signal) => signal.startsWith("react-native:")));
   assert.ok(mixed.signals.some((signal) => signal.startsWith("webview:")));
 
   const unknown = detectDomainFromSource("export const answer = 42;", "utility.ts");
   assert.equal(unknown.classification, "unknown");
+  assert.equal(unknown.outcome, "deferred");
   assert.deepEqual(unknown.evidence, []);
 
   assert.doesNotMatch(JSON.stringify([mixed, unknown]), forbiddenSupportClaims);
+});
+
+test("treats bare WebView JSX as a fallback-first boundary signal", () => {
+  const result = detectDomainFromSource(`export function Preview() { return <WebView source={{ uri: "https://example.test" }} />; }`, "Preview.tsx");
+  assert.equal(result.classification, "webview");
+  assert.equal(result.outcome, "fallback");
+  assert.equal(result.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(result.signals.includes("webview:component:WebView"));
 });
 
 test("changed detector source does not introduce forbidden support wording", () => {

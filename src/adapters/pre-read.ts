@@ -22,13 +22,8 @@ function relativePath(filePath: string, cwd: string): string {
 }
 
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
-  return (
-    /\bfrom\s+["']react-native(?:\/[^"']*)?["']/.test(sourceText) ||
-    /\brequire\(\s*["']react-native(?:\/[^"']*)?["']\s*\)/.test(sourceText) ||
-    /\bfrom\s+["']react-native-webview["']/.test(sourceText) ||
-    /\brequire\(\s*["']react-native-webview["']\s*\)/.test(sourceText) ||
-    /<WebView(?:\s|>|\/)/.test(sourceText)
-  );
+  const domainDetection = detectDomainFromSource(sourceText);
+  return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
 }
 
 export function decidePreRead(
@@ -58,7 +53,7 @@ export function decidePreRead(
 
   const sourceText = fs.readFileSync(resolvedPath, "utf8");
   const domainDetection = detectDomainFromSource(sourceText, resolvedPath);
-  if (hasReactNativeWebViewBoundaryMarker(sourceText)) {
+  if (domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON) {
     return {
       runtime,
       filePath: outputPath,

@@ -4,6 +4,9 @@ import ts from "typescript";
 
 export type DomainLabel = "react-web" | "react-native" | "webview" | "tui-ink" | "mixed" | "unknown";
 export type FrontendDomainClassification = DomainLabel;
+export type FrontendDomainOutcome = "extract" | "fallback" | "deferred" | "unsupported";
+
+export const FRONTEND_DOMAIN_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 
 export type FrontendDomainEvidence = {
   domain: Exclude<DomainLabel, "mixed" | "unknown">;
@@ -15,6 +18,8 @@ export type DomainDetectionResult = {
   classification: FrontendDomainClassification;
   /** @deprecated Use classification. */
   domain: DomainLabel;
+  outcome: FrontendDomainOutcome;
+  reason?: string;
   evidence: FrontendDomainEvidence[];
   /** @deprecated Use evidence. */
   signals: string[];
@@ -24,7 +29,19 @@ const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const RN_MODULE = "react-native";
 const WEBVIEW_MODULE = "react-native-webview";
 const INK_MODULE = "ink";
-const RN_PRIMITIVES = new Set(["View", "Text", "Image", "ScrollView", "Pressable", "TouchableOpacity"]);
+const RN_PRIMITIVES = new Set([
+  "View",
+  "Text",
+  "TextInput",
+  "Image",
+  "ScrollView",
+  "FlatList",
+  "Pressable",
+  "TouchableOpacity",
+  "TouchableHighlight",
+  "TouchableNativeFeedback",
+  "TouchableWithoutFeedback",
+]);
 const WEB_DOM_TAGS = new Set(["div", "span", "form", "input", "button", "select", "textarea", "label"]);
 const WEBVIEW_PROPS = new Set(["source", "injectedJavaScript", "onMessage"]);
 const TUI_PRIMITIVES = new Set(["Box", "Text"]);
@@ -56,6 +73,20 @@ function signalList(evidence: FrontendDomainEvidence[]): string[] {
   return evidence.map((item) => `${item.domain}:${item.signal}:${item.detail}`);
 }
 
+function outcomeForClassification(classification: DomainLabel): Pick<DomainDetectionResult, "outcome" | "reason"> {
+  switch (classification) {
+    case "react-web":
+    case "tui-ink":
+      return { outcome: "extract" };
+    case "react-native":
+    case "webview":
+    case "mixed":
+      return { outcome: "fallback", reason: FRONTEND_DOMAIN_BOUNDARY_REASON };
+    case "unknown":
+      return { outcome: "deferred" };
+  }
+}
+
 function classify(evidence: FrontendDomainEvidence[], hasWebDom: boolean): DomainDetectionResult {
   const domainEvidence = ["react-native", "webview", "tui-ink"] as const;
   const matched = domainEvidence.filter((domain) => hasEvidence(evidence, domain));
@@ -73,6 +104,7 @@ function classify(evidence: FrontendDomainEvidence[], hasWebDom: boolean): Domai
   return {
     classification,
     domain: classification,
+    ...outcomeForClassification(classification),
     evidence,
     signals: signalList(evidence),
   };
@@ -135,7 +167,7 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       const tag = ts.isIdentifier(tagName) ? tagName.text : ts.isPropertyAccessExpression(tagName) ? tagName.name.text : undefined;
       if (tag) {
         if (RN_PRIMITIVES.has(tag) && hasImportedName(RN_MODULE, tag)) addEvidence(evidence, "react-native", "primitive", tag);
-        if (tag === "WebView" && hasImportedName(WEBVIEW_MODULE, tag)) addEvidence(evidence, "webview", "component", tag);
+        if (tag === "WebView") addEvidence(evidence, "webview", "component", tag);
         if (TUI_PRIMITIVES.has(tag) && hasImportedName(INK_MODULE, tag)) addEvidence(evidence, "tui-ink", "primitive", tag);
         if (WEB_DOM_TAGS.has(tag)) hasWebDom = true;
       }

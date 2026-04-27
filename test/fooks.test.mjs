@@ -974,6 +974,8 @@ test("frontend domain detector returns evidence-only classifications for Level 3
   assert.ok(rn.signals.includes("react-native:primitive:View"));
   assert.ok(rn.signals.includes("react-native:primitive:Text"));
   assert.ok(rn.signals.includes("react-native:primitive:ScrollView"));
+  assert.equal(rn.outcome, "fallback");
+  assert.equal(rn.reason, "unsupported-react-native-webview-boundary");
   assert.ok(rn.signals.includes("react-native:style-factory:StyleSheet.create"));
   assert.ok(rn.signals.includes("react-native:platform-select:Platform.select"));
 
@@ -984,7 +986,9 @@ test("frontend domain detector returns evidence-only classifications for Level 3
 
   const pressable = detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
   assert.equal(pressable.classification, "react-native");
+  assert.equal(pressable.outcome, "fallback");
   assert.ok(pressable.signals.includes("react-native:primitive:Pressable"));
+  assert.ok(pressable.signals.includes("react-native:primitive:TextInput"));
 
   const touchable = detectDomain(path.join(fixtureRoot, "rn-interaction-gesture.tsx"));
   assert.equal(touchable.classification, "react-native");
@@ -992,6 +996,8 @@ test("frontend domain detector returns evidence-only classifications for Level 3
 
   const webview = detectDomain(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
   assert.equal(webview.classification, "webview");
+  assert.equal(webview.outcome, "fallback");
+  assert.equal(webview.reason, "unsupported-react-native-webview-boundary");
   assert.ok(webview.signals.includes("webview:import:react-native-webview"));
   assert.ok(webview.signals.includes("webview:component:WebView"));
   assert.ok(webview.signals.includes("webview:prop:source"));
@@ -1000,6 +1006,7 @@ test("frontend domain detector returns evidence-only classifications for Level 3
 
   const tui = detectDomain(path.join(fixtureRoot, "tui-ink-basic.tsx"));
   assert.equal(tui.classification, "tui-ink");
+  assert.equal(tui.outcome, "extract");
   assert.ok(tui.signals.includes("tui-ink:import:ink"));
   assert.ok(tui.signals.includes("tui-ink:primitive:Box"));
   assert.ok(tui.signals.includes("tui-ink:primitive:Text"));
@@ -1007,11 +1014,14 @@ test("frontend domain detector returns evidence-only classifications for Level 3
 
   const mixed = detectDomain(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx"));
   assert.equal(mixed.classification, "mixed");
+  assert.equal(mixed.outcome, "fallback");
+  assert.equal(mixed.reason, "unsupported-react-native-webview-boundary");
   assert.ok(mixed.signals.some((signal) => signal.startsWith("react-native:")));
   assert.ok(mixed.signals.some((signal) => signal.startsWith("webview:")));
 
   const unknown = detectDomainFromSource("export const answer = 42;", "utility.ts");
   assert.equal(unknown.classification, "unknown");
+  assert.equal(unknown.outcome, "deferred");
   assert.deepEqual(unknown.evidence, []);
 });
 
@@ -1065,6 +1075,25 @@ test("frontend domain detector and pre-read debug avoid RN WebView TUI support w
     fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8"),
   ].join("\n");
   assert.doesNotMatch(changedSource, forbiddenSupportClaims);
+});
+
+test("pre-read uses frontend domain detector for bare WebView fallback boundaries", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-bare-webview-"));
+  const bareWebViewPath = path.join(tempDir, "BareWebView.tsx");
+  fs.writeFileSync(
+    bareWebViewPath,
+    `export function BareWebView() {
+  return <WebView source={{ uri: "https://example.test" }} />;
+}
+`,
+  );
+
+  const result = preReadModule.decidePreRead(bareWebViewPath, tempDir, "codex");
+  assert.equal(result.decision, "fallback");
+  assert.deepEqual(result.reasons, ["unsupported-react-native-webview-boundary"]);
+  assert.equal(result.debug.domainDetection.classification, "webview");
+  assert.equal(result.debug.domainDetection.outcome, "fallback");
+  assert.ok(result.debug.domainDetection.signals.includes("webview:component:WebView"));
 });
 
 test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise", () => {
@@ -2913,7 +2942,6 @@ test("doctor is read-only for prepared project, Codex, and Claude paths", () => 
   assert.deepEqual(fileSnapshot(codexHome), beforeCodex);
   assert.deepEqual(fileSnapshot(claudeHome), beforeClaude);
 });
-
 
 test("setup runtime summary keeps Claude and opencode claims bounded", () => {
   const tempDir = makeTempProject();
