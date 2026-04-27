@@ -91,7 +91,7 @@ function classify(evidence: FrontendDomainEvidence[], hasWebDom: boolean): Domai
   const domainEvidence = ["react-native", "webview", "tui-ink"] as const;
   const matched = domainEvidence.filter((domain) => hasEvidence(evidence, domain));
   let classification: DomainLabel;
-  if (matched.length > 1) {
+  if (matched.length > 1 || (matched.length === 1 && hasWebDom)) {
     classification = "mixed";
   } else if (matched.length === 1) {
     classification = matched[0];
