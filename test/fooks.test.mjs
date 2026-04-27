@@ -4110,6 +4110,14 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
       assert.equal(item[field], undefined, `${item.id} deferred fixture must not carry selected-only ${field}`);
     }
   }
+  const webviewBridgePair = deferred.get("F4");
+  assert.equal(webviewBridgePair.id, "webview-bridge-pair");
+  assert.equal(webviewBridgePair.lane, "webview-bridge");
+  assert.equal(webviewBridgePair.path, undefined);
+  assert.equal(webviewBridgePair.expectedOutcome, undefined);
+  assert.equal(webviewBridgePair.expectedReason, undefined);
+  assert.equal(webviewBridgePair.requiredSignals, undefined);
+  assert.equal(webviewBridgePair.verification, undefined);
   assert.equal(deferred.get("F7").id, "tui-non-ink-cli-renderer");
   assert.equal(deferred.get("F7").supportClaim, "none");
   assert.equal(deferred.get("F7").path, undefined);
@@ -4189,6 +4197,11 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(webviewBridgePlan, /Native side fixture/);
   assert.match(webviewBridgePlan, /Web side fixture/);
   assert.match(webviewBridgePlan, /Boundary contract note/);
+  assert.match(webviewBridgePlan, /readiness-gate-only PR/);
+  assert.match(webviewBridgePlan, /later synthetic-local bridge-pair PR is a separate lane/);
+  assert.match(webviewBridgePlan, /must not add native\/web fixture files/);
+  assert.match(webviewBridgePlan, /move `F4` from deferred to selected/);
+  assert.match(webviewBridgePlan, /detector, extractor, runtime, pre-read, setup, or CLI behavior/);
   assert.match(webviewBridgePlan, /unsupported-react-native-webview-boundary/);
   assert.match(webviewBridgePlan, /expected outcome is `fallback`/);
   assert.match(webviewBridgePlan, /No WebView compact-payload reuse/);
@@ -4202,6 +4215,8 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.doesNotMatch(webviewBridgePlan, /WebView support is available|WebView is supported today/i);
   assert.doesNotMatch(webviewBridgePlan, /WebView compact payload reuse is supported/i);
   assert.doesNotMatch(webviewBridgePlan, /bridge safety is guaranteed/i);
+  assert.doesNotMatch(webviewBridgePlan, /WebView bridge is safe/i);
+  assert.doesNotMatch(webviewBridgePlan, /compact[- ]payload reuse is (?:available|enabled|safe)/i);
   assert.doesNotMatch(webviewBridgePlan, /default WebView compact extraction is enabled/i);
 });
 
