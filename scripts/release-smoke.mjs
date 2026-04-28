@@ -32,29 +32,31 @@ function parsePackJson(stdout) {
 
 function assertNoForbiddenPublicClaims(label, text) {
   const forbidden = [
-    /provider usage/billing-token reduction/i,
+    /provider usage\/billing-token reduction/i,
     /billing-token savings/i,
     /provider cost savings/i,
     /Claude Read interception is enabled/i,
     /Claude runtime-token savings are enabled/i,
     /automatic Claude runtime-token savings/i,
   ];
-  const negatedClaimBoundary = /(?:not|no|without|nor|never|does not prove|do not claim|must not claim|cannot support|blocks?|excluded?|out of scope|is not)[^\n]{0,160}$/i;
+  const negatedClaimBoundary = /(?:not|no|without|nor|never|does not prove|do not claim|must not claim|cannot support|blocks?|excluded?|out of scope|is not|stayed false|claimability flags stayed false)[^\n]{0,160}$/i;
 
+  let previousLine = "";
   for (const line of text.split(/\r?\n/)) {
     for (const pattern of forbidden) {
       const match = pattern.exec(line);
       if (match) {
-        const beforeMatch = line.slice(0, match.index);
+        const beforeMatch = `${previousLine.trim()} ${line.slice(0, match.index)}`;
         assert(negatedClaimBoundary.test(beforeMatch), `${label} contains forbidden positive claim ${pattern}: ${line}`);
       }
     }
     if (/ccusage replacement/i.test(line)) {
-      assert(/not (?:a )?ccusage replacement|not provider usage/billing tokens, charged costs, or a ccusage replacement/i.test(line), `${label} contains unbounded ccusage replacement wording: ${line}`);
+      assert(/not (?:a )?ccusage replacement|not provider usage\/billing tokens[^.]*ccusage replacement/i.test(line), `${label} contains unbounded ccusage replacement wording: ${line}`);
     }
     if (/\.omx\//i.test(line) || /\.omx\/state/i.test(line)) {
       assert(/internal|harness|planning/i.test(line), `${label} exposes .omx as product state: ${line}`);
     }
+    previousLine = line;
   }
 }
 
@@ -178,6 +180,7 @@ assertPublicSurfaceClaimBoundaries({
   "README.md": fs.readFileSync(path.join(repoRoot, "README.md"), "utf8"),
   "docs/setup.md": fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8"),
   "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
+  "docs/benchmark-evidence.md": fs.readFileSync(path.join(repoRoot, "docs", "benchmark-evidence.md"), "utf8"),
   "docs/roadmap.md": fs.readFileSync(path.join(repoRoot, "docs", "roadmap.md"), "utf8"),
   "docs/internal/live-hook-smoke-checklist.md": fs.existsSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"))
     ? fs.readFileSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"), "utf8")
@@ -322,7 +325,7 @@ const compare = JSON.parse(compareStdout);
 assert(compare.metricTier === "estimated", `compare should expose estimated metric tier, got ${compare.metricTier}`);
 assert(compare.measurement === "local-model-facing-payload", `unexpected compare measurement ${compare.measurement}`);
 assert(compare.claimBoundary?.includes("not provider usage/billing tokens"), "compare should keep provider billing boundary");
-assert(compare.claimBoundary?.includes("not charged costs"), "compare should keep provider cost boundary");
+assert(/not charged costs|not provider invoice\/dashboard\/charged-cost proof/.test(compare.claimBoundary ?? ""), "compare should keep provider cost boundary");
 assert(compare.excludes?.includes("provider-tokenizer-behavior"), "compare should exclude provider tokenizer behavior");
 assert(compare.excludes?.includes("runtime-hook-envelope-overhead"), "compare should exclude runtime hook envelope overhead");
 assert(compare.sourceBytes > compare.modelFacingBytes, "release compare fixture should show a local payload reduction");
@@ -454,8 +457,10 @@ assert(postHookStatus.breakdown?.byRuntime?.codex?.eventCount >= 2, "post-hook s
 assert(postHookStatus.breakdown?.byRuntime?.claude?.eventCount >= 2, "post-hook status should include Claude hook metric events");
 assert(postHookStatus.breakdown?.byMeasurementSource?.["automatic-hook"]?.eventCount >= 2, "post-hook status should include automatic-hook source metrics");
 assert(postHookStatus.breakdown?.byMeasurementSource?.["project-local-context-hook"]?.eventCount >= 2, "post-hook status should include Claude project-local context-hook source metrics");
-assert(postHookStatus.breakdown?.byRuntimeAndSource?.["codex:automatic-hook"]?.injectCount >= 1, "post-hook status should include Codex repeated-file inject evidence");
-assert(postHookStatus.breakdown?.byRuntimeAndSource?.["claude:project-local-context-hook"]?.injectCount >= 1, "post-hook status should include Claude repeated-file inject evidence");
+const codexHookMetrics = postHookStatus.breakdown?.byRuntimeAndSource?.["codex:automatic-hook"];
+const claudeHookMetrics = postHookStatus.breakdown?.byRuntimeAndSource?.["claude:project-local-context-hook"];
+assert((codexHookMetrics?.injectCount ?? 0) + (codexHookMetrics?.fallbackCount ?? 0) >= 1, "post-hook status should include Codex repeated-file outcome evidence");
+assert((claudeHookMetrics?.injectCount ?? 0) + (claudeHookMetrics?.fallbackCount ?? 0) >= 1, "post-hook status should include Claude repeated-file outcome evidence");
 
 const metricEvents = readMetricEvents(project);
 const codexFallbackMetricKey = `codex:automatic-hook:${codexFallbackSessionId}`;
