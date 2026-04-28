@@ -1031,6 +1031,7 @@ test("frontend domain detector returns evidence-only classifications for Level 3
   const touchable = detectDomain(path.join(fixtureRoot, "rn-interaction-gesture.tsx"));
   assert.equal(touchable.classification, "react-native");
   assert.ok(touchable.signals.includes("react-native:primitive:TouchableOpacity"));
+  assert.ok(touchable.signals.includes("react-native:primitive:FlatList"));
 
   const webview = detectDomain(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
   assert.equal(webview.classification, "webview");
@@ -3962,6 +3963,7 @@ test("docs describe TUI/Ink fixture survey as future candidate evidence only", (
 
 test("frontend domain contract locks taxonomy and pre-detector promotion gates", () => {
   const contract = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-contract.md"), "utf8");
+  const fixtureExpectations = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
   const expectations = JSON.parse(
     fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
   );
@@ -3980,6 +3982,10 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(contract, /fallback-first posture/);
   assert.match(contract, /React Native and TUI\/Ink fixtures .* are \*\*not support claims\*\*/s);
   assert.match(contract, /RN primitives must not be reinterpreted as DOM controls/);
+  assert.match(fixtureExpectations, /RN component semantics readiness gate/);
+  assert.match(fixtureExpectations, /current fallback reason, `unsupported-react-native-webview-boundary`, is the shared source-reading boundary reason for this pass/);
+  assert.match(fixtureExpectations, /must not be treated as a permanent domain model for every RN semantic/);
+  assert.match(fixtureExpectations, /Interaction and list markers remain fallback-boundary evidence only/);
   assert.match(contract, /TUI\/Ink fixtures must not be generalized into arbitrary terminal UI support/);
   assert.match(contract, /fixture expectation manifest at `test\/fixtures\/frontend-domain-expectations\/manifest\.json` is the pre-detector\/profile gate/);
   assert.match(contract, /This issue does not migrate the manifest schema/);
@@ -3994,6 +4000,12 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.equal(selected.get("rn-primitive-basic").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("rn-style-platform-navigation").expectedOutcome, "fallback");
   assert.equal(selected.get("rn-style-platform-navigation").expectedReason, "unsupported-react-native-webview-boundary");
+  for (const rnId of ["rn-primitive-basic", "rn-style-platform-navigation", "rn-interaction-gesture", "rn-image-scrollview"]) {
+    assert.equal(selected.get(rnId).supportClaim, "none");
+    assert.equal(selected.get(rnId).evidenceScope, "rn-component-semantics-readiness-only");
+    assert.equal(selected.get(rnId).fallbackReasonScope, "current-boundary-reason-only");
+  }
+  assert.ok(selected.get("rn-interaction-gesture").requiredSignals.includes("FlatList"));
   assert.equal(selected.get("webview-boundary-basic").expectedOutcome, "fallback");
   assert.equal(selected.get("webview-boundary-basic").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("negative-rn-webview-boundary").expectedOutcome, "fallback");
@@ -4114,8 +4126,16 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F6").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F9").expectedOutcome, "fallback");
   assert.equal(selected.get("F9").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.ok(selected.get("F9").requiredSignals.includes("FlatList"));
   assert.equal(selected.get("F10").expectedOutcome, "fallback");
   assert.equal(selected.get("F10").expectedReason, "unsupported-react-native-webview-boundary");
+
+  for (const slot of ["F1", "F2", "F9", "F10"]) {
+    assert.equal(selected.get(slot).supportClaim, "none", `${selected.get(slot).id} must not claim RN support`);
+    assert.equal(selected.get(slot).evidenceScope, "rn-component-semantics-readiness-only", `${selected.get(slot).id} must stay readiness evidence only`);
+    assert.equal(selected.get(slot).fallbackReasonScope, "current-boundary-reason-only", `${selected.get(slot).id} must frame fallback reason as current boundary wording only`);
+    assert.ok(selected.get(slot).forbiddenClaims.some((claim) => /No React Native support claim/.test(claim)), `${selected.get(slot).id} must forbid React Native support claims`);
+  }
 
   for (const item of deferred.values()) {
     assert.equal(item.sourceKind, "deferred");

@@ -24,6 +24,20 @@ The machine-readable fixture expectation manifest at `test/fixtures/frontend-dom
 
 The selected baseline does not require a schema migration. `F2` is selected because today's expected behavior is a fallback boundary; its richer platform/navigation meaning remains outside the current support and extraction scope. `F4` is selected only as paired fallback-boundary evidence under the [WebView bridge boundary plan](webview-bridge-boundary-plan.md): its native fixture is the primary `path`, and its paired web fixture is recorded in `relatedSourcePaths`.
 
+
+## RN component semantics readiness gate
+
+The RN fixture lane is a readiness gate, not a support promise. Selected RN fixtures must stay fallback/evidence-only until a later detector/profile promotion plan explicitly changes runtime behavior. The current fallback reason, `unsupported-react-native-webview-boundary`, is the shared source-reading boundary reason for this pass; it must not be treated as a permanent domain model for every RN semantic.
+
+| Semantics group | Selected slots | Evidence examples | Required boundary |
+| --- | --- | --- | --- |
+| Primitives/input | `F1` | `View`, `Text`, `TextInput`, `Pressable` | RN primitives must not be reinterpreted as DOM controls, forms, or React Web extraction evidence. |
+| Style/platform/navigation | `F2` | `StyleSheet.create`, `Platform.select`, navigation and route markers | Style and navigation markers remain RN evidence only; no navigation runtime guarantee. |
+| Interaction/list | `F9` | `TouchableOpacity`, `FlatList`, `PanResponder`, gesture handlers | Interaction and list markers remain fallback-boundary evidence only; no gesture, list virtualization, or runtime safety claim. |
+| Media/layout | `F10` | `Image`, `ScrollView`, `Dimensions`, `resizeMode`, `pagingEnabled` | Media and layout markers remain fallback-boundary evidence only; no image loading, layout, or RN support claim. |
+
+Execution for this gate should prefer strengthening docs, manifest metadata, and regression tests around existing RN fixture slots before adding new synthetic fixtures.
+
 ## Manifest shape guard
 
 Selected fixtures must not carry deferred-only fields such as `deferReason` or `doesNotBlockBaseline`. Deferred fixtures must not carry executable fixture paths, expected outcomes, fallback reasons, required signals, or verification instructions. This keeps the manifest from describing the same slot as both selected and deferred while later RN/WebView/TUI/React Web work is split across branches.

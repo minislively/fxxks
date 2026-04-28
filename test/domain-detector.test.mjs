@@ -60,7 +60,7 @@ test("detects React Native evidence signals without support wording", () => {
 
   const touchable = detectDomain(path.join(fixtureRoot, "rn-interaction-gesture.tsx"));
   assert.equal(touchable.classification, "react-native");
-  assertSignals(touchable, ["react-native:primitive:TouchableOpacity"]);
+  assertSignals(touchable, ["react-native:primitive:TouchableOpacity", "react-native:primitive:FlatList"]);
 
   assert.doesNotMatch(JSON.stringify([primitive, styled, image, touchable]), forbiddenSupportClaims);
 });

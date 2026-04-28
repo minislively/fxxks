@@ -49,7 +49,10 @@
         "No React Native support claim",
         "No DOM/form semantic inference"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary",
+      "supportClaim": "none",
+      "evidenceScope": "rn-component-semantics-readiness-only",
+      "fallbackReasonScope": "current-boundary-reason-only"
     },
     {
       "slot": "F2",
@@ -71,7 +74,10 @@
         "No DOM/form semantic inference",
         "No navigation runtime guarantee"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary",
+      "supportClaim": "none",
+      "evidenceScope": "rn-component-semantics-readiness-only",
+      "fallbackReasonScope": "current-boundary-reason-only"
     },
     {
       "slot": "F3",
@@ -180,15 +186,20 @@
       "expectedReason": "unsupported-react-native-webview-boundary",
       "requiredSignals": [
         "TouchableOpacity",
+        "FlatList",
         "PanResponder",
         "gesture handlers",
         "activeOpacity"
       ],
       "forbiddenClaims": [
         "No React Native support claim",
-        "No gesture runtime safety claim"
+        "No gesture runtime safety claim",
+        "No list virtualization support claim"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary and detector evidence includes TouchableOpacity plus FlatList without list/runtime support claims",
+      "supportClaim": "none",
+      "evidenceScope": "rn-component-semantics-readiness-only",
+      "fallbackReasonScope": "current-boundary-reason-only"
     },
     {
       "slot": "F10",
@@ -210,7 +221,10 @@
         "No React Native support claim",
         "No image loading safety claim"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary",
+      "supportClaim": "none",
+      "evidenceScope": "rn-component-semantics-readiness-only",
+      "fallbackReasonScope": "current-boundary-reason-only"
     }
   ],
   "deferred": [

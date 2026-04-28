@@ -1,6 +1,7 @@
-import { TouchableOpacity, PanResponder, View, Text, GestureResponderEvent } from "react-native";
+import { FlatList, TouchableOpacity, PanResponder, View, Text, GestureResponderEvent } from "react-native";
 
 export function DraggableCard() {
+  const actions = ["tap", "drag"];
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onPanResponderGrant: () => {},
@@ -15,6 +16,11 @@ export function DraggableCard() {
       <TouchableOpacity onPress={() => {}} activeOpacity={0.8}>
         <Text>Tap or drag me</Text>
       </TouchableOpacity>
+      <FlatList
+        data={actions}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => <Text>{item}</Text>}
+      />
     </View>
   );
 }
