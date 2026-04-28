@@ -4036,6 +4036,16 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(contract, /not a final RN semantic model/);
   assert.match(contract, /Promotion stops at the first failed gate/);
   assert.match(contract, /documentation and regression protection only/);
+  assert.match(contract, /Parallel domain ownership matrix/);
+  assert.match(contract, /not itself runtime behavior change, domain promotion, support claim expansion, or a shared-file free-for-all/);
+  for (const sharedFile of [
+    "src/core/domain-detector.ts",
+    "src/adapters/pre-read.ts",
+    "test/fooks.test.mjs",
+    "test/fixtures/frontend-domain-expectations/manifest.json",
+  ]) {
+    assert.ok(contract.includes(sharedFile), `${sharedFile} must be marked as serialized shared surface`);
+  }
 
   const readinessMatrixStart = contract.indexOf("### Domain readiness matrix");
   assert.notEqual(readinessMatrixStart, -1, "Domain readiness matrix section must exist");
@@ -4044,6 +4054,25 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   const readinessMatrix = contract.slice(readinessMatrixStart, readinessMatrixEnd);
   for (const domain of ["React Web", "React Native", "WebView", "TUI-Ink", "Mixed", "Unknown"]) {
     assert.ok(readinessMatrix.includes(`| ${domain} |`), `${domain} readiness matrix row must exist`);
+  }
+
+  const ownershipMatrixStart = contract.indexOf("### Parallel domain ownership matrix");
+  assert.notEqual(ownershipMatrixStart, -1, "Parallel domain ownership matrix section must exist");
+  const ownershipMatrixEnd = contract.indexOf("\n\nPromotion stops", ownershipMatrixStart);
+  assert.notEqual(ownershipMatrixEnd, -1, "Parallel domain ownership matrix must end before the promotion stop rule");
+  const ownershipMatrix = contract.slice(ownershipMatrixStart, ownershipMatrixEnd);
+  for (const lane of ["React Web", "React Native", "WebView", "TUI/Ink", "Mixed/Unknown/shared policy"]) {
+    assert.ok(ownershipMatrix.includes(`| ${lane} |`), `${lane} ownership matrix row must exist`);
+  }
+  for (const phrase of [
+    "one named owner",
+    "merge-order note",
+    "Verification minimum",
+    "Claim boundary",
+    "no bridge-safety, compact-payload reuse, or WebView support claim",
+    "no broad TUI support, terminal correctness, runtime-token savings, or default compact extraction claim",
+  ]) {
+    assert.ok(ownershipMatrix.includes(phrase), `${phrase} must stay in ownership matrix`);
   }
 
   assert.equal(expectations.schemaVersion, 1);
