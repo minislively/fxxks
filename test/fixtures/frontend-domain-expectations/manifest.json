@@ -49,12 +49,14 @@
       ],
       "forbiddenClaims": [
         "No React Native support claim",
-        "No DOM/form semantic inference"
+        "No DOM/form semantic inference",
+        "Narrow payload gate is not broad React Native support"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary",
+      "verification": "detectDomain remains react-native fallback evidence; decidePreRead returns payload only through the RN primitive/input narrow payload policy",
       "supportClaim": "none",
-      "evidenceScope": "rn-component-semantics-readiness-only",
-      "fallbackReasonScope": "current-boundary-reason-only"
+      "evidenceScope": "rn-primitive-input-narrow-payload-only",
+      "preReadExpectedOutcome": "payload",
+      "payloadPolicy": "rn-primitive-input-narrow-payload"
     },
     {
       "slot": "F2",
@@ -78,7 +80,9 @@
         "No DOM/form semantic inference",
         "No navigation runtime guarantee"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary",
+      "preReadExpectedOutcome": "fallback",
+      "preReadExpectedReason": "unsupported-frontend-domain-profile",
+      "verification": "detectDomain returns fallback with unsupported-react-native-webview-boundary; decidePreRead returns fallback with unsupported-frontend-domain-profile",
       "supportClaim": "none",
       "evidenceScope": "rn-component-semantics-readiness-only",
       "fallbackReasonScope": "current-boundary-reason-only"
@@ -200,7 +204,9 @@
         "No gesture runtime safety claim",
         "No list virtualization support claim"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary and detector evidence includes TouchableOpacity plus FlatList without list/runtime support claims",
+      "preReadExpectedOutcome": "fallback",
+      "preReadExpectedReason": "unsupported-frontend-domain-profile",
+      "verification": "detectDomain returns fallback with unsupported-react-native-webview-boundary; decidePreRead returns fallback with unsupported-frontend-domain-profile and detector evidence includes TouchableOpacity plus FlatList without list/runtime support claims",
       "supportClaim": "none",
       "evidenceScope": "rn-component-semantics-readiness-only",
       "fallbackReasonScope": "current-boundary-reason-only"
@@ -225,7 +231,9 @@
         "No React Native support claim",
         "No image loading safety claim"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary",
+      "preReadExpectedOutcome": "fallback",
+      "preReadExpectedReason": "unsupported-frontend-domain-profile",
+      "verification": "detectDomain returns fallback with unsupported-react-native-webview-boundary; decidePreRead returns fallback with unsupported-frontend-domain-profile",
       "supportClaim": "none",
       "evidenceScope": "rn-component-semantics-readiness-only",
       "fallbackReasonScope": "current-boundary-reason-only"

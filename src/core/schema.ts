@@ -218,6 +218,11 @@ export type PreReadDecision = {
     decideConfidence?: DecisionConfidence;
     language?: ExtractionResult["language"];
     domainDetection?: DomainDetectionResult;
+    frontendPayloadPolicy?: {
+      name: string;
+      allowed: boolean;
+      reason?: string;
+    };
   };
   fallback?: {
     action: "full-read";

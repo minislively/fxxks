@@ -11,8 +11,40 @@ const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
+export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
+const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
+  "react-native:primitive:View",
+  "react-native:primitive:Text",
+  "react-native:primitive:TextInput",
+  "react-native:primitive:Pressable",
+  "react-native:jsx-prop:onChangeText",
+  "react-native:jsx-prop:onPress",
+];
+const RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES = [
+  "webview:",
+  "tui-ink:",
+  "react-native:navigation-",
+  "react-native:api-call:Dimensions.",
+  "react-native:api-call:PanResponder.",
+];
+const RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS = [
+  "react-native:primitive:FlatList",
+  "react-native:primitive:Image",
+  "react-native:primitive:ScrollView",
+  "react-native:primitive:TouchableOpacity",
+  "react-native:style-factory:StyleSheet.create",
+  "react-native:platform-select:Platform.select",
+  "react-native:style-prop:resizeMode",
+  "react-native:jsx-prop:activeOpacity",
+  "react-native:jsx-prop:pagingEnabled",
+];
 
 export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
+export type FrontendPayloadPolicyDecision = {
+  name: string;
+  allowed: boolean;
+  reason?: string;
+};
 
 function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<string> {
   return runtime === "codex" ? CODEX_TS_JS_BETA_EXTENSIONS : REACT_ELIGIBLE_EXTENSIONS;
@@ -26,6 +58,7 @@ function relativePath(filePath: string, cwd: string): string {
 function assessFrontendProfilePayloadReuse(
   extension: string,
   domainDetection: DomainDetectionResult,
+  frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
 ): { allowed: true } | { allowed: false; reason: string } {
   if (!FRONTEND_PROFILE_GATE_EXTENSIONS.has(extension)) {
     return { allowed: true };
@@ -35,7 +68,55 @@ function assessFrontendProfilePayloadReuse(
     return { allowed: true };
   }
 
+  if (frontendPayloadPolicy?.allowed === true) {
+    return { allowed: true };
+  }
+
   return { allowed: false, reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON };
+}
+
+function hasSignal(domainDetection: DomainDetectionResult, signal: string): boolean {
+  return domainDetection.signals.includes(signal);
+}
+
+function hasAnySignalWithPrefix(domainDetection: DomainDetectionResult, prefix: string): boolean {
+  return domainDetection.signals.some((signal) => signal.startsWith(prefix));
+}
+
+function frontendDebug(
+  domainDetection: DomainDetectionResult,
+  frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
+): NonNullable<PreReadDecision["debug"]> {
+  return {
+    domainDetection,
+    ...(frontendPayloadPolicy ? { frontendPayloadPolicy } : {}),
+  };
+}
+
+export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResult): FrontendPayloadPolicyDecision | undefined {
+  if (domainDetection.classification !== "react-native") return undefined;
+
+  const missingSignal = RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS.find((signal) => !hasSignal(domainDetection, signal));
+  if (missingSignal) {
+    return {
+      name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+      allowed: false,
+      reason: `missing-signal:${missingSignal}`,
+    };
+  }
+
+  const forbiddenSignal =
+    RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS.find((signal) => hasSignal(domainDetection, signal)) ??
+    RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES.find((prefix) => hasAnySignalWithPrefix(domainDetection, prefix));
+  if (forbiddenSignal) {
+    return {
+      name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+      allowed: false,
+      reason: `forbidden-signal:${forbiddenSignal}`,
+    };
+  }
+
+  return { name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY, allowed: true };
 }
 
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
@@ -70,17 +151,37 @@ export function decidePreRead(
 
   const sourceText = fs.readFileSync(resolvedPath, "utf8");
   const domainDetection = detectDomainFromSource(sourceText, resolvedPath);
-  if (domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON) {
+  const frontendPayloadPolicy = assessFrontendPayloadPolicy(domainDetection);
+  if (
+    domainDetection.outcome === "fallback" &&
+    domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
+    domainDetection.classification !== "react-native"
+  ) {
     return {
       runtime,
       filePath: outputPath,
       eligible: true,
       decision: "fallback",
       reasons: [REACT_NATIVE_WEBVIEW_BOUNDARY_REASON],
-      debug: { domainDetection },
+      debug: frontendDebug(domainDetection, frontendPayloadPolicy),
       fallback: {
         action: "full-read",
         reason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
+      },
+    };
+  }
+
+  if (domainDetection.classification === "react-native" && frontendPayloadPolicy?.allowed !== true) {
+    return {
+      runtime,
+      filePath: outputPath,
+      eligible: true,
+      decision: "fallback",
+      reasons: [UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON],
+      debug: frontendDebug(domainDetection, frontendPayloadPolicy),
+      fallback: {
+        action: "full-read",
+        reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
       },
     };
   }
@@ -97,10 +198,11 @@ export function decidePreRead(
     decideConfidence: result.meta.decideConfidence,
     language: result.language,
     domainDetection,
+    ...(frontendPayloadPolicy ? { frontendPayloadPolicy } : {}),
   };
 
   if (readiness.ready) {
-    const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection);
+    const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection, frontendPayloadPolicy);
     if (profileGate.allowed) {
       return {
         runtime,

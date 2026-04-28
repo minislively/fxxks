@@ -1230,8 +1230,17 @@ export function CustomOnlyForm() {
   assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:htmlFor"));
 
   const unsupportedFrontendProfile = preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON;
+  const rnPrimitive = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-primitive-basic.tsx"), repoRoot);
+  assert.equal(rnPrimitive.eligible, true);
+  assert.equal(rnPrimitive.decision, "payload");
+  assert.equal(rnPrimitive.debug.domainDetection.classification, "react-native");
+  assert.equal(rnPrimitive.debug.frontendPayloadPolicy.name, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.debug.frontendPayloadPolicy.allowed, true);
+  assert.equal(rnPrimitive.readiness.ready, true);
+  assert.equal(rnPrimitive.readiness.signals.hasContract, true);
+  assert.ok(rnPrimitive.payload.contract.propsName);
+
   for (const rnFixture of [
-    "rn-primitive-basic.tsx",
     "rn-style-platform-navigation.tsx",
     "rn-interaction-gesture.tsx",
     "rn-image-scrollview.tsx",
@@ -1239,9 +1248,12 @@ export function CustomOnlyForm() {
     const rn = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", rnFixture), repoRoot);
     assert.equal(rn.eligible, true);
     assert.equal(rn.decision, "fallback");
-    assert.deepEqual(rn.reasons, ["unsupported-react-native-webview-boundary"]);
+    assert.deepEqual(rn.reasons, [unsupportedFrontendProfile]);
+    assert.equal(rn.fallback.reason, unsupportedFrontendProfile);
     assert.equal(rn.debug.domainDetection.classification, "react-native");
     assert.equal(rn.debug.domainDetection.profile.claimStatus, "fallback-boundary");
+    assert.equal(rn.debug.frontendPayloadPolicy.name, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+    assert.equal(rn.debug.frontendPayloadPolicy.allowed, false);
     assert.equal("payload" in rn, false);
   }
 
@@ -1301,6 +1313,33 @@ export function CustomOnlyForm() {
   assert.equal(linkedTs.decision, "payload");
   assert.ok(linkedTs.payload.structure.moduleDeclarations?.length);
   assert.equal(linkedTs.debug.language, "ts");
+});
+
+test("RN primitive input payload policy is semantic rather than path-only", () => {
+  const result = detectDomainFromSource(
+    `import { Pressable, Text, TextInput, View } from "react-native";
+
+     type FilterProps = { value: string; onChangeText: (value: string) => void; onApply: () => void };
+
+     export function FilterControl({ value, onChangeText, onApply }: FilterProps) {
+       return <View><Text>Filter</Text><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={onApply}><Text>Apply</Text></Pressable></View>;
+     }`,
+    "DifferentPath.tsx",
+  );
+  const policy = preReadModule.assessFrontendPayloadPolicy(result);
+  assert.equal(policy.name, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(policy.allowed, true);
+
+  const withNavigation = detectDomainFromSource(
+    `import { Pressable, Text, TextInput, View } from "react-native";
+     import { useNavigation } from "@react-navigation/native";
+     export function FilterControl() { useNavigation(); return <View><Text>Filter</Text><TextInput onChangeText={() => {}} /><Pressable onPress={() => {}}><Text>Apply</Text></Pressable></View>; }`,
+    "DifferentPathWithNavigation.tsx",
+  );
+  const denied = preReadModule.assessFrontendPayloadPolicy(withNavigation);
+  assert.equal(denied.name, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(denied.allowed, false);
+  assert.match(denied.reason, /forbidden-signal/);
 });
 
 test("pre-read treats React Native and WebView markers as unsupported source-reading boundary", () => {
@@ -4070,10 +4109,15 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
 
   assert.match(contract, /WebView is fallback-first/);
   assert.match(contract, /fallback-first posture/);
+  assert.match(contract, /explicitly scoped `F1` React Native primitive\/input pre-read payload gate/);
+  assert.match(contract, /Outside that named gate, it does not add extractor behavior, detector behavior, setup eligibility, runtime behavior/);
+  assert.doesNotMatch(contract, /This document is a docs\/process and regression-test gate only: it does not add extractor behavior, detector behavior, setup eligibility, runtime behavior/);
   assert.match(contract, /React Native and TUI\/Ink fixtures .* are \*\*not support claims\*\*/s);
   assert.match(contract, /RN primitives must not be reinterpreted as DOM controls/);
   assert.match(fixtureExpectations, /RN component semantics readiness gate/);
-  assert.match(fixtureExpectations, /current fallback reason, `unsupported-react-native-webview-boundary`, is the shared source-reading boundary reason for this pass/);
+  assert.match(fixtureExpectations, /`F1` is the first narrow runtime candidate/);
+  assert.match(fixtureExpectations, /`rn-primitive-input-narrow-payload`/);
+  assert.match(fixtureExpectations, /current fallback reason, `unsupported-react-native-webview-boundary`, is still the shared source-reading boundary reason/);
   assert.match(fixtureExpectations, /must not be treated as a permanent domain model for every RN semantic/);
   assert.match(fixtureExpectations, /Interaction and list markers remain fallback-boundary evidence only/);
   assert.match(contract, /TUI\/Ink fixtures must not be generalized into arbitrary terminal UI support/);
@@ -4088,6 +4132,7 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(contract, /WebView bridge safety, compact-payload reuse, or fallback removal/);
   assert.match(contract, /RN, WebView, or TUI evidence is described as support/);
   assert.match(contract, /`unsupported-react-native-webview-boundary` remains the current source-reading boundary reason/);
+  assert.match(contract, /`rn-primitive-input-narrow-payload`/);
   assert.match(contract, /not a final RN semantic model/);
   assert.match(contract, /Promotion stops at the first failed gate/);
   assert.match(contract, /documentation and regression protection only/);
@@ -4137,10 +4182,18 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.equal(selected.get("rn-primitive-basic").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("rn-style-platform-navigation").expectedOutcome, "fallback");
   assert.equal(selected.get("rn-style-platform-navigation").expectedReason, "unsupported-react-native-webview-boundary");
-  for (const rnId of ["rn-primitive-basic", "rn-style-platform-navigation", "rn-interaction-gesture", "rn-image-scrollview"]) {
+  assert.equal(selected.get("rn-primitive-basic").supportClaim, "none");
+  assert.equal(selected.get("rn-primitive-basic").evidenceScope, "rn-primitive-input-narrow-payload-only");
+  assert.equal(selected.get("rn-primitive-basic").fallbackReasonScope, undefined);
+  assert.equal(selected.get("rn-primitive-basic").preReadExpectedOutcome, "payload");
+  assert.equal(selected.get("rn-primitive-basic").payloadPolicy, "rn-primitive-input-narrow-payload");
+  for (const rnId of ["rn-style-platform-navigation", "rn-interaction-gesture", "rn-image-scrollview"]) {
     assert.equal(selected.get(rnId).supportClaim, "none");
     assert.equal(selected.get(rnId).evidenceScope, "rn-component-semantics-readiness-only");
     assert.equal(selected.get(rnId).fallbackReasonScope, "current-boundary-reason-only");
+    assert.equal(selected.get(rnId).preReadExpectedOutcome, "fallback");
+    assert.equal(selected.get(rnId).preReadExpectedReason, "unsupported-frontend-domain-profile");
+    assert.doesNotMatch(selected.get(rnId).verification, /decidePreRead returns fallback with unsupported-react-native-webview-boundary/);
   }
   assert.ok(selected.get("rn-interaction-gesture").requiredSignals.includes("FlatList"));
   assert.equal(selected.get("webview-boundary-basic").expectedOutcome, "fallback");
@@ -4244,6 +4297,8 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F0").expectedOutcome, "extract");
   assert.equal(selected.get("F1").expectedOutcome, "fallback");
   assert.equal(selected.get("F1").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F1").preReadExpectedOutcome, "payload");
+  assert.equal(selected.get("F1").payloadPolicy, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(selected.get("F2").expectedOutcome, "fallback");
   assert.equal(selected.get("F2").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F3").expectedOutcome, "fallback");
@@ -4273,10 +4328,17 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F12").lane, "react-web");
   assert.ok(selected.get("F12").requiredSignals.includes("htmlFor"));
 
-  for (const slot of ["F1", "F2", "F9", "F10"]) {
+  assert.equal(selected.get("F1").supportClaim, "none", `${selected.get("F1").id} must not claim RN support`);
+  assert.equal(selected.get("F1").evidenceScope, "rn-primitive-input-narrow-payload-only", `${selected.get("F1").id} must stay narrow payload evidence only`);
+  assert.ok(selected.get("F1").forbiddenClaims.some((claim) => /No React Native support claim/.test(claim)), `${selected.get("F1").id} must forbid React Native support claims`);
+
+  for (const slot of ["F2", "F9", "F10"]) {
     assert.equal(selected.get(slot).supportClaim, "none", `${selected.get(slot).id} must not claim RN support`);
     assert.equal(selected.get(slot).evidenceScope, "rn-component-semantics-readiness-only", `${selected.get(slot).id} must stay readiness evidence only`);
     assert.equal(selected.get(slot).fallbackReasonScope, "current-boundary-reason-only", `${selected.get(slot).id} must frame fallback reason as current boundary wording only`);
+    assert.equal(selected.get(slot).preReadExpectedOutcome, "fallback", `${selected.get(slot).id} must declare pre-read fallback separately`);
+    assert.equal(selected.get(slot).preReadExpectedReason, preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON, `${selected.get(slot).id} must declare pre-read profile fallback separately`);
+    assert.doesNotMatch(selected.get(slot).verification, /decidePreRead returns fallback with unsupported-react-native-webview-boundary/);
     assert.ok(selected.get(slot).forbiddenClaims.some((claim) => /No React Native support claim/.test(claim)), `${selected.get(slot).id} must forbid React Native support claims`);
   }
 
@@ -4342,10 +4404,24 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.doesNotMatch(source, /TUI support is available|TUI\/Ink is supported today|default TUI compact extraction is enabled/i);
   }
 
-  for (const slot of ["F1", "F2", "F3", "F4", "F6", "F9", "F10"]) {
+  const rnPrimitiveDecision = preReadModule.decidePreRead(path.join(repoRoot, selected.get("F1").path), repoRoot, "codex");
+  assert.equal(rnPrimitiveDecision.decision, "payload", `${selected.get("F1").id} should pass only the RN primitive/input narrow payload gate`);
+  assert.equal(rnPrimitiveDecision.debug.frontendPayloadPolicy.name, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitiveDecision.debug.frontendPayloadPolicy.allowed, true);
+
+  for (const slot of ["F2", "F9", "F10"]) {
     const item = selected.get(slot);
     const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
-    assert.equal(decision.decision, "fallback", `${item.id} should stay fallback-first`);
+    assert.equal(decision.decision, "fallback", `${item.id} should stay outside the RN primitive/input narrow payload gate`);
+    assert.deepEqual(decision.reasons, [preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON]);
+    assert.equal(decision.fallback.reason, preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+  }
+
+  for (const slot of ["F3", "F4", "F6"]) {
+    const item = selected.get(slot);
+    const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
+    assert.equal(decision.decision, "fallback", `${item.id} should stay WebView fallback-first`);
     assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
     assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
   }

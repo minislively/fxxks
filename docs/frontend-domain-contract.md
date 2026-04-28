@@ -1,11 +1,12 @@
 # Frontend domain contract
 
-Issue #198 locks the frontend-domain contract before any detector or profile promotion. This document is a docs/process and regression-test gate only: it does not add extractor behavior, detector behavior, setup eligibility, runtime behavior, CLI behavior, public support wording, manifest schema migration, or domain sharding.
+Issue #198 locked the frontend-domain contract before detector or profile promotion. This document now records that contract plus the explicitly scoped `F1` React Native primitive/input pre-read payload gate. Outside that named gate, it does not add extractor behavior, detector behavior, setup eligibility, runtime behavior, CLI behavior, public support wording, manifest schema migration, or domain sharding.
 
 ## Contract status
 
-- **Current supported lane remains React Web only** for the measured same-file TSX/JSX scope already covered by existing docs and tests.
-- **React Native, WebView, and TUI/Ink are evidence lanes**, not product/runtime support claims.
+- **Current broad supported lane remains React Web** for the measured same-file TSX/JSX scope already covered by existing docs and tests.
+- **React Native now has one narrow primitive/input payload gate** (`rn-primitive-input-narrow-payload`) for the measured `F1` fixture family only; this is not broad React Native support.
+- **WebView and TUI/Ink remain evidence lanes**, not product/runtime support claims.
 - **WebView is fallback-first.** WebView boundary signals must keep normal source reading unless a later gate explicitly approves a narrower detector/profile promotion.
 - **Mixed and Unknown classifications are safety states.** They prevent ambiguous syntax evidence from becoming semantic support.
 
@@ -13,8 +14,8 @@ Issue #198 locks the frontend-domain contract before any detector or profile pro
 
 | Domain | Classification rule | Current contract outcome | Claim boundary |
 | --- | --- | --- | --- |
-| React Web | DOM-oriented React/TSX evidence such as forms, DOM JSX elements, `className`, and browser event handlers, without stronger RN/WebView/TUI boundary signals. | Eligible for the existing measured React Web extraction path when current extractor and readiness rules allow it. | This is the only current frontend support lane. |
-| React Native | `react-native` imports, RN primitives such as `View`, `Text`, `TextInput`, `Pressable`, `Touchable*`, `FlatList`, or platform/navigation/style signals. | Evidence lane; fallback when current pre-read boundary markers apply. | Syntax evidence is not a React Native support claim and must not be treated as DOM/form semantics. |
+| React Web | DOM-oriented React/TSX evidence such as forms, DOM JSX elements, `className`, and browser event handlers, without stronger RN/WebView/TUI boundary signals. | Eligible for the existing measured React Web extraction path when current extractor and readiness rules allow it. | This remains the broad current frontend support lane. |
+| React Native | `react-native` imports, RN primitives such as `View`, `Text`, `TextInput`, `Pressable`, `Touchable*`, `FlatList`, or platform/navigation/style signals. | Evidence lane by default; only the measured primitive/input subset may pass `rn-primitive-input-narrow-payload` when readiness and policy gates allow it. | Narrow primitive/input payload reuse is not a React Native support claim and must not be treated as DOM/form semantics. |
 | WebView | `react-native-webview`, `<WebView>`, `source`, injected JavaScript, `onMessage`, or native/web bridge markers. | **Fallback-first** boundary lane. | No WebView support claim, no bridge-safety claim, and no compact-payload reuse claim. |
 | TUI-Ink | Ink/React CLI TSX evidence such as Ink-like imports, `Box`, `Text`, `useInput`, terminal layout, or command-palette style components. | Evidence lane only; current fixture evidence may prove TSX parsing/extraction for measured local files. | TUI/Ink evidence is not broad TUI support and not terminal correctness support. |
 | Mixed | Multiple domain signals in one file or fixture, especially combinations of React Web with RN/WebView/TUI or RN with WebView bridge markers. | Conservative boundary classification; fallback or defer according to the strongest safety signal. | Mixed evidence cannot be promoted by choosing the most convenient domain. |
@@ -34,7 +35,7 @@ WebView files are boundary files before they are extraction candidates. `react-n
 
 ## RN and TUI evidence-lane rule
 
-React Native and TUI/Ink fixtures may be useful evidence for syntax traversal, fixture shape, and future domain-signal design. They are **not support claims**. RN primitives must not be reinterpreted as DOM controls or React Web form semantics. TUI/Ink fixtures must not be generalized into arbitrary terminal UI support, terminal behavior correctness, or runtime-token savings.
+React Native and TUI/Ink fixtures may be useful evidence for syntax traversal, fixture shape, and future domain-signal design. They are **not support claims**. RN primitive/input `F1` may use the measured `rn-primitive-input-narrow-payload` gate, but RN primitives must not be reinterpreted as DOM controls, React Web form semantics, or broad React Native support. TUI/Ink fixtures must not be generalized into arbitrary terminal UI support, terminal behavior correctness, or runtime-token savings.
 
 ## Fixture manifest pre-detector/profile gate
 
@@ -43,7 +44,7 @@ The fixture expectation manifest at `test/fixtures/frontend-domain-expectations/
 1. one domain lane per selected fixture;
 2. one expected outcome per fixture: `extract`, `fallback`, or `deferred`/unsupported wording;
 3. local or synthetic-local fixture sources only for the first pass;
-4. explicit fallback reasons for RN/WebView boundary fixtures;
+4. explicit fallback reasons for RN/WebView boundary fixtures, plus explicit narrow-payload metadata for any measured RN payload candidate;
 5. forbidden support claims for RN, WebView, and TUI/Ink evidence lanes;
 6. deferred entries for fixture categories that are visible but not yet safe to promote.
 
@@ -78,7 +79,7 @@ A promotion candidate must pass every gate below before it changes runtime detec
 | Domain | Promotion-ready evidence required | Current stop condition |
 | --- | --- | --- |
 | React Web | Existing supported React Web fixtures stay green while any new detector rule proves no regression to current form/DOM extraction behavior. | React Web evidence is used to imply RN, WebView, TUI, Mixed, or Unknown support. |
-| React Native | RN primitive, interaction/list, style/platform/navigation, and fallback-reason expectations are fixture-backed and documented as measured evidence only, not a final RN semantic model. | RN primitives are mapped to DOM controls, or `unsupported-react-native-webview-boundary` is treated as a final RN semantic model instead of the current boundary reason. |
+| React Native | RN primitive/input payload policy, interaction/list fallback, style/platform/navigation fallback, and fallback-reason expectations are fixture-backed and documented as measured evidence only, not a final RN semantic model. | RN primitives are mapped to DOM controls, broad RN support is claimed, or `unsupported-react-native-webview-boundary` is treated as a final RN semantic model instead of the current boundary reason. |
 | WebView | WebView source/HTML/bridge fixtures stay fallback-first with explicit bridge-boundary wording. | The change claims WebView bridge safety, enables compact-payload reuse, or weakens fallback-first behavior. |
 | TUI-Ink | Ink syntax fixtures prove only local TSX traversal and measured fixture outcomes. | The change claims broad TUI support, terminal behavior correctness, runtime-token savings, or default TUI compact extraction. |
 | Mixed | Mixed signals select the strongest safety boundary and document why fallback/deferred wins. | The change promotes Mixed by choosing the most convenient single domain. |
@@ -92,7 +93,7 @@ This matrix enables future multi-branch domain work, but it is not itself runtim
 | Lane | Primary owned surfaces | Serialized shared surfaces | Merge-order rule | Verification minimum | Claim boundary |
 | --- | --- | --- | --- | --- | --- |
 | React Web | React Web fixtures, React Web readiness/payload tests, and React Web docs under the current supported lane. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | Merge before non-web lanes only when it changes shared profile policy; otherwise keep independent React Web-only changes separate. | React Web pre-read/readiness targeted tests plus full frontend-domain contract tests. | Current supported lane only; do not imply RN, WebView, TUI, Mixed, or Unknown support. |
-| React Native | RN fixture evidence, RN signal expectations, and RN fallback-boundary docs. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | Merge after any shared detector/profile policy owner; do not race WebView changes that reuse the same fallback reason. | RN detector/pre-read boundary tests plus manifest/docs parity tests. | Evidence/fallback lane only; no RN extraction, DOM-control mapping, or support claim. |
+| React Native | RN fixture evidence, RN signal expectations, the F1 primitive/input narrow payload policy, and RN fallback-boundary docs. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | Merge after any shared detector/profile policy owner; do not race WebView changes that reuse the same fallback reason. | RN detector/pre-read boundary tests plus manifest/docs parity tests. | Measured F1 narrow payload only; no broad RN extraction, DOM-control mapping, or support claim. |
 | WebView | WebView boundary fixtures, paired bridge evidence, source/onMessage/injected-JS wording, and fallback-first docs. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | Merge WebView boundary/security changes before any branch that would weaken fallback-first behavior. | WebView fallback-first tests, bridge-pair fixture tests, and forbidden support-claim checks. | Fallback-first boundary only; no bridge-safety, compact-payload reuse, or WebView support claim. |
 | TUI/Ink | TUI/Ink fixture evidence, terminal-syntax wording, and evidence-only profile tests. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | Merge after shared frontend profile gate changes so evidence-only fallback behavior remains explicit. | TUI evidence-only detector/pre-read tests plus no terminal-correctness wording checks. | Evidence-only; no broad TUI support, terminal correctness, runtime-token savings, or default compact extraction claim. |
 | Mixed/Unknown/shared policy | Shared safety policy docs, mixed/unknown fallback/deferred tests, and ownership matrix maintenance. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | This lane owns shared-file coordination; other lanes must serialize behind it when touching shared policy. | Mixed/Unknown classification tests, manifest alignment tests, and full `npm test` before merge. | Safety states only; no convenient-domain promotion from ambiguous or weak signals. |
