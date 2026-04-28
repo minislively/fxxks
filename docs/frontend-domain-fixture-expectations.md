@@ -26,6 +26,12 @@ The machine-readable fixture expectation manifest at `test/fixtures/frontend-dom
 
 The selected baseline does not require a schema migration. `F2` is selected because today's expected behavior is a fallback boundary; its richer platform/navigation meaning remains outside the current support and extraction scope. `F4` is selected only as paired fallback-boundary evidence under the [WebView bridge boundary plan](webview-bridge-boundary-plan.md): its native fixture is the primary `path`, and its paired web fixture is recorded in `relatedSourcePaths`. `F11` and `F12` are selected React Web runtime-gate fixtures: they are local synthetic design-system-style components used to prove the current supported lane handles custom JSX components with web-specific attributes before any RN/WebView/TUI lane is promoted.
 
+## WebView boundary hardening gate
+
+The WebView fixture lane is fallback-first even when pre-read edit guidance is requested. `F3`, `F4`, and `F6` must return the `unsupported-react-native-webview-boundary` fallback without constructing a compact payload. Detector evidence may record boundary facts such as WebView `source` object shape, `injectedJavaScript`, `onMessage`, and native/web `postMessage` markers, but those facts remain diagnosis evidence only.
+
+Mixed DOM plus WebView snippets must choose the safety fallback over the React Web current-supported lane. Bare `<WebView>` snippets without an import are also treated as WebView boundary evidence so embedded HTML strings and bridge markers do not accidentally unlock React Web payload reuse.
+
 
 ## RN component semantics readiness gate
 

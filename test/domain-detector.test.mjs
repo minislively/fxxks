@@ -139,8 +139,10 @@ test("detects WebView evidence signals without support wording", () => {
     "webview:import:react-native-webview",
     "webview:component:WebView",
     "webview:prop:source",
+    "webview:source-shape:uri",
     "webview:prop:injectedJavaScript",
     "webview:prop:onMessage",
+    "webview:bridge-marker:ReactNativeWebView.postMessage",
   ]);
   assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });
@@ -194,6 +196,7 @@ test("classifies web DOM mixed with non-web frontend signals as fallback", () =>
   assert.equal(webviewDom.reason, "unsupported-react-native-webview-boundary");
   assert.ok(webviewDom.signals.includes("webview:import:react-native-webview"));
   assert.ok(webviewDom.signals.includes("webview:component:WebView"));
+  assert.ok(webviewDom.signals.includes("webview:source-shape:html"));
 
   const tuiDom = detectDomainFromSource(
     `import { Box } from "ink";
@@ -221,11 +224,33 @@ test("classifies web DOM mixed with non-web frontend signals as fallback", () =>
 });
 
 test("treats bare WebView JSX as a fallback-first boundary signal", () => {
-  const result = detectDomainFromSource(`export function Preview() { return <WebView source={{ uri: "https://example.test" }} />; }`, "Preview.tsx");
+  const result = detectDomainFromSource(
+    `export function Preview() {
+       return <WebView source={{ html: "<script>window.ReactNativeWebView.postMessage('ready')</script>" }} onMessage={() => {}} />;
+     }`,
+    "Preview.tsx",
+  );
   assert.equal(result.classification, "webview");
   assert.equal(result.outcome, "fallback");
   assert.equal(result.reason, "unsupported-react-native-webview-boundary");
   assert.ok(result.signals.includes("webview:component:WebView"));
+  assert.ok(result.signals.includes("webview:prop:source"));
+  assert.ok(result.signals.includes("webview:source-shape:html"));
+  assert.ok(result.signals.includes("webview:prop:onMessage"));
+  assert.ok(result.signals.includes("webview:bridge-marker:window.ReactNativeWebView"));
+});
+
+test("keeps WebView bridge-pair evidence as fallback-only boundary facts", () => {
+  const result = detectDomain(path.join(fixtureRoot, "webview", "checkout-bridge-native.tsx"));
+  assert.equal(result.classification, "mixed");
+  assert.equal(result.outcome, "fallback");
+  assert.equal(result.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(result.signals.includes("react-native:primitive:View"));
+  assert.ok(result.signals.includes("webview:component:WebView"));
+  assert.ok(result.signals.includes("webview:prop:source"));
+  assert.ok(result.signals.includes("webview:prop:injectedJavaScript"));
+  assert.ok(result.signals.includes("webview:prop:onMessage"));
+  assert.ok(result.signals.includes("webview:bridge-call:postMessage"));
 });
 
 test("selected fixture manifest stays aligned with detector classifications and outcomes", () => {

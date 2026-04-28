@@ -46,6 +46,10 @@ const RN_MODULE = "react-native";
 const RN_NAVIGATION_MODULE = "@react-navigation/native";
 const WEBVIEW_MODULE = "react-native-webview";
 const INK_MODULE = "ink";
+const WEBVIEW_BRIDGE_MARKERS = [
+  ["ReactNativeWebView.postMessage", "ReactNativeWebView.postMessage"],
+  ["window.ReactNativeWebView", "window.ReactNativeWebView"],
+] as const;
 const RN_PRIMITIVES = new Set([
   "View",
   "Text",
@@ -96,6 +100,32 @@ function hasEvidence(evidence: FrontendDomainEvidence[], domain: FrontendDomainE
 
 function signalList(evidence: FrontendDomainEvidence[]): string[] {
   return evidence.map((item) => `${item.domain}:${item.signal}:${item.detail}`);
+}
+
+function addWebViewSourceShapeEvidence(evidence: FrontendDomainEvidence[], initializer: ts.JsxAttribute["initializer"]): void {
+  if (!initializer || !ts.isJsxExpression(initializer) || !initializer.expression) return;
+
+  const expression = initializer.expression;
+  if (!ts.isObjectLiteralExpression(expression)) return;
+
+  for (const property of expression.properties) {
+    if (!ts.isPropertyAssignment(property)) continue;
+    const name = property.name;
+    const propertyName = ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
+    if (propertyName === "html" || propertyName === "uri") {
+      addEvidence(evidence, "webview", "source-shape", propertyName);
+    }
+  }
+}
+
+function addWebViewBridgeMarkerEvidence(evidence: FrontendDomainEvidence[], text: string): void {
+  if (!hasEvidence(evidence, "webview")) return;
+
+  for (const [marker, detail] of WEBVIEW_BRIDGE_MARKERS) {
+    if (text.includes(marker)) {
+      addEvidence(evidence, "webview", "bridge-marker", detail);
+    }
+  }
 }
 
 function outcomeForClassification(classification: DomainLabel): Pick<DomainDetectionResult, "outcome" | "reason"> {
@@ -261,6 +291,9 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       }
       if (WEBVIEW_PROPS.has(attributeName) && hasEvidence(evidence, "webview")) {
         addEvidence(evidence, "webview", "prop", attributeName);
+        if (attributeName === "source") {
+          addWebViewSourceShapeEvidence(evidence, node.initializer);
+        }
       }
     }
 
@@ -279,6 +312,9 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
         hasImportedName(RN_MODULE, expression.text)
       ) {
         addEvidence(evidence, "react-native", "api-call", `${expression.text}.${property}`);
+      }
+      if (hasEvidence(evidence, "webview") && property === "postMessage") {
+        addEvidence(evidence, "webview", "bridge-call", "postMessage");
       }
     }
 
@@ -309,6 +345,10 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
 
     if (ts.isIdentifier(node) && TUI_HOOKS.has(node.text) && hasImportedName(INK_MODULE, node.text)) {
       addEvidence(evidence, "tui-ink", "hook", node.text);
+    }
+
+    if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      addWebViewBridgeMarkerEvidence(evidence, node.text);
     }
 
     ts.forEachChild(node, visit);

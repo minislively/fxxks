@@ -14,6 +14,12 @@ WebView bridge code is not just frontend TSX. A bridge pair can combine native R
 
 `F4` therefore provides fallback evidence only. It names a narrow fixture pair and proves that fallback-first behavior is still preserved.
 
+## Pre-read boundary behavior
+
+Pre-read must stop at fallback for `F3`, `F4`, and `F6` before compact payload construction, including calls that request edit guidance. The WebView detector can expose source-shape and bridge-marker evidence to explain the fallback, but that evidence must not be reused as an extraction profile.
+
+Bare `<WebView>` source snippets and mixed DOM plus WebView snippets are part of the same hardening gate. They stay fallback-first so HTML strings, injected JavaScript, `onMessage`, and `postMessage` boundaries are visible as source-reading boundaries rather than React Web payload eligibility.
+
 ## Fixture pair
 
 The current `F4` pair uses only local or synthetic-local fixtures:
@@ -38,6 +44,6 @@ Promotion from fallback evidence to extraction may happen only after all gates a
 - No WebView compact-payload reuse.
 - No bridge safety claim.
 - No automatic extraction across native/web message boundaries.
-- No detector, extractor, runtime, pre-read, setup, or CLI behavior change in the paired-fixture evidence PR.
+- No extractor, runtime, setup, or CLI behavior change. Detector evidence and pre-read guard tests may harden the existing fallback boundary, but they must not create WebView payload eligibility.
 - No public repository vendoring or live fetch.
 - No manifest schema migration.

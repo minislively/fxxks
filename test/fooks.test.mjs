@@ -1051,8 +1051,10 @@ test("frontend domain detector returns evidence-only classifications for Level 3
   assert.ok(webview.signals.includes("webview:import:react-native-webview"));
   assert.ok(webview.signals.includes("webview:component:WebView"));
   assert.ok(webview.signals.includes("webview:prop:source"));
+  assert.ok(webview.signals.includes("webview:source-shape:uri"));
   assert.ok(webview.signals.includes("webview:prop:injectedJavaScript"));
   assert.ok(webview.signals.includes("webview:prop:onMessage"));
+  assert.ok(webview.signals.includes("webview:bridge-marker:ReactNativeWebView.postMessage"));
 
   const tui = detectDomain(path.join(fixtureRoot, "tui-ink-basic.tsx"));
   assert.equal(tui.classification, "tui-ink");
@@ -1095,6 +1097,7 @@ test("extract output includes domainDetection for frontend fixtures", () => {
   assert.ok(webview.domainDetection);
   assert.equal(webview.domainDetection.classification, "webview");
   assert.ok(webview.domainDetection.signals.includes("webview:component:WebView"));
+  assert.ok(webview.domainDetection.signals.includes("webview:source-shape:uri"));
   assert.equal(webview.domainDetection.profile.claimStatus, "fallback-boundary");
   assert.equal(webview.domainDetection.profile.fallbackFirst, true);
 
@@ -1149,19 +1152,22 @@ test("pre-read uses frontend domain detector for bare WebView fallback boundarie
   fs.writeFileSync(
     bareWebViewPath,
     `export function BareWebView() {
-  return <WebView source={{ uri: "https://example.test" }} />;
+  return <WebView source={{ html: "<script>window.ReactNativeWebView.postMessage('ready')</script>" }} onMessage={() => {}} />;
 }
 `,
   );
 
-  const result = preReadModule.decidePreRead(bareWebViewPath, tempDir, "codex");
+  const result = preReadModule.decidePreRead(bareWebViewPath, tempDir, "codex", { includeEditGuidance: true });
   assert.equal(result.decision, "fallback");
   assert.deepEqual(result.reasons, ["unsupported-react-native-webview-boundary"]);
+  assert.equal("payload" in result, false);
   assert.equal(result.debug.domainDetection.classification, "webview");
   assert.equal(result.debug.domainDetection.outcome, "fallback");
   assert.equal(result.debug.domainDetection.profile.claimStatus, "fallback-boundary");
   assert.equal(result.debug.domainDetection.profile.boundaryReason, "unsupported-react-native-webview-boundary");
   assert.ok(result.debug.domainDetection.signals.includes("webview:component:WebView"));
+  assert.ok(result.debug.domainDetection.signals.includes("webview:source-shape:html"));
+  assert.ok(result.debug.domainDetection.signals.includes("webview:bridge-marker:window.ReactNativeWebView"));
 });
 
 test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise", () => {
@@ -4343,6 +4349,18 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
     assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
   }
+
+  for (const slot of ["F3", "F4", "F6"]) {
+    const item = selected.get(slot);
+    const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex", { includeEditGuidance: true });
+    assert.equal(decision.eligible, true, `${item.id} should remain eligible for pre-read inspection before boundary fallback`);
+    assert.equal(decision.decision, "fallback", `${item.id} should stay fallback even when edit guidance is requested`);
+    assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
+    assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
+    assert.equal("payload" in decision, false, `${item.id} must not build a compact payload across the WebView boundary`);
+    assert.equal(decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
+    assert.equal(decision.debug.domainDetection.profile.boundaryReason, "unsupported-react-native-webview-boundary");
+  }
 });
 
 test("frontend domain fixture docs mirror manifest slot expectations", () => {
@@ -4381,6 +4399,9 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   }
 
   assert.match(docs, /F2[\s\S]*current fallback expectation[\s\S]*navigation semantics remain non-promoted/);
+  assert.match(docs, /WebView boundary hardening gate/);
+  assert.match(docs, /`F3`, `F4`, and `F6` must return the `unsupported-react-native-webview-boundary` fallback without constructing a compact payload/);
+  assert.match(docs, /Mixed DOM plus WebView snippets must choose the safety fallback/);
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
   assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);
@@ -4390,9 +4411,12 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(webviewBridgePlan, /Web side fixture/);
   assert.match(webviewBridgePlan, /Boundary contract note/);
   assert.match(webviewBridgePlan, /Selected fallback-evidence boundary/);
+  assert.match(webviewBridgePlan, /Pre-read boundary behavior/);
+  assert.match(webviewBridgePlan, /before compact payload construction, including calls that request edit guidance/);
   assert.match(webviewBridgePlan, /synthetic bridge pair remains a separate lane/);
   assert.match(webviewBridgePlan, /expected outcome is `fallback`/);
-  assert.match(webviewBridgePlan, /detector, extractor, runtime, pre-read, setup, or CLI behavior/);
+  assert.match(webviewBridgePlan, /No extractor, runtime, setup, or CLI behavior change/);
+  assert.match(webviewBridgePlan, /Detector evidence and pre-read guard tests may harden the existing fallback boundary/);
   assert.match(webviewBridgePlan, /unsupported-react-native-webview-boundary/);
   assert.match(webviewBridgePlan, /expected outcome is `fallback`/);
   assert.match(webviewBridgePlan, /No WebView compact-payload reuse/);
