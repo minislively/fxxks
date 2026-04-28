@@ -4036,6 +4036,9 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(candidates, /gronxb\/webview-bridge/);
   assert.match(combined, /frontend-family candidate/);
   assert.match(combined, /Fixture\/benchmark evidence/);
+  assert.match(roadmap, /`F1` RN primitive\/input narrow pre-read payload gate/);
+  assert.match(release, /measured `F1` RN primitive\/input narrow pre-read payload gate/);
+  assert.match(release, /not broad React Native support/);
   assert.match(combined, /StyleSheet\.create/);
   assert.match(combined, /Platform\.select/);
   assert.match(combined, /react-native-webview/);
