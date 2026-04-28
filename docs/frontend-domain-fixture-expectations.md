@@ -35,6 +35,14 @@ Mixed DOM plus WebView snippets must choose the safety fallback over the React W
 WebView hardening is a serialized shared-policy owner lane whenever it updates manifest, shared docs, or regression tests. That PR must carry the merge-order note and must keep `F3`, `F4`, and `F6` at `supportClaim: "none"` with `fallback-boundary-evidence-only` scope. Each selected WebView boundary fixture must forbid all three claims together: WebView support, bridge safety, and compact-payload reuse.
 
 
+## TUI evidence hardening gate
+
+The TUI/Ink fixture lane is syntax evidence only. `F5` may prove that the current TSX/JSX extractor can traverse a small local Ink-like component and its paired local evidence fixture, but it must not be described as TUI/Ink support, terminal correctness, terminal UX safety, runtime-token savings, provider-token savings, billing savings, performance improvement, or default compact extraction.
+
+TUI evidence hardening is a serialized shared-policy owner lane whenever it updates manifest, shared docs, or regression tests. That PR must carry the merge-order note and must keep `F5` at `supportClaim: "none"` with `syntax-evidence-only` scope. `F7` remains deferred for broad non-Ink terminal renderer semantics and must not gain executable fixture paths in this evidence gate.
+
+Pre-read behavior must stay conservative for TUI/Ink: `F5` can remain extractable syntax evidence through `extractFile`, but Codex pre-read must continue to fallback with `unsupported-frontend-domain-profile` and must not construct a compact payload by default.
+
 ## RN component semantics readiness gate
 
 The RN fixture lane is a readiness gate, not a support promise. `F1` is the first narrow runtime candidate and is limited to primitive/input payload reuse through `rn-primitive-input-narrow-payload`; it is not broad React Native support. Other selected RN fixtures stay fallback/evidence-only until a later detector/profile promotion plan explicitly changes runtime behavior. The current fallback reason, `unsupported-react-native-webview-boundary`, is still the shared source-reading boundary reason for detector evidence and WebView/mixed boundaries; it must not be treated as a permanent domain model for every RN semantic.
@@ -67,6 +75,7 @@ This baseline must not imply any of the following support promotions:
 - React Native availability or current support.
 - WebView availability or current support.
 - TUI availability or current support.
+- TUI terminal correctness, terminal UX safety, runtime-token/provider-token/billing/performance/cost, or default compact extraction promotion.
 - WebView compact-payload reuse or bridge safety promotion.
 
 ## Promotion boundary

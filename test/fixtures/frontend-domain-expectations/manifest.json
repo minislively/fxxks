@@ -155,10 +155,13 @@
         "terminal layout"
       ],
       "forbiddenClaims": [
-        "No broad TUI support claim",
+        "No TUI/Ink support claim",
+        "No terminal correctness claim",
+        "No runtime-token/provider-token/billing/performance/cost claim",
+        "No default TUI compact extraction",
         "No RN/WebView fallback boundary implied"
       ],
-      "verification": "extractFile returns a non-empty TSX extraction result",
+      "verification": "extractFile returns a non-empty TSX extraction result; decidePreRead remains fallback with unsupported-frontend-domain-profile; docs/tests forbid TUI/Ink support, terminal correctness, runtime-token/provider-token/billing/performance/cost, and default compact extraction claims",
       "supportClaim": "none",
       "evidenceScope": "syntax-evidence-only",
       "relatedSourcePaths": [

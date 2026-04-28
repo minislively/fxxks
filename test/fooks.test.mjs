@@ -1120,7 +1120,7 @@ test("extract output includes domainDetection for frontend fixtures", () => {
 });
 
 test("frontend domain detector and pre-read debug avoid RN WebView TUI support wording", () => {
-  const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled/i;
+  const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|terminal correctness is guaranteed|terminal UX safety is guaranteed|runtime-token savings are available|provider-token savings are available|billing savings are available|TUI performance improvement is available|default WebView compact extraction is enabled|default TUI compact extraction is enabled/i;
   const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
   const results = [
     detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx")),
@@ -1264,6 +1264,7 @@ export function CustomOnlyForm() {
   assert.equal(tui.fallback.reason, unsupportedFrontendProfile);
   assert.equal(tui.debug.domainDetection.classification, "tui-ink");
   assert.equal(tui.debug.domainDetection.profile.claimStatus, "evidence-only");
+  assert.notEqual(tui.debug.frontendPayloadPolicy?.allowed, true);
   assert.equal("payload" in tui, false);
 
   const moduleTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"), repoRoot);
@@ -4234,6 +4235,15 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.equal(deferred.get("webview-bridge-pair"), undefined);
   assert.equal(selected.get("tui-ink-basic").supportClaim, "none");
   assert.equal(selected.get("tui-ink-basic").evidenceScope, "syntax-evidence-only");
+  for (const forbidden of [
+    "No TUI/Ink support claim",
+    "No terminal correctness claim",
+    "No runtime-token/provider-token/billing/performance/cost claim",
+    "No default TUI compact extraction",
+  ]) {
+    assert.ok(selected.get("tui-ink-basic").forbiddenClaims.includes(forbidden), `tui-ink-basic must forbid ${forbidden}`);
+  }
+  assert.doesNotMatch(selected.get("tui-ink-basic").verification, /TUI\/Ink is supported|terminal correctness is guaranteed|runtime-token savings are available|default TUI compact extraction is enabled/i);
 
   assert.doesNotMatch(contract, /React Native support is available/i);
   assert.doesNotMatch(contract, /WebView support is available/i);
@@ -4336,6 +4346,15 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F5").expectedOutcome, "extract");
   assert.equal(selected.get("F5").supportClaim, "none");
   assert.equal(selected.get("F5").evidenceScope, "syntax-evidence-only");
+  for (const forbidden of [
+    "No TUI/Ink support claim",
+    "No terminal correctness claim",
+    "No runtime-token/provider-token/billing/performance/cost claim",
+    "No default TUI compact extraction",
+  ]) {
+    assert.ok(selected.get("F5").forbiddenClaims.includes(forbidden), `F5 must forbid ${forbidden}`);
+  }
+  assert.doesNotMatch(selected.get("F5").verification, /TUI\/Ink is supported|terminal correctness is guaranteed|terminal UX safety is guaranteed|runtime-token savings are available|provider-token savings are available|billing savings are available|performance improvement is available|default TUI compact extraction is enabled/i);
   assert.equal(selected.get("F6").expectedOutcome, "fallback");
   assert.equal(selected.get("F6").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F9").expectedOutcome, "fallback");
@@ -4433,7 +4452,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(extracted.language, "tsx", `${evidencePath} must remain TSX syntax evidence`);
     assert.ok(["compressed", "hybrid", "raw"].includes(extracted.mode), `${evidencePath} must be extractable`);
     assert.doesNotMatch(source, /github\.com|https?:\/\/|public-snapshot|live-fetch|vendor-external/i);
-    assert.doesNotMatch(source, /TUI support is available|TUI\/Ink is supported today|default TUI compact extraction is enabled/i);
+    assert.doesNotMatch(source, /TUI support is available|TUI\/Ink is supported today|terminal correctness is guaranteed|terminal UX safety is guaranteed|runtime-token savings are available|provider-token savings are available|billing savings are available|performance improvement is available|default TUI compact extraction is enabled/i);
   }
 
   const rnPrimitiveDecision = preReadModule.decidePreRead(path.join(repoRoot, selected.get("F1").path), repoRoot, "codex");
@@ -4513,6 +4532,13 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(docs, /WebView hardening is a serialized shared-policy owner lane/);
   assert.match(docs, /keep `F3`, `F4`, and `F6` at `supportClaim: "none"` with `fallback-boundary-evidence-only` scope/);
   assert.match(docs, /forbid all three claims together: WebView support, bridge safety, and compact-payload reuse/);
+  assert.match(docs, /TUI evidence hardening gate/);
+  assert.match(docs, /TUI\/Ink fixture lane is syntax evidence only/);
+  assert.match(docs, /TUI evidence hardening is a serialized shared-policy owner lane/);
+  assert.match(docs, /keep `F5` at `supportClaim: "none"` with `syntax-evidence-only` scope/);
+  assert.match(docs, /`F7` remains deferred for broad non-Ink terminal renderer semantics/);
+  assert.match(docs, /pre-read must continue to fallback with `unsupported-frontend-domain-profile`/i);
+  assert.match(docs, /must not construct a compact payload by default/);
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
   assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);
@@ -4535,8 +4561,9 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(webviewBridgePlan, /No automatic extraction across native\/web message boundaries/);
   assert.doesNotMatch(docs, /React Native support is available|React Native is supported today/i);
   assert.doesNotMatch(docs, /WebView support is available|WebView is supported today/i);
-  assert.doesNotMatch(docs, /TUI support is available|TUI is supported today/i);
-  assert.doesNotMatch(docs, /default WebView compact extraction is enabled/i);
+  assert.doesNotMatch(docs, /TUI support is available|TUI is supported today|TUI\/Ink is supported today/i);
+  assert.doesNotMatch(docs, /terminal correctness is guaranteed|terminal UX safety is guaranteed|runtime-token savings are available|provider-token savings are available|billing savings are available|TUI performance improvement is available/i);
+  assert.doesNotMatch(docs, /default WebView compact extraction is enabled|default TUI compact extraction is enabled/i);
   assert.doesNotMatch(webviewBridgePlan, /React Native support is available|React Native is supported today/i);
   assert.doesNotMatch(webviewBridgePlan, /WebView support is available|WebView is supported today/i);
   assert.doesNotMatch(webviewBridgePlan, /WebView compact payload reuse is supported/i);
