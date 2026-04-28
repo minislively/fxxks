@@ -1,14 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { extractFile } from "../core/extract";
-import { detectDomainFromSource } from "../core/domain-detector";
+import { detectDomainFromSource, type DomainDetectionResult } from "../core/domain-detector";
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import type { PreReadDecision } from "../core/schema";
 
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
+const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
+export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
 
 export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
 
@@ -19,6 +21,21 @@ function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<st
 function relativePath(filePath: string, cwd: string): string {
   const relative = path.relative(cwd, filePath);
   return relative || path.basename(filePath);
+}
+
+function assessFrontendProfilePayloadReuse(
+  extension: string,
+  domainDetection: DomainDetectionResult,
+): { allowed: true } | { allowed: false; reason: string } {
+  if (!FRONTEND_PROFILE_GATE_EXTENSIONS.has(extension)) {
+    return { allowed: true };
+  }
+
+  if (domainDetection.profile.lane === "react-web" && domainDetection.profile.claimStatus === "current-supported-lane") {
+    return { allowed: true };
+  }
+
+  return { allowed: false, reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON };
 }
 
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
@@ -83,15 +100,32 @@ export function decidePreRead(
   };
 
   if (readiness.ready) {
+    const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection);
+    if (profileGate.allowed) {
+      return {
+        runtime,
+        filePath: outputPath,
+        eligible: true,
+        decision: "payload",
+        reasons: [],
+        payload,
+        readiness,
+        debug,
+      };
+    }
+
     return {
       runtime,
       filePath: outputPath,
       eligible: true,
-      decision: "payload",
-      reasons: [],
-      payload,
+      decision: "fallback",
+      reasons: [profileGate.reason],
       readiness,
       debug,
+      fallback: {
+        action: "full-read",
+        reason: profileGate.reason,
+      },
     };
   }
 

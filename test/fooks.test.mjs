@@ -1161,6 +1161,11 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.ok(compressed.payload);
   assert.ok(compressed.payload.sourceFingerprint);
   assert.equal("editGuidance" in compressed.payload, false);
+  assert.equal("domainDetection" in compressed.payload, false);
+  assert.equal("profile" in compressed.payload, false);
+  assert.equal(compressed.debug.domainDetection.classification, "react-web");
+  assert.equal(compressed.debug.domainDetection.profile.lane, "react-web");
+  assert.equal(compressed.debug.domainDetection.profile.claimStatus, "current-supported-lane");
   assert.ok(["low", "medium", "high"].includes(compressed.debug.decideConfidence));
 
   const compressedOptIn = preReadModule.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
@@ -1184,10 +1189,22 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.ok(jsx.payload.contract);
   assert.equal("editGuidance" in jsx.payload, false);
 
+  const unsupportedFrontendProfile = preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON;
+  const tui = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "tui-ink-basic.tsx"), repoRoot);
+  assert.equal(tui.eligible, true);
+  assert.equal(tui.decision, "fallback");
+  assert.deepEqual(tui.reasons, [unsupportedFrontendProfile]);
+  assert.equal(tui.fallback.reason, unsupportedFrontendProfile);
+  assert.equal(tui.debug.domainDetection.classification, "tui-ink");
+  assert.equal(tui.debug.domainDetection.profile.claimStatus, "evidence-only");
+  assert.equal("payload" in tui, false);
+
   const moduleTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"), repoRoot);
   assert.equal(moduleTs.eligible, true);
   assert.equal(moduleTs.decision, "payload");
   assert.equal(moduleTs.debug.language, "ts");
+  assert.equal(moduleTs.debug.domainDetection.classification, "unknown");
+  assert.equal(moduleTs.debug.domainDetection.profile.claimStatus, "deferred");
   assert.ok(moduleTs.payload.structure.moduleDeclarations?.length);
   assert.equal("editGuidance" in moduleTs.payload, false);
 
