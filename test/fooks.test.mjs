@@ -1016,22 +1016,33 @@ test("frontend domain detector returns evidence-only classifications for Level 3
   assert.equal(rn.reason, "unsupported-react-native-webview-boundary");
   assert.ok(rn.signals.includes("react-native:style-factory:StyleSheet.create"));
   assert.ok(rn.signals.includes("react-native:platform-select:Platform.select"));
+  assert.ok(rn.signals.includes("react-native:navigation-import:@react-navigation/native"));
+  assert.ok(rn.signals.includes("react-native:navigation-hook:useNavigation"));
+  assert.ok(rn.signals.includes("react-native:navigation-hook:useRoute"));
+  assert.ok(rn.signals.includes("react-native:navigation-route:route.params"));
 
   const image = detectDomain(path.join(fixtureRoot, "rn-image-scrollview.tsx"));
   assert.equal(image.classification, "react-native");
   assert.ok(image.signals.includes("react-native:primitive:Image"));
   assert.ok(image.signals.includes("react-native:primitive:ScrollView"));
+  assert.ok(image.signals.includes("react-native:api-call:Dimensions.get"));
+  assert.ok(image.signals.includes("react-native:jsx-prop:pagingEnabled"));
+  assert.ok(image.signals.includes("react-native:style-prop:resizeMode"));
 
   const pressable = detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
   assert.equal(pressable.classification, "react-native");
   assert.equal(pressable.outcome, "fallback");
   assert.ok(pressable.signals.includes("react-native:primitive:Pressable"));
   assert.ok(pressable.signals.includes("react-native:primitive:TextInput"));
+  assert.ok(pressable.signals.includes("react-native:jsx-prop:onChangeText"));
+  assert.ok(pressable.signals.includes("react-native:jsx-prop:onPress"));
 
   const touchable = detectDomain(path.join(fixtureRoot, "rn-interaction-gesture.tsx"));
   assert.equal(touchable.classification, "react-native");
   assert.ok(touchable.signals.includes("react-native:primitive:TouchableOpacity"));
   assert.ok(touchable.signals.includes("react-native:primitive:FlatList"));
+  assert.ok(touchable.signals.includes("react-native:api-call:PanResponder.create"));
+  assert.ok(touchable.signals.includes("react-native:jsx-prop:activeOpacity"));
 
   const webview = detectDomain(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
   assert.equal(webview.classification, "webview");
@@ -1213,6 +1224,21 @@ export function CustomOnlyForm() {
   assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:htmlFor"));
 
   const unsupportedFrontendProfile = preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON;
+  for (const rnFixture of [
+    "rn-primitive-basic.tsx",
+    "rn-style-platform-navigation.tsx",
+    "rn-interaction-gesture.tsx",
+    "rn-image-scrollview.tsx",
+  ]) {
+    const rn = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", rnFixture), repoRoot);
+    assert.equal(rn.eligible, true);
+    assert.equal(rn.decision, "fallback");
+    assert.deepEqual(rn.reasons, ["unsupported-react-native-webview-boundary"]);
+    assert.equal(rn.debug.domainDetection.classification, "react-native");
+    assert.equal(rn.debug.domainDetection.profile.claimStatus, "fallback-boundary");
+    assert.equal("payload" in rn, false);
+  }
+
   const tui = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "tui-ink-basic.tsx"), repoRoot);
   assert.equal(tui.eligible, true);
   assert.equal(tui.decision, "fallback");

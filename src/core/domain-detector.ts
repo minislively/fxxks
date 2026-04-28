@@ -43,6 +43,7 @@ export type DomainDetectionResult = {
 
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const RN_MODULE = "react-native";
+const RN_NAVIGATION_MODULE = "@react-navigation/native";
 const WEBVIEW_MODULE = "react-native-webview";
 const INK_MODULE = "ink";
 const RN_PRIMITIVES = new Set([
@@ -61,6 +62,13 @@ const RN_PRIMITIVES = new Set([
 const WEB_DOM_TAGS = new Set(["div", "span", "form", "input", "button", "select", "textarea", "label"]);
 const WEB_REACT_ATTRIBUTES = new Set(["className", "htmlFor"]);
 const WEBVIEW_PROPS = new Set(["source", "injectedJavaScript", "onMessage"]);
+const RN_JSX_PROPS = new Set(["activeOpacity", "onChangeText", "onPress", "pagingEnabled"]);
+const RN_STYLE_PROPS = new Set(["resizeMode"]);
+const RN_API_CALLS = new Map([
+  ["Dimensions", new Set(["get"])],
+  ["PanResponder", new Set(["create"])],
+]);
+const RN_NAVIGATION_HOOKS = new Set(["useNavigation", "useRoute"]);
 const TUI_PRIMITIVES = new Set(["Box", "Text"]);
 const TUI_HOOKS = new Set(["useInput"]);
 
@@ -199,6 +207,9 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       if (moduleName === RN_MODULE || moduleName.startsWith(`${RN_MODULE}/`)) {
         addEvidence(evidence, "react-native", "import", moduleName);
       }
+      if (moduleName === RN_NAVIGATION_MODULE) {
+        addEvidence(evidence, "react-native", "navigation-import", moduleName);
+      }
       if (moduleName === WEBVIEW_MODULE) {
         addEvidence(evidence, "webview", "import", moduleName);
       }
@@ -245,6 +256,9 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
         hasReactWebEvidence = true;
         addEvidence(evidence, "react-web", "jsx-attribute", attributeName);
       }
+      if (RN_JSX_PROPS.has(attributeName) && hasEvidence(evidence, "react-native")) {
+        addEvidence(evidence, "react-native", "jsx-prop", attributeName);
+      }
       if (WEBVIEW_PROPS.has(attributeName) && hasEvidence(evidence, "webview")) {
         addEvidence(evidence, "webview", "prop", attributeName);
       }
@@ -258,6 +272,38 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       }
       if (ts.isIdentifier(expression) && expression.text === "Platform" && property === "select") {
         addEvidence(evidence, "react-native", "platform-select", "Platform.select");
+      }
+      if (
+        ts.isIdentifier(expression) &&
+        RN_API_CALLS.get(expression.text)?.has(property) === true &&
+        hasImportedName(RN_MODULE, expression.text)
+      ) {
+        addEvidence(evidence, "react-native", "api-call", `${expression.text}.${property}`);
+      }
+    }
+
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const callName = node.expression.text;
+      if (RN_NAVIGATION_HOOKS.has(callName) && hasImportedName(RN_NAVIGATION_MODULE, callName)) {
+        addEvidence(evidence, "react-native", "navigation-hook", callName);
+      }
+    }
+
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "route" &&
+      node.name.text === "params" &&
+      hasEvidence(evidence, "react-native")
+    ) {
+      addEvidence(evidence, "react-native", "navigation-route", "route.params");
+    }
+
+    if (ts.isPropertyAssignment(node) && hasEvidence(evidence, "react-native")) {
+      const name = node.name;
+      const propertyName = ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
+      if (propertyName && RN_STYLE_PROPS.has(propertyName)) {
+        addEvidence(evidence, "react-native", "style-prop", propertyName);
       }
     }
 

@@ -91,6 +91,8 @@ test("detects React Native evidence signals without support wording", () => {
     "react-native:primitive:Text",
     "react-native:primitive:TextInput",
     "react-native:primitive:Pressable",
+    "react-native:jsx-prop:onChangeText",
+    "react-native:jsx-prop:onPress",
   ]);
 
   const styled = detectDomain(path.join(fixtureRoot, "rn-style-platform-navigation.tsx"));
@@ -99,15 +101,30 @@ test("detects React Native evidence signals without support wording", () => {
     "react-native:primitive:ScrollView",
     "react-native:style-factory:StyleSheet.create",
     "react-native:platform-select:Platform.select",
+    "react-native:navigation-import:@react-navigation/native",
+    "react-native:navigation-hook:useNavigation",
+    "react-native:navigation-hook:useRoute",
+    "react-native:navigation-route:route.params",
   ]);
 
   const image = detectDomain(path.join(fixtureRoot, "rn-image-scrollview.tsx"));
   assert.equal(image.classification, "react-native");
-  assertSignals(image, ["react-native:primitive:Image", "react-native:primitive:ScrollView"]);
+  assertSignals(image, [
+    "react-native:primitive:Image",
+    "react-native:primitive:ScrollView",
+    "react-native:api-call:Dimensions.get",
+    "react-native:jsx-prop:pagingEnabled",
+    "react-native:style-prop:resizeMode",
+  ]);
 
   const touchable = detectDomain(path.join(fixtureRoot, "rn-interaction-gesture.tsx"));
   assert.equal(touchable.classification, "react-native");
-  assertSignals(touchable, ["react-native:primitive:TouchableOpacity", "react-native:primitive:FlatList"]);
+  assertSignals(touchable, [
+    "react-native:primitive:TouchableOpacity",
+    "react-native:primitive:FlatList",
+    "react-native:api-call:PanResponder.create",
+    "react-native:jsx-prop:activeOpacity",
+  ]);
 
   assert.doesNotMatch(JSON.stringify([primitive, styled, image, touchable]), forbiddenSupportClaims);
 });

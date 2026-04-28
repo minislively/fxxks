@@ -43,7 +43,9 @@
         "View",
         "Text",
         "TextInput",
-        "Pressable"
+        "Pressable",
+        "onChangeText",
+        "onPress"
       ],
       "forbiddenClaims": [
         "No React Native support claim",
@@ -66,7 +68,9 @@
       "requiredSignals": [
         "StyleSheet.create",
         "Platform.select",
-        "navigation hooks",
+        "@react-navigation/native",
+        "useNavigation",
+        "useRoute",
         "route.params"
       ],
       "forbiddenClaims": [
@@ -187,7 +191,7 @@
       "requiredSignals": [
         "TouchableOpacity",
         "FlatList",
-        "PanResponder",
+        "PanResponder.create",
         "gesture handlers",
         "activeOpacity"
       ],
@@ -213,7 +217,7 @@
       "requiredSignals": [
         "Image",
         "ScrollView",
-        "Dimensions",
+        "Dimensions.get",
         "resizeMode",
         "pagingEnabled"
       ],
