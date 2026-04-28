@@ -6,6 +6,43 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+const NEXT_ACTION_SHORTLIST_LIMIT = 10;
+
+function isDocsBranch(row) {
+  return /(^|[\/-])docs?([\/-]|$)|documentation|readme/i.test(`${row.branch} ${row.lastSubject}`);
+}
+
+function isTestBranch(row) {
+  return /(^|[\/-])tests?([\/-]|$)|coverage|fixture|smoke/i.test(`${row.branch} ${row.lastSubject}`);
+}
+
+function candidateReviewFocus(row) {
+  if (row.currentTreeImpact.destructiveStaleTree) {
+    return "inspect deleted current-file paths before any cleanup decision";
+  }
+  if (isTestBranch(row)) {
+    return "check whether test or fixture coverage still needs a tracked follow-up";
+  }
+  if (isDocsBranch(row)) {
+    return "check whether documentation evidence still needs a tracked follow-up";
+  }
+  return "inspect the diff and record owner plus keep/follow-up/no-op outcome";
+}
+
+function buildDiscordNextActionShortlist(branches, summary) {
+  return branches
+    .filter((row) => row.classification === "valid-candidate")
+    .slice(0, NEXT_ACTION_SHORTLIST_LIMIT)
+    .map((row) => ({
+      branch: row.branch,
+      ref: row.ref,
+      action: "Read-only triage: inspect the branch diff and record an owner plus outcome; this artifact does not recommend deleting branches or merging code.",
+      reviewFocus: candidateReviewFocus(row),
+      evidence: `${row.uniquePatchCommits} unique patch commit${row.uniquePatchCommits === 1 ? "" : "s"}; ${formatCurrentTreeRisk(row.currentTreeImpact)}; last commit ${row.lastCommitDate} (${row.lastSha})`,
+      diffCommand: `git diff --stat ${summary.base}...${row.ref}`,
+    }));
+}
+
 function run(command, args, options = {}) {
   const output = execFileSync(command, args, {
     cwd: repoRoot,
@@ -57,7 +94,12 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/audit-remote-branches.mjs [options]\n\nAudits remote branches against a base ref and classifies branches that can add\nstale-branch noise after main has absorbed equivalent work.\n\nOptions:\n  --base <ref>      Base ref to compare against (default: origin/main)\n  --remote <name>   Remote namespace to audit (default: origin)\n  --no-fetch        Use local remote-tracking refs without fetching first\n  --json            Emit machine-readable JSON instead of markdown\n  --markdown        Emit markdown (default)\n  --output <path>   Write output to a file instead of stdout\n  -h, --help        Show this help\n\nClassification:\n  redundant-merged            branch has no commits ahead of base\n  redundant-patch-equivalent  branch commits are patch-equivalent to base\n  valid-candidate             branch has unique patch commits and no open PR\n  open-pr                     branch has an open PR and is not stale-branch noise`);
+  console.log(`Usage: node scripts/audit-remote-branches.mjs [options]\n\nAudits remote branches against a base ref and classifies branches that can add\nstale-branch noise after main has absorbed equivalent work.\n\nOptions:\n  --base <ref>      Base ref to compare against (default: origin/main)\n  --remote <name>   Remote namespace to audit (default: origin)\n  --no-fetch        Use local remote-tracking refs without fetching first\n  --json            Emit machine-readable JSON instead of markdown\n  --markdown        Emit markdown (default)\n  --output <path>   Write output to a file instead of stdout\n  -h, --help        Show this help\n\nClassification:\n  redundant-merged            branch has no commits ahead of base\n  redundant-patch-equivalent  branch commits are patch-equivalent to base\n  valid-candidate             branch has unique patch commits and no open PR\n  open-pr                     branch has an open PR and is not stale-branch noise
+
+Next-action shortlist:
+  Markdown and JSON include a read-only Discord-friendly valid-candidate
+  shortlist for operator triage. It does not recommend deleting branches or
+  merging code.`);
 }
 
 function getOpenPullRequestHeads(remote) {
@@ -224,10 +266,25 @@ function escapeMarkdown(value) {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 }
 
+function renderDiscordNextActionShortlist(shortlist) {
+  if (shortlist.length === 0) {
+    return "No valid-candidate next actions.\n";
+  }
+
+  const lines = [
+    "Read-only operator shortlist for Discord handoff. It does not recommend deleting branches or merging code.",
+    "",
+  ];
+  for (const item of shortlist) {
+    lines.push(`- \`${item.branch}\` — ${escapeMarkdown(item.reviewFocus)}. Evidence: ${escapeMarkdown(item.evidence)}. Verify with \`${item.diffCommand}\`.`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 function renderMarkdown(result) {
   const { summary, branches } = result;
   const redundantTotal = (summary.counts["redundant-merged"] ?? 0) + (summary.counts["redundant-patch-equivalent"] ?? 0);
-  return `# Remote branch stale-work audit\n\nGenerated: ${summary.generatedAt}\n\nBase: \`${summary.base}\`\n\nRemote: \`${summary.remote}\`\nGitHub open PR check: ${summary.githubPullRequestsChecked ? `yes (${summary.openPullRequests} open PRs in ${summary.githubRepository})` : "unavailable"}\n\nRegenerate this report with \`npm run --silent branch:audit -- --output docs/remote-branch-audit.md\`. Use \`--json\` for automation.\n\n## Summary\n\n- Total remote branches audited: ${summary.totalBranches}\n- Redundant branches: ${redundantTotal}\n  - Fully merged by commit: ${summary.counts["redundant-merged"] ?? 0}\n  - Patch-equivalent to base: ${summary.counts["redundant-patch-equivalent"] ?? 0}\n- Valid candidates needing human review: ${summary.counts["valid-candidate"] ?? 0}\n- Branches with open PRs: ${summary.counts["open-pr"] ?? 0}\n\n## Valid candidates without open PRs\n\nThese branches still have unique patch commits relative to \`${summary.base}\`. Review before deleting or recreating PRs.\n\n${markdownTable(branches, "valid-candidate")}\n## Redundant: fully merged by commit\n\n${markdownTable(branches, "redundant-merged")}\n## Redundant: patch-equivalent to base\n\nThese branches still have commits ahead of the base ref, but \`git cherry\` reports their patches as already present in \`${summary.base}\`.\n\n${markdownTable(branches, "redundant-patch-equivalent")}\n## Open PR branches\n\n${markdownTable(branches, "open-pr")}`;
+  return `# Remote branch stale-work audit\n\nGenerated: ${summary.generatedAt}\n\nBase: \`${summary.base}\`\n\nRemote: \`${summary.remote}\`\nGitHub open PR check: ${summary.githubPullRequestsChecked ? `yes (${summary.openPullRequests} open PRs in ${summary.githubRepository})` : "unavailable"}\n\nRegenerate this report with \`npm run --silent branch:audit -- --output docs/remote-branch-audit.md\`. Use \`--json\` for automation.\n\n## Summary\n\n- Total remote branches audited: ${summary.totalBranches}\n- Redundant branches: ${redundantTotal}\n  - Fully merged by commit: ${summary.counts["redundant-merged"] ?? 0}\n  - Patch-equivalent to base: ${summary.counts["redundant-patch-equivalent"] ?? 0}\n- Valid candidates needing human review: ${summary.counts["valid-candidate"] ?? 0}\n- Branches with open PRs: ${summary.counts["open-pr"] ?? 0}\n\n## Discord-friendly valid-candidate next-action shortlist\n\n${renderDiscordNextActionShortlist(result.discordNextActionShortlist)}\n## Valid candidates without open PRs\n\nThese branches still have unique patch commits relative to \`${summary.base}\`. This audit is read-only and does not recommend deleting branches or merging code.\n\n${markdownTable(branches, "valid-candidate")}\n## Redundant: fully merged by commit\n\n${markdownTable(branches, "redundant-merged")}\n## Redundant: patch-equivalent to base\n\nThese branches still have commits ahead of the base ref, but \`git cherry\` reports their patches as already present in \`${summary.base}\`.\n\n${markdownTable(branches, "redundant-patch-equivalent")}\n## Open PR branches\n\n${markdownTable(branches, "open-pr")}`;
 }
 
 function main() {
@@ -251,7 +308,12 @@ function main() {
         || right.lastCommitDate.localeCompare(left.lastCommitDate)
         || left.branch.localeCompare(right.branch);
     });
-  const result = { summary: summarize(branches, prInfo, options), branches };
+  const summary = summarize(branches, prInfo, options);
+  const result = {
+    summary,
+    branches,
+    discordNextActionShortlist: buildDiscordNextActionShortlist(branches, summary),
+  };
   const output = options.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : renderMarkdown(result);
 
   if (options.output) {

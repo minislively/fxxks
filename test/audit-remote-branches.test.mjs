@@ -88,6 +88,27 @@ printf '%s\n' '[]'
         "test/domain-detector.test.mjs",
       ],
     });
+    assert.deepEqual(result.discordNextActionShortlist, [
+      {
+        branch: "feature-a",
+        ref: "origin/feature-a",
+        action: "Read-only triage: inspect the branch diff and record an owner plus outcome; this artifact does not recommend deleting branches or merging code.",
+        reviewFocus: "inspect deleted current-file paths before any cleanup decision",
+        evidence: "1 unique patch commit; destructive-stale-tree (2 current-file deletes; deletes `scripts/audit-remote-branches.mjs`, `test/domain-detector.test.mjs`); last commit 2026-04-27 (bbbbbbbbbbbb)",
+        diffCommand: "git diff --stat origin/main...origin/feature-a",
+      },
+    ]);
+
+    const markdown = execFileSync(process.execPath, [auditScript, "--markdown"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.match(markdown, /## Discord-friendly valid-candidate next-action shortlist/);
+    assert.match(markdown, /Read-only operator shortlist for Discord handoff/);
+    assert.match(markdown, /does not recommend deleting branches or merging code/);
+    assert.match(markdown, /`feature-a` — inspect deleted current-file paths before any cleanup decision/);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
