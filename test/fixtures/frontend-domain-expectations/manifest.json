@@ -225,6 +225,44 @@
       "supportClaim": "none",
       "evidenceScope": "rn-component-semantics-readiness-only",
       "fallbackReasonScope": "current-boundary-reason-only"
+    },
+    {
+      "slot": "F11",
+      "id": "react-web-custom-design-system-card",
+      "lane": "react-web",
+      "path": "test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local React Web design-system style fixture with custom components only",
+      "expectedOutcome": "extract",
+      "requiredSignals": [
+        "className",
+        "custom components",
+        "event handler",
+        "design-system composition"
+      ],
+      "forbiddenClaims": [
+        "No RN/WebView/TUI support claim"
+      ],
+      "verification": "decidePreRead returns payload through the React Web current-supported-lane profile gate"
+    },
+    {
+      "slot": "F12",
+      "id": "react-web-custom-form-shell",
+      "lane": "react-web",
+      "path": "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local React Web form-shell fixture with custom components only and no lowercase DOM tags",
+      "expectedOutcome": "extract",
+      "requiredSignals": [
+        "className",
+        "htmlFor",
+        "custom form shell",
+        "event handler"
+      ],
+      "forbiddenClaims": [
+        "No RN/WebView/TUI support claim"
+      ],
+      "verification": "detectDomain classifies React Web and decidePreRead returns payload without weakening non-web fallback boundaries"
     }
   ],
   "deferred": [

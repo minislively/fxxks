@@ -4175,7 +4175,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     return resolved;
   };
 
-  assert.deepEqual([...selected.keys()], ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F9", "F10"]);
+  assert.deepEqual([...selected.keys()], ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F9", "F10", "F11", "F12"]);
   assert.deepEqual([...deferred.keys()], ["F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
@@ -4234,6 +4234,12 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.ok(selected.get("F9").requiredSignals.includes("FlatList"));
   assert.equal(selected.get("F10").expectedOutcome, "fallback");
   assert.equal(selected.get("F10").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F11").expectedOutcome, "extract");
+  assert.equal(selected.get("F11").lane, "react-web");
+  assert.ok(selected.get("F11").requiredSignals.includes("className"));
+  assert.equal(selected.get("F12").expectedOutcome, "extract");
+  assert.equal(selected.get("F12").lane, "react-web");
+  assert.ok(selected.get("F12").requiredSignals.includes("htmlFor"));
 
   for (const slot of ["F1", "F2", "F9", "F10"]) {
     assert.equal(selected.get(slot).supportClaim, "none", `${selected.get(slot).id} must not claim RN support`);
@@ -4275,6 +4281,16 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(reactWeb.language, "tsx");
   assert.ok(["compressed", "hybrid", "raw"].includes(reactWeb.mode));
   assert.ok(reactWeb.componentName || reactWeb.structure?.jsx?.length > 0);
+
+  for (const slot of ["F11", "F12"]) {
+    const item = selected.get(slot);
+    const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
+    assert.equal(decision.decision, "payload", `${item.id} should reuse payload as React Web current lane`);
+    assert.equal(decision.debug.domainDetection.classification, "react-web", `${item.id} should classify as React Web`);
+    assert.equal(decision.debug.domainDetection.profile.claimStatus, "current-supported-lane", `${item.id} should stay in the current supported lane`);
+    assert.ok(decision.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"), `${item.id} should carry className evidence`);
+    assert.equal("fallback" in decision, false, `${item.id} must not fall back after React Web evidence`);
+  }
 
   const tuiInk = extractFile(path.join(repoRoot, selected.get("F5").path));
   assert.equal(tuiInk.language, "tsx");
