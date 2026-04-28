@@ -1226,6 +1226,8 @@ export function CustomOnlyForm() {
   assert.equal(customReactWeb.decision, "payload");
   assert.equal(customReactWeb.debug.domainDetection.classification, "react-web");
   assert.equal(customReactWeb.debug.domainDetection.profile.claimStatus, "current-supported-lane");
+  assert.equal(customReactWeb.debug.frontendPayloadPolicy.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+  assert.equal(customReactWeb.debug.frontendPayloadPolicy.allowed, true);
   assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"));
   assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:htmlFor"));
 
@@ -1264,6 +1266,7 @@ export function CustomOnlyForm() {
   assert.equal(tui.fallback.reason, unsupportedFrontendProfile);
   assert.equal(tui.debug.domainDetection.classification, "tui-ink");
   assert.equal(tui.debug.domainDetection.profile.claimStatus, "evidence-only");
+  assert.notEqual(tui.debug.frontendPayloadPolicy?.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   assert.notEqual(tui.debug.frontendPayloadPolicy?.allowed, true);
   assert.equal("payload" in tui, false);
 
@@ -1273,6 +1276,7 @@ export function CustomOnlyForm() {
   assert.equal(moduleTs.debug.language, "ts");
   assert.equal(moduleTs.debug.domainDetection.classification, "unknown");
   assert.equal(moduleTs.debug.domainDetection.profile.claimStatus, "deferred");
+  assert.notEqual(moduleTs.debug.frontendPayloadPolicy?.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   assert.ok(moduleTs.payload.structure.moduleDeclarations?.length);
   assert.equal("editGuidance" in moduleTs.payload, false);
 
@@ -4436,6 +4440,12 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(decision.decision, "payload", `${item.id} should reuse payload as React Web current lane`);
     assert.equal(decision.debug.domainDetection.classification, "react-web", `${item.id} should classify as React Web`);
     assert.equal(decision.debug.domainDetection.profile.claimStatus, "current-supported-lane", `${item.id} should stay in the current supported lane`);
+    assert.equal(
+      decision.debug.frontendPayloadPolicy.name,
+      preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+      `${item.id} should expose the React Web current-supported payload policy marker`,
+    );
+    assert.equal(decision.debug.frontendPayloadPolicy.allowed, true, `${item.id} should allow the React Web current-supported payload policy`);
     assert.ok(decision.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"), `${item.id} should carry className evidence`);
     assert.equal("fallback" in decision, false, `${item.id} must not fall back after React Web evidence`);
   }
@@ -4469,6 +4479,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(decision.decision, "fallback", `${item.id} should stay outside the RN primitive/input narrow payload gate`);
     assert.deepEqual(decision.reasons, [preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON]);
     assert.equal(decision.fallback.reason, preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.notEqual(decision.debug.frontendPayloadPolicy.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
     assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
   }
 
@@ -4478,6 +4489,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(decision.decision, "fallback", `${item.id} should stay WebView fallback-first`);
     assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
     assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
+    assert.notEqual(decision.debug.frontendPayloadPolicy?.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   }
 
   for (const slot of ["F3", "F4", "F6"]) {
@@ -4490,6 +4502,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal("payload" in decision, false, `${item.id} must not build a compact payload across the WebView boundary`);
     assert.equal(decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
     assert.equal(decision.debug.domainDetection.profile.boundaryReason, "unsupported-react-native-webview-boundary");
+    assert.notEqual(decision.debug.frontendPayloadPolicy?.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   }
 });
 

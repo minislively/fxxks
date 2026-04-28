@@ -11,6 +11,7 @@ const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
+export const REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY = "react-web-current-supported-lane";
 export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
 const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
   "react-native:primitive:View",
@@ -94,6 +95,10 @@ function frontendDebug(
 }
 
 export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResult): FrontendPayloadPolicyDecision | undefined {
+  if (domainDetection.classification === "react-web" && domainDetection.profile.claimStatus === "current-supported-lane") {
+    return { name: REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY, allowed: true };
+  }
+
   if (domainDetection.classification !== "react-native") return undefined;
 
   const missingSignal = RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS.find((signal) => !hasSignal(domainDetection, signal));
