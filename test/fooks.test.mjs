@@ -4681,6 +4681,18 @@ test("docs give first-run users a clear support and diagnosis path", () => {
   assert.match(combined, /no universal read interception|Universal file-read interception/);
 });
 
+test("docs keep bounded R4 rerun diagnostic reason tied to claimability failures", () => {
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const benchmarkEvidence = fs.readFileSync(path.join(repoRoot, "docs", "benchmark-evidence.md"), "utf8");
+  const combined = `${release}\n${benchmarkEvidence}`;
+
+  assert.match(combined, /2026-04-25 bounded rerun accepted 5\/7 pairs/);
+  assert.match(combined, /one severe runtime-token regression remained/);
+  assert.match(combined, /stable claimability flags stayed false/);
+  assert.match(benchmarkEvidence, /not because the accepted-pair\s+denominator was missing/);
+  assert.doesNotMatch(benchmarkEvidence, /diagnostic-only` because\s+the candidate threshold was not met/);
+});
+
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");

@@ -112,7 +112,8 @@ A bounded live rerun used the repeated R4 applied-code path with
 `requiredAccepted=5`, `maxPairs=8`, Codex provider mode, and model
 `gpt-5.4-mini`. It attempted seven matched vanilla/fooks pairs and accepted
 five pairs, but the summary classification remained `diagnostic-only` because
-the candidate threshold was not met.
+regression outliers kept stable claimability false, not because the accepted-pair
+denominator was missing.
 
 Accepted-pair medians were directionally positive: fooks supplied an 86.4%
 smaller prompt, CLI-reported runtime tokens were 22.4% lower, and latency was
