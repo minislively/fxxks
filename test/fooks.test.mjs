@@ -4220,11 +4220,17 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.equal(selected.get("negative-rn-webview-boundary").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("webview-bridge-pair").expectedOutcome, "fallback");
   assert.equal(selected.get("webview-bridge-pair").expectedReason, "unsupported-react-native-webview-boundary");
-  assert.equal(selected.get("webview-bridge-pair").supportClaim, "none");
-  assert.equal(selected.get("webview-bridge-pair").evidenceScope, "fallback-boundary-evidence-only");
   assert.deepEqual(selected.get("webview-bridge-pair").relatedSourcePaths, [
     "test/fixtures/frontend-domain-expectations/webview/checkout-bridge-web.html",
   ]);
+  for (const webviewId of ["webview-boundary-basic", "webview-bridge-pair", "negative-rn-webview-boundary"]) {
+    const item = selected.get(webviewId);
+    assert.equal(item.supportClaim, "none", `${webviewId} must not claim WebView support`);
+    assert.equal(item.evidenceScope, "fallback-boundary-evidence-only", `${webviewId} must stay fallback-boundary evidence only`);
+    for (const forbidden of ["No WebView support claim", "No bridge safety claim", "No WebView compact payload reuse"]) {
+      assert.ok(item.forbiddenClaims.includes(forbidden), `${webviewId} must forbid ${forbidden}`);
+    }
+  }
   assert.equal(deferred.get("webview-bridge-pair"), undefined);
   assert.equal(selected.get("tui-ink-basic").supportClaim, "none");
   assert.equal(selected.get("tui-ink-basic").evidenceScope, "syntax-evidence-only");
@@ -4324,8 +4330,6 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F4").id, "webview-bridge-pair");
   assert.equal(selected.get("F4").expectedOutcome, "fallback");
   assert.equal(selected.get("F4").expectedReason, "unsupported-react-native-webview-boundary");
-  assert.equal(selected.get("F4").supportClaim, "none");
-  assert.equal(selected.get("F4").evidenceScope, "fallback-boundary-evidence-only");
   assert.deepEqual(selected.get("F4").relatedSourcePaths, [
     "test/fixtures/frontend-domain-expectations/webview/checkout-bridge-web.html",
   ]);
@@ -4358,6 +4362,16 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(selected.get(slot).preReadExpectedReason, preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON, `${selected.get(slot).id} must declare pre-read profile fallback separately`);
     assert.doesNotMatch(selected.get(slot).verification, /decidePreRead returns fallback with unsupported-react-native-webview-boundary/);
     assert.ok(selected.get(slot).forbiddenClaims.some((claim) => /No React Native support claim/.test(claim)), `${selected.get(slot).id} must forbid React Native support claims`);
+  }
+
+  for (const slot of ["F3", "F4", "F6"]) {
+    const item = selected.get(slot);
+    assert.equal(item.supportClaim, "none", `${item.id} must not claim WebView support`);
+    assert.equal(item.evidenceScope, "fallback-boundary-evidence-only", `${item.id} must stay fallback-boundary evidence only`);
+    for (const forbidden of ["No WebView support claim", "No bridge safety claim", "No WebView compact payload reuse"]) {
+      assert.ok(item.forbiddenClaims.includes(forbidden), `${item.id} must forbid ${forbidden}`);
+    }
+    assert.doesNotMatch(item.verification, /payload reuse is enabled|bridge safety is guaranteed|WebView is supported/i);
   }
 
   for (const item of deferred.values()) {
@@ -4496,6 +4510,9 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(docs, /WebView boundary hardening gate/);
   assert.match(docs, /`F3`, `F4`, and `F6` must return the `unsupported-react-native-webview-boundary` fallback without constructing a compact payload/);
   assert.match(docs, /Mixed DOM plus WebView snippets must choose the safety fallback/);
+  assert.match(docs, /WebView hardening is a serialized shared-policy owner lane/);
+  assert.match(docs, /keep `F3`, `F4`, and `F6` at `supportClaim: "none"` with `fallback-boundary-evidence-only` scope/);
+  assert.match(docs, /forbid all three claims together: WebView support, bridge safety, and compact-payload reuse/);
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
   assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);

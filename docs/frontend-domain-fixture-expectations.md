@@ -32,6 +32,8 @@ The WebView fixture lane is fallback-first even when pre-read edit guidance is r
 
 Mixed DOM plus WebView snippets must choose the safety fallback over the React Web current-supported lane. Bare `<WebView>` snippets without an import are also treated as WebView boundary evidence so embedded HTML strings and bridge markers do not accidentally unlock React Web payload reuse.
 
+WebView hardening is a serialized shared-policy owner lane whenever it updates manifest, shared docs, or regression tests. That PR must carry the merge-order note and must keep `F3`, `F4`, and `F6` at `supportClaim: "none"` with `fallback-boundary-evidence-only` scope. Each selected WebView boundary fixture must forbid all three claims together: WebView support, bridge safety, and compact-payload reuse.
+
 
 ## RN component semantics readiness gate
 

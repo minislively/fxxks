@@ -104,9 +104,12 @@
       ],
       "forbiddenClaims": [
         "No WebView support claim",
-        "No WebView compact payload reuse"
+        "No WebView compact payload reuse",
+        "No bridge safety claim"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary and docs/tests forbid WebView support, bridge-safety, and compact-payload reuse claims",
+      "supportClaim": "none",
+      "evidenceScope": "fallback-boundary-evidence-only"
     },
     {
       "slot": "F4",
@@ -130,7 +133,7 @@
       "forbiddenClaims": [
         "No WebView support claim",
         "No bridge safety claim",
-        "No compact payload reuse"
+        "No WebView compact payload reuse"
       ],
       "supportClaim": "none",
       "evidenceScope": "fallback-boundary-evidence-only",
@@ -178,10 +181,13 @@
         "onMessage"
       ],
       "forbiddenClaims": [
-        "No compact payload reuse",
-        "No bridge safety claim"
+        "No WebView compact payload reuse",
+        "No bridge safety claim",
+        "No WebView support claim"
       ],
-      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary"
+      "verification": "decidePreRead returns fallback with unsupported-react-native-webview-boundary and docs/tests forbid WebView support, bridge-safety, and compact-payload reuse claims",
+      "supportClaim": "none",
+      "evidenceScope": "fallback-boundary-evidence-only"
     },
     {
       "slot": "F9",
