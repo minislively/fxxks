@@ -58,6 +58,26 @@ test("detects React Web profile metadata for the current supported lane", () => 
   assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });
 
+test("detects React Web custom-component className evidence for the current supported lane", () => {
+  const result = detectDomainFromSource(
+    `import { Button, FieldLabel } from "@/components/ui";
+     export function CustomOnlyForm() {
+       return <Button className="rounded px-3"><FieldLabel htmlFor="email">Email</FieldLabel></Button>;
+     }`,
+    "CustomOnlyForm.tsx",
+  );
+
+  assert.equal(result.classification, "react-web");
+  assert.equal(result.outcome, "extract");
+  assertProfile(result, {
+    claimStatus: "current-supported-lane",
+    fallbackFirst: false,
+    claimBoundary: "react-web-measured-extraction",
+  });
+  assertSignals(result, ["react-web:jsx-attribute:className", "react-web:jsx-attribute:htmlFor"]);
+  assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
+});
+
 test("detects React Native evidence signals without support wording", () => {
   const primitive = detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
   assert.equal(primitive.classification, "react-native");
@@ -169,7 +189,18 @@ test("classifies web DOM mixed with non-web frontend signals as fallback", () =>
   assert.ok(tuiDom.signals.includes("tui-ink:import:ink"));
   assert.ok(tuiDom.signals.includes("tui-ink:primitive:Box"));
 
-  assert.doesNotMatch(JSON.stringify([rnDom, webviewDom, tuiDom]), forbiddenSupportClaims);
+  const rnClassName = detectDomainFromSource(
+    `import { View } from "react-native";
+     export function NativeWithClassName() { return <View className="p-2" />; }`,
+    "NativeWithClassName.tsx",
+  );
+  assert.equal(rnClassName.classification, "mixed");
+  assert.equal(rnClassName.outcome, "fallback");
+  assert.equal(rnClassName.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(rnClassName.signals.includes("react-native:primitive:View"));
+  assert.ok(rnClassName.signals.includes("react-web:jsx-attribute:className"));
+
+  assert.doesNotMatch(JSON.stringify([rnDom, webviewDom, tuiDom, rnClassName]), forbiddenSupportClaims);
 });
 
 test("treats bare WebView JSX as a fallback-first boundary signal", () => {

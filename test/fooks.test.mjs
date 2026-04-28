@@ -1189,6 +1189,29 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.ok(jsx.payload.contract);
   assert.equal("editGuidance" in jsx.payload, false);
 
+  const customReactWebDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-profile-"));
+  const customReactWebPath = path.join(customReactWebDir, "CustomOnlyForm.tsx");
+  fs.writeFileSync(
+    customReactWebPath,
+    `import { Button, FieldLabel } from "@/components/ui";
+
+export function CustomOnlyForm() {
+  return (
+    <Button className="rounded px-3" onClick={() => undefined}>
+      <FieldLabel htmlFor="email">Email</FieldLabel>
+    </Button>
+  );
+}
+`,
+  );
+  const customReactWeb = decideCodexPreRead(customReactWebPath, customReactWebDir);
+  assert.equal(customReactWeb.eligible, true);
+  assert.equal(customReactWeb.decision, "payload");
+  assert.equal(customReactWeb.debug.domainDetection.classification, "react-web");
+  assert.equal(customReactWeb.debug.domainDetection.profile.claimStatus, "current-supported-lane");
+  assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"));
+  assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:htmlFor"));
+
   const unsupportedFrontendProfile = preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON;
   const tui = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "tui-ink-basic.tsx"), repoRoot);
   assert.equal(tui.eligible, true);

@@ -59,6 +59,7 @@ const RN_PRIMITIVES = new Set([
   "TouchableWithoutFeedback",
 ]);
 const WEB_DOM_TAGS = new Set(["div", "span", "form", "input", "button", "select", "textarea", "label"]);
+const WEB_REACT_ATTRIBUTES = new Set(["className", "htmlFor"]);
 const WEBVIEW_PROPS = new Set(["source", "injectedJavaScript", "onMessage"]);
 const TUI_PRIMITIVES = new Set(["Box", "Text"]);
 const TUI_HOOKS = new Set(["useInput"]);
@@ -180,7 +181,7 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
   const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
   const importedNamesByModule = new Map<string, Set<string>>();
   const evidence: FrontendDomainEvidence[] = [];
-  let hasWebDom = false;
+  let hasReactWebEvidence = false;
 
   function rememberImportedName(moduleName: string, name: string): void {
     const names = importedNamesByModule.get(moduleName) ?? new Set<string>();
@@ -231,12 +232,22 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
         if (RN_PRIMITIVES.has(tag) && hasImportedName(RN_MODULE, tag)) addEvidence(evidence, "react-native", "primitive", tag);
         if (tag === "WebView") addEvidence(evidence, "webview", "component", tag);
         if (TUI_PRIMITIVES.has(tag) && hasImportedName(INK_MODULE, tag)) addEvidence(evidence, "tui-ink", "primitive", tag);
-        if (WEB_DOM_TAGS.has(tag)) hasWebDom = true;
+        if (WEB_DOM_TAGS.has(tag)) {
+          hasReactWebEvidence = true;
+          addEvidence(evidence, "react-web", "dom-tag", tag);
+        }
       }
     }
 
-    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && WEBVIEW_PROPS.has(node.name.text) && hasEvidence(evidence, "webview")) {
-      addEvidence(evidence, "webview", "prop", node.name.text);
+    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name)) {
+      const attributeName = node.name.text;
+      if (WEB_REACT_ATTRIBUTES.has(attributeName)) {
+        hasReactWebEvidence = true;
+        addEvidence(evidence, "react-web", "jsx-attribute", attributeName);
+      }
+      if (WEBVIEW_PROPS.has(attributeName) && hasEvidence(evidence, "webview")) {
+        addEvidence(evidence, "webview", "prop", attributeName);
+      }
     }
 
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
@@ -258,7 +269,7 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
   }
 
   visit(sourceFile);
-  return classify(evidence, hasWebDom);
+  return classify(evidence, hasReactWebEvidence);
 }
 
 export function detectDomain(filePath: string): DomainDetectionResult {
