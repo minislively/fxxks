@@ -4498,6 +4498,7 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
     fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
   );
   const docs = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
+  const boundaryMap = fs.readFileSync(path.join(repoRoot, "docs", "frontend-fixture-boundary-regression-map.md"), "utf8");
   const webviewBridgePlan = fs.readFileSync(path.join(repoRoot, "docs", "webview-bridge-boundary-plan.md"), "utf8");
   const selectedRows = parseMarkdownTableRows(docs, "Selected fixture expectations");
   const deferredRows = parseMarkdownTableRows(docs, "Deferred fixture slots");
@@ -4544,6 +4545,8 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(docs, /must not construct a compact payload by default/);
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
+  assert.match(docs, /\[frontend fixture boundary regression map\]\(frontend-fixture-boundary-regression-map\.md\)/);
+  assert.match(boundaryMap, /## Regression map/);
   assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);
   assert.match(webviewBridgePlan, /`F4` \(`webview-bridge-pair`\) as \*\*selected fallback-boundary evidence\*\*/);
   assert.match(webviewBridgePlan, /checkout\.submit/);
@@ -4574,6 +4577,86 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.doesNotMatch(webviewBridgePlan, /WebView bridge is safe/i);
   assert.doesNotMatch(webviewBridgePlan, /compact[- ]payload reuse is (?:available|enabled|safe)/i);
   assert.doesNotMatch(webviewBridgePlan, /default WebView compact extraction is enabled/i);
+});
+
+test("frontend fixture boundary regression map keeps RN WebView TUI claim boundaries compact", () => {
+  const expectations = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
+  );
+  const boundaryMap = fs.readFileSync(path.join(repoRoot, "docs", "frontend-fixture-boundary-regression-map.md"), "utf8");
+  const rows = parseMarkdownTableRows(boundaryMap, "Regression map");
+  const docsBySlot = new Map(
+    rows.map(([slot, lane, boundaryLabel, detectorExpectation, preReadExpectation, mustNotClaim, reviewCue]) => [
+      stripMarkdownCode(slot),
+      {
+        lane,
+        boundaryLabel,
+        detectorExpectation,
+        preReadExpectation,
+        mustNotClaim,
+        reviewCue,
+      },
+    ]),
+  );
+  const manifestBySlot = new Map([...expectations.selected, ...expectations.deferred].map((item) => [item.slot, item]));
+
+  assert.deepEqual([...docsBySlot.keys()], ["F1", "F2", "F9", "F10", "F3", "F4", "F6", "F5", "F7"]);
+
+  for (const slot of docsBySlot.keys()) {
+    assert.ok(manifestBySlot.has(slot), `${slot} boundary map row must exist in manifest`);
+  }
+
+  const rnPrimitive = docsBySlot.get("F1");
+  assert.equal(rnPrimitive.boundaryLabel, "measured narrow payload");
+  assert.match(rnPrimitive.detectorExpectation, /fallback/);
+  assert.match(rnPrimitive.detectorExpectation, /unsupported-react-native-webview-boundary/);
+  assert.match(rnPrimitive.preReadExpectation, /payload/);
+  assert.match(rnPrimitive.preReadExpectation, /rn-primitive-input-narrow-payload/);
+  assert.match(rnPrimitive.mustNotClaim, /React Native support/);
+  assert.match(rnPrimitive.reviewCue, /does not cover `F2`, `F9`, or `F10`/);
+
+  for (const slot of ["F2", "F9", "F10"]) {
+    const row = docsBySlot.get(slot);
+    assert.equal(row.boundaryLabel, "readiness evidence only", `${slot} must stay RN readiness-only`);
+    assert.match(row.detectorExpectation, /unsupported-react-native-webview-boundary/);
+    assert.match(row.preReadExpectation, /unsupported-frontend-domain-profile/);
+    assert.match(row.mustNotClaim, /React Native support/);
+    assert.doesNotMatch(row.preReadExpectation, /rn-primitive-input-narrow-payload/);
+  }
+
+  for (const slot of ["F3", "F4", "F6"]) {
+    const row = docsBySlot.get(slot);
+    assert.equal(row.boundaryLabel, "fallback-only boundary", `${slot} must stay WebView fallback-only`);
+    assert.match(row.detectorExpectation, /unsupported-react-native-webview-boundary/);
+    assert.match(row.preReadExpectation, /unsupported-react-native-webview-boundary/);
+    assert.match(row.mustNotClaim, /WebView support/);
+    assert.match(row.mustNotClaim, /bridge safety/);
+    assert.match(row.mustNotClaim, /compact-payload reuse/);
+    assert.doesNotMatch(`${row.preReadExpectation} ${row.reviewCue}`, /payload construction is allowed|payload reuse is enabled/i);
+  }
+
+  const tui = docsBySlot.get("F5");
+  assert.equal(tui.boundaryLabel, "syntax-only evidence");
+  assert.match(tui.detectorExpectation, /extractable TSX syntax evidence/);
+  assert.match(tui.preReadExpectation, /unsupported-frontend-domain-profile/);
+  assert.match(tui.mustNotClaim, /TUI\/Ink support/);
+  assert.match(tui.mustNotClaim, /terminal correctness/);
+  assert.match(tui.mustNotClaim, /token\/cost\/performance savings/);
+  assert.match(tui.mustNotClaim, /default compact extraction/);
+
+  const deferred = docsBySlot.get("F7");
+  assert.equal(deferred.boundaryLabel, "deferred");
+  assert.match(deferred.detectorExpectation, /no executable fixture path/);
+  assert.match(deferred.preReadExpectation, /no executable fixture path/);
+  assert.match(deferred.mustNotClaim, /broad terminal renderer support/);
+
+  for (const slot of ["F1", "F2", "F9", "F10", "F3", "F4", "F6", "F5"]) {
+    assert.equal(manifestBySlot.get(slot).supportClaim, "none", `${slot} must stay no-support in manifest`);
+  }
+  assert.doesNotMatch(
+    boundaryMap,
+    /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|bridge safety is guaranteed|compact[- ]payload reuse is (?:available|enabled|safe)|terminal correctness is guaranteed|terminal UX safety is guaranteed|runtime-token savings are available|provider-token savings are available|billing savings are available|performance improvement is available|default WebView compact extraction is enabled|default TUI compact extraction is enabled/i,
+  );
 });
 
 test("docs give first-run users a clear support and diagnosis path", () => {

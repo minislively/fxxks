@@ -8,7 +8,7 @@ Selected first-pass fixtures are limited to `existing-local` or `synthetic-local
 
 ## Selected fixture expectations
 
-The machine-readable fixture expectation manifest at `test/fixtures/frontend-domain-expectations/manifest.json` is the source of truth for selected and deferred slots. This table mirrors that manifest so parallel domain work does not reinterpret selected fixtures differently.
+The machine-readable fixture expectation manifest at `test/fixtures/frontend-domain-expectations/manifest.json` is the source of truth for selected and deferred slots. This table mirrors that manifest so parallel domain work does not reinterpret selected fixtures differently. For a compact cross-fixture claim-boundary view, use the [frontend fixture boundary regression map](frontend-fixture-boundary-regression-map.md).
 
 | Slot | ID | Lane | Source kind | Path | Expected outcome | Required proof |
 | --- | --- | --- | --- | --- | --- | --- |
