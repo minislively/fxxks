@@ -51,7 +51,7 @@ This issue does not migrate the manifest schema. The current schema remains the 
 
 ## Next detector/profile promotion gate
 
-The next detector/profile PR may start only after this contract is green in docs and tests. That later PR must be explicitly scoped and must include, before source behavior changes:
+The next detector/profile PR may start only after this contract is green in docs and tests. Evidence lanes do not approve detector/profile implementation by themselves. That later PR must be explicitly scoped and must include, before source behavior changes:
 
 - fixture-backed domain classification rules for React Web, React Native, WebView, TUI-Ink, Mixed, and Unknown;
 - pass/fail expectations for each promoted fixture;
@@ -59,5 +59,29 @@ The next detector/profile PR may start only after this contract is green in docs
 - wording boundaries that avoid RN/WebView/TUI support claims beyond measured evidence;
 - regression coverage proving the manifest remains a pre-detector/profile gate;
 - a stated non-goal for package/lockfile changes, setup/CLI changes, runtime/pre-read broadening, manifest schema migration, and domain sharding unless a separate issue explicitly opens one of those lanes.
+
+### Detector promotion readiness checklist
+
+A promotion candidate must pass every gate below before it changes runtime detector, extractor, or pre-read behavior. A failed gate keeps the current fallback/deferred contract in place.
+
+| Gate | Required proof before promotion | Blocks promotion when |
+| --- | --- | --- |
+| Domain coverage | Classification evidence and expected outcome are named for React Web, React Native, WebView, TUI-Ink, Mixed, and Unknown. | Any selected domain relies on syntax evidence without an explicit `extract`, `fallback`, or `deferred` expectation. |
+| Fixture manifest alignment | `test/fixtures/frontend-domain-expectations/manifest.json`, fixture docs, and contract wording agree on lane, outcome, reason, and support-claim boundary. | The manifest schema must change without a separate migration plan, or docs/tests disagree on the current schema. |
+| Fallback safety | WebView and mixed-boundary cases keep fallback-first behavior unless a later approved security/boundary plan narrows the scope. | A change implies WebView bridge safety, compact-payload reuse, or fallback removal without that later approval. |
+| Runtime-change approval | The PR names the exact detector/profile behavior that will change and the regression proof for it. | Runtime detector, extractor, or pre-read behavior changes are introduced from evidence-lane docs alone. |
+| Claim wording | Public/user-facing wording remains limited to measured evidence and current supported lane. | RN, WebView, or TUI evidence is described as support, terminal correctness, bridge safety, or broad compact extraction. |
+| Source-reading reason boundary | `unsupported-react-native-webview-boundary` remains the current source-reading boundary reason until a later semantic model is approved. | The fallback reason is treated as a permanent RN/WebView/TUI semantic model or reused to claim domain support. |
+
+### Domain readiness matrix
+
+| Domain | Promotion-ready evidence required | Current stop condition |
+| --- | --- | --- |
+| React Web | Existing supported React Web fixtures stay green while any new detector rule proves no regression to current form/DOM extraction behavior. | React Web evidence is used to imply RN, WebView, TUI, Mixed, or Unknown support. |
+| React Native | RN primitive, interaction/list, style/platform/navigation, and fallback-reason expectations are fixture-backed and documented as measured evidence only, not a final RN semantic model. | RN primitives are mapped to DOM controls, or `unsupported-react-native-webview-boundary` is treated as a final RN semantic model instead of the current boundary reason. |
+| WebView | WebView source/HTML/bridge fixtures stay fallback-first with explicit bridge-boundary wording. | The change claims WebView bridge safety, enables compact-payload reuse, or weakens fallback-first behavior. |
+| TUI-Ink | Ink syntax fixtures prove only local TSX traversal and measured fixture outcomes. | The change claims broad TUI support, terminal behavior correctness, runtime-token savings, or default TUI compact extraction. |
+| Mixed | Mixed signals select the strongest safety boundary and document why fallback/deferred wins. | The change promotes Mixed by choosing the most convenient single domain. |
+| Unknown | Weak or absent signals remain deferred or generic only under existing eligibility rules. | Unknown is treated as implicit React Web, RN, WebView, or TUI support. |
 
 Promotion stops at the first failed gate. Until that later gate passes, this contract is documentation and regression protection only.

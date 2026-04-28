@@ -5,6 +5,12 @@ import ts from "typescript";
 export type DomainLabel = "react-web" | "react-native" | "webview" | "tui-ink" | "mixed" | "unknown";
 export type FrontendDomainClassification = DomainLabel;
 export type FrontendDomainOutcome = "extract" | "fallback" | "deferred" | "unsupported";
+export type FrontendDomainProfileClaimStatus = "current-supported-lane" | "evidence-only" | "fallback-boundary" | "deferred";
+export type FrontendDomainProfileClaimBoundary =
+  | "react-web-measured-extraction"
+  | "domain-evidence-only"
+  | "source-reading-boundary"
+  | "unknown-deferred";
 
 export const FRONTEND_DOMAIN_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 
@@ -14,12 +20,22 @@ export type FrontendDomainEvidence = {
   detail: string;
 };
 
+export type FrontendDomainProfileMetadata = {
+  lane: DomainLabel;
+  outcome: FrontendDomainOutcome;
+  claimStatus: FrontendDomainProfileClaimStatus;
+  fallbackFirst: boolean;
+  boundaryReason?: string;
+  claimBoundary: FrontendDomainProfileClaimBoundary;
+};
+
 export type DomainDetectionResult = {
   classification: FrontendDomainClassification;
   /** @deprecated Use classification. */
   domain: DomainLabel;
   outcome: FrontendDomainOutcome;
   reason?: string;
+  profile: FrontendDomainProfileMetadata;
   evidence: FrontendDomainEvidence[];
   /** @deprecated Use evidence. */
   signals: string[];
@@ -87,6 +103,50 @@ function outcomeForClassification(classification: DomainLabel): Pick<DomainDetec
   }
 }
 
+function profileForClassification(
+  classification: DomainLabel,
+  outcome: FrontendDomainOutcome,
+  reason?: string,
+): FrontendDomainProfileMetadata {
+  switch (classification) {
+    case "react-web":
+      return {
+        lane: classification,
+        outcome,
+        claimStatus: "current-supported-lane",
+        fallbackFirst: false,
+        claimBoundary: "react-web-measured-extraction",
+      };
+    case "react-native":
+    case "webview":
+    case "mixed":
+      return {
+        lane: classification,
+        outcome,
+        claimStatus: "fallback-boundary",
+        fallbackFirst: true,
+        boundaryReason: reason,
+        claimBoundary: "source-reading-boundary",
+      };
+    case "tui-ink":
+      return {
+        lane: classification,
+        outcome,
+        claimStatus: "evidence-only",
+        fallbackFirst: false,
+        claimBoundary: "domain-evidence-only",
+      };
+    case "unknown":
+      return {
+        lane: classification,
+        outcome,
+        claimStatus: "deferred",
+        fallbackFirst: false,
+        claimBoundary: "unknown-deferred",
+      };
+  }
+}
+
 function classify(evidence: FrontendDomainEvidence[], hasWebDom: boolean): DomainDetectionResult {
   const domainEvidence = ["react-native", "webview", "tui-ink"] as const;
   const matched = domainEvidence.filter((domain) => hasEvidence(evidence, domain));
@@ -101,10 +161,12 @@ function classify(evidence: FrontendDomainEvidence[], hasWebDom: boolean): Domai
     classification = "unknown";
   }
 
+  const outcome = outcomeForClassification(classification);
   return {
     classification,
     domain: classification,
-    ...outcomeForClassification(classification),
+    ...outcome,
+    profile: profileForClassification(classification, outcome.outcome, outcome.reason),
     evidence,
     signals: signalList(evidence),
   };

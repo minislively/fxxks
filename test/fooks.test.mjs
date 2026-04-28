@@ -1071,24 +1071,38 @@ test("extract output includes domainDetection for frontend fixtures", () => {
   assert.ok(rn.domainDetection);
   assert.equal(rn.domainDetection.classification, "react-native");
   assert.ok(rn.domainDetection.signals.includes("react-native:primitive:View"));
+  assert.deepEqual(rn.domainDetection.profile, {
+    lane: "react-native",
+    outcome: "fallback",
+    claimStatus: "fallback-boundary",
+    fallbackFirst: true,
+    boundaryReason: "unsupported-react-native-webview-boundary",
+    claimBoundary: "source-reading-boundary",
+  });
 
   const webview = extractFile(path.join(fixtureRoot, "webview-boundary-basic.tsx"));
   assert.ok(webview.domainDetection);
   assert.equal(webview.domainDetection.classification, "webview");
   assert.ok(webview.domainDetection.signals.includes("webview:component:WebView"));
+  assert.equal(webview.domainDetection.profile.claimStatus, "fallback-boundary");
+  assert.equal(webview.domainDetection.profile.fallbackFirst, true);
 
   const tui = extractFile(path.join(fixtureRoot, "tui-ink-basic.tsx"));
   assert.ok(tui.domainDetection);
   assert.equal(tui.domainDetection.classification, "tui-ink");
   assert.ok(tui.domainDetection.signals.includes("tui-ink:primitive:Box"));
+  assert.equal(tui.domainDetection.profile.claimStatus, "evidence-only");
+  assert.equal(tui.domainDetection.profile.claimBoundary, "domain-evidence-only");
 
   const mixed = extractFile(path.join(fixtureRoot, "negative-rn-webview-boundary.tsx"));
   assert.ok(mixed.domainDetection);
   assert.equal(mixed.domainDetection.classification, "mixed");
+  assert.equal(mixed.domainDetection.profile.claimStatus, "fallback-boundary");
 
   const unknown = extractFile(path.join(repoRoot, "package.json"));
   assert.ok(unknown.domainDetection);
   assert.equal(unknown.domainDetection.classification, "unknown");
+  assert.equal(unknown.domainDetection.profile.claimStatus, "deferred");
 });
 
 test("frontend domain detector and pre-read debug avoid RN WebView TUI support wording", () => {
@@ -1107,6 +1121,8 @@ test("frontend domain detector and pre-read debug avoid RN WebView TUI support w
     assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
     assert.ok(Array.isArray(result.evidence), "detector result must carry evidence");
     assert.equal(typeof result.classification, "string");
+    assert.equal(result.profile.lane, result.classification);
+    assert.equal(result.profile.outcome, result.outcome);
   }
 
   const changedSource = [
@@ -1132,6 +1148,8 @@ test("pre-read uses frontend domain detector for bare WebView fallback boundarie
   assert.deepEqual(result.reasons, ["unsupported-react-native-webview-boundary"]);
   assert.equal(result.debug.domainDetection.classification, "webview");
   assert.equal(result.debug.domainDetection.outcome, "fallback");
+  assert.equal(result.debug.domainDetection.profile.claimStatus, "fallback-boundary");
+  assert.equal(result.debug.domainDetection.profile.boundaryReason, "unsupported-react-native-webview-boundary");
   assert.ok(result.debug.domainDetection.signals.includes("webview:component:WebView"));
 });
 
@@ -3990,8 +4008,26 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(contract, /fixture expectation manifest at `test\/fixtures\/frontend-domain-expectations\/manifest\.json` is the pre-detector\/profile gate/);
   assert.match(contract, /This issue does not migrate the manifest schema/);
   assert.match(contract, /Next detector\/profile promotion gate/);
+  assert.match(contract, /Evidence lanes do not approve detector\/profile implementation by themselves/);
+  assert.match(contract, /Detector promotion readiness checklist/);
+  assert.match(contract, /Domain readiness matrix/);
+  assert.match(contract, /runtime detector, extractor, or pre-read behavior/);
+  assert.match(contract, /manifest schema must change without a separate migration plan/);
+  assert.match(contract, /WebView bridge safety, compact-payload reuse, or fallback removal/);
+  assert.match(contract, /RN, WebView, or TUI evidence is described as support/);
+  assert.match(contract, /`unsupported-react-native-webview-boundary` remains the current source-reading boundary reason/);
+  assert.match(contract, /not a final RN semantic model/);
   assert.match(contract, /Promotion stops at the first failed gate/);
   assert.match(contract, /documentation and regression protection only/);
+
+  const readinessMatrixStart = contract.indexOf("### Domain readiness matrix");
+  assert.notEqual(readinessMatrixStart, -1, "Domain readiness matrix section must exist");
+  const readinessMatrixEnd = contract.indexOf("\n\nPromotion stops", readinessMatrixStart);
+  assert.notEqual(readinessMatrixEnd, -1, "Domain readiness matrix must end before the promotion stop rule");
+  const readinessMatrix = contract.slice(readinessMatrixStart, readinessMatrixEnd);
+  for (const domain of ["React Web", "React Native", "WebView", "TUI-Ink", "Mixed", "Unknown"]) {
+    assert.ok(readinessMatrix.includes(`| ${domain} |`), `${domain} readiness matrix row must exist`);
+  }
 
   assert.equal(expectations.schemaVersion, 1);
   assert.equal(selected.get("react-web-regression-form-controls").lane, "react-web");

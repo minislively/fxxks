@@ -22,6 +22,19 @@ function assertSignals(result, expectedSignals) {
   }
 }
 
+function assertProfile(result, expected) {
+  assert.equal(result.profile.lane, result.classification);
+  assert.equal(result.profile.outcome, result.outcome);
+  assert.equal(result.profile.claimStatus, expected.claimStatus);
+  assert.equal(result.profile.fallbackFirst, expected.fallbackFirst);
+  assert.equal(result.profile.claimBoundary, expected.claimBoundary);
+  if (expected.boundaryReason !== undefined) {
+    assert.equal(result.profile.boundaryReason, expected.boundaryReason);
+  } else {
+    assert.equal(result.profile.boundaryReason, undefined);
+  }
+}
+
 function expectedClassificationForLane(lane) {
   if (lane === "react-web") return "react-web";
   if (lane === "tui-ink") return "tui-ink";
@@ -32,12 +45,26 @@ function expectedClassificationForLane(lane) {
   throw new Error(`No detector classification expectation for lane: ${lane}`);
 }
 
+
+test("detects React Web profile metadata for the current supported lane", () => {
+  const result = detectDomain(path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"));
+  assert.equal(result.classification, "react-web");
+  assert.equal(result.outcome, "extract");
+  assertProfile(result, {
+    claimStatus: "current-supported-lane",
+    fallbackFirst: false,
+    claimBoundary: "react-web-measured-extraction",
+  });
+  assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
+});
+
 test("detects React Native evidence signals without support wording", () => {
   const primitive = detectDomain(path.join(fixtureRoot, "rn-primitive-basic.tsx"));
   assert.equal(primitive.classification, "react-native");
   assert.equal(primitive.domain, "react-native");
   assert.equal(primitive.outcome, "fallback");
   assert.equal(primitive.reason, "unsupported-react-native-webview-boundary");
+  assertProfile(primitive, { claimStatus: "fallback-boundary", fallbackFirst: true, claimBoundary: "source-reading-boundary", boundaryReason: "unsupported-react-native-webview-boundary" });
   assertSignals(primitive, [
     "react-native:import:react-native",
     "react-native:primitive:View",
@@ -70,6 +97,7 @@ test("detects WebView evidence signals without support wording", () => {
   assert.equal(result.classification, "webview");
   assert.equal(result.outcome, "fallback");
   assert.equal(result.reason, "unsupported-react-native-webview-boundary");
+  assertProfile(result, { claimStatus: "fallback-boundary", fallbackFirst: true, claimBoundary: "source-reading-boundary", boundaryReason: "unsupported-react-native-webview-boundary" });
   assertSignals(result, [
     "webview:import:react-native-webview",
     "webview:component:WebView",
@@ -84,6 +112,7 @@ test("detects TUI Ink evidence signals without support wording", () => {
   const result = detectDomain(path.join(fixtureRoot, "tui-ink-basic.tsx"));
   assert.equal(result.classification, "tui-ink");
   assert.equal(result.outcome, "extract");
+  assertProfile(result, { claimStatus: "evidence-only", fallbackFirst: false, claimBoundary: "domain-evidence-only" });
   assertSignals(result, ["tui-ink:import:ink", "tui-ink:primitive:Box", "tui-ink:primitive:Text", "tui-ink:hook:useInput"]);
   assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });
@@ -93,12 +122,14 @@ test("classifies mixed and unknown fallback cases", () => {
   assert.equal(mixed.classification, "mixed");
   assert.equal(mixed.outcome, "fallback");
   assert.equal(mixed.reason, "unsupported-react-native-webview-boundary");
+  assertProfile(mixed, { claimStatus: "fallback-boundary", fallbackFirst: true, claimBoundary: "source-reading-boundary", boundaryReason: "unsupported-react-native-webview-boundary" });
   assert.ok(mixed.signals.some((signal) => signal.startsWith("react-native:")));
   assert.ok(mixed.signals.some((signal) => signal.startsWith("webview:")));
 
   const unknown = detectDomainFromSource("export const answer = 42;", "utility.ts");
   assert.equal(unknown.classification, "unknown");
   assert.equal(unknown.outcome, "deferred");
+  assertProfile(unknown, { claimStatus: "deferred", fallbackFirst: false, claimBoundary: "unknown-deferred" });
   assert.deepEqual(unknown.evidence, []);
 
   assert.doesNotMatch(JSON.stringify([mixed, unknown]), forbiddenSupportClaims);
@@ -157,6 +188,8 @@ test("selected fixture manifest stays aligned with detector classifications and 
     assert.equal(result.classification, expectedClassificationForLane(item.lane), `${item.id} classification must match manifest lane`);
     assert.equal(result.domain, result.classification, `${item.id} deprecated domain alias must mirror classification`);
     assert.equal(result.outcome, item.expectedOutcome, `${item.id} detector outcome must match manifest`);
+    assert.equal(result.profile.lane, result.classification, `${item.id} profile lane must mirror classification`);
+    assert.equal(result.profile.outcome, result.outcome, `${item.id} profile outcome must mirror detector outcome`);
 
     if (item.expectedReason !== undefined) {
       assert.equal(result.reason, item.expectedReason, `${item.id} detector fallback reason must match manifest`);
