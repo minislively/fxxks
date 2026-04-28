@@ -90,6 +90,31 @@ A promotion candidate must pass every gate below before it changes runtime detec
 
 This matrix enables future multi-branch domain work, but it is not itself runtime behavior change, domain promotion, support claim expansion, or a shared-file free-for-all. Domain lanes may proceed in parallel only when they stay inside their primary owned surfaces. Changes to serialized shared surfaces require one named owner and a merge-order note for that PR wave.
 
+#### Serialized shared surfaces
+
+The files below are shared policy surfaces. A PR wave that changes any of them must name one shared-policy owner, include a merge-order note, and keep other domain branches from editing the same file until the owner branch lands or is abandoned.
+
+- `src/core/domain-detector.ts`
+- `src/adapters/pre-read.ts`
+- `src/core/schema.ts`
+- `test/fooks.test.mjs`
+- `test/domain-detector.test.mjs`
+- `test/fixtures/frontend-domain-expectations/manifest.json`
+- `docs/frontend-domain-contract.md`
+- `docs/frontend-domain-fixture-expectations.md`
+
+#### Domain-owned parallel surfaces
+
+The paths below may be edited in parallel when the branch stays inside its domain and does not change serialized shared surfaces:
+
+- React Web fixture-only work under `test/fixtures/frontend-domain-expectations/react-web/`
+- React Native fixture-only work under `test/fixtures/frontend-domain-expectations/rn-*.tsx`
+- WebView fixture-only work under `test/fixtures/frontend-domain-expectations/webview*/`
+- TUI/Ink fixture-only work under `test/fixtures/frontend-domain-expectations/tui-*`
+- Domain-specific docs that do not change shared support, detector, pre-read, or manifest policy
+
+Parallel branches that need a serialized shared surface are no longer independent domain branches for that PR wave; they must serialize behind the named shared-policy owner.
+
 | Lane | Primary owned surfaces | Serialized shared surfaces | Merge-order rule | Verification minimum | Claim boundary |
 | --- | --- | --- | --- | --- | --- |
 | React Web | React Web fixtures, React Web readiness/payload tests, and React Web docs under the current supported lane. | `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `test/fooks.test.mjs`, `test/fixtures/frontend-domain-expectations/manifest.json`. | Merge before non-web lanes only when it changes shared profile policy; otherwise keep independent React Web-only changes separate. | React Web pre-read/readiness targeted tests plus full frontend-domain contract tests. | Current supported lane only; do not imply RN, WebView, TUI, Mixed, or Unknown support. |

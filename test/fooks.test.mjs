@@ -4136,15 +4136,31 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(contract, /not a final RN semantic model/);
   assert.match(contract, /Promotion stops at the first failed gate/);
   assert.match(contract, /documentation and regression protection only/);
-  assert.match(contract, /Parallel domain ownership matrix/);
   assert.match(contract, /not itself runtime behavior change, domain promotion, support claim expansion, or a shared-file free-for-all/);
+  assert.match(contract, /### Parallel domain ownership matrix/);
+  assert.match(contract, /#### Serialized shared surfaces/);
+  assert.match(contract, /#### Domain-owned parallel surfaces/);
+  assert.match(contract, /Parallel branches that need a serialized shared surface are no longer independent domain branches/);
   for (const sharedFile of [
     "src/core/domain-detector.ts",
     "src/adapters/pre-read.ts",
+    "src/core/schema.ts",
     "test/fooks.test.mjs",
+    "test/domain-detector.test.mjs",
     "test/fixtures/frontend-domain-expectations/manifest.json",
+    "docs/frontend-domain-contract.md",
+    "docs/frontend-domain-fixture-expectations.md",
   ]) {
     assert.ok(contract.includes(sharedFile), `${sharedFile} must be marked as serialized shared surface`);
+  }
+  for (const domainSurface of [
+    "test/fixtures/frontend-domain-expectations/react-web/",
+    "test/fixtures/frontend-domain-expectations/rn-*.tsx",
+    "test/fixtures/frontend-domain-expectations/webview*/",
+    "test/fixtures/frontend-domain-expectations/tui-*",
+    "Domain-specific docs that do not change shared support, detector, pre-read, or manifest policy",
+  ]) {
+    assert.ok(contract.includes(domainSurface), `${domainSurface} must be marked as domain-owned parallel surface`);
   }
 
   const readinessMatrixStart = contract.indexOf("### Domain readiness matrix");
@@ -4161,6 +4177,8 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   const ownershipMatrixEnd = contract.indexOf("\n\nPromotion stops", ownershipMatrixStart);
   assert.notEqual(ownershipMatrixEnd, -1, "Parallel domain ownership matrix must end before the promotion stop rule");
   const ownershipMatrix = contract.slice(ownershipMatrixStart, ownershipMatrixEnd);
+  assert.match(ownershipMatrix, /must name one shared-policy owner, include a merge-order note/);
+  assert.match(ownershipMatrix, /may be edited in parallel when the branch stays inside its domain/);
   for (const lane of ["React Web", "React Native", "WebView", "TUI/Ink", "Mixed/Unknown/shared policy"]) {
     assert.ok(ownershipMatrix.includes(`| ${lane} |`), `${lane} ownership matrix row must exist`);
   }
