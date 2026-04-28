@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertPublicSurfaceClaimBoundaries } from "./release-claim-guards.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,41 +31,6 @@ function parsePackJson(stdout) {
 }
 
 
-function assertNoForbiddenPublicClaims(label, text) {
-  const forbidden = [
-    /provider usage\/billing-token reduction/i,
-    /billing-token savings/i,
-    /provider cost savings/i,
-    /Claude Read interception is enabled/i,
-    /Claude runtime-token savings are enabled/i,
-    /automatic Claude runtime-token savings/i,
-  ];
-  const negatedClaimBoundary = /(?:not|no|without|nor|never|does not prove|do not claim|must not claim|cannot support|blocks?|excluded?|out of scope|is not|stayed false|claimability flags stayed false)[^\n]{0,160}$/i;
-
-  let previousLine = "";
-  for (const line of text.split(/\r?\n/)) {
-    for (const pattern of forbidden) {
-      const match = pattern.exec(line);
-      if (match) {
-        const beforeMatch = `${previousLine.trim()} ${line.slice(0, match.index)}`;
-        assert(negatedClaimBoundary.test(beforeMatch), `${label} contains forbidden positive claim ${pattern}: ${line}`);
-      }
-    }
-    if (/ccusage replacement/i.test(line)) {
-      assert(/not (?:a )?ccusage replacement|not provider usage\/billing tokens[^.]*ccusage replacement/i.test(line), `${label} contains unbounded ccusage replacement wording: ${line}`);
-    }
-    if (/\.omx\//i.test(line) || /\.omx\/state/i.test(line)) {
-      assert(/internal|harness|planning/i.test(line), `${label} exposes .omx as product state: ${line}`);
-    }
-    previousLine = line;
-  }
-}
-
-function assertPublicSurfaceClaimBoundaries(surfaces) {
-  for (const [label, text] of Object.entries(surfaces)) {
-    assertNoForbiddenPublicClaims(label, text);
-  }
-}
 
 function runInstalledFooks(fooksBin, args, options = {}) {
   return execFileSync(fooksBin, args, {
