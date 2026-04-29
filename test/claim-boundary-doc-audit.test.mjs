@@ -72,7 +72,7 @@ const forbiddenBroadDomainParallelClaims = [
   },
   {
     label: "domain-parallel-runtime-support",
-    pattern: /\b(?:domain[-\s]parallel|parallel domain|safe to split)\b[^\n]{0,100}\b(?:runtime behavior|runtime support|support expansion|support claim|source changes?)\b[^\n]{0,60}\b(?:authorized|enabled|supported|safe|available|default)\b/i,
+    pattern: /\b(?:domain[-\s]parallel|parallel domain|safe to split)\b[^\n]{0,100}\b(?:runtime behavior|runtime support|support expansion|support claim|source changes?)\b[^\n]{0,60}\b(?:authorized|permitted|allowed|enabled|supported|safe|available|default)\b/i,
   },
 ];
 
@@ -195,6 +195,12 @@ test("claim-boundary doc audit rejects broad domain-parallel examples but allows
   ]);
   assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract says domain-parallel runtime support is authorized for source changes.", "synthetic.md"), [
     "synthetic.md:1 [domain-parallel-runtime-support] The PR wave contract says domain-parallel runtime support is authorized for source changes.",
+  ]);
+  assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract says domain-parallel runtime support is permitted for source changes.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-runtime-support] The PR wave contract says domain-parallel runtime support is permitted for source changes.",
+  ]);
+  assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract says domain-parallel source changes are allowed by default.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-runtime-support] The PR wave contract says domain-parallel source changes are allowed by default.",
   ]);
   assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract is docs/tests-only unless a shared-seam owner says domain-parallel runtime support is authorized.", "synthetic.md"), [
     "synthetic.md:1 [domain-parallel-runtime-support] The PR wave contract is docs/tests-only unless a shared-seam owner says domain-parallel runtime support is authorized.",
