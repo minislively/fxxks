@@ -76,7 +76,7 @@ const forbiddenBroadDomainParallelClaims = [
   },
 ];
 
-const domainParallelBoundary = /\b(?:not itself runtime behavior change|does not authorize runtime source changes|docs\/tests-only by default|shared-file free-for-all|must name one shared-policy owner|merge-order note|disjoint-file proof|changed-file guard|must serialize|not parallel-safe|only when it avoids shared support-policy expansion|single runtime writer lane|full domain writer parallelism[^\n]{0,80}forbidden|remains forbidden)\b/i;
+const domainParallelBoundary = /\b(?:not itself runtime behavior change|does not authorize runtime source changes|docs\/tests-only by default|shared-file free-for-all|must name one shared-policy owner|merge-order note|disjoint-file proof|changed-file guard|must serialize|not parallel-safe|only when it avoids shared support-policy expansion|single runtime writer lane|full domain writer parallelism[^\n]{0,80}forbidden|remains forbidden|shared seams? must serialize|worktree launch needs a separate plan|separate approved launch plan|no domain implementation worktree is authorized)\b/i;
 
 function collectMarkdownFiles(entry) {
   const absolute = path.join(repoRoot, entry);
@@ -193,6 +193,13 @@ test("claim-boundary doc audit rejects broad domain-parallel examples but allows
   assert.deepEqual(findBroadDomainParallelClaims("Safe to split means runtime support is enabled for domain-parallel source changes.", "synthetic.md"), [
     "synthetic.md:1 [domain-parallel-runtime-support] Safe to split means runtime support is enabled for domain-parallel source changes.",
   ]);
+  assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract says domain-parallel runtime support is authorized for source changes.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-runtime-support] The PR wave contract says domain-parallel runtime support is authorized for source changes.",
+  ]);
+  assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract is docs/tests-only unless a shared-seam owner says domain-parallel runtime support is authorized.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-runtime-support] The PR wave contract is docs/tests-only unless a shared-seam owner says domain-parallel runtime support is authorized.",
+  ]);
   assert.deepEqual(findBroadDomainParallelClaims("The parallel safety layer is docs/tests-only by default and does not authorize runtime source changes.", "synthetic.md"), []);
   assert.deepEqual(findBroadDomainParallelClaims("Domain lanes may proceed in parallel only when each lane has a disjoint-file proof and shared seams must serialize.", "synthetic.md"), []);
+  assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract is docs/tests-only; shared seams must serialize behind a named owner and worktree launch needs a separate plan.", "synthetic.md"), []);
 });

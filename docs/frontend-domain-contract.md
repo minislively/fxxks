@@ -142,11 +142,22 @@ Unsafe lane types are not parallel-safe and must serialize:
 
 Execution handoff checklist for any future domain-parallel PR wave:
 
-1. **Named shared-policy owner** — required for any PR wave touching serialized shared surfaces.
-2. **Merge-order note** — records which shared-policy branch must land first and which domain branches wait.
-3. **Disjoint-file proof** — lists each lane's owned files and proves they do not overlap shared seams.
-4. **Verifier command** — names the targeted command proving fallback/deferred/support boundaries did not weaken.
-5. **Contradiction check** — states that full domain writer parallelism against shared runtime/shared-seam files remains forbidden, docs/claim-boundary lanes cannot freely change shared support policy, and single runtime writer lanes serialize instead of running parallel.
+Every PR wave must carry a small **PR wave contract** before worktree, team, or multi-agent launch. The contract is operational bookkeeping only: it is docs/tests-only unless a separate serialized runtime plan names a single shared-seam owner. Required fields are:
+
+1. **Base branch or base commit prerequisite** — records the exact `main` tip, merged prerequisite PR, or branch that every lane must start from.
+2. **Lane name** — names the domain lane, for example `react-web`, `react-native`, `webview-boundary`, `tui-ink`, `mixed-unknown`, or `shared-policy`.
+3. **Lane type** — chooses exactly one safe lane type from the list above; runtime writer lanes are single-writer and serialized, not a parallel default.
+4. **Lane owner** — names the branch or agent responsible for the lane's owned files.
+5. **Allowed files** — lists the lane-owned docs, fixtures, or tests that may change.
+6. **Disallowed files** — repeats the serialized shared surfaces that this lane must not edit without stopping for shared-policy planning.
+7. **Shared-seam lock status** — states either `none` or the exact serialized shared seam under lock.
+8. **Named shared-policy owner** — required for any PR wave touching serialized shared surfaces.
+9. **Merge-order note** — records which shared-policy branch must land first and which domain branches wait.
+10. **Disjoint-file proof** — lists each lane's owned files and proves they do not overlap shared seams.
+11. **Required verification command** — names the targeted command proving fallback/deferred/support boundaries did not weaken.
+12. **Claim-boundary audit** — records the forbidden broad-support/domain-parallel wording check for the lane.
+13. **Worktree/team launch status** — states whether this is only a planning contract or names the separate approved launch plan; absence of that plan means no domain implementation worktree is authorized.
+14. **Contradiction check** — states that full domain writer parallelism against shared runtime/shared-seam files remains forbidden, docs/claim-boundary lanes cannot freely change shared support policy, and single runtime writer lanes serialize instead of running parallel.
 
 Shared fallback reasons and denial markers are boundary evidence, not support claims. In particular, `unsupported-react-native-webview-boundary`, `unsupported-frontend-domain-profile`, `webview-boundary-fallback`, and domain-specific payload policy strings must not be reused as React Native, WebView, TUI/Ink, Mixed, or Unknown support wording.
 

@@ -4244,15 +4244,28 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(ownershipMatrix, /Unsafe lane types are not parallel-safe and must serialize/);
   assert.match(ownershipMatrix, /full domain writer parallelism against shared runtime\/shared-seam files/);
   assert.match(ownershipMatrix, /Execution handoff checklist/);
+  assert.match(ownershipMatrix, /PR wave contract/);
+  assert.match(ownershipMatrix, /before worktree, team, or multi-agent launch/);
+  assert.match(ownershipMatrix, /docs\/tests-only unless a separate serialized runtime plan names a single shared-seam owner/);
   for (const handoffItem of [
+    "Base branch or base commit prerequisite",
+    "Lane name",
+    "Lane type",
+    "Lane owner",
+    "Allowed files",
+    "Disallowed files",
+    "Shared-seam lock status",
     "Named shared-policy owner",
     "Merge-order note",
     "Disjoint-file proof",
-    "Verifier command",
+    "Required verification command",
+    "Claim-boundary audit",
+    "Worktree/team launch status",
     "Contradiction check",
   ]) {
-    assert.ok(ownershipMatrix.includes(handoffItem), `${handoffItem} must stay in the execution handoff checklist`);
+    assert.ok(ownershipMatrix.includes(handoffItem), `${handoffItem} must stay in the PR wave contract checklist`);
   }
+  assert.match(ownershipMatrix, /absence of that plan means no domain implementation worktree is authorized/);
   assert.match(ownershipMatrix, /Shared fallback reasons and denial markers are boundary evidence, not support claims/);
   assert.match(ownershipMatrix, /`unsupported-react-native-webview-boundary`/);
   assert.match(ownershipMatrix, /`unsupported-frontend-domain-profile`/);
