@@ -4651,8 +4651,19 @@ test("custom-wrapper-dom-signal-gap keeps React Web wrapper fixtures in the narr
     );
     assert.equal(decision.debug.frontendPayloadPolicy.allowed, true, `${item.id} must allow only the measured React Web current lane`);
     assert.ok(
+      decision.debug.frontendPayloadPolicy.evidenceGates.includes(preReadModule.CUSTOM_WRAPPER_DOM_SIGNAL_GAP),
+      `${item.id} must expose custom-wrapper-dom-signal-gap through debug policy evidence`,
+    );
+    assert.ok(
       decision.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"),
       `${item.id} must carry className evidence for custom-wrapper-dom-signal-gap`,
+    );
+
+    const cliDecision = run(["codex-pre-read", item.path]);
+    assert.deepEqual(
+      cliDecision.debug.frontendPayloadPolicy,
+      decision.debug.frontendPayloadPolicy,
+      `${item.id} must expose the same custom-wrapper-dom-signal-gap traceability through codex-pre-read CLI debug JSON`,
     );
     assert.equal("fallback" in decision, false, `${item.id} must not fall back after narrow custom wrapper React Web evidence`);
   }

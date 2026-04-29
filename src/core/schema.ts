@@ -224,6 +224,7 @@ export type PreReadDecision = {
       name: string;
       allowed: boolean;
       reason?: string;
+      evidenceGates?: string[];
     };
   };
   fallback?: {
