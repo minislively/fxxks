@@ -124,6 +124,8 @@ Parallel branches that need a serialized shared surface are no longer independen
 
 The parallel safety layer is an execution contract for future multi-agent or multi-worktree domain work. It is docs/tests-only by default and does not authorize runtime source changes. A safety-layer PR must include a changed-file guard: the final diff may contain only the selected frontend-domain contract doc(s), focused contract regression test(s), and OMX planning/state artifacts needed for workflow bookkeeping. If `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `src/core/payload/readiness.ts`, runtime hooks, hook presets, schema files, or manifest policy must change, the work stops and reruns planning/review as a serialized shared-policy owner branch.
 
+Readiness-layer non-goals are explicit: no runtime source change, no fixture corpus expansion, no domain implementation, no public support wording, no provider/runtime-token, cache, billing, or performance claim, and no team or worktree launch without a separate approved launch plan.
+
 Safe lane types are limited to:
 
 - read-only investigation;

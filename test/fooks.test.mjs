@@ -4259,6 +4259,11 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(ownershipMatrix, /may be edited in parallel when the branch stays inside its domain/);
   assert.match(ownershipMatrix, /#### Domain parallel safety layer/);
   assert.match(ownershipMatrix, /docs\/tests-only by default and does not authorize runtime source changes/);
+  assert.match(ownershipMatrix, /Readiness-layer non-goals are explicit/);
+  assert.match(ownershipMatrix, /no runtime source change, no fixture corpus expansion, no domain implementation/);
+  assert.match(ownershipMatrix, /no public support wording/);
+  assert.match(ownershipMatrix, /no provider\/runtime-token, cache, billing, or performance claim/);
+  assert.match(ownershipMatrix, /no team or worktree launch without a separate approved launch plan/);
   assert.match(ownershipMatrix, /changed-file guard/);
   assert.match(ownershipMatrix, /read-only investigation/);
   assert.match(ownershipMatrix, /fixture-only lane/);
