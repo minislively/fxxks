@@ -86,7 +86,7 @@ function readAlertText(alertsInput) {
 
 function extractAlertRunRefs(alertText) {
   const refsById = new Map();
-  const urlPattern = /https:\/\/github\.com\/[^\s<>)\]]+\/actions\/runs\/(\d+)(?:[^\s<>)\]]*)?/gi;
+  const urlPattern = /https:\/\/github\.com\/[^\s<>)\]]+\/actions\/runs\/(\d+)(?:\/(?:attempts|job|jobs)\/\d+)?(?:[?#][^\s<>)\]]*)?/gi;
 
   for (const match of alertText.matchAll(urlPattern)) {
     const id = match[1];

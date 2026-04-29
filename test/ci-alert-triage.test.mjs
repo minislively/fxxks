@@ -130,8 +130,8 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
   ]));
   fs.writeFileSync(alertsPath, [
     "Discord alert: https://github.com/minislively/fooks/actions/runs/204",
-    "clawhip replay https://github.com/minislively/fooks/actions/runs/203/attempts/1",
-    "duplicate https://github.com/minislively/fooks/actions/runs/204",
+    "clawhip replay job URL https://github.com/minislively/fooks/actions/runs/203/job/987654321",
+    "duplicate job URL https://github.com/minislively/fooks/actions/runs/204/job/123456789",
     "outside inspected window https://github.com/minislively/fooks/actions/runs/999",
   ].join("\n"));
 
@@ -157,6 +157,7 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
     assert.equal(byAlertId.get("204").reason, "superseded by run 205");
     assert.equal(byAlertId.get("204").appearances, 2);
     assert.equal(byAlertId.get("203").evidence, "actionable");
+    assert.equal(byAlertId.get("203").alertedUrl, "https://github.com/minislively/fooks/actions/runs/203/job/987654321");
     assert.equal(byAlertId.get("999").evidence, "missing");
     assert.equal(byAlertId.get("999").reason, "run URL was not present in the inspected gh run list window");
   } finally {
