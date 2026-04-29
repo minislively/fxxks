@@ -13,6 +13,7 @@ export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-we
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
 export const REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY = "react-web-current-supported-lane";
 export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
+export const WEBVIEW_BOUNDARY_FALLBACK_POLICY = "webview-boundary-fallback";
 const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
   "react-native:primitive:View",
   "react-native:primitive:Text",
@@ -97,6 +98,17 @@ function frontendDebug(
 export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResult): FrontendPayloadPolicyDecision | undefined {
   if (domainDetection.classification === "react-web" && domainDetection.profile.claimStatus === "current-supported-lane") {
     return { name: REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY, allowed: true };
+  }
+
+  if (
+    domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
+    hasAnySignalWithPrefix(domainDetection, "webview:")
+  ) {
+    return {
+      name: WEBVIEW_BOUNDARY_FALLBACK_POLICY,
+      allowed: false,
+      reason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
+    };
   }
 
   if (domainDetection.classification !== "react-native") return undefined;
