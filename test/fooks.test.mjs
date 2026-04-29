@@ -4820,17 +4820,12 @@ test("docs keep bounded R4 rerun diagnostic reason tied to claimability failures
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
-  const followupPath = path.join(repoRoot, "benchmarks", "frontend-harness", "reports", "round1-risk-followup-1776327829.md");
-  if (!fs.existsSync(followupPath)) {
-    console.log("skip: benchmark followup report not present");
-    return;
-  }
-  const followup = fs.readFileSync(followupPath, "utf8");
-  const combined = `${readme}\n${release}\n${followup}`;
+  const combined = `${readme}\n${release}`;
 
-  assert.match(combined, /not stable yet|does \*\*not\*\* support a stable direct-Codex speed or runtime-token reduction claim/);
-  assert.match(combined, /fooks used more runtime tokens in 3\/6 pairs/);
-  assert.match(combined, /median runtime-token reduction was -5\.35%|Median runtime-token reduction: -5\.35%/);
+  assert.match(release, /round1-risk-followup-1776327829\.md/);
+  assert.match(release, /must not claim\s+stable direct runtime-token\/time wins/);
+  assert.match(release, /fooks used more runtime tokens in 3\/6 pairs/);
+  assert.match(release, /median\s+runtime-token reduction was -5\.35%/);
   assert.match(release, /Blocks stable runtime-token\/time win claims/);
   assert.doesNotMatch(readme, /billing-grade runtime-token savings claims/i);
 });
