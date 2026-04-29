@@ -13,6 +13,8 @@ This snapshot records the current pre-public release posture after the #172 LSP 
 - `package.json` — package metadata, `bin` mapping, `files` allowlist, and npm scripts.
 - `docs/release-note-v0.1.0.md` — release-note wording and conservative evidence boundary.
 - `docs/release.md` — public release checklist, residual risks, pre-publish blockers, and verification commands.
+- `docs/frontend-domain-contract.md` — domain-parallel launch contract gate and planning-only/no-launch boundary.
+- `scripts/release-claim-guards.mjs` and release claim tests — release-facing claim guard coverage for benchmark, provider, `.omx`, and domain-parallel launch wording.
 
 ## Current package and CLI boundary
 
@@ -62,3 +64,4 @@ The following remain unresolved until a human-approved publish step:
 - Keep Codex wording scoped to supported repeated-file hook behavior through `fooks setup`.
 - Keep Claude wording scoped to project-local `SessionStart` / `UserPromptSubmit` context hooks; do not claim Claude `Read` interception.
 - Keep opencode wording scoped to the prepared tool/slash-command bridge; do not claim automatic `read` interception or automatic runtime-token savings.
+- Domain-parallel worktree/team/PR wave readiness remains planning-only unless a launch contract lists the required fields, including `Launch base`, `Lane table`, `Allowed write set`, `Forbidden write set`, `Shared-seam owner`, `PR order`, `Verification matrix`, `Stop rules`, and `No-launch marker`.

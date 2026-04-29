@@ -21,6 +21,8 @@ Before a public release, keep the public claim surface aligned to this matrix:
 | Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | `Read` interception, full prompt interception parity, or runtime-token savings |
 | opencode | Manual/semi-automatic custom tool and slash command prepared by `fooks setup` when possible | Read interception or automatic runtime-token savings |
 
+Release-facing readiness docs must also stay tied to the domain-parallel launch contract gate. Any domain-parallel worktree/team/PR wave readiness wording must cite a launch contract with `Launch base`, `Lane table`, `Allowed write set`, `Forbidden write set`, `Shared-seam owner`, `PR order`, `Verification matrix`, `Stop rules`, and a `No-launch marker`, or else state that the work is planning-only and no implementation worktree is authorized.
+
 The opencode boundary is intentional. The current bridge may steer users toward
 `fooks_extract`, but it must not be described as automatic `read` interception.
 A future project-local `read` shadow would need to preserve opencode's native
@@ -137,6 +139,7 @@ Automated local checks now covered by `npm run release:smoke`:
 - [x] isolated `fooks setup` smoke test passes without mutating the real user Codex config.
 - [x] isolated `fooks setup` smoke test covers a fresh public-style repo without requiring `FOOKS_ACTIVE_ACCOUNT`.
 - [x] packed CLI `fooks compare <file> --json` smoke keeps local estimated payload comparison separate from provider usage/billing-token, invoice/dashboard, or charged-cost claims.
+- [x] release-facing docs/tests keep domain-parallel worktree/team/PR wave readiness tied to a launch contract with the required fields or to the planning-only/no-launch boundary.
 
 Authority-gated checks before any real publish:
 

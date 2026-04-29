@@ -3,10 +3,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import {
   assertNoForbiddenPublicClaims,
   assertPublicSurfaceClaimBoundaries,
 } from "../scripts/release-claim-guards.mjs";
+
+const repoRoot = process.cwd();
 
 function assertGuardRejects(text, expectedMessage) {
   assert.throws(
@@ -73,4 +77,15 @@ test("release claim guard requires launch-contract evidence for domain-parallel 
       "Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.",
     ].join("\n"),
   );
+});
+
+test("release-facing docs keep domain-parallel launch readiness tied to launch contracts", () => {
+  const surfaces = {
+    "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
+    "docs/release-readiness.md": fs.readFileSync(path.join(repoRoot, "docs", "release-readiness.md"), "utf8"),
+  };
+
+  assertPublicSurfaceClaimBoundaries(surfaces);
+  assert.match(surfaces["docs/release.md"], /domain-parallel worktree\/team\/PR wave readiness wording must cite a launch contract/);
+  assert.match(surfaces["docs/release-readiness.md"], /Domain-parallel worktree\/team\/PR wave readiness remains planning-only unless a launch contract lists the required fields/);
 });

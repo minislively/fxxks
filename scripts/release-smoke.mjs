@@ -146,6 +146,7 @@ assertPublicSurfaceClaimBoundaries({
   "README.md": fs.readFileSync(path.join(repoRoot, "README.md"), "utf8"),
   "docs/setup.md": fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8"),
   "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
+  "docs/release-readiness.md": fs.readFileSync(path.join(repoRoot, "docs", "release-readiness.md"), "utf8"),
   "docs/benchmark-evidence.md": fs.readFileSync(path.join(repoRoot, "docs", "benchmark-evidence.md"), "utf8"),
   "docs/roadmap.md": fs.readFileSync(path.join(repoRoot, "docs", "roadmap.md"), "utf8"),
   "docs/internal/live-hook-smoke-checklist.md": fs.existsSync(path.join(repoRoot, "docs", "internal", "live-hook-smoke-checklist.md"))
