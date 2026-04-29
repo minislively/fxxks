@@ -61,6 +61,23 @@ const conservativeBoundary = /\b(?:not|no|nor|never|without|cannot|can't|does no
 
 const measuredNarrowEvidence = /\b(?:measured\s+`?F1`?|F1`?\s+RN primitive\/input|rn-primitive-input-narrow-payload|narrow\s+(?:RN\s+)?(?:pre-read\s+)?payload|measured\s+(?:primitive\/input|same-file)\s+scope)\b/i;
 
+const forbiddenBroadDomainParallelClaims = [
+  {
+    label: "domain-parallel-free-for-all",
+    pattern: /\b(?:domain[-\s]parallel|parallel domain|domain lanes?|frontend domain lanes?)\b[^\n]{0,100}\b(?:free-for-all|any file|all files|shared files|shared seams|shared runtime|runtime seams)\b/i,
+  },
+  {
+    label: "domain-parallel-broad-safe",
+    pattern: /\b(?:safe to split|safe to parallelize|parallel-safe|safe in parallel)\b[^\n]{0,100}\b(?:without|no need for|does not need|needn'?t|across|any|all|shared)\b[^\n]{0,80}\b(?:owner|merge-order|serialization|serialized|disjoint-file|shared seams?|shared runtime|runtime seams?)\b/i,
+  },
+  {
+    label: "domain-parallel-runtime-support",
+    pattern: /\b(?:domain[-\s]parallel|parallel domain|safe to split)\b[^\n]{0,100}\b(?:runtime behavior|runtime support|support expansion|support claim|source changes?)\b[^\n]{0,60}\b(?:authorized|enabled|supported|safe|available|default)\b/i,
+  },
+];
+
+const domainParallelBoundary = /\b(?:not itself runtime behavior change|does not authorize runtime source changes|docs\/tests-only by default|shared-file free-for-all|must name one shared-policy owner|merge-order note|disjoint-file proof|changed-file guard|must serialize|not parallel-safe|only when it avoids shared support-policy expansion|single runtime writer lane|full domain writer parallelism[^\n]{0,80}forbidden|remains forbidden)\b/i;
+
 function collectMarkdownFiles(entry) {
   const absolute = path.join(repoRoot, entry);
   const stat = fs.statSync(absolute);
@@ -99,6 +116,21 @@ function findBroadSupportClaims(text, relativePath) {
   return findings;
 }
 
+function findBroadDomainParallelClaims(text, relativePath) {
+  const findings = [];
+  const lines = text.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const normalized = line.replace(/\s+/g, " ").trim();
+    if (!normalized) continue;
+    for (const rule of forbiddenBroadDomainParallelClaims) {
+      if (rule.pattern.test(normalized) && !domainParallelBoundary.test(normalized)) {
+        findings.push(`${relativePath}:${index + 1} [${rule.label}] ${normalized}`);
+      }
+    }
+  }
+  return findings;
+}
+
 test("current docs do not make broad RN/WebView/TUI support claims", () => {
   const markdownFiles = docsRoots.flatMap(collectMarkdownFiles).sort();
   assert.ok(markdownFiles.some((file) => file.endsWith(path.join("docs", "release.md"))), "release doc should be in audit corpus");
@@ -111,6 +143,17 @@ test("current docs do not make broad RN/WebView/TUI support claims", () => {
   });
 
   assert.deepEqual(findings, [], `forbidden broad support claims found:\n${findings.join("\n")}`);
+});
+
+test("current docs do not make broad domain-parallel execution claims", () => {
+  const markdownFiles = docsRoots.flatMap(collectMarkdownFiles).sort();
+
+  const findings = markdownFiles.flatMap((file) => {
+    const relativePath = path.relative(repoRoot, file);
+    return findBroadDomainParallelClaims(fs.readFileSync(file, "utf8"), relativePath);
+  });
+
+  assert.deepEqual(findings, [], `forbidden broad domain-parallel claims found:\n${findings.join("\n")}`);
 });
 
 test("claim-boundary doc audit preserves measured narrow evidence wording", () => {
@@ -140,4 +183,16 @@ test("claim-boundary doc audit rejects positive examples but allows negated or m
   assert.deepEqual(findBroadSupportClaims("The measured F1 RN primitive/input narrow payload gate is not broad React Native support.", "synthetic.md"), []);
   assert.deepEqual(findBroadSupportClaims("WebView remains fallback-first; no WebView support claim.", "synthetic.md"), []);
   assert.deepEqual(findBroadSupportClaims("TUI / React CLI is a future profile candidate only; no implementation or support promise.", "synthetic.md"), []);
+});
+
+test("claim-boundary doc audit rejects broad domain-parallel examples but allows scoped safety-layer wording", () => {
+  assert.deepEqual(findBroadDomainParallelClaims("Domain-parallel lanes are safe to split across shared runtime seams without a named owner.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-free-for-all] Domain-parallel lanes are safe to split across shared runtime seams without a named owner.",
+    "synthetic.md:1 [domain-parallel-broad-safe] Domain-parallel lanes are safe to split across shared runtime seams without a named owner.",
+  ]);
+  assert.deepEqual(findBroadDomainParallelClaims("Safe to split means runtime support is enabled for domain-parallel source changes.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-runtime-support] Safe to split means runtime support is enabled for domain-parallel source changes.",
+  ]);
+  assert.deepEqual(findBroadDomainParallelClaims("The parallel safety layer is docs/tests-only by default and does not authorize runtime source changes.", "synthetic.md"), []);
+  assert.deepEqual(findBroadDomainParallelClaims("Domain lanes may proceed in parallel only when each lane has a disjoint-file proof and shared seams must serialize.", "synthetic.md"), []);
 });
