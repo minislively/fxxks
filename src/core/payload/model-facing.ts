@@ -1,5 +1,6 @@
 import path from "node:path";
 import { deriveDesignReviewMetadata } from "../design-review-metadata";
+import { buildReactWebDomainPayload, REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "./domain-payload";
 import type { EditGuidance, ExtractionResult, ModelFacingPayload, PatchTarget, PatchTargetKind, SourceFingerprint, SourceRange } from "../schema";
 
 const PATCH_TARGET_LIMIT = 12;
@@ -13,6 +14,8 @@ const EDIT_GUIDANCE_INSTRUCTIONS = [
 export type ModelFacingPayloadOptions = {
   includeEditGuidance?: boolean;
   includeDesignReviewMetadata?: boolean;
+  includeDomainPayload?: boolean;
+  domainPayloadPolicy?: string;
 };
 
 function supportsEditGuidance(result: ExtractionResult): boolean {
@@ -125,12 +128,17 @@ function buildEditGuidance(result: ExtractionResult, freshness: SourceFingerprin
 }
 
 export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd(), options: ModelFacingPayloadOptions = {}): ModelFacingPayload {
+  const domainPayload = options.includeDomainPayload
+    ? buildReactWebDomainPayload(result, result.domainDetection, options.domainPayloadPolicy ?? REACT_WEB_DOMAIN_PAYLOAD_POLICY)
+    : undefined;
+
   if (result.useOriginal && result.mode === "raw" && result.rawText) {
     return {
       mode: result.mode,
       filePath: toRelativePath(result.filePath, cwd),
       useOriginal: true,
       rawText: result.rawText,
+      ...(domainPayload ? { domainPayload } : {}),
     };
   }
 
@@ -199,6 +207,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
     ...(fingerprint ? { sourceFingerprint: fingerprint } : {}),
     ...(editGuidance ? { editGuidance } : {}),
     ...(designReviewMetadata ? { designReviewMetadata } : {}),
+    ...(domainPayload ? { domainPayload } : {}),
     ...(result.exports.length > 0 ? { exports: result.exports } : {}),
     ...(contract ? { contract } : {}),
     ...(behavior ? { behavior } : {}),

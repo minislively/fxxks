@@ -1,5 +1,6 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
 import type { DomainDetectionResult } from "./domain-detector";
+import type { DomainPayload } from "./payload/domain-payload";
 
 export type OutputMode = "raw" | "compressed" | "hybrid";
 export type Language = "tsx" | "jsx" | "ts" | "js";
@@ -187,6 +188,7 @@ export type ModelFacingPayload = {
   snippets?: ExtractionResult["snippets"];
   editGuidance?: EditGuidance;
   designReviewMetadata?: DesignReviewMetadataV0;
+  domainPayload?: DomainPayload;
 };
 
 export type PayloadReadiness = {

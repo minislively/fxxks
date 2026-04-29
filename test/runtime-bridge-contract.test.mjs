@@ -63,6 +63,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(firstInject.action, "record");
   assert.equal(secondInject.action, "inject");
   assert.match(secondInject.additionalContext, /^fooks: reused pre-read \(compressed\)/);
+  assert.match(secondInject.additionalContext, /"domainPayload"/);
+  assert.equal(secondInject.debug.decision.payload.domainPayload.domain, "react-web");
   assert.equal(secondInject.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), true);
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
@@ -186,6 +188,8 @@ test("claude runtime bridge follows record-then-inject repeated same-file contra
   assert.match(second.additionalContext, /fixtures\/compressed\/FormSection\.tsx/);
   assert.match(second.additionalContext, /does not intercept Claude Read or claim runtime-token savings/);
   assert.equal(second.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(second.additionalContext.includes("\"domainPayload\""), true);
+  assert.equal(second.debug.decision.payload.domainPayload.domain, "react-web");
   assert.deepEqual(second.debug.decision.payload.editGuidance.freshness, second.debug.decision.payload.sourceFingerprint);
   assert.doesNotMatch(second.additionalContext, /Claude Read interception is enabled/i);
   assert.equal(second.debug.repeatedFile, true);

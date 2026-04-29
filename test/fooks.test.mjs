@@ -1186,6 +1186,13 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.equal("editGuidance" in compressed.payload, false);
   assert.equal("domainDetection" in compressed.payload, false);
   assert.equal("profile" in compressed.payload, false);
+  assert.equal(compressed.payload.domainPayload.domain, "react-web");
+  assert.equal(compressed.payload.domainPayload.schemaVersion, "domain-payload.v1");
+  assert.equal(compressed.payload.domainPayload.policy, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+  assert.equal(compressed.payload.domainPayload.plannerDecision, "compact-safe");
+  assert.equal(compressed.payload.domainPayload.claimBoundary, "react-web-measured-extraction");
+  assert.ok(compressed.payload.domainPayload.evidence.some((signal) => signal.startsWith("react-web:")));
+  assert.match(compressed.payload.domainPayload.warnings.join("\n"), /current supported lane only/);
   assert.equal(compressed.debug.domainDetection.classification, "react-web");
   assert.equal(compressed.debug.domainDetection.profile.lane, "react-web");
   assert.equal(compressed.debug.domainDetection.profile.claimStatus, "current-supported-lane");
@@ -1236,6 +1243,8 @@ export function CustomOnlyForm() {
   assert.equal(customReactWeb.debug.frontendPayloadPolicy.allowed, true);
   assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"));
   assert.ok(customReactWeb.debug.domainDetection.signals.includes("react-web:jsx-attribute:htmlFor"));
+  assert.equal(customReactWeb.payload.domainPayload.domain, "react-web");
+  assert.deepEqual(customReactWeb.payload.domainPayload.facts.jsxAttributes, ["className", "htmlFor"]);
 
   const unsupportedFrontendProfile = preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON;
   const rnPrimitive = decideCodexPreRead(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-primitive-basic.tsx"), repoRoot);
@@ -1247,6 +1256,7 @@ export function CustomOnlyForm() {
   assert.equal(rnPrimitive.readiness.ready, true);
   assert.equal(rnPrimitive.readiness.signals.hasContract, true);
   assert.ok(rnPrimitive.payload.contract.propsName);
+  assert.equal("domainPayload" in rnPrimitive.payload, false);
 
   for (const rnFixture of [
     "rn-style-platform-navigation.tsx",
@@ -4556,6 +4566,8 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     );
     assert.equal(decision.debug.frontendPayloadPolicy.allowed, true, `${item.id} should allow the React Web current-supported payload policy`);
     assert.ok(decision.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"), `${item.id} should carry className evidence`);
+    assert.equal(decision.payload.domainPayload.domain, "react-web", `${item.id} should emit the React Web domain payload slice`);
+    assert.equal(decision.payload.domainPayload.plannerDecision, "compact-safe", `${item.id} should use the compact-safe React Web planner decision`);
     assert.equal("fallback" in decision, false, `${item.id} must not fall back after React Web evidence`);
   }
 

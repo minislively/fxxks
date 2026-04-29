@@ -3,6 +3,7 @@ import path from "node:path";
 import { extractFile } from "../core/extract";
 import { detectDomainFromSource, type DomainDetectionResult } from "../core/domain-detector";
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
+import { REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "../core/payload/domain-payload";
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import type { PreReadDecision } from "../core/schema";
 
@@ -11,7 +12,7 @@ const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
-export const REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY = "react-web-current-supported-lane";
+export const REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY = REACT_WEB_DOMAIN_PAYLOAD_POLICY;
 export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
 export const WEBVIEW_BOUNDARY_FALLBACK_POLICY = "webview-boundary-fallback";
 const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
@@ -60,6 +61,7 @@ function relativePath(filePath: string, cwd: string): string {
 function assessFrontendProfilePayloadReuse(
   extension: string,
   domainDetection: DomainDetectionResult,
+  payload: ReturnType<typeof toModelFacingPayload>,
   frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
 ): { allowed: true } | { allowed: false; reason: string } {
   if (!FRONTEND_PROFILE_GATE_EXTENSIONS.has(extension)) {
@@ -67,7 +69,9 @@ function assessFrontendProfilePayloadReuse(
   }
 
   if (domainDetection.profile.lane === "react-web" && domainDetection.profile.claimStatus === "current-supported-lane") {
-    return { allowed: true };
+    return payload.domainPayload?.domain === "react-web" && payload.domainPayload.plannerDecision === "compact-safe"
+      ? { allowed: true }
+      : { allowed: false, reason: "missing-react-web-domain-payload" };
   }
 
   if (frontendPayloadPolicy?.allowed === true) {
@@ -206,6 +210,8 @@ export function decidePreRead(
   const result = extractFile(resolvedPath);
   const payload = toModelFacingPayload(result, cwd, {
     includeEditGuidance: options.includeEditGuidance === true,
+    includeDomainPayload: frontendPayloadPolicy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+    domainPayloadPolicy: frontendPayloadPolicy?.name,
   });
   const readiness = assessPayloadReadiness(result, payload);
   const debug = {
@@ -219,7 +225,7 @@ export function decidePreRead(
   };
 
   if (readiness.ready) {
-    const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection, frontendPayloadPolicy);
+    const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection, payload, frontendPayloadPolicy);
     if (profileGate.allowed) {
       return {
         runtime,
