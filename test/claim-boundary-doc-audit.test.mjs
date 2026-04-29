@@ -98,6 +98,19 @@ const forbiddenBroadDomainParallelClaims = [
   },
 ];
 
+const forbiddenDomainParallelLaunchReadinessClaims = [
+  {
+    label: "domain-parallel-launch-readiness-without-contract",
+    pattern: /\b(?:domain[-\s]parallel|parallel domain|domain lanes?|frontend domain lanes?)\b[^\n]{0,120}\b(?:worktree|team|multi-agent|launch|PR wave|wave)\b[^\n]{0,100}\b(?:ready|readiness|authorized|permitted|allowed|enabled|safe|available|may proceed|can proceed|may launch|can launch)\b/i,
+  },
+  {
+    label: "domain-parallel-launch-readiness-without-contract",
+    pattern: /\b(?:worktree|team|multi-agent|launch|PR wave|wave)\b[^\n]{0,120}\b(?:ready|readiness|authorized|permitted|allowed|enabled|safe|available|may proceed|can proceed|may launch|can launch)\b[^\n]{0,100}\b(?:domain[-\s]parallel|parallel domain|domain lanes?|frontend domain lanes?)\b/i,
+  },
+];
+
+const launchContractEvidence = /\b(?:named launch contract|launch contract)\b[^\n]{0,220}\b(?:Launch base|Lane table|Branch\/worktree name|Allowed write set|Forbidden write set|Shared-seam owner|PR order|Verification matrix|Stop rules|No-launch marker|planning-only|verifier-only|single-shared-owner|disjoint-domain-writers|required fields|lists the required fields)\b|\b(?:Launch base|Lane table|Branch\/worktree name|Allowed write set|Forbidden write set|Shared-seam owner|PR order|Verification matrix|Stop rules|No-launch marker|planning-only|verifier-only|single-shared-owner|disjoint-domain-writers|required fields|lists the required fields)\b[^\n]{0,220}\b(?:named launch contract|launch contract)\b/i;
+
 const domainParallelBoundary = /\b(?:not itself runtime behavior change|does not authorize runtime source changes|docs\/tests-only by default|shared-file free-for-all|must name one shared-policy owner|merge-order note|disjoint-file proof|changed-file guard|must serialize|not parallel-safe|only when it avoids shared support-policy expansion|single runtime writer lane|full domain writer parallelism[^\n]{0,80}forbidden|remains forbidden|shared seams? must serialize|worktree launch needs a separate plan|separate approved launch plan|no domain implementation worktree is authorized)\b/i;
 
 function collectMarkdownFiles(entry) {
@@ -138,6 +151,21 @@ function findBroadSupportClaims(text, relativePath) {
   return findings;
 }
 
+function findDomainParallelLaunchReadinessClaims(text, relativePath) {
+  const findings = [];
+  const lines = text.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const normalized = line.replace(/\s+/g, " ").trim();
+    if (!normalized) continue;
+    for (const rule of forbiddenDomainParallelLaunchReadinessClaims) {
+      if (rule.pattern.test(normalized) && !launchContractEvidence.test(normalized) && !domainParallelBoundary.test(normalized)) {
+        findings.push(`${relativePath}:${index + 1} [${rule.label}] ${normalized}`);
+        break;
+      }
+    }
+  }
+  return findings;
+}
 
 function findSchemaEditGuidanceClaims(text, relativePath) {
   const findings = [];
@@ -188,7 +216,11 @@ test("current docs do not make broad domain-parallel execution claims", () => {
 
   const findings = markdownFiles.flatMap((file) => {
     const relativePath = path.relative(repoRoot, file);
-    return findBroadDomainParallelClaims(fs.readFileSync(file, "utf8"), relativePath);
+    const text = fs.readFileSync(file, "utf8");
+    return [
+      ...findBroadDomainParallelClaims(text, relativePath),
+      ...findDomainParallelLaunchReadinessClaims(text, relativePath),
+    ];
   });
 
   assert.deepEqual(findings, [], `forbidden broad domain-parallel claims found:\n${findings.join("\n")}`);
@@ -276,4 +308,9 @@ test("claim-boundary doc audit rejects broad domain-parallel examples but allows
   assert.deepEqual(findBroadDomainParallelClaims("The parallel safety layer is docs/tests-only by default and does not authorize runtime source changes.", "synthetic.md"), []);
   assert.deepEqual(findBroadDomainParallelClaims("Domain lanes may proceed in parallel only when each lane has a disjoint-file proof and shared seams must serialize.", "synthetic.md"), []);
   assert.deepEqual(findBroadDomainParallelClaims("The PR wave contract is docs/tests-only; shared seams must serialize behind a named owner and worktree launch needs a separate plan.", "synthetic.md"), []);
+  assert.deepEqual(findDomainParallelLaunchReadinessClaims("Domain-parallel worktree launch is ready for implementation.", "synthetic.md"), [
+    "synthetic.md:1 [domain-parallel-launch-readiness-without-contract] Domain-parallel worktree launch is ready for implementation.",
+  ]);
+  assert.deepEqual(findDomainParallelLaunchReadinessClaims("A domain-parallel team wave may launch when the launch contract lists the required fields and status disjoint-domain-writers.", "synthetic.md"), []);
+  assert.deepEqual(findDomainParallelLaunchReadinessClaims("Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.", "synthetic.md"), []);
 });

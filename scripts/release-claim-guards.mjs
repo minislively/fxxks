@@ -8,6 +8,9 @@ export function assertNoForbiddenPublicClaims(label, text) {
     /automatic Claude runtime-token savings/i,
   ];
   const negatedClaimBoundary = /(?:not|no|without|nor|never|does not prove|do not claim|must not claim|cannot support|blocks?|excluded?|out of scope|is not|stayed false|claimability flags stayed false)[^\n]{0,160}$/i;
+  const domainParallelLaunchReadiness = /\b(?:domain[-\s]parallel|parallel domain|domain lanes?|frontend domain lanes?)\b[^\n]{0,120}\b(?:worktree|team|multi-agent|launch|PR wave|wave)\b[^\n]{0,100}\b(?:ready|readiness|authorized|permitted|allowed|enabled|safe|available|may proceed|can proceed|may launch|can launch)\b|\b(?:worktree|team|multi-agent|launch|PR wave|wave)\b[^\n]{0,120}\b(?:ready|readiness|authorized|permitted|allowed|enabled|safe|available|may proceed|can proceed|may launch|can launch)\b[^\n]{0,100}\b(?:domain[-\s]parallel|parallel domain|domain lanes?|frontend domain lanes?)\b/i;
+  const launchContractEvidence = /\b(?:named launch contract|launch contract)\b[^\n]{0,220}\b(?:Launch base|Lane table|Branch\/worktree name|Allowed write set|Forbidden write set|Shared-seam owner|PR order|Verification matrix|Stop rules|No-launch marker|planning-only|verifier-only|single-shared-owner|disjoint-domain-writers|required fields|lists the required fields)\b|\b(?:Launch base|Lane table|Branch\/worktree name|Allowed write set|Forbidden write set|Shared-seam owner|PR order|Verification matrix|Stop rules|No-launch marker|planning-only|verifier-only|single-shared-owner|disjoint-domain-writers|required fields|lists the required fields)\b[^\n]{0,220}\b(?:named launch contract|launch contract)\b/i;
+  const domainParallelLaunchBoundary = /\b(?:does not authorize runtime source changes|docs\/tests-only by default|worktree launch needs a separate plan|separate approved launch plan|no domain implementation worktree is authorized|planning-only|must serialize|shared seams? must serialize)\b/i;
 
   let previousLine = "";
   for (const line of text.split(/\r?\n/)) {
@@ -23,6 +26,12 @@ export function assertNoForbiddenPublicClaims(label, text) {
     }
     if (/\.omx\//i.test(line) || /\.omx\/state/i.test(line)) {
       assertClaimBoundary(/internal|harness|planning/i.test(line), `${label} exposes .omx as product state: ${line}`);
+    }
+    if (domainParallelLaunchReadiness.test(line)) {
+      assertClaimBoundary(
+        launchContractEvidence.test(line) || domainParallelLaunchBoundary.test(line),
+        `${label} contains domain-parallel launch readiness claim without launch-contract evidence: ${line}`,
+      );
     }
     previousLine = line;
   }
