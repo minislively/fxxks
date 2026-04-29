@@ -33,7 +33,7 @@ If the answer you want sounds like “React Native?”, “WebView?”, “TUI/C
 
 ### React Native / WebView promotion ladder
 
-React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” The canonical taxonomy, outcome vocabulary, and claim boundaries are defined in [Frontend domain contract](frontend-domain-contract.md). The architecture direction is documented in [React Native / WebView architecture direction](rn-webview-architecture.md): keep the shared TypeScript AST core, split web/RN/WebView/TUI into domain signal profiles, and start WebView as a boundary/fallback profile. Treat this as a `frontend-family candidate` ladder:
+React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” The canonical taxonomy, outcome vocabulary, and claim boundaries are defined in [Frontend domain contract](frontend-domain-contract.md). The pipeline architecture is described in [Domain payload architecture](domain-payload-architecture.md): shared syntax facts flow through domain detector/profile, domain scanner, payload planner, payload builder, and then cache/repeated-read policy. The React Native / WebView-specific direction is documented in [React Native / WebView architecture direction](rn-webview-architecture.md): keep the shared TypeScript AST core, split web/RN/WebView/TUI into domain signal profiles, and start WebView as a boundary/fallback profile. Treat this as a `frontend-family candidate` ladder:
 
 | Level | Name | What must be true | Public wording allowed |
 | --- | --- | --- | --- |

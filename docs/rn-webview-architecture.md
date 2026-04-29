@@ -1,6 +1,6 @@
 # React Native / WebView architecture direction
 
-This note answers the issue #182 design question before any extractor promotion: keep the existing TypeScript AST core, but split platform/domain interpretation into explicit signal profiles. It is a roadmap architecture commitment, not a public support promise, timeline, or default WebView compact-extraction plan.
+This note answers the issue #182 design question before any extractor promotion: keep the existing TypeScript AST core, but split platform/domain interpretation into explicit signal profiles. It is a roadmap architecture commitment, not a public support promise, timeline, or default WebView compact-extraction plan. The cross-domain pipeline shape is documented in [Domain payload architecture](domain-payload-architecture.md), while [Frontend domain contract](frontend-domain-contract.md) remains the normative taxonomy and claim-boundary source.
 
 ## Current structure
 
