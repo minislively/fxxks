@@ -61,6 +61,28 @@ const conservativeBoundary = /\b(?:not|no|nor|never|without|cannot|can't|does no
 
 const measuredNarrowEvidence = /\b(?:measured\s+`?F1`?|F1`?\s+RN primitive\/input|rn-primitive-input-narrow-payload|narrow\s+(?:RN\s+)?(?:pre-read\s+)?payload|measured\s+(?:primitive\/input|same-file)\s+scope)\b/i;
 
+
+const forbiddenSchemaEditGuidanceClaims = [
+  {
+    label: "edit-guidance-guarantees-edits",
+    pattern: /\b(?:editGuidance|edit guidance|patchTargets?|patch targets?)\b[^\n]{0,120}\b(?:guarantees?|ensures?|proves?|makes?)\b[^\n]{0,80}\b(?:safe|successful|correct|accurate|automatic|runtime|production)\b[^\n]{0,60}\bedits?\b/i,
+  },
+  {
+    label: "patch-targets-lsp-semantic-safety",
+    pattern: /\b(?:patchTargets?|patch targets?|loc ranges?|line ranges?)\b[^\n]{0,120}\b(?:LSP-backed|semantic(?:ally)? safe|rename\/reference safe|rename safe|reference safe)\b/i,
+  },
+  {
+    label: "edit-guidance-runtime-outcome-proof",
+    pattern: /\b(?:editGuidance|edit guidance|patchTargets?|patch targets?)\b[^\n]{0,120}\b(?:runtime|automatic|Codex|Claude|live model)\b[^\n]{0,80}\b(?:outcome|editing?|accuracy|success|speed|fewer reads?|search steps?)\b[^\n]{0,80}\b(?:proven|guaranteed|available|enabled|improved|reduced)\b/i,
+  },
+  {
+    label: "fallback-receives-edit-guidance",
+    pattern: /\b(?:fallback|unsupported[-\s]frontend[-\s]domain[-\s]profile|unsupported[-\s]react[-\s]native[-\s]webview[-\s]boundary)\b[^\n]{0,120}\b(?:receives?|includes?|constructs?|gets?|returns?)\b[^\n]{0,80}\b(?:editGuidance|edit guidance|patchTargets?|patch targets?|compact payload)\b/i,
+  },
+];
+
+const schemaEditGuidanceBoundary = /\b(?:not|no|nor|never|without|cannot|can't|does not|do not|must not|should not|isn't|aren't|remain(?:s)?|fallback-first|full-source|normal source reading|read the file|rerun|re-run|opt-in|explicitly request|requires?|before applying|confirm|matching source fingerprint|sourceFingerprint|AST-derived|line-aware hints?|edit aids?|not LSP-backed|not proof|not proven|not provider|not billing|local\/dry-run|claim boundary|forbidden|must stop|before compact payload construction|must continue to fallback|no automatic|no default|future opt-in path|requires an explicit opt-in path)\b/i;
+
 const forbiddenBroadDomainParallelClaims = [
   {
     label: "domain-parallel-free-for-all",
@@ -116,6 +138,22 @@ function findBroadSupportClaims(text, relativePath) {
   return findings;
 }
 
+
+function findSchemaEditGuidanceClaims(text, relativePath) {
+  const findings = [];
+  const lines = text.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const normalized = line.replace(/\s+/g, " ").trim();
+    if (!normalized) continue;
+    for (const rule of forbiddenSchemaEditGuidanceClaims) {
+      if (rule.pattern.test(normalized) && !schemaEditGuidanceBoundary.test(normalized)) {
+        findings.push(`${relativePath}:${index + 1} [${rule.label}] ${normalized}`);
+      }
+    }
+  }
+  return findings;
+}
+
 function findBroadDomainParallelClaims(text, relativePath) {
   const findings = [];
   const lines = text.split(/\r?\n/);
@@ -156,6 +194,20 @@ test("current docs do not make broad domain-parallel execution claims", () => {
   assert.deepEqual(findings, [], `forbidden broad domain-parallel claims found:\n${findings.join("\n")}`);
 });
 
+
+test("current docs do not make schema-facing edit-guidance or fallback execution claims", () => {
+  const markdownFiles = docsRoots.flatMap(collectMarkdownFiles).sort();
+  assert.ok(markdownFiles.some((file) => file.endsWith(path.join("docs", "edit-guidance-evidence.md"))), "edit-guidance evidence doc should be in audit corpus");
+  assert.ok(markdownFiles.some((file) => file.endsWith(path.join("docs", "frontend-fixture-boundary-regression-map.md"))), "frontend fixture boundary map should be in audit corpus");
+
+  const findings = markdownFiles.flatMap((file) => {
+    const relativePath = path.relative(repoRoot, file);
+    return findSchemaEditGuidanceClaims(fs.readFileSync(file, "utf8"), relativePath);
+  });
+
+  assert.deepEqual(findings, [], `forbidden schema-facing edit-guidance/fallback claims found:\n${findings.join("\n")}`);
+});
+
 test("claim-boundary doc audit preserves measured narrow evidence wording", () => {
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
   const contract = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-contract.md"), "utf8");
@@ -183,6 +235,22 @@ test("claim-boundary doc audit rejects positive examples but allows negated or m
   assert.deepEqual(findBroadSupportClaims("The measured F1 RN primitive/input narrow payload gate is not broad React Native support.", "synthetic.md"), []);
   assert.deepEqual(findBroadSupportClaims("WebView remains fallback-first; no WebView support claim.", "synthetic.md"), []);
   assert.deepEqual(findBroadSupportClaims("TUI / React CLI is a future profile candidate only; no implementation or support promise.", "synthetic.md"), []);
+});
+
+
+test("claim-boundary doc audit rejects schema-facing edit-guidance execution claims but allows scoped boundaries", () => {
+  assert.deepEqual(findSchemaEditGuidanceClaims("editGuidance patchTargets guarantee safe automatic runtime edits.", "synthetic.md"), [
+    "synthetic.md:1 [edit-guidance-guarantees-edits] editGuidance patchTargets guarantee safe automatic runtime edits.",
+  ]);
+  assert.deepEqual(findSchemaEditGuidanceClaims("patchTargets are LSP-backed rename/reference safe locations.", "synthetic.md"), [
+    "synthetic.md:1 [patch-targets-lsp-semantic-safety] patchTargets are LSP-backed rename/reference safe locations.",
+  ]);
+  assert.deepEqual(findSchemaEditGuidanceClaims("fallback paths include editGuidance patchTargets for unsupported profiles.", "synthetic.md"), [
+    "synthetic.md:1 [fallback-receives-edit-guidance] fallback paths include editGuidance patchTargets for unsupported profiles.",
+  ]);
+  assert.deepEqual(findSchemaEditGuidanceClaims("patchTargets are AST-derived edit aids that require a matching sourceFingerprint before applying edits.", "synthetic.md"), []);
+  assert.deepEqual(findSchemaEditGuidanceClaims("Pre-read must stop at fallback before compact payload construction, including calls that request edit guidance.", "synthetic.md"), []);
+  assert.deepEqual(findSchemaEditGuidanceClaims("A positive dry-run report is not by itself a claim that automatic Codex runtime editing improved.", "synthetic.md"), []);
 });
 
 test("claim-boundary doc audit rejects broad domain-parallel examples but allows scoped safety-layer wording", () => {
