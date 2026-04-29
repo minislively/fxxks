@@ -1277,6 +1277,19 @@ export function CustomOnlyForm() {
   assert.notEqual(tui.debug.frontendPayloadPolicy?.allowed, true);
   assert.equal("payload" in tui, false);
 
+  const tuiWithEditGuidance = decideCodexPreRead(
+    path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "tui-ink-basic.tsx"),
+    repoRoot,
+    { includeEditGuidance: true },
+  );
+  assert.equal(tuiWithEditGuidance.eligible, true);
+  assert.equal(tuiWithEditGuidance.decision, "fallback");
+  assert.deepEqual(tuiWithEditGuidance.reasons, [unsupportedFrontendProfile]);
+  assert.equal(tuiWithEditGuidance.fallback.reason, unsupportedFrontendProfile);
+  assert.equal(tuiWithEditGuidance.debug.domainDetection.classification, "tui-ink");
+  assert.equal(tuiWithEditGuidance.debug.domainDetection.profile.claimStatus, "evidence-only");
+  assert.equal("payload" in tuiWithEditGuidance, false);
+
   const moduleTs = decideCodexPreRead(path.join(repoRoot, "fixtures", "ts-js-beta", "module-utils.ts"), repoRoot);
   assert.equal(moduleTs.eligible, true);
   assert.equal(moduleTs.decision, "payload");
