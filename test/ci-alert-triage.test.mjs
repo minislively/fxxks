@@ -188,3 +188,81 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("CI alert triage keeps explicit rerun attempt evidence distinct", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-attempts-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 301,
+      attempt: 2,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-04-28T12:00:00Z",
+      updatedAt: "2026-04-28T12:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/301",
+    },
+    {
+      databaseId: 302,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "missing-attempt",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-04-28T11:00:00Z",
+      updatedAt: "2026-04-28T11:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/302",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "old rerun attempt https://github.com/minislively/fooks/actions/runs/301/attempts/1",
+    "current run URL https://github.com/minislively/fooks/actions/runs/301",
+    "current job URL https://github.com/minislively/fooks/actions/runs/301/job/777888999",
+    "unknown current attempt https://github.com/minislively/fooks/actions/runs/302/attempts/1",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const attempt301 = result.alerts.find((alert) => alert.alertedRunId === "301" && alert.alertedAttempt === 1);
+    const current301 = result.alerts.find((alert) => alert.alertedRunId === "301" && alert.alertedAttempt === null);
+    const missingCurrentAttempt = result.alerts.find((alert) => alert.alertedRunId === "302" && alert.alertedAttempt === 1);
+
+    assert.equal(result.alerts.length, 3);
+    assert.equal(attempt301.alertedUrl, "https://github.com/minislively/fooks/actions/runs/301/attempts/1");
+    assert.equal(attempt301.currentAttempt, 2);
+    assert.equal(attempt301.evidence, "stale");
+    assert.equal(attempt301.reason, "superseded by attempt 2");
+
+    assert.equal(current301.alertedUrl, "https://github.com/minislively/fooks/actions/runs/301");
+    assert.equal(current301.appearances, 2);
+    assert.equal(current301.currentAttempt, 2);
+    assert.equal(current301.evidence, "current");
+    assert.equal(current301.reason, "not failing");
+
+    assert.equal(missingCurrentAttempt.alertedUrl, "https://github.com/minislively/fooks/actions/runs/302/attempts/1");
+    assert.equal(missingCurrentAttempt.currentAttempt, null);
+    assert.equal(missingCurrentAttempt.evidence, "current");
+    assert.equal(missingCurrentAttempt.reason, "not failing");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

@@ -47,7 +47,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/triage-ci-alerts.mjs [options]\n\nClassifies recent GitHub Actions CI runs so replayed alert buffers can be skimmed\nfor only the latest actionable failures. Cancelled/skipped runs and older runs\nsuperseded by newer runs on the same workflow+branch are marked stale.\n\nOptions:\n  --input <path>     Read gh run list JSON from a file instead of invoking gh\n  --alerts <path>    Read pasted alert text / run URLs from a file, or - for stdin\n  --limit <n>        Number of runs to fetch when using gh (default: ${DEFAULT_LIMIT})\n  --branch <name>    Restrict to a branch/head branch\n  --workflow <name>  Restrict to a workflow display name\n  --json             Emit machine-readable JSON instead of markdown\n  --markdown         Emit markdown (default)\n  --output <path>    Write output to a file instead of stdout\n  -h, --help         Show this help\n\nLive usage:\n  npm run --silent ci:alerts -- --branch main\n\nOffline/replay usage:\n  gh run list --limit 100 --json databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url > /tmp/runs.json\n  npm run --silent ci:alerts -- --input /tmp/runs.json --json
+  console.log(`Usage: node scripts/triage-ci-alerts.mjs [options]\n\nClassifies recent GitHub Actions CI runs so replayed alert buffers can be skimmed\nfor only the latest actionable failures. Cancelled/skipped runs and older runs\nsuperseded by newer runs on the same workflow+branch are marked stale.\n\nOptions:\n  --input <path>     Read gh run list JSON from a file instead of invoking gh\n  --alerts <path>    Read pasted alert text / run URLs from a file, or - for stdin\n  --limit <n>        Number of runs to fetch when using gh (default: ${DEFAULT_LIMIT})\n  --branch <name>    Restrict to a branch/head branch\n  --workflow <name>  Restrict to a workflow display name\n  --json             Emit machine-readable JSON instead of markdown\n  --markdown         Emit markdown (default)\n  --output <path>    Write output to a file instead of stdout\n  -h, --help         Show this help\n\nLive usage:\n  npm run --silent ci:alerts -- --branch main\n\nOffline/replay usage:\n  gh run list --limit 100 --json attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url > /tmp/runs.json\n  npm run --silent ci:alerts -- --input /tmp/runs.json --json
 
 Pasted alert URL usage:
   pbpaste > /tmp/discord-alerts.txt
@@ -65,7 +65,7 @@ function readRuns(options) {
     "--limit",
     String(options.limit),
     "--json",
-    "databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url",
+    "attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url",
   ];
   if (options.branch) args.push("--branch", options.branch);
   if (options.workflow) args.push("--workflow", options.workflow);
@@ -84,25 +84,34 @@ function readAlertText(alertsInput) {
   return fs.readFileSync(path.resolve(repoRoot, alertsInput), "utf8");
 }
 
+function normalizePositiveInteger(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function extractAlertRunRefs(alertText) {
-  const refsById = new Map();
-  const urlPattern = /https:\/\/github\.com\/[^\s<>)\]]+\/actions\/runs\/(\d+)(?:\/(?:attempts|job|jobs)\/\d+)?(?:[?#][^\s<>)\]]*)?/gi;
+  const refsByKey = new Map();
+  const urlPattern = /https:\/\/github\.com\/[^\s<>)\]]+\/actions\/runs\/(\d+)(?:\/(attempts|job|jobs)\/(\d+))?(?:[?#][^\s<>)\]]*)?/gi;
 
   for (const match of alertText.matchAll(urlPattern)) {
     const id = match[1];
-    const existing = refsById.get(id);
+    const alertedAttempt = match[2] === "attempts" ? normalizePositiveInteger(match[3]) : null;
+    const key = alertedAttempt === null ? id : `${id}:attempt:${alertedAttempt}`;
+    const existing = refsByKey.get(key);
     if (existing) {
       existing.appearances += 1;
     } else {
-      refsById.set(id, {
+      refsByKey.set(key, {
         id,
+        alertedAttempt,
         url: match[0].replace(/[.,;:!?]+$/, ""),
         appearances: 1,
       });
     }
   }
 
-  return [...refsById.values()];
+  return [...refsByKey.values()];
 }
 
 function normalizeRun(run) {
@@ -114,6 +123,7 @@ function normalizeRun(run) {
     event: run.event || "unknown-event",
     status: run.status || "unknown-status",
     conclusion: run.conclusion || "",
+    attempt: normalizePositiveInteger(run.attempt),
     createdAt: run.createdAt || "",
     updatedAt: run.updatedAt || run.createdAt || "",
     url: run.url || "",
@@ -134,19 +144,25 @@ function buildAlertEvidence(alertRefs, rows) {
   const rowsById = new Map(rows.map((row) => [String(row.id), row]));
   return alertRefs.map((ref) => {
     const row = rowsById.get(ref.id);
+    const currentAttempt = row?.attempt ?? null;
+    const isStaleAttempt = ref.alertedAttempt !== null && currentAttempt !== null && ref.alertedAttempt < currentAttempt;
     return {
       alertedRunId: ref.id,
+      alertedAttempt: ref.alertedAttempt,
       alertedUrl: ref.url,
       appearances: ref.appearances,
-      evidence: alertEvidenceState(row),
-      reason: row?.reason ?? "run URL was not present in the inspected gh run list window",
+      evidence: isStaleAttempt ? "stale" : alertEvidenceState(row),
+      reason: isStaleAttempt
+        ? `superseded by attempt ${currentAttempt}`
+        : row?.reason ?? "run URL was not present in the inspected gh run list window",
       currentRunId: row?.latestRunId ?? null,
+      currentAttempt,
       workflow: row?.workflow ?? "",
       branch: row?.branch ?? "",
       status: row?.status ?? "",
       conclusion: row?.conclusion ?? "",
       updatedAt: row?.updatedAt ?? "",
-      runUrl: row?.url ?? ref.url,
+      runUrl: ref.url,
     };
   });
 }
@@ -227,14 +243,16 @@ function alertEvidenceTable(alerts) {
   const lines = [
     "## Pasted alert URL evidence",
     "",
-    "| Evidence | Alerted run | Current run | Workflow | Branch | Status | Conclusion | Reason | Seen |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Evidence | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
 
   for (const alert of alerts) {
     const alertedRun = alert.runUrl ? `[${alert.alertedRunId}](${alert.runUrl})` : `\`${alert.alertedRunId}\``;
     const currentRun = alert.currentRunId ? `\`${alert.currentRunId}\`` : "-";
-    lines.push(`| ${alert.evidence} | ${alertedRun} | ${currentRun} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(alert.reason)} | ${alert.appearances} |`);
+    const alertedAttempt = alert.alertedAttempt ?? "-";
+    const currentAttempt = alert.currentAttempt ?? "-";
+    lines.push(`| ${alert.evidence} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(alert.reason)} | ${alert.appearances} |`);
   }
 
   return `${lines.join("\n")}\n\n`;
