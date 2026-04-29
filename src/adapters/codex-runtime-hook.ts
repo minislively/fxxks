@@ -28,6 +28,19 @@ function payloadContextMode(payload: ModelFacingPayload): ContextMode {
   return payload.useOriginal ? "light-minimal" : "light";
 }
 
+function payloadContextModeReason(
+  phase: "first-seen" | "repeated",
+  contextMode: ContextMode,
+  payload: ModelFacingPayload,
+  editGuidanceIncluded: boolean,
+): string {
+  if (editGuidanceIncluded) return `${phase}-exact-file-edit-guidance`;
+  if (contextMode === "light-minimal") return `${phase}-exact-file-tiny-raw-original`;
+  return payload.domainPayload?.domain === "react-web"
+    ? `${phase}-exact-file-react-web-payload`
+    : `${phase}-exact-file-narrow-payload`;
+}
+
 function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, contextMode: ContextMode): string {
   return [
     `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode}`,
@@ -337,11 +350,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       statePath,
       additionalContext,
       contextMode,
-      contextModeReason: editGuidanceIncluded
-        ? "repeated-exact-file-edit-guidance"
-        : contextMode === "light-minimal"
-          ? "repeated-exact-file-tiny-raw-original"
-          : "repeated-exact-file-payload",
+      contextModeReason: payloadContextModeReason("repeated", contextMode, decision.payload, editGuidanceIncluded),
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,

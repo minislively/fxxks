@@ -1888,7 +1888,7 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
   );
   assert.equal(firstInspect.action, "record");
   assert.equal(secondInspect.action, "inject");
-  assert.equal(secondInspect.contextModeReason, "repeated-exact-file-payload");
+  assert.equal(secondInspect.contextModeReason, "repeated-exact-file-react-web-payload");
   assert.equal(secondInspect.additionalContext.includes("\"editGuidance\""), false);
   assert.equal("editGuidance" in secondInspect.debug.decision.payload, false);
   assert.equal(secondInspect.reasons.includes("edit-guidance-opt-in"), false);

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { cleanupMetricSessions } from "./metric-cleanup.mjs";
 
@@ -9,7 +10,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const { handleCodexRuntimeHook } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
-const { CUSTOM_WRAPPER_DOM_SIGNAL_GAP } = await import(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
+const {
+  CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
+  REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
+  REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+  RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+  UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+  WEBVIEW_BOUNDARY_FALLBACK_POLICY,
+} = await import(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const {
   CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
   handleClaudeRuntimeHook,
@@ -94,7 +102,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondWrapper.action, "inject");
   assert.equal(secondWrapper.debug.decision.debug.domainDetection.classification, "react-web");
   assert.deepEqual(secondWrapper.debug.decision.debug.frontendPayloadPolicy.evidenceGates, [CUSTOM_WRAPPER_DOM_SIGNAL_GAP]);
-  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-payload");
+  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-react-web-payload");
 
   const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);
@@ -170,6 +178,65 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
   assert.equal(legacyOverride.action, "fallback");
   assert.equal(legacyOverride.fallback.reason, "escape-hatch-full-read");
+});
+
+
+test("codex runtime activates React Web payload semantics only for the React Web lane", () => {
+  const runRepeatedPrompt = (label, prompt, cwd = repoRoot) => {
+    const sessionId = `bridge-contract-domain-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, cwd);
+    const first = handleCodexRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt }, cwd);
+    const second = handleCodexRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt: `Again, ${prompt}` }, cwd);
+    return { first, second };
+  };
+
+  const reactWeb = runRepeatedPrompt("react-web", "inspect fixtures/compressed/FormSection.tsx");
+  assert.equal(reactWeb.first.action, "record");
+  assert.equal(reactWeb.second.action, "inject");
+  assert.equal(reactWeb.second.contextModeReason, "repeated-exact-file-react-web-payload");
+  assert.equal(reactWeb.second.debug.decision.debug.domainDetection.classification, "react-web");
+  assert.equal(reactWeb.second.debug.decision.debug.frontendPayloadPolicy.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+  assert.equal(reactWeb.second.debug.decision.payload.domainPayload.domain, "react-web");
+  assert.equal(reactWeb.second.debug.decision.payload.domainPayload.plannerDecision, "compact-safe");
+
+  const rnPrimitive = runRepeatedPrompt("rn-primitive", "inspect test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx");
+  assert.equal(rnPrimitive.second.action, "inject");
+  assert.equal(rnPrimitive.second.contextModeReason, "repeated-exact-file-narrow-payload");
+  assert.equal(rnPrimitive.second.debug.decision.debug.domainDetection.classification, "react-native");
+  assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.allowed, true);
+  assert.equal("domainPayload" in rnPrimitive.second.debug.decision.payload, false);
+  assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), false);
+
+  for (const [label, prompt, classification, reason, policyName] of [
+    ["webview", "inspect test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx", "webview", REACT_NATIVE_WEBVIEW_BOUNDARY_REASON, WEBVIEW_BOUNDARY_FALLBACK_POLICY],
+    ["tui", "inspect test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx", "tui-ink", UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON, undefined],
+    ["mixed", "inspect test/fixtures/frontend-domain-expectations/negative-rn-webview-boundary.tsx", "mixed", REACT_NATIVE_WEBVIEW_BOUNDARY_REASON, WEBVIEW_BOUNDARY_FALLBACK_POLICY],
+  ]) {
+    const { second } = runRepeatedPrompt(label, prompt);
+    assert.equal(second.action, "fallback", `${label} should not inject React Web payload semantics`);
+    assert.equal(second.contextModeReason, reason);
+    assert.equal(second.debug.decision.debug.domainDetection.classification, classification);
+    assert.equal(second.debug.decision.fallback.reason, reason);
+    assert.equal("payload" in second.debug.decision, false);
+    assert.notEqual(second.debug.decision.debug.frontendPayloadPolicy?.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+    if (policyName) assert.equal(second.debug.decision.debug.frontendPayloadPolicy.name, policyName);
+  }
+
+  const unknownDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-unknown-domain-"));
+  try {
+    fs.writeFileSync(path.join(unknownDir, "PlainUnknown.tsx"), "export function PlainUnknown() { return null; }\n");
+    const { second: unknown } = runRepeatedPrompt("unknown", "inspect PlainUnknown.tsx", unknownDir);
+    assert.equal(unknown.action, "fallback");
+    assert.equal(unknown.contextModeReason, UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal(unknown.debug.decision.debug.domainDetection.classification, "unknown");
+    assert.equal(unknown.debug.decision.debug.domainDetection.profile.claimStatus, "deferred");
+    assert.equal(unknown.debug.decision.fallback.reason, UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal("payload" in unknown.debug.decision, false);
+    assert.notEqual(unknown.debug.decision.debug.frontendPayloadPolicy?.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+  } finally {
+    fs.rmSync(unknownDir, { recursive: true, force: true });
+  }
 });
 
 test("claude runtime bridge follows record-then-inject repeated same-file contract", () => {
@@ -248,7 +315,7 @@ test("claude runtime bridge follows record-then-inject repeated same-file contra
     repoRoot,
   );
   assert.equal(readOnlySecond.action, "inject");
-  assert.equal(readOnlySecond.contextModeReason, "repeated-exact-file-payload");
+  assert.equal(readOnlySecond.contextModeReason, "repeated-exact-file-react-web-payload");
   assert.equal(readOnlySecond.additionalContext.includes("\"editGuidance\""), false);
   assert.equal("editGuidance" in readOnlySecond.debug.decision.payload, false);
   assert.equal(readOnlySecond.reasons.includes("edit-guidance-opt-in"), false);
@@ -298,7 +365,7 @@ test("claude runtime bridge follows record-then-inject repeated same-file contra
       repoRoot,
     );
     assert.equal(mixedCodeSecond.action, "inject");
-    assert.equal(mixedCodeSecond.contextModeReason, "repeated-exact-file-payload");
+    assert.equal(mixedCodeSecond.contextModeReason, "repeated-exact-file-react-web-payload");
     assert.equal(mixedCodeSecond.additionalContext.includes("\"editGuidance\""), false);
     assert.equal(mixedCodeSecond.reasons.includes("edit-guidance-opt-in"), false);
   }
