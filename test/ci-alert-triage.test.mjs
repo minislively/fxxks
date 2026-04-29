@@ -127,10 +127,23 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
       updatedAt: "2026-04-27T10:10:00Z",
       url: "https://github.com/minislively/fooks/actions/runs/203",
     },
+    {
+      databaseId: 202,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "ci-alert-pr-job-url-regression",
+      event: "pull_request",
+      status: "completed",
+      conclusion: "failure",
+      createdAt: "2026-04-27T09:00:00Z",
+      updatedAt: "2026-04-27T09:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/202",
+    },
   ]));
   fs.writeFileSync(alertsPath, [
     "Discord alert: https://github.com/minislively/fooks/actions/runs/204",
     "clawhip replay job URL https://github.com/minislively/fooks/actions/runs/203/job/987654321",
+    "clawhip fooks#263 · PR CI job URL https://github.com/minislively/fooks/actions/runs/202/job/333444555",
     "duplicate job URL https://github.com/minislively/fooks/actions/runs/204/job/123456789",
     "outside inspected window https://github.com/minislively/fooks/actions/runs/999",
   ].join("\n"));
@@ -151,13 +164,18 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
     const result = JSON.parse(stdout);
     const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
 
-    assert.equal(result.alerts.length, 3);
+    assert.equal(result.alerts.length, 4);
+    assert.equal(byAlertId.get("204").alertedUrl, "https://github.com/minislively/fooks/actions/runs/204");
     assert.equal(byAlertId.get("204").evidence, "stale");
     assert.equal(byAlertId.get("204").currentRunId, 205);
     assert.equal(byAlertId.get("204").reason, "superseded by run 205");
     assert.equal(byAlertId.get("204").appearances, 2);
     assert.equal(byAlertId.get("203").evidence, "actionable");
     assert.equal(byAlertId.get("203").alertedUrl, "https://github.com/minislively/fooks/actions/runs/203/job/987654321");
+    assert.equal(byAlertId.get("202").evidence, "actionable");
+    assert.equal(byAlertId.get("202").alertedRunId, "202");
+    assert.equal(byAlertId.get("202").alertedUrl, "https://github.com/minislively/fooks/actions/runs/202/job/333444555");
+    assert.equal(byAlertId.get("202").branch, "ci-alert-pr-job-url-regression");
     assert.equal(byAlertId.get("999").evidence, "missing");
     assert.equal(byAlertId.get("999").reason, "run URL was not present in the inspected gh run list window");
   } finally {
