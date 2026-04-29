@@ -37,6 +37,10 @@ WebView files are boundary files before they are extraction candidates. `react-n
 
 React Native and TUI/Ink fixtures may be useful evidence for syntax traversal, fixture shape, and future domain-signal design. They are **not support claims**. RN primitive/input `F1` may use the measured `rn-primitive-input-narrow-payload` gate, but RN primitives must not be reinterpreted as DOM controls, React Web form semantics, or broad React Native support. TUI/Ink fixtures must not be generalized into arbitrary terminal UI support, terminal behavior correctness, or runtime-token savings.
 
+## Runtime debug evidence boundary
+
+`custom-wrapper-dom-signal-gap` is a traceability marker for the same-file React Web wrapper payload gate only. When it appears in pre-read or runtime-hook debug output such as `debug.frontendPayloadPolicy.evidenceGates`, it explains why a custom-component TSX fixture stayed inside the current React Web lane; it must not be interpreted as domain-parallel runtime readiness, setup/provider readiness, runtime promotion, or support for RN, WebView, TUI, Mixed, or Unknown lanes.
+
 ## Fixture manifest pre-detector/profile gate
 
 The fixture expectation manifest at `test/fixtures/frontend-domain-expectations/manifest.json` is the pre-detector/profile gate for this lane. Before any detector or profile promotion, a candidate change must keep the manifest and docs aligned on:

@@ -26,6 +26,10 @@ const forbiddenBroadReactWebRuntimeClaims = [
     label: "react-web-runtime-savings-proof",
     pattern: /\b(?:React\s*Web|React\/Web|web\s+React)\b[^\n]{0,100}\b(?:runtime-token|runtime token|latency|billing|cost)\b[^\n]{0,80}\b(?:savings?|reduction|win|proof|guarantee)\b/i,
   },
+  {
+    label: "wrapper-debug-domain-parallel-readiness",
+    pattern: /\b(?:custom-wrapper-dom-signal-gap|wrapper(?:-lane)?|pre-read\s+runtime\s+debug\s+evidence|runtime\s+debug\s+evidence|frontendPayloadPolicy(?:\.evidenceGates)?)\b[^\n]{0,120}\b(?:proves?|guarantees?|establishes?|unlocks?|counts\s+as|interpreted\s+as)\b[^\n]{0,120}\b(?:domain-parallel|parallel\s+domain|multi-domain|cross-domain|runtime\s+readiness|runtime\s+promotion|setup\s+readiness|provider\s+readiness)\b/i,
+  },
 ];
 
 const boundedClaimBoundary = /\b(?:measured|same-file|current supported lane only|current supported lane|fixture(?:-backed)?|local synthetic|claim boundary|does not|do not|not|no|without|cannot|must not|only|fallback|deferred|narrow|before any|separate approval|not broad|not stable|not provider|not runtime-token)\b/i;
@@ -88,6 +92,8 @@ test("React Web runtime evidence audit preserves the narrow fixture boundary", (
   assert.match(combined, /F11` and `F12` are selected React Web runtime-gate fixtures/);
   assert.match(combined, /prove the current supported lane handles custom JSX components with web-specific attributes before any RN\/WebView\/TUI lane is promoted/);
   assert.match(combined, /React Web evidence is used to imply RN, WebView, TUI, Mixed, or Unknown support/);
+  assert.match(combined, /`custom-wrapper-dom-signal-gap` is a traceability marker for the same-file React Web wrapper payload gate only/);
+  assert.match(combined, /must not be interpreted as domain-parallel runtime readiness/);
 });
 
 test("React Web runtime evidence audit rejects broad examples but allows scoped examples", () => {
@@ -112,6 +118,19 @@ test("React Web runtime evidence audit rejects broad examples but allows scoped 
   );
   assert.deepEqual(
     findBroadReactWebRuntimeClaims("F11/F12 are measured same-file React Web runtime-gate fixtures only; this is not stable runtime-token proof.", "synthetic.md"),
+    [],
+  );
+  assert.deepEqual(
+    findBroadReactWebRuntimeClaims("pre-read runtime debug evidence proves domain-parallel runtime readiness.", "synthetic.md"),
+    [
+      "synthetic.md:1 [wrapper-debug-domain-parallel-readiness] pre-read runtime debug evidence proves domain-parallel runtime readiness.",
+    ],
+  );
+  assert.deepEqual(
+    findBroadReactWebRuntimeClaims(
+      "custom-wrapper-dom-signal-gap is traceability for the same-file React Web wrapper gate only; it must not be interpreted as domain-parallel runtime readiness.",
+      "synthetic.md",
+    ),
     [],
   );
 });
