@@ -4213,9 +4213,11 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
     "src/core/schema.ts",
     "test/fooks.test.mjs",
     "test/domain-detector.test.mjs",
+    "test/claim-boundary-doc-audit.test.mjs",
     "test/fixtures/frontend-domain-expectations/manifest.json",
     "docs/frontend-domain-contract.md",
     "docs/frontend-domain-fixture-expectations.md",
+    "docs/frontend-fixture-boundary-regression-map.md",
   ]) {
     assert.ok(contract.includes(sharedFile), `${sharedFile} must be marked as serialized shared surface`);
   }

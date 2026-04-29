@@ -102,9 +102,11 @@ The files below are shared policy surfaces. A PR wave that changes any of them m
 - `src/core/schema.ts`
 - `test/fooks.test.mjs`
 - `test/domain-detector.test.mjs`
+- `test/claim-boundary-doc-audit.test.mjs`
 - `test/fixtures/frontend-domain-expectations/manifest.json`
 - `docs/frontend-domain-contract.md`
 - `docs/frontend-domain-fixture-expectations.md`
+- `docs/frontend-fixture-boundary-regression-map.md`
 
 #### Domain-owned parallel surfaces
 
