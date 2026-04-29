@@ -89,6 +89,12 @@ function runTextWithInput(args, input, cwd = repoRoot, envOverrides = {}) {
   });
 }
 
+function assertWebViewBoundaryFallbackPolicy(policy) {
+  assert.equal(policy?.name, preReadModule.WEBVIEW_BOUNDARY_FALLBACK_POLICY);
+  assert.equal(policy?.allowed, false);
+  assert.equal(policy?.reason, "unsupported-react-native-webview-boundary");
+}
+
 function collectStrings(value) {
   const strings = [];
   const visit = (item) => {
@@ -1347,6 +1353,40 @@ test("RN primitive input payload policy is semantic rather than path-only", () =
   assert.match(denied.reason, /forbidden-signal/);
 });
 
+test("WebView boundary payload policy requires actual WebView evidence", () => {
+  const rnDom = detectDomainFromSource(
+    `import { View } from "react-native";
+     export function Mixed() { return <div><View /></div>; }`,
+    "MixedRnDom.tsx",
+  );
+  const tuiDom = detectDomainFromSource(
+    `import { Box } from "ink";
+     export function Mixed() { return <div><Box /></div>; }`,
+    "MixedTuiDom.tsx",
+  );
+  const rnClassName = detectDomainFromSource(
+    `import { View } from "react-native";
+     export function NativeWithClassName() { return <View className="p-2" />; }`,
+    "NativeWithClassName.tsx",
+  );
+  for (const result of [rnDom, tuiDom, rnClassName]) {
+    assert.equal(result.reason, "unsupported-react-native-webview-boundary");
+    assert.equal(result.signals.some((signal) => signal.startsWith("webview:")), false);
+    const policy = preReadModule.assessFrontendPayloadPolicy(result);
+    assert.notEqual(policy?.name, preReadModule.WEBVIEW_BOUNDARY_FALLBACK_POLICY);
+  }
+
+  const webviewDom = detectDomainFromSource(
+    `import { WebView } from "react-native-webview";
+     export function Mixed() { return <form><WebView source={{ html: "<p>checkout</p>" }} /></form>; }`,
+    "MixedWebViewDom.tsx",
+  );
+  assert.equal(webviewDom.reason, "unsupported-react-native-webview-boundary");
+  assert.ok(webviewDom.signals.some((signal) => signal.startsWith("webview:")));
+  const policy = preReadModule.assessFrontendPayloadPolicy(webviewDom);
+  assertWebViewBoundaryFallbackPolicy(policy);
+});
+
 test("pre-read treats React Native and WebView markers as unsupported source-reading boundary", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-rn-webview-"));
   const rnWebViewPath = path.join(tempDir, "CheckoutWebView.tsx");
@@ -1366,6 +1406,7 @@ export function CheckoutWebView() {
   assert.equal(result.decision, "fallback");
   assert.deepEqual(result.reasons, ["unsupported-react-native-webview-boundary"]);
   assert.equal(result.fallback.reason, "unsupported-react-native-webview-boundary");
+  assertWebViewBoundaryFallbackPolicy(result.debug.frontendPayloadPolicy);
   assert.equal("payload" in result, false);
 });
 
@@ -4489,7 +4530,9 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(decision.decision, "fallback", `${item.id} should stay WebView fallback-first`);
     assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
     assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
+    assertWebViewBoundaryFallbackPolicy(decision.debug.frontendPayloadPolicy);
     assert.notEqual(decision.debug.frontendPayloadPolicy?.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+    assert.equal("payload" in decision, false, `${item.id} must not build a compact payload across the WebView boundary`);
   }
 
   for (const slot of ["F3", "F4", "F6"]) {
@@ -4502,6 +4545,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal("payload" in decision, false, `${item.id} must not build a compact payload across the WebView boundary`);
     assert.equal(decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
     assert.equal(decision.debug.domainDetection.profile.boundaryReason, "unsupported-react-native-webview-boundary");
+    assertWebViewBoundaryFallbackPolicy(decision.debug.frontendPayloadPolicy);
     assert.notEqual(decision.debug.frontendPayloadPolicy?.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   }
 });
