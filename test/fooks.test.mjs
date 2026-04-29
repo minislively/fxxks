@@ -4631,6 +4631,33 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   }
 });
 
+test("custom-wrapper-dom-signal-gap keeps React Web wrapper fixtures in the narrow current lane", () => {
+  const expectations = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
+  );
+  const selected = new Map(expectations.selected.map((item) => [item.slot, item]));
+
+  for (const slot of ["F11", "F12"]) {
+    const item = selected.get(slot);
+    const decision = preReadModule.decidePreRead(path.join(repoRoot, item.path), repoRoot, "codex");
+
+    assert.equal(decision.decision, "payload", `${item.id} should satisfy custom-wrapper-dom-signal-gap as narrow payload evidence`);
+    assert.equal(decision.debug.domainDetection.classification, "react-web", `${item.id} must remain a React Web-only wrapper boundary`);
+    assert.equal(decision.debug.domainDetection.profile.claimStatus, "current-supported-lane", `${item.id} must not promote broad React Web support`);
+    assert.equal(
+      decision.debug.frontendPayloadPolicy.name,
+      preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+      `${item.id} must expose the current-lane policy for custom-wrapper-dom-signal-gap`,
+    );
+    assert.equal(decision.debug.frontendPayloadPolicy.allowed, true, `${item.id} must allow only the measured React Web current lane`);
+    assert.ok(
+      decision.debug.domainDetection.signals.includes("react-web:jsx-attribute:className"),
+      `${item.id} must carry className evidence for custom-wrapper-dom-signal-gap`,
+    );
+    assert.equal("fallback" in decision, false, `${item.id} must not fall back after narrow custom wrapper React Web evidence`);
+  }
+});
+
 test("frontend domain fixture docs mirror manifest slot expectations", () => {
   const expectations = JSON.parse(
     fs.readFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json"), "utf8"),
