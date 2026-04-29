@@ -176,6 +176,17 @@ Serialized examples:
 
 Use the frontend-domain contract's ownership matrix for the normative shared-surface list.
 
+Before opening a true domain-parallel wave, use the frontend-domain contract's launch contract gate. The gate must name:
+
+- each participating lane;
+- branch/worktree names;
+- allowed write sets and forbidden shared seams;
+- PR order;
+- verification matrix;
+- stop rules.
+
+Planning-only launch-contract work remains docs/regression-only and does not authorize runtime/source changes, fixture expansion, domain implementation, support claims, or team/worktree execution by itself.
+
 ## Claim boundaries
 
 Architecture wording may describe future seams and planned responsibilities. It must not imply that those seams already exist in runtime code, that every TSX family is supported, or that compact payload behavior is safe for RN/WebView/TUI.

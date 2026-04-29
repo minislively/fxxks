@@ -4277,6 +4277,23 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(ownershipMatrix, /PR wave contract/);
   assert.match(ownershipMatrix, /before worktree, team, or multi-agent launch/);
   assert.match(ownershipMatrix, /docs\/tests-only unless a separate serialized runtime plan names a single shared-seam owner/);
+  assert.match(ownershipMatrix, /#### Domain-parallel launch contract/);
+  assert.match(ownershipMatrix, /named launch contract before any worktree, team, or multi-agent execution starts/);
+  assert.match(ownershipMatrix, /not a runtime\/source change, fixture expansion, domain support claim, token\/cache\/billing\/performance claim/);
+  assert.match(ownershipMatrix, /Launch base/);
+  assert.match(ownershipMatrix, /Lane table/);
+  assert.match(ownershipMatrix, /Branch\/worktree name/);
+  assert.match(ownershipMatrix, /Allowed write set/);
+  assert.match(ownershipMatrix, /Forbidden write set/);
+  assert.match(ownershipMatrix, /Shared-seam owner/);
+  assert.match(ownershipMatrix, /PR order/);
+  assert.match(ownershipMatrix, /Verification matrix/);
+  assert.match(ownershipMatrix, /Stop rules/);
+  assert.match(ownershipMatrix, /No-launch marker for planning-only work/);
+  for (const launchStatus of ["planning-only", "verifier-only", "single-shared-owner", "disjoint-domain-writers"]) {
+    assert.ok(ownershipMatrix.includes(`| \`${launchStatus}\` |`), `${launchStatus} launch status must be documented`);
+  }
+  assert.match(ownershipMatrix, /domain-parallel work remains planning-only and no implementation worktree is authorized/);
   for (const handoffItem of [
     "Base branch or base commit prerequisite",
     "Lane name",

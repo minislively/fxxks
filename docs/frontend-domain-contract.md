@@ -167,6 +167,34 @@ Every PR wave must carry a small **PR wave contract** before worktree, team, or 
 13. **Worktree/team launch status** — states whether this is only a planning contract or names the separate approved launch plan; absence of that plan means no domain implementation worktree is authorized.
 14. **Contradiction check** — states that full domain writer parallelism against shared runtime/shared-seam files remains forbidden, docs/claim-boundary lanes cannot freely change shared support policy, and single runtime writer lanes serialize instead of running parallel.
 
+#### Domain-parallel launch contract
+
+A future domain-parallel launch must have a named launch contract before any worktree, team, or multi-agent execution starts. The launch contract is the operational gate that turns the ownership matrix into a wave-specific checklist. It is not a runtime/source change, fixture expansion, domain support claim, token/cache/billing/performance claim, or permission to run multiple writers against shared seams.
+
+The launch contract must include:
+
+1. **Launch base** — exact `main` commit or prerequisite PR that every lane starts from.
+2. **Lane table** — one row each for `react-web`, `react-native`, `webview-boundary`, `tui-ink`, and `shared-policy` when that lane participates.
+3. **Branch/worktree name** — a stable branch/worktree prefix per lane so review and cleanup can trace ownership.
+4. **Allowed write set** — exact files or directories each lane may edit.
+5. **Forbidden write set** — serialized shared surfaces the lane must not edit without becoming the named shared-policy owner.
+6. **Shared-seam owner** — either `none` or one named branch that owns the shared seam for the wave.
+7. **PR order** — which PR lands first, which PRs wait, and which PRs must rebase after the shared-policy owner lands.
+8. **Verification matrix** — targeted command per lane plus the aggregate command the leader runs after integration.
+9. **Stop rules** — shared-file conflict, support-claim drift, fixture sprawl, runtime seam expansion, or failing verification stops the wave and returns to planning.
+10. **No-launch marker for planning-only work** — states `planning-only` when the current PR only writes docs/regression tests and does not authorize team/worktree execution.
+
+Allowed launch statuses are:
+
+| Status | Meaning | Allowed next action |
+| --- | --- | --- |
+| `planning-only` | The current PR records launch rules but starts no implementation worktree. | Merge docs/regression first, then run a separate launch approval pass. |
+| `verifier-only` | Parallel lanes may inspect and report without writing. | Collect reports, then let the leader decide whether another plan is needed. |
+| `single-shared-owner` | One branch owns a serialized shared seam while other lanes avoid that seam or wait. | Merge the shared owner first, then rebase dependent domain lanes. |
+| `disjoint-domain-writers` | Domain lanes write only disjoint owned files and avoid serialized shared surfaces. | Run lane commands plus leader aggregate verification before merge. |
+
+Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.
+
 Shared fallback reasons and denial markers are boundary evidence, not support claims. In particular, `unsupported-react-native-webview-boundary`, `unsupported-frontend-domain-profile`, `webview-boundary-fallback`, and domain-specific payload policy strings must not be reused as React Native, WebView, TUI/Ink, Mixed, or Unknown support wording.
 
 Domain promotion must follow this ordered ladder and stop at the first failed gate:
