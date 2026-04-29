@@ -32,9 +32,10 @@ export class CacheMonitor {
 
     const backupAvailable = existsSync(backupPath) && this.readIndexHealth(backupPath).valid;
     const corruptionEvents = this.metrics.corruptionEvents;
+    const status = this.resolveHealthStatus({ indexExists, indexValid, corruptionEvents });
 
-    return {
-      status: this.resolveHealthStatus({ indexExists, indexValid, corruptionEvents }),
+    const report = {
+      status,
       indexExists,
       indexValid,
       entryCount,
@@ -42,6 +43,7 @@ export class CacheMonitor {
       backupAvailable,
       lastCheck: new Date().toISOString(),
     };
+    return { ...report, recommendation: this.generateRecommendation(report) };
   }
 
   private readIndexHealth(indexPath: string): { valid: boolean; entryCount: number } {
@@ -119,7 +121,7 @@ export class CacheMonitor {
     return report.corruptionEvents > 0 ? "recovered" : "healthy";
   }
 
-  private generateRecommendation(report: CacheHealthReport): string {
+  private generateRecommendation(report: Pick<CacheHealthReport, "status" | "backupAvailable" | "corruptionEvents">): string {
     if (report.status === "empty") {
       return "Initialize cache with first scan";
     }
@@ -168,6 +170,7 @@ interface CacheHealthReport {
   entryCount: number;
   corruptionEvents: number;
   backupAvailable: boolean;
+  recommendation: string;
   lastCheck: string;
 }
 

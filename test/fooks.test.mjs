@@ -4885,6 +4885,19 @@ test("status cache reports healthy after scan builds the cache index", () => {
   assert.ok(status.entryCount >= 5);
 });
 
+test("status cache reports an actionable recommendation for corrupted indexes", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, ".fooks", "index.json"), "{ invalid json");
+
+  const status = run(["status", "cache"], tempDir);
+
+  assert.equal(status.status, "corrupted");
+  assert.equal(status.indexExists, true);
+  assert.equal(status.indexValid, false);
+  assert.match(status.recommendation, /rerun scan to regenerate/i);
+});
+
 test("attach codex proves contract and runtime under minislively account context", () => {
   const tempDir = makeTempProject();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-codex-home-"));
