@@ -145,6 +145,7 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
     "clawhip replay job URL https://github.com/minislively/fooks/actions/runs/203/job/987654321",
     "clawhip fooks#263 · PR CI job URL https://github.com/minislively/fooks/actions/runs/202/job/333444555",
     "duplicate job URL https://github.com/minislively/fooks/actions/runs/204/job/123456789",
+    "main branch job URL should keep parent run id https://github.com/minislively/fooks/actions/runs/205/job/444555666",
     "outside inspected window https://github.com/minislively/fooks/actions/runs/999",
   ].join("\n"));
 
@@ -164,7 +165,12 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
     const result = JSON.parse(stdout);
     const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
 
-    assert.equal(result.alerts.length, 4);
+    assert.equal(result.alerts.length, 5);
+    assert.equal(byAlertId.has("444555666"), false);
+    assert.equal(byAlertId.get("205").alertedRunId, "205");
+    assert.equal(byAlertId.get("205").alertedUrl, "https://github.com/minislively/fooks/actions/runs/205/job/444555666");
+    assert.equal(byAlertId.get("205").evidence, "current");
+    assert.equal(byAlertId.get("205").branch, "main");
     assert.equal(byAlertId.get("204").alertedUrl, "https://github.com/minislively/fooks/actions/runs/204");
     assert.equal(byAlertId.get("204").evidence, "stale");
     assert.equal(byAlertId.get("204").currentRunId, 205);
