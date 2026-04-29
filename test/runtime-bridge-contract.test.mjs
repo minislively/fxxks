@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const { handleCodexRuntimeHook } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const { CUSTOM_WRAPPER_DOM_SIGNAL_GAP } = await import(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const {
   CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
   handleClaudeRuntimeHook,
@@ -69,6 +70,31 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), true);
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
   assert.deepEqual(secondInject.debug.decision.payload.editGuidance.freshness, secondInject.debug.decision.payload.sourceFingerprint);
+
+  const wrapperSession = `bridge-contract-wrapper-debug-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: wrapperSession }, repoRoot);
+  const firstWrapper = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: wrapperSession,
+      prompt: "Please update test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
+    },
+    repoRoot,
+  );
+  const secondWrapper = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: wrapperSession,
+      prompt: "Again, update test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
+    },
+    repoRoot,
+  );
+
+  assert.equal(firstWrapper.action, "record");
+  assert.equal(secondWrapper.action, "inject");
+  assert.equal(secondWrapper.debug.decision.debug.domainDetection.classification, "react-web");
+  assert.deepEqual(secondWrapper.debug.decision.debug.frontendPayloadPolicy.evidenceGates, [CUSTOM_WRAPPER_DOM_SIGNAL_GAP]);
+  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-payload");
 
   const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);
