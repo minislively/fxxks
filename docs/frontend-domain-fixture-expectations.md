@@ -56,6 +56,14 @@ The RN fixture lane is a readiness gate, not a support promise. `F1` is the firs
 
 Execution for later RN gates should prefer strengthening docs, manifest metadata, and regression tests around existing RN fixture slots before adding new synthetic fixtures. This first gate is intentionally limited to `F1`; `F2`, `F9`, and `F10` remain fallback/readiness-only.
 
+### RN F1-adjacent fixture gap gate
+
+The next RN fixture gap should stay adjacent to `F1` before any broader RN lane work begins. An acceptable F1-adjacent gap varies exactly one primitive/input axis from the existing `F1` fixture family, such as an alternate primitive press/input component or prop shape, while preserving the same narrow purpose: local RN primitive/input payload evidence only.
+
+An F1-adjacent gap must not introduce `StyleSheet.create`, `Platform.select`, navigation hooks, `FlatList`, `PanResponder`, image/layout primitives, WebView bridge markers, TUI/Ink imports, or React Web DOM/form evidence. If a candidate needs any of those signals, it belongs to `F2`, `F9`, `F10`, WebView, TUI, or React Web planning instead of the F1-adjacent lane.
+
+Before adding an F1-adjacent fixture file or promoting any runtime behavior, the plan must name the specific missing primitive/input acceptance check, state whether the expected pre-read outcome remains fallback or uses the existing `rn-primitive-input-narrow-payload` policy, and keep `supportClaim: "none"`. Without a named failing or missing acceptance check, the correct result is a no-op audit rather than invented implementation.
+
 ## Manifest shape guard
 
 Selected fixtures must not carry deferred-only fields such as `deferReason` or `doesNotBlockBaseline`. Deferred fixtures must not carry executable fixture paths, expected outcomes, fallback reasons, required signals, or verification instructions. This keeps the manifest from describing the same slot as both selected and deferred while later RN/WebView/TUI/React Web work is split across branches.

@@ -4667,10 +4667,17 @@ test("frontend domain fixture docs mirror manifest slot expectations", () => {
   assert.match(docs, /`F7` remains deferred for broad non-Ink terminal renderer semantics/);
   assert.match(docs, /pre-read must continue to fallback with `unsupported-frontend-domain-profile`/i);
   assert.match(docs, /must not construct a compact payload by default/);
+  assert.match(docs, /RN F1-adjacent fixture gap gate/);
+  assert.match(docs, /varies exactly one primitive\/input axis/);
+  assert.match(docs, /must not introduce `StyleSheet\.create`, `Platform\.select`, navigation hooks, `FlatList`, `PanResponder`, image\/layout primitives, WebView bridge markers, TUI\/Ink imports, or React Web DOM\/form evidence/);
+  assert.match(docs, /name the specific missing primitive\/input acceptance check/);
+  assert.match(docs, /Without a named failing or missing acceptance check, the correct result is a no-op audit/);
   assert.match(docs, /Selected fixtures must not carry deferred-only fields/);
   assert.match(docs, /Deferred fixtures must not carry executable fixture paths/);
   assert.match(docs, /\[frontend fixture boundary regression map\]\(frontend-fixture-boundary-regression-map\.md\)/);
   assert.match(boundaryMap, /## Regression map/);
+  assert.match(boundaryMap, /future RN F1-adjacent fixture gap limited to one primitive\/input axis/);
+  assert.match(boundaryMap, /Require a named missing primitive\/input acceptance check before adding an F1-adjacent fixture file or changing runtime behavior/);
   assert.match(docs, /\[WebView bridge boundary plan\]\(webview-bridge-boundary-plan\.md\)/);
   assert.match(webviewBridgePlan, /`F4` \(`webview-bridge-pair`\) as \*\*selected fallback-boundary evidence\*\*/);
   assert.match(webviewBridgePlan, /checkout\.submit/);

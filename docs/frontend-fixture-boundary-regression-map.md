@@ -22,4 +22,6 @@ This is the compact review map for the RN/WebView/TUI fixture boundary. It does 
 - Keep WebView slots `F3`, `F4`, and `F6` at `evidenceScope: "fallback-boundary-evidence-only"`.
 - Keep TUI slot `F5` at `evidenceScope: "syntax-evidence-only"`.
 - Keep only RN slot `F1` on `payloadPolicy: "rn-primitive-input-narrow-payload"`; the other selected RN slots stay readiness-only fallback evidence.
+- Keep any future RN F1-adjacent fixture gap limited to one primitive/input axis; do not mix in `F2`, `F9`, `F10`, WebView, TUI, or React Web signals.
+- Require a named missing primitive/input acceptance check before adding an F1-adjacent fixture file or changing runtime behavior; otherwise record a no-op audit.
 - Do not add support, setup-eligibility, runtime-token, provider-token, billing, performance, terminal-safety, bridge-safety, or default compact-extraction claims from these fixtures.
