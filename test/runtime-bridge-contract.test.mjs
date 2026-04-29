@@ -208,6 +208,24 @@ test("codex runtime activates React Web payload semantics only for the React Web
   assert.equal("domainPayload" in rnPrimitive.second.debug.decision.payload, false);
   assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), false);
 
+  for (const [label, fixture, forbiddenSignal] of [
+    ["rn-style-platform", "rn-style-platform-navigation.tsx", "react-native:primitive:ScrollView"],
+    ["rn-interaction", "rn-interaction-gesture.tsx", "react-native:primitive:FlatList"],
+    ["rn-image-scrollview", "rn-image-scrollview.tsx", "react-native:primitive:Image"],
+  ]) {
+    const { second } = runRepeatedPrompt(label, `inspect test/fixtures/frontend-domain-expectations/${fixture}`);
+    assert.equal(second.action, "fallback", `${label} should not inherit the RN F1 narrow payload`);
+    assert.equal(second.contextModeReason, UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal(second.debug.decision.debug.domainDetection.classification, "react-native");
+    assert.equal(second.debug.decision.fallback.reason, UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal(second.debug.decision.debug.frontendPayloadPolicy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+    assert.equal(second.debug.decision.debug.frontendPayloadPolicy.allowed, false);
+    assert.match(second.debug.decision.debug.frontendPayloadPolicy.reason, new RegExp(`^forbidden-signal:${forbiddenSignal.replaceAll(".", "\\.")}`));
+    assert.equal("payload" in second.debug.decision, false);
+    assert.notEqual(second.debug.decision.debug.frontendPayloadPolicy.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+    assert.equal(second.additionalContext, undefined);
+  }
+
   for (const [label, prompt, classification, reason, policyName] of [
     ["webview", "inspect test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx", "webview", REACT_NATIVE_WEBVIEW_BOUNDARY_REASON, WEBVIEW_BOUNDARY_FALLBACK_POLICY],
     ["tui", "inspect test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx", "tui-ink", UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON, undefined],
@@ -236,6 +254,41 @@ test("codex runtime activates React Web payload semantics only for the React Web
     assert.notEqual(unknown.debug.decision.debug.frontendPayloadPolicy?.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   } finally {
     fs.rmSync(unknownDir, { recursive: true, force: true });
+  }
+});
+
+test("claude runtime keeps RN F1 narrow payload separate from broader RN domains", () => {
+  const runRepeatedPrompt = (label, prompt) => {
+    const sessionId = `bridge-contract-claude-rn-domain-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+    const first = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt }, repoRoot);
+    const second = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", sessionId, prompt: `Again, ${prompt}` }, repoRoot);
+    return { first, second };
+  };
+
+  const rnPrimitive = runRepeatedPrompt("rn-primitive", "inspect test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx");
+  assert.equal(rnPrimitive.first.action, "record");
+  assert.equal(rnPrimitive.second.action, "inject");
+  assert.equal(rnPrimitive.second.contextModeReason, "repeated-exact-file-narrow-payload");
+  assert.equal(rnPrimitive.second.debug.decision.debug.domainDetection.classification, "react-native");
+  assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.allowed, true);
+  assert.equal("domainPayload" in rnPrimitive.second.debug.decision.payload, false);
+  assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), false);
+
+  for (const [label, fixture] of [
+    ["rn-style-platform", "rn-style-platform-navigation.tsx"],
+    ["rn-interaction", "rn-interaction-gesture.tsx"],
+    ["rn-image-scrollview", "rn-image-scrollview.tsx"],
+  ]) {
+    const { second } = runRepeatedPrompt(label, `inspect test/fixtures/frontend-domain-expectations/${fixture}`);
+    assert.equal(second.action, "fallback", `${label} should not inherit the RN F1 narrow payload`);
+    assert.equal(second.contextModeReason, UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal(second.fallback.reason, UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+    assert.equal(second.additionalContext.includes(UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON), true);
+    assert.equal(second.additionalContext.includes('"domainPayload"'), false);
+    assert.equal(second.debug.repeatedFile, true);
+    assert.equal(second.debug.bounded, true);
   }
 });
 
