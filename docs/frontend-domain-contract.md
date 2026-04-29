@@ -96,6 +96,9 @@ The files below are shared policy surfaces. A PR wave that changes any of them m
 
 - `src/core/domain-detector.ts`
 - `src/adapters/pre-read.ts`
+- `src/core/payload/readiness.ts`
+- `src/adapters/*-runtime-hook.ts`
+- `src/adapters/*-hook-preset.ts`
 - `src/core/schema.ts`
 - `test/fooks.test.mjs`
 - `test/domain-detector.test.mjs`
@@ -114,6 +117,46 @@ The paths below may be edited in parallel when the branch stays inside its domai
 - Domain-specific docs that do not change shared support, detector, pre-read, or manifest policy
 
 Parallel branches that need a serialized shared surface are no longer independent domain branches for that PR wave; they must serialize behind the named shared-policy owner.
+
+#### Domain parallel safety layer
+
+The parallel safety layer is an execution contract for future multi-agent or multi-worktree domain work. It is docs/tests-only by default and does not authorize runtime source changes. A safety-layer PR must include a changed-file guard: the final diff may contain only the selected frontend-domain contract doc(s), focused contract regression test(s), and OMX planning/state artifacts needed for workflow bookkeeping. If `src/core/domain-detector.ts`, `src/adapters/pre-read.ts`, `src/core/payload/readiness.ts`, runtime hooks, hook presets, schema files, or manifest policy must change, the work stops and reruns planning/review as a serialized shared-policy owner branch.
+
+Safe lane types are limited to:
+
+- read-only investigation;
+- fixture-only lane;
+- disjoint domain test lane;
+- docs/claim-boundary lane, only when it avoids shared support-policy expansion or names the shared-policy owner;
+- single runtime writer lane, explicitly serialized and never parallel with other shared-seam/runtime writers;
+- verifier lane.
+
+Unsafe lane types are not parallel-safe and must serialize:
+
+- multiple branches editing detector, pre-read, readiness, runtime hooks, hook presets, schema, shared tests, or manifest policy in the same PR wave;
+- domain branches changing shared support wording without a named shared-policy owner;
+- WebView payload or bridge reuse while WebView is fallback-first;
+- RN or TUI support wording based only on syntax traversal evidence;
+- Mixed or Unknown promotion by choosing the most convenient domain;
+- full domain writer parallelism against shared runtime/shared-seam files.
+
+Execution handoff checklist for any future domain-parallel PR wave:
+
+1. **Named shared-policy owner** — required for any PR wave touching serialized shared surfaces.
+2. **Merge-order note** — records which shared-policy branch must land first and which domain branches wait.
+3. **Disjoint-file proof** — lists each lane's owned files and proves they do not overlap shared seams.
+4. **Verifier command** — names the targeted command proving fallback/deferred/support boundaries did not weaken.
+5. **Contradiction check** — states that full domain writer parallelism against shared runtime/shared-seam files remains forbidden, docs/claim-boundary lanes cannot freely change shared support policy, and single runtime writer lanes serialize instead of running parallel.
+
+Shared fallback reasons and denial markers are boundary evidence, not support claims. In particular, `unsupported-react-native-webview-boundary`, `unsupported-frontend-domain-profile`, `webview-boundary-fallback`, and domain-specific payload policy strings must not be reused as React Native, WebView, TUI/Ink, Mixed, or Unknown support wording.
+
+Domain promotion must follow this ordered ladder and stop at the first failed gate:
+
+1. evidence-only;
+2. readiness gate;
+3. denial/current marker;
+4. narrow runtime gate;
+5. narrow payload gate.
 
 | Lane | Primary owned surfaces | Serialized shared surfaces | Merge-order rule | Verification minimum | Claim boundary |
 | --- | --- | --- | --- | --- | --- |

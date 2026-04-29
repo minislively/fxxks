@@ -4193,6 +4193,9 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   for (const sharedFile of [
     "src/core/domain-detector.ts",
     "src/adapters/pre-read.ts",
+    "src/core/payload/readiness.ts",
+    "src/adapters/*-runtime-hook.ts",
+    "src/adapters/*-hook-preset.ts",
     "src/core/schema.ts",
     "test/fooks.test.mjs",
     "test/domain-detector.test.mjs",
@@ -4228,6 +4231,42 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   const ownershipMatrix = contract.slice(ownershipMatrixStart, ownershipMatrixEnd);
   assert.match(ownershipMatrix, /must name one shared-policy owner, include a merge-order note/);
   assert.match(ownershipMatrix, /may be edited in parallel when the branch stays inside its domain/);
+  assert.match(ownershipMatrix, /#### Domain parallel safety layer/);
+  assert.match(ownershipMatrix, /docs\/tests-only by default and does not authorize runtime source changes/);
+  assert.match(ownershipMatrix, /changed-file guard/);
+  assert.match(ownershipMatrix, /read-only investigation/);
+  assert.match(ownershipMatrix, /fixture-only lane/);
+  assert.match(ownershipMatrix, /disjoint domain test lane/);
+  assert.match(ownershipMatrix, /docs\/claim-boundary lane, only when it avoids shared support-policy expansion or names the shared-policy owner/);
+  assert.match(ownershipMatrix, /single runtime writer lane, explicitly serialized and never parallel with other shared-seam\/runtime writers/);
+  assert.match(ownershipMatrix, /verifier lane/);
+  assert.match(ownershipMatrix, /Unsafe lane types are not parallel-safe and must serialize/);
+  assert.match(ownershipMatrix, /full domain writer parallelism against shared runtime\/shared-seam files/);
+  assert.match(ownershipMatrix, /Execution handoff checklist/);
+  for (const handoffItem of [
+    "Named shared-policy owner",
+    "Merge-order note",
+    "Disjoint-file proof",
+    "Verifier command",
+    "Contradiction check",
+  ]) {
+    assert.ok(ownershipMatrix.includes(handoffItem), `${handoffItem} must stay in the execution handoff checklist`);
+  }
+  assert.match(ownershipMatrix, /Shared fallback reasons and denial markers are boundary evidence, not support claims/);
+  assert.match(ownershipMatrix, /`unsupported-react-native-webview-boundary`/);
+  assert.match(ownershipMatrix, /`unsupported-frontend-domain-profile`/);
+  assert.match(ownershipMatrix, /`webview-boundary-fallback`/);
+  assert.match(ownershipMatrix, /must not be reused as React Native, WebView, TUI\/Ink, Mixed, or Unknown support wording/);
+  assert.match(ownershipMatrix, /Domain promotion must follow this ordered ladder and stop at the first failed gate/);
+  for (const ladderStep of [
+    "1. evidence-only",
+    "2. readiness gate",
+    "3. denial/current marker",
+    "4. narrow runtime gate",
+    "5. narrow payload gate",
+  ]) {
+    assert.ok(ownershipMatrix.includes(ladderStep), `${ladderStep} must stay in the domain promotion ladder`);
+  }
   for (const lane of ["React Web", "React Native", "WebView", "TUI/Ink", "Mixed/Unknown/shared policy"]) {
     assert.ok(ownershipMatrix.includes(`| ${lane} |`), `${lane} ownership matrix row must exist`);
   }
