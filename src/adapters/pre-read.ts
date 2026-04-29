@@ -113,15 +113,6 @@ export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResu
 
   if (domainDetection.classification !== "react-native") return undefined;
 
-  const missingSignal = RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS.find((signal) => !hasSignal(domainDetection, signal));
-  if (missingSignal) {
-    return {
-      name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
-      allowed: false,
-      reason: `missing-signal:${missingSignal}`,
-    };
-  }
-
   const forbiddenSignal =
     RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS.find((signal) => hasSignal(domainDetection, signal)) ??
     RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES.find((prefix) => hasAnySignalWithPrefix(domainDetection, prefix));
@@ -130,6 +121,15 @@ export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResu
       name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
       allowed: false,
       reason: `forbidden-signal:${forbiddenSignal}`,
+    };
+  }
+
+  const missingSignal = RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS.find((signal) => !hasSignal(domainDetection, signal));
+  if (missingSignal) {
+    return {
+      name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+      allowed: false,
+      reason: `missing-signal:${missingSignal}`,
     };
   }
 

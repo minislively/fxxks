@@ -1262,6 +1262,7 @@ export function CustomOnlyForm() {
     assert.equal(rn.debug.domainDetection.profile.claimStatus, "fallback-boundary");
     assert.equal(rn.debug.frontendPayloadPolicy.name, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
     assert.equal(rn.debug.frontendPayloadPolicy.allowed, false);
+    assert.match(rn.debug.frontendPayloadPolicy.reason, /^forbidden-signal:react-native:/);
     assert.equal("payload" in rn, false);
   }
 
@@ -4561,6 +4562,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     assert.equal(decision.fallback.reason, preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
     assert.notEqual(decision.debug.frontendPayloadPolicy.name, preReadModule.REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
     assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+    assert.match(decision.debug.frontendPayloadPolicy.reason, /^forbidden-signal:react-native:/);
   }
 
   for (const slot of ["F3", "F4", "F6"]) {
