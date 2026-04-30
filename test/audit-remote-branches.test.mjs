@@ -113,3 +113,128 @@ printf '%s\n' '[]'
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("remote branch audit classifies archived otherwise-valid candidates from archive docs", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-branch-audit-archive-"));
+  const binDir = path.join(tempDir, "bin");
+  const archiveDocsDir = path.join(tempDir, "archive-docs");
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.mkdirSync(archiveDocsDir, { recursive: true });
+
+  fs.writeFileSync(path.join(archiveDocsDir, "explicit-branch-archive-999.md"), `# Explicit branch archive\n\nBranch inspected: \`origin/feature-archived\`\n`);
+  fs.writeFileSync(path.join(archiveDocsDir, "title-branch-archive-998.md"), `# Archive rationale for \`feature-title-archived\` (#998)\n`);
+  fs.writeFileSync(path.join(archiveDocsDir, "precedence-branch-archive-997.md"), `# Precedence branch archive\n\nBranch inspected: \`origin/feature-open-archived\`\nBranch inspected: \`origin/feature-merged-archived\`\nBranch inspected: \`origin/feature-patch-archived\`\n`);
+
+  writeExecutable(path.join(binDir, "git"), `#!/bin/sh
+args="$*"
+case "$args" in
+  "remote get-url origin")
+    printf '%s\n' 'https://github.com/minislively/fooks.git'
+    ;;
+  "fetch --prune origin")
+    exit 0
+    ;;
+  "rev-parse --verify origin/main")
+    printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    ;;
+  "branch -r --format=%(refname:short)")
+    printf '%s\n' \
+      'origin/main' \
+      'origin/feature-archived' \
+      'origin/feature-title-archived' \
+      'origin/feature-open-archived' \
+      'origin/feature-merged-archived' \
+      'origin/feature-patch-archived' \
+      'origin/feature-live'
+    ;;
+  "rev-list --left-right --count origin/main...origin/feature-merged-archived")
+    printf '%s\n' '3 0'
+    ;;
+  "rev-list --left-right --count origin/main..."*)
+    printf '%s\n' '2 1'
+    ;;
+  "cherry origin/main origin/feature-patch-archived")
+    printf '%s\n' '- bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    ;;
+  "cherry origin/main "*)
+    printf '%s\n' '+ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    ;;
+  "log -1 --format=%cs "*)
+    printf '%s\n' '2026-04-27'
+    ;;
+  "log -1 --format=%s "*)
+    printf '%s\n' "Archive fixture"
+    ;;
+  "rev-parse --short=12 "*)
+    printf '%s\n' 'bbbbbbbbbbbb'
+    ;;
+  "diff --name-status origin/main "*)
+    printf '%s\n' 'M\tREADME.md'
+    ;;
+  "diff --shortstat origin/main "*)
+    printf '%s\n' '1 file changed, 1 insertion(+)'
+    ;;
+  *)
+    printf 'unexpected git args: %s\n' "$args" >&2
+    exit 64
+    ;;
+esac
+`);
+
+  writeExecutable(path.join(binDir, "gh"), `#!/bin/sh
+cat <<'JSON'
+[{"headRefName":"feature-open-archived","headRepositoryOwner":{"login":"minislively"},"number":123,"title":"Open archived fixture","url":"https://example.test/pr/123"}]
+JSON
+`);
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      auditScript,
+      "--json",
+      "--archive-docs-dir",
+      archiveDocsDir,
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const byBranch = new Map(result.branches.map((row) => [row.branch, row]));
+
+    assert.equal(byBranch.get("feature-archived").classification, "archived");
+    assert.deepEqual(byBranch.get("feature-archived").archiveEvidence, {
+      sourcePath: path.relative(repoRoot, path.join(archiveDocsDir, "explicit-branch-archive-999.md")),
+      matchType: "branch-inspected",
+      matchedRef: "origin/feature-archived",
+      lineNumber: 3,
+    });
+    assert.equal(byBranch.get("feature-title-archived").classification, "archived");
+    assert.equal(byBranch.get("feature-title-archived").archiveEvidence.matchType, "title");
+    assert.equal(byBranch.get("feature-open-archived").classification, "open-pr");
+    assert.equal(byBranch.get("feature-open-archived").archiveEvidence, undefined);
+    assert.equal(byBranch.get("feature-merged-archived").classification, "redundant-merged");
+    assert.equal(byBranch.get("feature-patch-archived").classification, "redundant-patch-equivalent");
+    assert.equal(byBranch.get("feature-live").classification, "valid-candidate");
+    assert.deepEqual(result.discordNextActionShortlist.map((row) => row.branch), ["feature-live"]);
+    assert.equal(result.summary.counts.archived, 2);
+
+    const markdown = execFileSync(process.execPath, [
+      auditScript,
+      "--markdown",
+      "--archive-docs-dir",
+      archiveDocsDir,
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.match(markdown, /Archived valid candidates suppressed: 2/);
+    assert.match(markdown, /## Archived valid candidates/);
+    assert.match(markdown, /not a recommendation to delete remote branches, merge stale trees, or replay stale-tree deletes/);
+    assert.doesNotMatch(markdown.split("## Discord-friendly valid-candidate next-action shortlist")[1].split("## Valid candidates without open PRs")[0], /feature-archived/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
