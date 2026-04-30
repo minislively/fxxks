@@ -15,6 +15,7 @@ export type ReactWebDomainPayload = {
   facts: {
     domTags?: string[];
     jsxAttributes?: string[];
+    jsxComponents?: string[];
     componentName?: string;
     exports?: Pick<ExtractionResult["exports"][number], "name" | "kind" | "type">[];
     hooks?: string[];
@@ -43,6 +44,10 @@ type ReactWebPayloadPlan = {
 
 function uniqueSorted(values: Iterable<string>): string[] {
   return [...new Set(values)].sort();
+}
+
+function collectJsxComponents(sections: string[] | undefined): string[] {
+  return uniqueSorted((sections ?? []).filter((section) => /^[A-Z][A-Za-z0-9_$]*$/.test(section)));
 }
 
 function compactExports(exportItems: ExtractionResult["exports"]): ReactWebDomainPayload["facts"]["exports"] {
@@ -103,6 +108,7 @@ function buildReactWebPayloadFacts(
   const styleSystem = result.style?.system && result.style.system !== "unknown" ? result.style.system : undefined;
   const exportFacts = compactExports(result.exports);
   const hooks = uniqueSorted(result.behavior?.hooks ?? []);
+  const jsxComponents = collectJsxComponents(result.structure?.sections);
 
   return {
     ...(result.componentName ? { componentName: result.componentName } : {}),
@@ -113,6 +119,7 @@ function buildReactWebPayloadFacts(
     ...(typeof result.style?.hasStyleBranching === "boolean" ? { hasStyleBranching: result.style.hasStyleBranching } : {}),
     ...(evidenceFacts.domTags.length > 0 ? { domTags: evidenceFacts.domTags } : {}),
     ...(evidenceFacts.jsxAttributes.length > 0 ? { jsxAttributes: evidenceFacts.jsxAttributes } : {}),
+    ...(jsxComponents.length > 0 ? { jsxComponents } : {}),
     ...(formControls && formControls.length > 0 ? { formControls } : {}),
     ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
     ...(styleSystem ? { styleSystem } : {}),

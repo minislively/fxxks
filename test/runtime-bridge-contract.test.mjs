@@ -188,12 +188,32 @@ test("runtime bridge preserves React Web custom-wrapper domainPayload parity for
       path: "test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
       componentName: "BillingPlanCard",
       requiredEvidence: ["react-web:jsx-attribute:className"],
+      expectedJsxComponents: [
+        "Badge",
+        "Button",
+        "Card",
+        "CardContent",
+        "CardDescription",
+        "CardHeader",
+        "CardTitle",
+        "StatRow",
+      ],
     },
     {
       label: "custom-form-shell",
       path: "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
       componentName: "ProfileSettingsShell",
       requiredEvidence: ["react-web:jsx-attribute:className", "react-web:jsx-attribute:htmlFor"],
+      expectedJsxComponents: [
+        "Button",
+        "ButtonGroup",
+        "ErrorText",
+        "Field",
+        "FieldControl",
+        "FieldLabel",
+        "HelperText",
+        "TextField",
+      ],
     },
   ];
 
@@ -261,6 +281,7 @@ test("runtime bridge preserves React Web custom-wrapper domainPayload parity for
     assert.equal(runtimePayload.claimStatus, "current-supported-lane");
     assert.equal(runtimePayload.claimBoundary, "react-web-measured-extraction");
     assert.equal(runtimePayload.facts.componentName, fixture.componentName);
+    assert.deepEqual(runtimePayload.facts.jsxComponents, fixture.expectedJsxComponents);
     for (const evidence of fixture.requiredEvidence) {
       assert.ok(runtimePayload.evidence.includes(evidence), `${fixture.label} should include ${evidence}`);
     }
@@ -268,6 +289,7 @@ test("runtime bridge preserves React Web custom-wrapper domainPayload parity for
       assert.equal(forbiddenKey in runtimePayload.facts, false, `${fixture.label} must not emit ${forbiddenKey}`);
     }
     assert.equal("formControls" in runtimePayload.facts, false, `${fixture.label} must not infer DOM form controls from custom components`);
+    assert.equal("customComponentSemantics" in runtimePayload.facts, false, `${fixture.label} must keep custom components structural only`);
   }
 });
 
