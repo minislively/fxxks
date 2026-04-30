@@ -110,7 +110,7 @@ const forbiddenDomainParallelLaunchReadinessClaims = [
 ];
 
 const launchContractEvidence = /\b(?:named launch contract|launch contract)\b[^\n]{0,220}\b(?:Launch base|Lane table|Branch\/worktree name|Allowed write set|Forbidden write set|Shared-seam owner|PR order|Verification matrix|Stop rules|No-launch marker|planning-only|verifier-only|single-shared-owner|disjoint-domain-writers|required fields|lists the required fields)\b|\b(?:Launch base|Lane table|Branch\/worktree name|Allowed write set|Forbidden write set|Shared-seam owner|PR order|Verification matrix|Stop rules|No-launch marker|planning-only|verifier-only|single-shared-owner|disjoint-domain-writers|required fields|lists the required fields)\b[^\n]{0,220}\b(?:named launch contract|launch contract)\b/i;
-const launchPreflightOwnershipEvidence = /(?=.*\b(?:Build preflight|build\/typecheck evidence|local build\/typecheck evidence)\b)(?=.*\b(?:Ownership replay|ownership replay evidence|task owner|branch\/worktree name|review inbox target)\b)/i;
+const launchPreflightOwnershipEvidence = /(?=.*\b(?:build\/typecheck preflight evidence|local build\/typecheck evidence)\b)(?=.*\bownership\/scope evidence\b)/i;
 
 const domainParallelBoundary = /\b(?:not itself runtime behavior change|does not authorize runtime source changes|docs\/tests-only by default|shared-file free-for-all|must name one shared-policy owner|merge-order note|disjoint-file proof|changed-file guard|must serialize|not parallel-safe|only when it avoids shared support-policy expansion|single runtime writer lane|full domain writer parallelism[^\n]{0,80}forbidden|remains forbidden|shared seams? must serialize|worktree launch needs a separate plan|separate approved launch plan|no (?:domain )?implementation worktree is authorized)\b/i;
 
@@ -319,6 +319,6 @@ test("claim-boundary doc audit rejects broad domain-parallel examples but allows
   assert.deepEqual(findDomainParallelLaunchReadinessClaims("A domain-parallel team wave may launch when the launch contract lists the required fields and status disjoint-domain-writers.", "synthetic.md"), [
     "synthetic.md:1 [domain-parallel-launch-readiness-without-contract] A domain-parallel team wave may launch when the launch contract lists the required fields and status disjoint-domain-writers.",
   ]);
-  assert.deepEqual(findDomainParallelLaunchReadinessClaims("A domain-parallel team wave may launch when the launch contract lists the required fields, status disjoint-domain-writers, Build preflight evidence, and Ownership replay evidence.", "synthetic.md"), []);
+  assert.deepEqual(findDomainParallelLaunchReadinessClaims("A domain-parallel team wave may launch when the launch contract lists the required fields, status disjoint-domain-writers, build/typecheck preflight evidence, and ownership/scope evidence.", "synthetic.md"), []);
   assert.deepEqual(findDomainParallelLaunchReadinessClaims("Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.", "synthetic.md"), []);
 });

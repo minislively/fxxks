@@ -163,8 +163,8 @@ Every PR wave must carry a small **PR wave contract** before worktree, team, or 
 9. **Merge-order note** — records which shared-policy branch must land first and which domain branches wait.
 10. **Disjoint-file proof** — lists each lane's owned files and proves they do not overlap shared seams.
 11. **Required verification command** — names the targeted command proving fallback/deferred/support boundaries did not weaken.
-12. **Build preflight evidence** — records the local build/typecheck command that ran before any worker prompt, inbox, or implementation handoff for lanes that depend on generated artifacts.
-13. **Ownership replay evidence** — records that each lane task owner, branch/worktree name, and review inbox target matched the launch contract before any domain work started.
+12. **build/typecheck preflight evidence** — records the local build/typecheck command that ran before any lane prompt, review inbox, or implementation handoff for lanes that depend on generated artifacts.
+13. **ownership/scope evidence** — records that each lane task owner, branch/worktree name, and review inbox target matched the launch contract before any domain work started.
 14. **Claim-boundary audit** — records the forbidden broad-support/domain-parallel wording check for the lane.
 15. **Worktree/team launch status** — states whether this is only a planning contract or names the separate approved launch plan; absence of that plan means no domain implementation worktree is authorized.
 16. **Contradiction check** — states that full domain writer parallelism against shared runtime/shared-seam files remains forbidden, docs/claim-boundary lanes cannot freely change shared support policy, and single runtime writer lanes serialize instead of running parallel.
@@ -183,8 +183,8 @@ The launch contract must include:
 6. **Shared-seam owner** — either `none` or one named branch that owns the shared seam for the wave.
 7. **PR order** — which PR lands first, which PRs wait, and which PRs must rebase after the shared-policy owner lands.
 8. **Verification matrix** — targeted command per lane plus the aggregate command the leader runs after integration.
-9. **Build preflight** — local build/typecheck evidence for any lane whose tests, package entrypoints, or scripts depend on generated artifacts before worker prompt or inbox delivery.
-10. **Ownership replay** — evidence that task owner, branch/worktree name, and review inbox target are aligned for every participating lane before domain work starts.
+9. **build/typecheck preflight evidence** — local build/typecheck evidence for any lane whose tests, package entrypoints, or scripts depend on generated artifacts before lane prompt or review inbox delivery.
+10. **ownership/scope evidence** — evidence that task owner, branch/worktree name, and review inbox target are aligned for every participating lane before domain work starts.
 11. **Stop rules** — shared-file conflict, support-claim drift, fixture sprawl, runtime seam expansion, missing build preflight, ownership mismatch, or failing verification stops the wave and returns to planning.
 12. **No-launch marker for planning-only work** — states `planning-only` when the current PR only writes docs/regression tests and does not authorize team/worktree execution.
 
