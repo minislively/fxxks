@@ -138,6 +138,19 @@ function alertEvidenceState(row) {
   return "current";
 }
 
+function isHistoricalReplayEvidence(row, isStaleAttempt) {
+  if (isStaleAttempt) return true;
+  if (!row || row.bucket !== "stale") return false;
+  return row.latestRunId !== null && row.id !== null && String(row.latestRunId) !== String(row.id);
+}
+
+function alertDisposition(evidence, replay) {
+  if (evidence === "actionable" || evidence === "watch") return "inspect";
+  if (replay) return "suppress-replay";
+  if (evidence === "stale") return "suppress-stale";
+  return "review";
+}
+
 function buildAlertEvidence(alertRefs, rows) {
   if (alertRefs.length === 0) return [];
 
@@ -146,15 +159,21 @@ function buildAlertEvidence(alertRefs, rows) {
     const row = rowsById.get(ref.id);
     const currentAttempt = row?.attempt ?? null;
     const isStaleAttempt = ref.alertedAttempt !== null && currentAttempt !== null && ref.alertedAttempt < currentAttempt;
+    const replay = isHistoricalReplayEvidence(row, isStaleAttempt);
+    const evidence = isStaleAttempt ? "stale" : alertEvidenceState(row);
+    const reason = isStaleAttempt
+      ? `superseded by attempt ${currentAttempt}`
+      : row?.reason ?? "run URL was not present in the inspected gh run list window";
     return {
       alertedRunId: ref.id,
       alertedAttempt: ref.alertedAttempt,
       alertedUrl: ref.url,
       appearances: ref.appearances,
-      evidence: isStaleAttempt ? "stale" : alertEvidenceState(row),
-      reason: isStaleAttempt
-        ? `superseded by attempt ${currentAttempt}`
-        : row?.reason ?? "run URL was not present in the inspected gh run list window",
+      evidence,
+      replay,
+      disposition: alertDisposition(evidence, replay),
+      reason,
+      replayReason: replay ? `historical replay of ${reason}` : "",
       currentRunId: row?.latestRunId ?? null,
       currentAttempt,
       workflow: row?.workflow ?? "",
@@ -243,8 +262,8 @@ function alertEvidenceTable(alerts) {
   const lines = [
     "## Pasted alert URL evidence",
     "",
-    "| Evidence | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Evidence | Disposition | Replay | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
 
   for (const alert of alerts) {
@@ -252,7 +271,9 @@ function alertEvidenceTable(alerts) {
     const currentRun = alert.currentRunId ? `\`${alert.currentRunId}\`` : "-";
     const alertedAttempt = alert.alertedAttempt ?? "-";
     const currentAttempt = alert.currentAttempt ?? "-";
-    lines.push(`| ${alert.evidence} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(alert.reason)} | ${alert.appearances} |`);
+    const replay = alert.replay ? "historical replay" : "-";
+    const reason = alert.replayReason || alert.reason;
+    lines.push(`| ${alert.evidence} | ${alert.disposition} | ${replay} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(reason)} | ${alert.appearances} |`);
   }
 
   return `${lines.join("\n")}\n\n`;
@@ -261,7 +282,7 @@ function alertEvidenceTable(alerts) {
 function renderMarkdown(result) {
   const actionable = result.rows.filter((row) => row.bucket === "actionable" || row.bucket === "watch");
   const stale = result.rows.filter((row) => row.bucket === "stale");
-  return `# CI alert replay triage\n\nGenerated: ${result.generatedAt}\n\nUse this report to collapse replayed GitHub Actions alert buffers: inspect only \`actionable\` and \`watch\` rows, and treat \`stale\` rows as already superseded/cancelled unless a new run appears.\n\n## Summary\n\n- Total runs inspected: ${result.totalRuns}\n- Actionable latest failures: ${result.counts.actionable ?? 0}\n- Latest runs still in flight: ${result.counts.watch ?? 0}\n- Stale replay rows: ${result.counts.stale ?? 0}\n- Informational successes/neutral rows: ${result.counts.informational ?? 0}\n- Pasted alert URLs inspected: ${result.alerts?.length ?? 0}\n\n${alertEvidenceTable(result.alerts)}## Actionable / watch\n\n${markdownTable(actionable)}\n## Stale replay rows\n\n${markdownTable(stale)}`;
+  return `# CI alert replay triage\n\nGenerated: ${result.generatedAt}\n\nUse this report to collapse replayed GitHub Actions alert buffers: inspect only \`actionable\` and \`watch\` rows, suppress alert evidence marked \`suppress-replay\`, and treat \`stale\` rows as already superseded/cancelled unless a new run appears.\n\n## Summary\n\n- Total runs inspected: ${result.totalRuns}\n- Actionable latest failures: ${result.counts.actionable ?? 0}\n- Latest runs still in flight: ${result.counts.watch ?? 0}\n- Stale replay rows: ${result.counts.stale ?? 0}\n- Informational successes/neutral rows: ${result.counts.informational ?? 0}\n- Pasted alert URLs inspected: ${result.alerts?.length ?? 0}\n\n${alertEvidenceTable(result.alerts)}## Actionable / watch\n\n${markdownTable(actionable)}\n## Stale replay rows\n\n${markdownTable(stale)}`;
 }
 
 function main() {

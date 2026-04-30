@@ -266,3 +266,142 @@ test("CI alert triage keeps explicit rerun attempt evidence distinct", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("CI alert triage identifies replayed historical main alerts for suppression", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-replay-storm-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 404,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-04-30T20:12:00Z",
+      updatedAt: "2026-04-30T20:14:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/404",
+    },
+    {
+      databaseId: 403,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "cancelled",
+      createdAt: "2026-04-30T19:40:00Z",
+      updatedAt: "2026-04-30T19:42:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/403",
+    },
+    {
+      databaseId: 402,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-04-30T19:20:00Z",
+      updatedAt: "2026-04-30T19:24:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/402",
+    },
+    {
+      databaseId: 401,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "failure",
+      createdAt: "2026-04-30T19:00:00Z",
+      updatedAt: "2026-04-30T19:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/401",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "20:14 UTC replayed old success https://github.com/minislively/fooks/actions/runs/402",
+    "20:14 UTC replayed old cancelled https://github.com/minislively/fooks/actions/runs/403",
+    "20:14 UTC replayed old failure now superseded https://github.com/minislively/fooks/actions/runs/401",
+    "current green main evidence https://github.com/minislively/fooks/actions/runs/404",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
+
+    for (const id of ["401", "402", "403"]) {
+      assert.equal(byAlertId.get(id).evidence, "stale");
+      assert.equal(byAlertId.get(id).replay, true);
+      assert.equal(byAlertId.get(id).disposition, "suppress-replay");
+      assert.match(byAlertId.get(id).replayReason, /historical replay/);
+      assert.equal(byAlertId.get(id).currentRunId, 404);
+    }
+
+    assert.equal(byAlertId.get("404").evidence, "current");
+    assert.equal(byAlertId.get("404").replay, false);
+    assert.equal(byAlertId.get("404").disposition, "review");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage does not call a latest cancelled alert a historical replay", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-replay-negative-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 501,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "cancelled",
+      createdAt: "2026-04-30T20:00:00Z",
+      updatedAt: "2026-04-30T20:01:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/501",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, "latest cancelled alert https://github.com/minislively/fooks/actions/runs/501\n");
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    assert.equal(result.alerts[0].evidence, "stale");
+    assert.equal(result.alerts[0].reason, "completed cancelled");
+    assert.equal(result.alerts[0].replay, false);
+    assert.equal(result.alerts[0].disposition, "suppress-stale");
+    assert.equal(result.alerts[0].replayReason, "");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
