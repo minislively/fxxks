@@ -36,6 +36,16 @@ input file
 
 The key split is that scanner, planner, and builder must not collapse into one policy-heavy extractor. The shared syntax layer can parse TS/JS/TSX/JSX, but syntax parsing alone is not framework support.
 
+## Shared seam responsibility contract
+
+Future domain payload work must preserve a three-part contract:
+
+- **Scanner contract:** observes source-derived signals only. A scanner must not choose compact, narrow, boundary-aware, fallback, or deferred mode; must not emit model-facing payloads; and must not claim domain support.
+- **Planner contract:** consumes the domain profile plus scanner facts and chooses the safety/policy decision. A planner must not invent source facts, format final payload output, weaken WebView fallback-first behavior, broaden the measured RN `F1` narrow gate, or promote TUI, Mixed, or Unknown evidence lanes.
+- **Builder contract:** formats the model-facing packet according to the planner decision. A builder must not override planner safety decisions, decide support or promotion, or compact across a boundary the planner rejected.
+
+Shared seam changes are serialized by default. Any PR that changes detector, pre-read, model-facing payload, domain payload, schema, shared fixture manifest, or normative support-policy docs must name one shared-policy owner and a merge-order note. Domain-specific lanes may run in parallel only when they stay in disjoint fixture/docs/test surfaces and do not edit those serialized shared seams.
+
 ## Shared syntax layer
 
 The shared syntax layer owns reusable source facts:

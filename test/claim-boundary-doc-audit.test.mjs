@@ -258,6 +258,28 @@ test("claim-boundary doc audit preserves measured narrow evidence wording", () =
   assert.match(combined, /TUI \/ React CLI profiles[\s\S]*Future profile candidate only; no implementation or support promise/);
 });
 
+test("claim-boundary doc audit preserves shared scanner planner builder seam responsibilities", () => {
+  const architecture = fs.readFileSync(path.join(repoRoot, "docs", "domain-payload-architecture.md"), "utf8");
+
+  assert.match(architecture, /## Shared seam responsibility contract/);
+  assert.match(
+    architecture,
+    /\*\*Scanner contract:\*\* observes source-derived signals only\.[\s\S]*?must not choose compact, narrow, boundary-aware, fallback, or deferred mode[\s\S]*?must not emit model-facing payloads[\s\S]*?must not claim domain support/,
+  );
+  assert.match(
+    architecture,
+    /\*\*Planner contract:\*\* consumes the domain profile plus scanner facts and chooses the safety\/policy decision\.[\s\S]*?must not invent source facts[\s\S]*?format final payload output[\s\S]*?weaken WebView fallback-first behavior[\s\S]*?broaden the measured RN `F1` narrow gate[\s\S]*?promote TUI, Mixed, or Unknown evidence lanes/,
+  );
+  assert.match(
+    architecture,
+    /\*\*Builder contract:\*\* formats the model-facing packet according to the planner decision\.[\s\S]*?must not override planner safety decisions[\s\S]*?decide support or promotion[\s\S]*?compact across a boundary the planner rejected/,
+  );
+  assert.match(
+    architecture,
+    /Shared seam changes are serialized by default\.[\s\S]*?must name one shared-policy owner and a merge-order note[\s\S]*?Domain-specific lanes may run in parallel only when they stay in disjoint fixture\/docs\/test surfaces/,
+  );
+});
+
 test("claim-boundary doc audit rejects positive examples but allows negated or measured examples", () => {
   assert.deepEqual(findBroadSupportClaims("React Native support is available for all TSX files.", "synthetic.md"), [
     "synthetic.md:1 [react-native-support-available] React Native support is available for all TSX files.",
