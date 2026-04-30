@@ -132,3 +132,66 @@ test("React Web runtime payload preserves the full compact domainPayload contrac
   });
   assertNoNonWhitelistedDetails(hookPayload.facts);
 });
+
+test("React Web runtime payload adds jsxComponentCount for wrapper-heavy current-lane payloads", () => {
+  const customCardPayload = repeatedPayloadFor(
+    "test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
+    "custom-design-system-card",
+  );
+
+  assertExactPayload(customCardPayload, {
+    schemaVersion: "domain-payload.v1",
+    domain: "react-web",
+    policy: "react-web-current-supported-lane",
+    plannerDecision: "compact-safe",
+    claimStatus: "current-supported-lane",
+    claimBoundary: "react-web-measured-extraction",
+    evidence: ["react-web:jsx-attribute:className"],
+    facts: {
+      componentName: "BillingPlanCard",
+      exports: [{ name: "BillingPlanCard", kind: "named", type: "function" }],
+      jsxDepth: 3,
+      hasSideEffects: false,
+      hasStyleBranching: true,
+      jsxAttributes: ["className"],
+      jsxComponentCount: 8,
+      jsxComponents: ["Badge", "Button", "Card", "CardContent", "CardDescription", "CardHeader", "CardTitle", "StatRow"],
+      eventHandlers: ["onClick"],
+      styleSystem: "tailwind",
+    },
+    warnings: reactWebWarnings,
+  });
+  assertNoNonWhitelistedDetails(customCardPayload.facts);
+
+  const customFormPayload = repeatedPayloadFor(
+    "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+    "custom-form-shell",
+  );
+
+  assertExactPayload(customFormPayload, {
+    schemaVersion: "domain-payload.v1",
+    domain: "react-web",
+    policy: "react-web-current-supported-lane",
+    plannerDecision: "compact-safe",
+    claimStatus: "current-supported-lane",
+    claimBoundary: "react-web-measured-extraction",
+    evidence: [
+      "react-web:jsx-attribute:className",
+      "react-web:jsx-attribute:htmlFor",
+    ],
+    facts: {
+      componentName: "ProfileSettingsShell",
+      exports: [{ name: "ProfileSettingsShell", kind: "named", type: "function" }],
+      jsxDepth: 3,
+      hasSideEffects: false,
+      hasStyleBranching: false,
+      jsxAttributes: ["className", "htmlFor"],
+      jsxComponentCount: 8,
+      jsxComponents: ["Button", "ButtonGroup", "ErrorText", "Field", "FieldControl", "FieldLabel", "HelperText", "TextField"],
+      eventHandlers: ["onChange", "onClick"],
+      styleSystem: "tailwind",
+    },
+    warnings: reactWebWarnings,
+  });
+  assertNoNonWhitelistedDetails(customFormPayload.facts);
+});

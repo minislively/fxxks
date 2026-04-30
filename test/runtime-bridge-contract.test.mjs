@@ -281,6 +281,7 @@ test("runtime bridge preserves React Web custom-wrapper domainPayload parity for
     assert.equal(runtimePayload.claimStatus, "current-supported-lane");
     assert.equal(runtimePayload.claimBoundary, "react-web-measured-extraction");
     assert.equal(runtimePayload.facts.componentName, fixture.componentName);
+    assert.equal(runtimePayload.facts.jsxComponentCount, fixture.expectedJsxComponents.length);
     assert.deepEqual(runtimePayload.facts.jsxComponents, fixture.expectedJsxComponents);
     for (const evidence of fixture.requiredEvidence) {
       assert.ok(runtimePayload.evidence.includes(evidence), `${fixture.label} should include ${evidence}`);

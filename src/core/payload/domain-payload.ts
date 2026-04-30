@@ -15,6 +15,7 @@ export type ReactWebDomainPayload = {
   facts: {
     domTags?: string[];
     jsxAttributes?: string[];
+    jsxComponentCount?: number;
     jsxComponents?: string[];
     componentName?: string;
     exports?: Pick<ExtractionResult["exports"][number], "name" | "kind" | "type">[];
@@ -119,6 +120,7 @@ function buildReactWebPayloadFacts(
     ...(typeof result.style?.hasStyleBranching === "boolean" ? { hasStyleBranching: result.style.hasStyleBranching } : {}),
     ...(evidenceFacts.domTags.length > 0 ? { domTags: evidenceFacts.domTags } : {}),
     ...(evidenceFacts.jsxAttributes.length > 0 ? { jsxAttributes: evidenceFacts.jsxAttributes } : {}),
+    ...(jsxComponents.length > 0 ? { jsxComponentCount: jsxComponents.length } : {}),
     ...(jsxComponents.length > 0 ? { jsxComponents } : {}),
     ...(formControls && formControls.length > 0 ? { formControls } : {}),
     ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
