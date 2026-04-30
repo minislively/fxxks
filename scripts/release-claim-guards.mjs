@@ -37,6 +37,21 @@ export function assertNoForbiddenPublicClaims(label, text) {
   }
 }
 
+const PR_BODY_CLOSING_KEYWORD_PATTERN = /\b(?:close[sd]?|fix(?:e[sd]|ed)?|resolve[sd]?)\s*:?\s+(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+\b/i;
+const STANDALONE_REFS_ISSUE_PATTERN = /^\s*(?:[-*]\s*)?(?:refs?|references?)\s*:?\s+(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+(?:\s*,\s*(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+)*\s*[.!]?\s*$/i;
+
+export function assertPullRequestBodyUsesClosingIssueRefs(label, text) {
+  for (const line of text.split(/\r?\n/)) {
+    if (PR_BODY_CLOSING_KEYWORD_PATTERN.test(line)) continue;
+    if (STANDALONE_REFS_ISSUE_PATTERN.test(line)) {
+      assertClaimBoundary(
+        false,
+        `${label} uses a non-closing issue reference in a PR body: ${line.trim()}. Use Closes #N, Fixes #N, or Resolves #N when the PR should close the issue.`,
+      );
+    }
+  }
+}
+
 export function assertPublicSurfaceClaimBoundaries(surfaces) {
   for (const [label, text] of Object.entries(surfaces)) {
     assertNoForbiddenPublicClaims(label, text);

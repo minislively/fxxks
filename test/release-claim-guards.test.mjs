@@ -8,6 +8,7 @@ import path from "node:path";
 import {
   assertNoForbiddenPublicClaims,
   assertPublicSurfaceClaimBoundaries,
+  assertPullRequestBodyUsesClosingIssueRefs,
 } from "../scripts/release-claim-guards.mjs";
 
 const repoRoot = process.cwd();
@@ -77,6 +78,23 @@ test("release claim guard requires launch-contract evidence for domain-parallel 
       "Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.",
     ].join("\n"),
   );
+});
+
+test("PR body guard rejects standalone Refs footers for issue-closing PRs", () => {
+  assert.throws(
+    () => assertPullRequestBodyUsesClosingIssueRefs("synthetic PR body", "Summary\n\nRefs #287"),
+    /non-closing issue reference.*Use Closes #N, Fixes #N, or Resolves #N/,
+  );
+  assert.throws(
+    () => assertPullRequestBodyUsesClosingIssueRefs("synthetic PR body", "- Refs: #277, #281"),
+    /non-closing issue reference/,
+  );
+});
+
+test("PR body guard allows GitHub closing keywords and contextual refs", () => {
+  assertPullRequestBodyUsesClosingIssueRefs("closing PR body", "Summary\n\nCloses #287");
+  assertPullRequestBodyUsesClosingIssueRefs("closing PR body", "Fixes: minislively/fooks#287");
+  assertPullRequestBodyUsesClosingIssueRefs("related PR body", "Refs #287 for related background only; this PR does not close it.");
 });
 
 test("release-facing docs keep domain-parallel launch readiness tied to launch contracts", () => {
