@@ -30,6 +30,17 @@ export type ReactWebDomainPayload = {
 
 export type DomainPayload = ReactWebDomainPayload;
 
+type ReactWebPayloadEvidenceFacts = {
+  evidence: string[];
+  domTags: string[];
+  jsxAttributes: string[];
+};
+
+type ReactWebPayloadPlan = {
+  result: ExtractionResult;
+  evidenceFacts: ReactWebPayloadEvidenceFacts;
+};
+
 function uniqueSorted(values: Iterable<string>): string[] {
   return [...new Set(values)].sort();
 }
@@ -55,27 +66,66 @@ function compactFormControls(controls: FormControlSignal[] | undefined): ReactWe
   }));
 }
 
-export function buildReactWebDomainPayload(
+function collectReactWebPayloadEvidence(domainDetection: DomainDetectionResult): ReactWebPayloadEvidenceFacts | undefined {
+  const reactWebEvidence = domainDetection.evidence.filter((item) => item.domain === "react-web");
+  if (reactWebEvidence.length === 0) return undefined;
+
+  return {
+    evidence: uniqueSorted(reactWebEvidence.map((item) => `${item.domain}:${item.signal}:${item.detail}`)),
+    domTags: uniqueSorted(reactWebEvidence.filter((item) => item.signal === "dom-tag").map((item) => item.detail)),
+    jsxAttributes: uniqueSorted(reactWebEvidence.filter((item) => item.signal === "jsx-attribute").map((item) => item.detail)),
+  };
+}
+
+function planReactWebPayload(
   result: ExtractionResult,
-  domainDetection: DomainDetectionResult | undefined = result.domainDetection,
-  policy = REACT_WEB_DOMAIN_PAYLOAD_POLICY,
-): ReactWebDomainPayload | undefined {
+  domainDetection: DomainDetectionResult | undefined,
+  policy: string,
+): ReactWebPayloadPlan | undefined {
   if (policy !== REACT_WEB_DOMAIN_PAYLOAD_POLICY) return undefined;
   if (!domainDetection) return undefined;
   if (domainDetection.classification !== "react-web") return undefined;
   if (domainDetection.profile.claimStatus !== "current-supported-lane") return undefined;
   if (domainDetection.profile.claimBoundary !== "react-web-measured-extraction") return undefined;
 
-  const reactWebEvidence = domainDetection.evidence.filter((item) => item.domain === "react-web");
-  if (reactWebEvidence.length === 0) return undefined;
+  const evidenceFacts = collectReactWebPayloadEvidence(domainDetection);
+  if (!evidenceFacts) return undefined;
 
-  const domTags = uniqueSorted(reactWebEvidence.filter((item) => item.signal === "dom-tag").map((item) => item.detail));
-  const jsxAttributes = uniqueSorted(reactWebEvidence.filter((item) => item.signal === "jsx-attribute").map((item) => item.detail));
+  return { result, evidenceFacts };
+}
+
+function buildReactWebPayloadFacts(
+  result: ExtractionResult,
+  evidenceFacts: ReactWebPayloadEvidenceFacts,
+): ReactWebDomainPayload["facts"] {
   const eventHandlers = uniqueSorted(result.behavior?.eventHandlers ?? []);
   const formControls = compactFormControls(result.behavior?.formSurface?.controls);
   const styleSystem = result.style?.system && result.style.system !== "unknown" ? result.style.system : undefined;
   const exportFacts = compactExports(result.exports);
   const hooks = uniqueSorted(result.behavior?.hooks ?? []);
+
+  return {
+    ...(result.componentName ? { componentName: result.componentName } : {}),
+    ...(exportFacts && exportFacts.length > 0 ? { exports: exportFacts } : {}),
+    ...(hooks.length > 0 ? { hooks } : {}),
+    ...(typeof result.structure?.jsxDepth === "number" ? { jsxDepth: result.structure.jsxDepth } : {}),
+    ...(typeof result.behavior?.hasSideEffects === "boolean" ? { hasSideEffects: result.behavior.hasSideEffects } : {}),
+    ...(typeof result.style?.hasStyleBranching === "boolean" ? { hasStyleBranching: result.style.hasStyleBranching } : {}),
+    ...(evidenceFacts.domTags.length > 0 ? { domTags: evidenceFacts.domTags } : {}),
+    ...(evidenceFacts.jsxAttributes.length > 0 ? { jsxAttributes: evidenceFacts.jsxAttributes } : {}),
+    ...(formControls && formControls.length > 0 ? { formControls } : {}),
+    ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
+    ...(styleSystem ? { styleSystem } : {}),
+  };
+}
+
+export function buildReactWebDomainPayload(
+  result: ExtractionResult,
+  domainDetection: DomainDetectionResult | undefined = result.domainDetection,
+  policy = REACT_WEB_DOMAIN_PAYLOAD_POLICY,
+): ReactWebDomainPayload | undefined {
+  const plan = planReactWebPayload(result, domainDetection, policy);
+  if (!plan) return undefined;
 
   return {
     schemaVersion: DOMAIN_PAYLOAD_SCHEMA_VERSION,
@@ -84,20 +134,8 @@ export function buildReactWebDomainPayload(
     plannerDecision: "compact-safe",
     claimStatus: "current-supported-lane",
     claimBoundary: "react-web-measured-extraction",
-    evidence: uniqueSorted(reactWebEvidence.map((item) => `${item.domain}:${item.signal}:${item.detail}`)),
-    facts: {
-      ...(result.componentName ? { componentName: result.componentName } : {}),
-      ...(exportFacts && exportFacts.length > 0 ? { exports: exportFacts } : {}),
-      ...(hooks.length > 0 ? { hooks } : {}),
-      ...(typeof result.structure?.jsxDepth === "number" ? { jsxDepth: result.structure.jsxDepth } : {}),
-      ...(typeof result.behavior?.hasSideEffects === "boolean" ? { hasSideEffects: result.behavior.hasSideEffects } : {}),
-      ...(typeof result.style?.hasStyleBranching === "boolean" ? { hasStyleBranching: result.style.hasStyleBranching } : {}),
-      ...(domTags.length > 0 ? { domTags } : {}),
-      ...(jsxAttributes.length > 0 ? { jsxAttributes } : {}),
-      ...(formControls && formControls.length > 0 ? { formControls } : {}),
-      ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
-      ...(styleSystem ? { styleSystem } : {}),
-    },
+    evidence: plan.evidenceFacts.evidence,
+    facts: buildReactWebPayloadFacts(plan.result, plan.evidenceFacts),
     warnings: [
       "React Web current supported lane only; this payload does not imply React Native, WebView, TUI, Mixed, or Unknown support.",
       "Planner decision depends on current extractor readiness and domain profile evidence; rerun extraction if the source changes.",
