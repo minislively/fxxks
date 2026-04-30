@@ -4288,6 +4288,8 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
   assert.match(ownershipMatrix, /Shared-seam owner/);
   assert.match(ownershipMatrix, /PR order/);
   assert.match(ownershipMatrix, /Verification matrix/);
+  assert.match(ownershipMatrix, /Build preflight/);
+  assert.match(ownershipMatrix, /Ownership replay/);
   assert.match(ownershipMatrix, /Stop rules/);
   assert.match(ownershipMatrix, /No-launch marker for planning-only work/);
   for (const launchStatus of ["planning-only", "verifier-only", "single-shared-owner", "disjoint-domain-writers"]) {
@@ -4306,6 +4308,8 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
     "Merge-order note",
     "Disjoint-file proof",
     "Required verification command",
+    "Build preflight evidence",
+    "Ownership replay evidence",
     "Claim-boundary audit",
     "Worktree/team launch status",
     "Contradiction check",
@@ -4313,6 +4317,10 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
     assert.ok(ownershipMatrix.includes(handoffItem), `${handoffItem} must stay in the PR wave contract checklist`);
   }
   assert.match(ownershipMatrix, /absence of that plan means no domain implementation worktree is authorized/);
+  assert.match(ownershipMatrix, /before any worker prompt, inbox, or implementation handoff/);
+  assert.match(ownershipMatrix, /before worker prompt or inbox delivery/);
+  assert.match(ownershipMatrix, /task owner, branch\/worktree name, and review inbox target/);
+  assert.match(ownershipMatrix, /missing build preflight, ownership mismatch/);
   assert.match(ownershipMatrix, /Shared fallback reasons and denial markers are boundary evidence, not support claims/);
   assert.match(ownershipMatrix, /`unsupported-react-native-webview-boundary`/);
   assert.match(ownershipMatrix, /`unsupported-frontend-domain-profile`/);
