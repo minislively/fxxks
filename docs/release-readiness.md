@@ -64,4 +64,4 @@ The following remain unresolved until a human-approved publish step:
 - Keep Codex wording scoped to supported repeated-file hook behavior through `fooks setup`.
 - Keep Claude wording scoped to project-local `SessionStart` / `UserPromptSubmit` context hooks; do not claim Claude `Read` interception.
 - Keep opencode wording scoped to the prepared tool/slash-command bridge; do not claim automatic `read` interception or automatic runtime-token savings.
-- Domain-parallel worktree/team/PR wave readiness remains planning-only unless a launch contract lists the required fields, including `Launch base`, `Lane table`, `Allowed write set`, `Forbidden write set`, `Shared-seam owner`, `PR order`, `Verification matrix`, `Stop rules`, and `No-launch marker`.
+- Domain-parallel worktree/team/PR wave readiness remains planning-only unless a launch contract lists the required fields, including `Launch base`, `Lane table`, `Allowed write set`, `Forbidden write set`, `Shared-seam owner`, `PR order`, `Verification matrix`, `Build preflight`, `Ownership replay`, `Stop rules`, and `No-launch marker`.

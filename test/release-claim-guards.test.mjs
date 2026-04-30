@@ -69,12 +69,12 @@ test("release public surface guard reports the offending surface label", () => {
 test("release claim guard requires launch-contract evidence for domain-parallel launch readiness", () => {
   assertGuardRejects(
     "Domain-parallel worktree launch is ready for implementation.",
-    /domain-parallel launch readiness claim without launch-contract evidence/,
+    /domain-parallel launch readiness claim without launch-contract and preflight\/ownership evidence/,
   );
   assertNoForbiddenPublicClaims(
     "bounded domain-parallel launch surface",
     [
-      "A domain-parallel team wave may launch when the launch contract lists the required fields and status disjoint-domain-writers.",
+      "A domain-parallel team wave may launch when the launch contract lists the required fields, status disjoint-domain-writers, Build preflight evidence, and Ownership replay evidence.",
       "Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.",
     ].join("\n"),
   );
@@ -105,5 +105,5 @@ test("release-facing docs keep domain-parallel launch readiness tied to launch c
 
   assertPublicSurfaceClaimBoundaries(surfaces);
   assert.match(surfaces["docs/release.md"], /domain-parallel worktree\/team\/PR wave readiness wording must cite a launch contract/);
-  assert.match(surfaces["docs/release-readiness.md"], /Domain-parallel worktree\/team\/PR wave readiness remains planning-only unless a launch contract lists the required fields/);
+  assert.match(surfaces["docs/release-readiness.md"], /Domain-parallel worktree\/team\/PR wave readiness remains planning-only unless a launch contract lists the required fields[^\n]*`Build preflight`[^\n]*`Ownership replay`/);
 });

@@ -183,6 +183,8 @@ Before opening a true domain-parallel wave, use the frontend-domain contract's l
 - allowed write sets and forbidden shared seams;
 - PR order;
 - verification matrix;
+- Build preflight evidence;
+- Ownership replay evidence;
 - stop rules.
 
 Planning-only launch-contract work remains docs/regression-only and does not authorize runtime/source changes, fixture expansion, domain implementation, support claims, or team/worktree execution by itself.
