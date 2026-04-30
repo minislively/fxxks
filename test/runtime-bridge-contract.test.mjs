@@ -17,6 +17,7 @@ const {
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
   UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
   WEBVIEW_BOUNDARY_FALLBACK_POLICY,
+  decidePreRead,
 } = await import(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const {
   CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
@@ -178,6 +179,96 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
   assert.equal(legacyOverride.action, "fallback");
   assert.equal(legacyOverride.fallback.reason, "escape-hatch-full-read");
+});
+
+test("runtime bridge preserves React Web custom-wrapper domainPayload parity for F11/F12", () => {
+  const wrapperFixtures = [
+    {
+      label: "custom-design-system-card",
+      path: "test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
+      componentName: "BillingPlanCard",
+      requiredEvidence: ["react-web:jsx-attribute:className"],
+    },
+    {
+      label: "custom-form-shell",
+      path: "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+      componentName: "ProfileSettingsShell",
+      requiredEvidence: ["react-web:jsx-attribute:className", "react-web:jsx-attribute:htmlFor"],
+    },
+  ];
+
+  const forbiddenFactKeys = [
+    "rawText",
+    "snippets",
+    "loc",
+    "componentLoc",
+    "effectSignals",
+    "callbackSignals",
+    "stateSummary",
+    "sourceRanges",
+    "customComponentSemantics",
+  ];
+
+  for (const fixture of wrapperFixtures) {
+    const direct = decidePreRead(path.join(repoRoot, fixture.path), repoRoot, "codex");
+
+    assert.equal(direct.decision, "payload", `${fixture.label} direct pre-read should build payload`);
+    assert.equal(direct.debug.domainDetection.classification, "react-web", `${fixture.label} must stay React Web`);
+    assert.equal(direct.debug.domainDetection.profile.claimStatus, "current-supported-lane");
+    assert.equal(direct.debug.frontendPayloadPolicy.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+    assert.equal(direct.debug.frontendPayloadPolicy.allowed, true);
+    assert.ok(
+      direct.debug.frontendPayloadPolicy.evidenceGates.includes(CUSTOM_WRAPPER_DOM_SIGNAL_GAP),
+      `${fixture.label} must expose ${CUSTOM_WRAPPER_DOM_SIGNAL_GAP}`,
+    );
+    assert.equal(direct.payload.domainPayload.domain, "react-web");
+
+    const sessionId = `bridge-contract-wrapper-parity-${fixture.label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Please inspect ${fixture.path}`,
+      },
+      repoRoot,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, inspect ${fixture.path}`,
+      },
+      repoRoot,
+    );
+
+    assert.equal(first.action, "record", `${fixture.label} first runtime prompt should record`);
+    assert.equal(second.action, "inject", `${fixture.label} repeated runtime prompt should inject`);
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.additionalContext.includes("\"domainPayload\""), true);
+    assert.equal("fallback" in second, false, `${fixture.label} should not fallback after React Web wrapper evidence`);
+    assert.deepEqual(
+      second.debug.decision.payload.domainPayload,
+      direct.payload.domainPayload,
+      `${fixture.label} runtime domainPayload must match direct pre-read domainPayload`,
+    );
+
+    const runtimePayload = second.debug.decision.payload.domainPayload;
+    assert.equal(runtimePayload.schemaVersion, "domain-payload.v1");
+    assert.equal(runtimePayload.domain, "react-web");
+    assert.equal(runtimePayload.policy, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
+    assert.equal(runtimePayload.plannerDecision, "compact-safe");
+    assert.equal(runtimePayload.claimStatus, "current-supported-lane");
+    assert.equal(runtimePayload.claimBoundary, "react-web-measured-extraction");
+    assert.equal(runtimePayload.facts.componentName, fixture.componentName);
+    for (const evidence of fixture.requiredEvidence) {
+      assert.ok(runtimePayload.evidence.includes(evidence), `${fixture.label} should include ${evidence}`);
+    }
+    for (const forbiddenKey of forbiddenFactKeys) {
+      assert.equal(forbiddenKey in runtimePayload.facts, false, `${fixture.label} must not emit ${forbiddenKey}`);
+    }
+    assert.equal("formControls" in runtimePayload.facts, false, `${fixture.label} must not infer DOM form controls from custom components`);
+  }
 });
 
 
