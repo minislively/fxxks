@@ -405,3 +405,82 @@ test("CI alert triage does not call a latest cancelled alert a historical replay
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("CI alert triage compacts bulk replay URLs around current main and cancelled samples", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-bulk-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  const runs = [
+    {
+      databaseId: 500,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-04-30T12:00:00Z",
+      updatedAt: "2026-04-30T12:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/500",
+    },
+  ];
+  for (let id = 401; id <= 414; id += 1) {
+    runs.push({
+      databaseId: id,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: id % 5 === 0 ? "cancelled" : "success",
+      createdAt: `2026-04-29T${String(id - 400).padStart(2, "0")}:00:00Z`,
+      updatedAt: `2026-04-29T${String(id - 400).padStart(2, "0")}:05:00Z`,
+      url: `https://github.com/minislively/fooks/actions/runs/${id}`,
+    });
+  }
+
+  fs.writeFileSync(runsPath, JSON.stringify(runs));
+  fs.writeFileSync(alertsPath, [
+    ...runs.slice(1).map((run) => `old replay https://github.com/minislively/fooks/actions/runs/${run.databaseId}`),
+    "current main run mixed into the replay https://github.com/minislively/fooks/actions/runs/500",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.alertSummary.mode, "compact");
+    assert.equal(result.alertSummary.total, 15);
+    assert.equal(result.alertSummary.focusBranch, "main");
+    assert.equal(result.alertSummary.byConclusion.success, 12);
+    assert.ok(result.alertSummary.omitted > 0);
+    assert.ok(result.alerts.length < result.alertSummary.total);
+
+    const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
+    assert.equal(byAlertId.get("500").evidence, "current");
+    assert.equal(byAlertId.get("500").branch, "main");
+    assert.equal(byAlertId.get("500").reason, "not failing");
+
+    const cancelledSamples = result.alerts.filter((alert) => alert.conclusion === "cancelled");
+    assert.equal(cancelledSamples.length, 2);
+    assert.ok(cancelledSamples.every((alert) => alert.evidence === "stale"));
+    assert.ok(cancelledSamples.every((alert) => alert.sampled === true));
+    assert.ok([...byAlertId.keys()].every((id) => id === "500" || Number(id) % 5 === 0));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

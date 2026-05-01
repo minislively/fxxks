@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_LIMIT = 100;
+const DEFAULT_ALERT_EVIDENCE_LIMIT = 12;
+const STALE_ALERT_SAMPLE_LIMIT = 3;
 const STALE_CONCLUSIONS = new Set(["cancelled", "skipped"]);
 const ACTIONABLE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure"]);
 const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
@@ -19,6 +21,7 @@ function parseArgs(argv) {
     branch: "",
     workflow: "",
     format: "markdown",
+    alertEvidenceLimit: DEFAULT_ALERT_EVIDENCE_LIMIT,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -29,6 +32,7 @@ function parseArgs(argv) {
     else if (arg === "--limit") options.limit = Number.parseInt(argv[++index], 10);
     else if (arg === "--branch") options.branch = argv[++index];
     else if (arg === "--workflow") options.workflow = argv[++index];
+    else if (arg === "--alert-evidence-limit") options.alertEvidenceLimit = Number.parseInt(argv[++index], 10);
     else if (arg === "--json") options.format = "json";
     else if (arg === "--markdown") options.format = "markdown";
     else if (arg === "--help" || arg === "-h") {
@@ -42,6 +46,9 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.limit) || options.limit <= 0) {
     throw new Error("--limit must be a positive integer");
   }
+  if (!Number.isInteger(options.alertEvidenceLimit) || options.alertEvidenceLimit <= 0) {
+    throw new Error("--alert-evidence-limit must be a positive integer");
+  }
 
   return options;
 }
@@ -51,7 +58,12 @@ function printHelp() {
 
 Pasted alert URL usage:
   pbpaste > /tmp/discord-alerts.txt
-  npm run --silent ci:alerts -- --alerts /tmp/discord-alerts.txt --branch main`);
+  npm run --silent ci:alerts -- --alerts /tmp/discord-alerts.txt --branch main
+
+Bulk replay behavior:
+  When pasted alerts exceed --alert-evidence-limit, ci:alerts keeps current main/
+  selected-branch runs plus actionable/watch/missing evidence and a small cancelled
+  stale sample, then summarizes omitted historical success/cancelled replay rows.`);
 }
 
 function readRuns(options) {
@@ -151,9 +163,7 @@ function alertDisposition(evidence, replay) {
   return "review";
 }
 
-function buildAlertEvidence(alertRefs, rows) {
-  if (alertRefs.length === 0) return [];
-
+function buildRawAlertEvidence(alertRefs, rows) {
   const rowsById = new Map(rows.map((row) => [String(row.id), row]));
   return alertRefs.map((ref) => {
     const row = rowsById.get(ref.id);
@@ -184,6 +194,88 @@ function buildAlertEvidence(alertRefs, rows) {
       runUrl: ref.url,
     };
   });
+}
+
+function shouldKeepCompactAlert(alert, focusBranch) {
+  if (alert.evidence === "actionable" || alert.evidence === "watch" || alert.evidence === "missing") return true;
+  if (alert.evidence === "current" && alert.branch === focusBranch) return true;
+  if (alert.evidence === "stale" && alert.conclusion && !["success", "cancelled", "skipped"].includes(alert.conclusion)) return true;
+  return false;
+}
+
+function summarizeOmittedAlerts(omitted) {
+  const byEvidence = {};
+  const byConclusion = {};
+  for (const alert of omitted) {
+    const evidence = alert.evidence || "unknown";
+    const conclusion = alert.conclusion || "unknown";
+    byEvidence[evidence] = (byEvidence[evidence] ?? 0) + 1;
+    byConclusion[conclusion] = (byConclusion[conclusion] ?? 0) + 1;
+  }
+  return { byEvidence, byConclusion };
+}
+
+function buildAlertEvidence(alertRefs, rows, options = {}) {
+  const allEvidence = buildRawAlertEvidence(alertRefs, rows);
+  const focusBranch = options.branch || "main";
+  const limit = options.alertEvidenceLimit || DEFAULT_ALERT_EVIDENCE_LIMIT;
+
+  if (allEvidence.length <= limit) {
+    return {
+      alerts: allEvidence,
+      summary: {
+        mode: "full",
+        total: allEvidence.length,
+        shown: allEvidence.length,
+        omitted: 0,
+        focusBranch,
+      },
+    };
+  }
+
+  const kept = [];
+  const keptKeys = new Set();
+  const keep = (alert, sampled = false) => {
+    const key = `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`;
+    if (keptKeys.has(key)) return;
+    keptKeys.add(key);
+    kept.push(sampled ? { ...alert, sampled: true } : alert);
+  };
+
+  for (const alert of allEvidence) {
+    if (shouldKeepCompactAlert(alert, focusBranch)) keep(alert);
+  }
+
+  let staleSampleCount = 0;
+  for (const alert of allEvidence) {
+    if (staleSampleCount >= STALE_ALERT_SAMPLE_LIMIT) break;
+    if (alert.evidence === "stale" && (alert.conclusion === "cancelled" || alert.conclusion === "skipped")) {
+      keep(alert, true);
+      staleSampleCount += 1;
+    }
+  }
+
+  kept.sort((left, right) => {
+    const leftTime = Date.parse(left.updatedAt || "") || 0;
+    const rightTime = Date.parse(right.updatedAt || "") || 0;
+    return rightTime - leftTime || Number(right.appearances) - Number(left.appearances);
+  });
+
+  const keptKeySet = new Set(kept.map((alert) => `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`));
+  const omitted = allEvidence.filter((alert) => !keptKeySet.has(`${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`));
+
+  return {
+    alerts: kept,
+    summary: {
+      mode: "compact",
+      total: allEvidence.length,
+      shown: kept.length,
+      omitted: omitted.length,
+      focusBranch,
+      staleSampleLimit: STALE_ALERT_SAMPLE_LIMIT,
+      ...summarizeOmittedAlerts(omitted),
+    },
+  };
 }
 
 function runKey(run) {
@@ -257,10 +349,23 @@ function markdownTable(rows) {
   return `${lines.join("\n")}\n`;
 }
 
-function alertEvidenceTable(alerts) {
+function formatCountMap(map) {
+  if (!map || Object.keys(map).length === 0) return "none";
+  return Object.entries(map)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, count]) => `${key}: ${count}`)
+    .join(", ");
+}
+
+function alertEvidenceTable(alerts, summary) {
   if (!alerts || alerts.length === 0) return "";
+  const compactNote = summary?.mode === "compact"
+    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).`
+    : `Full mode: showing all ${summary?.shown ?? alerts.length} pasted alert URLs.`;
   const lines = [
     "## Pasted alert URL evidence",
+    "",
+    compactNote,
     "",
     "| Evidence | Disposition | Replay | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -271,9 +376,10 @@ function alertEvidenceTable(alerts) {
     const currentRun = alert.currentRunId ? `\`${alert.currentRunId}\`` : "-";
     const alertedAttempt = alert.alertedAttempt ?? "-";
     const currentAttempt = alert.currentAttempt ?? "-";
+    const evidence = alert.sampled ? `${alert.evidence} sample` : alert.evidence;
     const replay = alert.replay ? "historical replay" : "-";
     const reason = alert.replayReason || alert.reason;
-    lines.push(`| ${alert.evidence} | ${alert.disposition} | ${replay} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(reason)} | ${alert.appearances} |`);
+    lines.push(`| ${evidence} | ${alert.disposition} | ${replay} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(reason)} | ${alert.appearances} |`);
   }
 
   return `${lines.join("\n")}\n\n`;
@@ -282,7 +388,29 @@ function alertEvidenceTable(alerts) {
 function renderMarkdown(result) {
   const actionable = result.rows.filter((row) => row.bucket === "actionable" || row.bucket === "watch");
   const stale = result.rows.filter((row) => row.bucket === "stale");
-  return `# CI alert replay triage\n\nGenerated: ${result.generatedAt}\n\nUse this report to collapse replayed GitHub Actions alert buffers: inspect only \`actionable\` and \`watch\` rows, suppress alert evidence marked \`suppress-replay\`, and treat \`stale\` rows as already superseded/cancelled unless a new run appears.\n\n## Summary\n\n- Total runs inspected: ${result.totalRuns}\n- Actionable latest failures: ${result.counts.actionable ?? 0}\n- Latest runs still in flight: ${result.counts.watch ?? 0}\n- Stale replay rows: ${result.counts.stale ?? 0}\n- Informational successes/neutral rows: ${result.counts.informational ?? 0}\n- Pasted alert URLs inspected: ${result.alerts?.length ?? 0}\n\n${alertEvidenceTable(result.alerts)}## Actionable / watch\n\n${markdownTable(actionable)}\n## Stale replay rows\n\n${markdownTable(stale)}`;
+  return `# CI alert replay triage
+
+Generated: ${result.generatedAt}
+
+Use this report to collapse replayed GitHub Actions alert buffers: inspect only \`actionable\` and \`watch\` rows, suppress alert evidence marked \`suppress-replay\`, and treat \`stale\` rows as already superseded/cancelled unless a new run appears.
+
+## Summary
+
+- Total runs inspected: ${result.totalRuns}
+- Actionable latest failures: ${result.counts.actionable ?? 0}
+- Latest runs still in flight: ${result.counts.watch ?? 0}
+- Stale replay rows: ${result.counts.stale ?? 0}
+- Informational successes/neutral rows: ${result.counts.informational ?? 0}
+- Pasted alert URLs inspected: ${result.alertSummary?.total ?? result.alerts?.length ?? 0}
+- Pasted alert evidence shown: ${result.alertSummary?.shown ?? result.alerts?.length ?? 0}
+- Pasted alert evidence omitted: ${result.alertSummary?.omitted ?? 0}
+
+${alertEvidenceTable(result.alerts, result.alertSummary)}## Actionable / watch
+
+${markdownTable(actionable)}
+## Stale replay rows
+
+${markdownTable(stale)}`;
 }
 
 function main() {
@@ -291,7 +419,9 @@ function main() {
   if (!Array.isArray(rawRuns)) throw new Error("Expected an array of GitHub Actions runs");
   const result = classifyRuns(rawRuns);
   const alertRefs = extractAlertRunRefs(readAlertText(options.alertsInput));
-  result.alerts = buildAlertEvidence(alertRefs, result.rows);
+  const alertEvidence = buildAlertEvidence(alertRefs, result.rows, options);
+  result.alerts = alertEvidence.alerts;
+  result.alertSummary = alertEvidence.summary;
   const output = options.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : renderMarkdown(result);
 
   if (options.output) fs.writeFileSync(path.resolve(repoRoot, options.output), output);
