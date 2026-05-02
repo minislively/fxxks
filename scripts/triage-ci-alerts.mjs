@@ -251,7 +251,10 @@ function alertSummaryFields(allEvidence, focusBranch) {
     currentHeadCount: currentHeadRunIds.length,
     currentHeadRunIds,
     currentMainEchoCount: allEvidence.filter((alert) => alert.echo).length,
+    verificationOnlyCount: allEvidence.filter((alert) => alert.disposition === "verification-only").length,
+    actionableAlertCount: allEvidence.filter((alert) => alert.disposition === "inspect").length,
     staleReplayCount: allEvidence.filter((alert) => alert.replay).length,
+    staleSuccessReplayCount: allEvidence.filter((alert) => alert.replay && alert.conclusion === "success").length,
   };
 }
 
@@ -450,6 +453,9 @@ Use this report to collapse replayed GitHub Actions alert buffers: inspect only 
 - Pasted alert URLs inspected: ${result.alertSummary?.total ?? result.alerts?.length ?? 0}
 - Pasted alert evidence shown: ${result.alertSummary?.shown ?? result.alerts?.length ?? 0}
 - Pasted alert evidence omitted: ${result.alertSummary?.omitted ?? 0}
+- Pasted alert evidence needing inspection: ${result.alertSummary?.actionableAlertCount ?? 0}
+- Verification-only current-main echoes: ${result.alertSummary?.verificationOnlyCount ?? 0}
+- Stale success replay evidence: ${result.alertSummary?.staleSuccessReplayCount ?? 0}
 
 ${alertEvidenceTable(result.alerts, result.alertSummary)}## Actionable / watch
 

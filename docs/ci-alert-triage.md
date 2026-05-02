@@ -6,9 +6,12 @@ triage report.
 
 For clawhip bursts that replay many historical green CI URLs after a merge,
 compact mode keeps the current `main` head run visible and records the stale
-historical replay count in `alertSummary.staleReplayCount`. The omitted-count
-maps (`byEvidence`, `byConclusion`) provide evidence that the collapsed rows
-were stale successes rather than new failures.
+historical replay count in `alertSummary.staleReplayCount`. It also reports
+`alertSummary.actionableAlertCount` and `alertSummary.staleSuccessReplayCount`
+so all-green bursts can show zero evidence needing inspection while still
+counting the omitted historical successes. The omitted-count maps (`byEvidence`,
+`byConclusion`) provide evidence that the collapsed rows were stale successes
+rather than new failures.
 
 When the pasted alert is the current completed `main` CI success (for example a
 `git:fooks@main` notice followed by `CI passed · fooks` for the same head run),

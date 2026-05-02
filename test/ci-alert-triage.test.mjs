@@ -549,9 +549,14 @@ test("CI alert triage collapses success-heavy clawhip bursts to current head plu
     assert.equal(result.alertSummary.omitted, 20);
     assert.equal(result.alertSummary.currentHeadCount, 1);
     assert.deepEqual(result.alertSummary.currentHeadRunIds, ["700"]);
+    assert.equal(result.alertSummary.actionableAlertCount, 0);
+    assert.equal(result.alertSummary.verificationOnlyCount, 1);
     assert.equal(result.alertSummary.staleReplayCount, 20);
+    assert.equal(result.alertSummary.staleSuccessReplayCount, 20);
     assert.equal(result.alertSummary.byEvidence.stale, 20);
     assert.equal(result.alertSummary.byConclusion.success, 20);
+    assert.equal(result.counts.actionable ?? 0, 0);
+    assert.equal(result.counts.watch ?? 0, 0);
     assert.equal(result.alerts.length, 1);
     assert.equal(result.alerts[0].alertedRunId, "700");
     assert.equal(result.alerts[0].evidence, "current");
