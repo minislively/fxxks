@@ -5,31 +5,25 @@ import { detectDomainFromSource, type DomainDetectionResult } from "../core/doma
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import {
-  assessFallbackPayloadPolicy,
   MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
   UNKNOWN_FRONTEND_DEFERRED_PAYLOAD_POLICY,
   UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
 } from "../core/payload-policy/fallback";
+import { assessFrontendPayloadPolicy } from "../core/payload-policy/registry";
 import {
-  assessReactWebPayloadPolicy,
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
 } from "../core/payload-policy/react-web";
-import {
-  assessReactNativePayloadPolicy,
-  RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
-} from "../core/payload-policy/react-native";
-import {
-  assessTuiInkPayloadPolicy,
-  TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY,
-} from "../core/payload-policy/tui-ink";
+import { RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY } from "../core/payload-policy/react-native";
+import { TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY } from "../core/payload-policy/tui-ink";
 import type { FrontendPayloadPolicyDecision } from "../core/payload-policy/types";
-import { assessWebViewPayloadPolicy, WEBVIEW_BOUNDARY_FALLBACK_POLICY } from "../core/payload-policy/webview";
+import { WEBVIEW_BOUNDARY_FALLBACK_POLICY } from "../core/payload-policy/webview";
 import type { PreReadDecision } from "../core/schema";
 
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
+export { assessFrontendPayloadPolicy } from "../core/payload-policy/registry";
 export {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
@@ -85,22 +79,6 @@ function frontendDebug(
     domainDetection,
     ...(frontendPayloadPolicy ? { frontendPayloadPolicy } : {}),
   };
-}
-
-export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResult): FrontendPayloadPolicyDecision | undefined {
-  const reactWebPolicy = assessReactWebPayloadPolicy(domainDetection);
-  if (reactWebPolicy) return reactWebPolicy;
-
-  const webViewPolicy = assessWebViewPayloadPolicy(domainDetection);
-  if (webViewPolicy) return webViewPolicy;
-
-  const tuiInkPolicy = assessTuiInkPayloadPolicy(domainDetection);
-  if (tuiInkPolicy) return tuiInkPolicy;
-
-  const reactNativePolicy = assessReactNativePayloadPolicy(domainDetection);
-  if (reactNativePolicy) return reactNativePolicy;
-
-  return assessFallbackPayloadPolicy(domainDetection);
 }
 
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
