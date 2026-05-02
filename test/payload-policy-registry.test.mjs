@@ -66,15 +66,37 @@ test("pre-read compatibility entrypoint uses the core policy registry", () => {
   }
 });
 
+test("frontend payload build options include domain payload only for React Web policy", () => {
+  const reactWebPolicy = registry.assessFrontendPayloadPolicy(samples["react-web"]);
+
+  assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactWebPolicy), {
+    includeDomainPayload: true,
+    domainPayloadPolicy: reactWebPolicy.name,
+  });
+
+  for (const lane of ["webview", "tui-ink", "react-native", "mixed", "unknown"]) {
+    const policy = registry.assessFrontendPayloadPolicy(samples[lane]);
+    assert.deepEqual(
+      registry.toFrontendPayloadBuildOptions(policy),
+      { includeDomainPayload: false, domainPayloadPolicy: policy.name },
+      lane,
+    );
+  }
+
+  assert.deepEqual(registry.toFrontendPayloadBuildOptions(undefined), { includeDomainPayload: false });
+});
+
 test("pre-read adapter no longer owns hardcoded policy assessment order", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
 
-  assert.match(source, /import \{ assessFrontendPayloadPolicy \} from "\.\.\/core\/payload-policy\/registry"/);
+  assert.match(source, /import \{ assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions \} from "\.\.\/core\/payload-policy\/registry"/);
   assert.doesNotMatch(source, /assessReactWebPayloadPolicy\(domainDetection\)/);
   assert.doesNotMatch(source, /assessWebViewPayloadPolicy\(domainDetection\)/);
   assert.doesNotMatch(source, /assessTuiInkPayloadPolicy\(domainDetection\)/);
   assert.doesNotMatch(source, /assessReactNativePayloadPolicy\(domainDetection\)/);
   assert.doesNotMatch(source, /assessFallbackPayloadPolicy\(domainDetection\)/);
+  assert.doesNotMatch(source, /includeDomainPayload:\s*frontendPayloadPolicy\?\.name ===/);
+  assert.match(source, /toFrontendPayloadBuildOptions\(frontendPayloadPolicy\)/);
 });
 
 test("payload policy registry source avoids broad support claims", () => {

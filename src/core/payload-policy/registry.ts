@@ -1,7 +1,7 @@
 import type { DomainDetectionResult } from "../domain-detector";
 import { assessFallbackPayloadPolicy } from "./fallback";
 import { assessReactNativePayloadPolicy } from "./react-native";
-import { assessReactWebPayloadPolicy } from "./react-web";
+import { assessReactWebPayloadPolicy, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY } from "./react-web";
 import { assessTuiInkPayloadPolicy } from "./tui-ink";
 import type { FrontendPayloadPolicyDecision } from "./types";
 import { assessWebViewPayloadPolicy } from "./webview";
@@ -9,6 +9,11 @@ import { assessWebViewPayloadPolicy } from "./webview";
 export type FrontendPayloadPolicyAssessor = (
   domainDetection: DomainDetectionResult,
 ) => FrontendPayloadPolicyDecision | undefined;
+
+export type FrontendPayloadBuildOptions = {
+  includeDomainPayload: boolean;
+  domainPayloadPolicy?: string;
+};
 
 export type FrontendPayloadPolicyRegistryEntry = {
   name: string;
@@ -33,4 +38,13 @@ export function assessFrontendPayloadPolicy(
   }
 
   return undefined;
+}
+
+export function toFrontendPayloadBuildOptions(
+  policy: FrontendPayloadPolicyDecision | undefined,
+): FrontendPayloadBuildOptions {
+  return {
+    includeDomainPayload: policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+    ...(policy?.name ? { domainPayloadPolicy: policy.name } : {}),
+  };
 }

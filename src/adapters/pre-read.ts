@@ -9,7 +9,7 @@ import {
   UNKNOWN_FRONTEND_DEFERRED_PAYLOAD_POLICY,
   UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
 } from "../core/payload-policy/fallback";
-import { assessFrontendPayloadPolicy } from "../core/payload-policy/registry";
+import { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } from "../core/payload-policy/registry";
 import {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
@@ -23,7 +23,7 @@ import type { PreReadDecision } from "../core/schema";
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
-export { assessFrontendPayloadPolicy } from "../core/payload-policy/registry";
+export { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } from "../core/payload-policy/registry";
 export {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
@@ -149,10 +149,10 @@ export function decidePreRead(
   }
 
   const result = extractFile(resolvedPath);
+  const payloadBuildOptions = toFrontendPayloadBuildOptions(frontendPayloadPolicy);
   const payload = toModelFacingPayload(result, cwd, {
     includeEditGuidance: options.includeEditGuidance === true,
-    includeDomainPayload: frontendPayloadPolicy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
-    domainPayloadPolicy: frontendPayloadPolicy?.name,
+    ...payloadBuildOptions,
   });
   const readiness = assessPayloadReadiness(result, payload);
   const debug = {
