@@ -13,6 +13,10 @@ import {
   assessReactNativePayloadPolicy,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
 } from "../core/payload-policy/react-native";
+import {
+  assessTuiInkPayloadPolicy,
+  TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY,
+} from "../core/payload-policy/tui-ink";
 import type { FrontendPayloadPolicyDecision } from "../core/payload-policy/types";
 import { assessWebViewPayloadPolicy, WEBVIEW_BOUNDARY_FALLBACK_POLICY } from "../core/payload-policy/webview";
 import type { PreReadDecision } from "../core/schema";
@@ -24,6 +28,7 @@ export {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+  TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY,
   WEBVIEW_BOUNDARY_FALLBACK_POLICY,
 };
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
@@ -80,6 +85,9 @@ export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResu
 
   const webViewPolicy = assessWebViewPayloadPolicy(domainDetection);
   if (webViewPolicy) return webViewPolicy;
+
+  const tuiInkPolicy = assessTuiInkPayloadPolicy(domainDetection);
+  if (tuiInkPolicy) return tuiInkPolicy;
 
   return assessReactNativePayloadPolicy(domainDetection);
 }
