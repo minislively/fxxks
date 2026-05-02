@@ -256,7 +256,7 @@ test("CI alert triage keeps explicit rerun attempt evidence distinct", () => {
     assert.equal(current301.appearances, 2);
     assert.equal(current301.currentAttempt, 2);
     assert.equal(current301.evidence, "current");
-    assert.equal(current301.reason, "not failing");
+    assert.equal(current301.reason, "verification-only current main success echo");
 
     assert.equal(missingCurrentAttempt.alertedUrl, "https://github.com/minislively/fooks/actions/runs/302/attempts/1");
     assert.equal(missingCurrentAttempt.currentAttempt, null);
@@ -354,8 +354,10 @@ test("CI alert triage identifies replayed historical main alerts for suppression
     }
 
     assert.equal(byAlertId.get("404").evidence, "current");
+    assert.equal(byAlertId.get("404").verdict, "current-main-echo");
+    assert.equal(byAlertId.get("404").echo, true);
     assert.equal(byAlertId.get("404").replay, false);
-    assert.equal(byAlertId.get("404").disposition, "review");
+    assert.equal(byAlertId.get("404").disposition, "verification-only");
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -473,7 +475,7 @@ test("CI alert triage compacts bulk replay URLs around current main and cancelle
     const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
     assert.equal(byAlertId.get("500").evidence, "current");
     assert.equal(byAlertId.get("500").branch, "main");
-    assert.equal(byAlertId.get("500").reason, "not failing");
+    assert.equal(byAlertId.get("500").reason, "verification-only current main success echo");
 
     const cancelledSamples = result.alerts.filter((alert) => alert.conclusion === "cancelled");
     assert.equal(cancelledSamples.length, 2);
@@ -553,7 +555,82 @@ test("CI alert triage collapses success-heavy clawhip bursts to current head plu
     assert.equal(result.alerts.length, 1);
     assert.equal(result.alerts[0].alertedRunId, "700");
     assert.equal(result.alerts[0].evidence, "current");
+    assert.equal(result.alerts[0].verdict, "current-main-echo");
+    assert.equal(result.alerts[0].echo, true);
+    assert.equal(result.alerts[0].disposition, "verification-only");
     assert.equal(result.alerts[0].conclusion, "success");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage classifies pasted current main CI success as verification-only echo", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-main-pass-echo-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 850,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-02T09:00:00Z",
+      updatedAt: "2026-05-02T09:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/850",
+    },
+    {
+      databaseId: 849,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-02T08:00:00Z",
+      updatedAt: "2026-05-02T08:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/849",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "git:fooks@main",
+    "CI passed · fooks https://github.com/minislively/fooks/actions/runs/850/job/1234567890",
+    "historical green replay https://github.com/minislively/fooks/actions/runs/849",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
+
+    assert.equal(byAlertId.get("850").evidence, "current");
+    assert.equal(byAlertId.get("850").verdict, "current-main-echo");
+    assert.equal(byAlertId.get("850").echo, true);
+    assert.equal(byAlertId.get("850").disposition, "verification-only");
+    assert.equal(byAlertId.get("850").reason, "verification-only current main success echo");
+    assert.equal(byAlertId.get("850").currentRunId, 850);
+    assert.equal(byAlertId.get("849").evidence, "stale");
+    assert.equal(byAlertId.get("849").replay, true);
+    assert.equal(byAlertId.get("849").disposition, "suppress-replay");
+    assert.equal(result.alertSummary.currentHeadRunIds.includes("850"), true);
+    assert.equal(result.alertSummary.currentMainEchoCount, 1);
+    assert.equal(result.alertSummary.staleReplayCount, 1);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

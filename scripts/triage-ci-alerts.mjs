@@ -156,32 +156,51 @@ function isHistoricalReplayEvidence(row, isStaleAttempt) {
   return row.latestRunId !== null && row.id !== null && String(row.latestRunId) !== String(row.id);
 }
 
-function alertDisposition(evidence, replay) {
+function isCurrentMainSuccessEcho(row, focusBranch) {
+  return row
+    && row.bucket === "informational"
+    && row.branch === focusBranch
+    && row.status === "completed"
+    && row.conclusion === "success"
+    && row.latestRunId !== null
+    && row.id !== null
+    && String(row.latestRunId) === String(row.id);
+}
+
+function alertDisposition(evidence, replay, echo = false) {
   if (evidence === "actionable" || evidence === "watch") return "inspect";
+  if (echo) return "verification-only";
   if (replay) return "suppress-replay";
   if (evidence === "stale") return "suppress-stale";
   return "review";
 }
 
-function buildRawAlertEvidence(alertRefs, rows) {
+function buildRawAlertEvidence(alertRefs, rows, options = {}) {
   const rowsById = new Map(rows.map((row) => [String(row.id), row]));
+  const focusBranch = options.branch || "main";
   return alertRefs.map((ref) => {
     const row = rowsById.get(ref.id);
     const currentAttempt = row?.attempt ?? null;
     const isStaleAttempt = ref.alertedAttempt !== null && currentAttempt !== null && ref.alertedAttempt < currentAttempt;
     const replay = isHistoricalReplayEvidence(row, isStaleAttempt);
+    const echo = !isStaleAttempt && isCurrentMainSuccessEcho(row, focusBranch);
     const evidence = isStaleAttempt ? "stale" : alertEvidenceState(row);
+    const verdict = echo ? "current-main-echo" : evidence;
     const reason = isStaleAttempt
       ? `superseded by attempt ${currentAttempt}`
-      : row?.reason ?? "run URL was not present in the inspected gh run list window";
+      : echo
+        ? `verification-only current ${focusBranch} success echo`
+        : row?.reason ?? "run URL was not present in the inspected gh run list window";
     return {
       alertedRunId: ref.id,
       alertedAttempt: ref.alertedAttempt,
       alertedUrl: ref.url,
       appearances: ref.appearances,
       evidence,
+      verdict,
+      echo,
       replay,
-      disposition: alertDisposition(evidence, replay),
+      disposition: alertDisposition(evidence, replay, echo),
       reason,
       replayReason: replay ? `historical replay of ${reason}` : "",
       currentRunId: row?.latestRunId ?? null,
@@ -223,7 +242,7 @@ function alertSummaryFields(allEvidence, focusBranch) {
   const currentHeadRunIds = [
     ...new Set(
       allEvidence
-        .filter((alert) => alert.evidence === "current" && alert.branch === focusBranch)
+        .filter((alert) => alert.echo || (alert.evidence === "current" && alert.branch === focusBranch))
         .map((alert) => alert.alertedRunId),
     ),
   ];
@@ -231,13 +250,14 @@ function alertSummaryFields(allEvidence, focusBranch) {
   return {
     currentHeadCount: currentHeadRunIds.length,
     currentHeadRunIds,
+    currentMainEchoCount: allEvidence.filter((alert) => alert.echo).length,
     staleReplayCount: allEvidence.filter((alert) => alert.replay).length,
   };
 }
 
 function buildAlertEvidence(alertRefs, rows, options = {}) {
-  const allEvidence = buildRawAlertEvidence(alertRefs, rows);
   const focusBranch = options.branch || "main";
+  const allEvidence = buildRawAlertEvidence(alertRefs, rows, { branch: focusBranch });
   const limit = options.alertEvidenceLimit || DEFAULT_ALERT_EVIDENCE_LIMIT;
   const summaryFields = alertSummaryFields(allEvidence, focusBranch);
 
@@ -383,7 +403,7 @@ function formatCountMap(map) {
 function alertEvidenceTable(alerts, summary) {
   if (!alerts || alerts.length === 0) return "";
   const currentHeadVerdict = summary?.currentHeadRunIds?.length
-    ? ` Current-head verdict${summary.currentHeadRunIds.length === 1 ? "" : "s"}: ${summary.currentHeadRunIds.map((id) => `\`${escapeMarkdown(id)}\``).join(", ")}. Stale historical replay count: ${summary.staleReplayCount ?? 0}.`
+    ? ` Current-head verdict${summary.currentHeadRunIds.length === 1 ? "" : "s"}: ${summary.currentHeadRunIds.map((id) => `\`${escapeMarkdown(id)}\``).join(", ")}. Current-main echo count: ${summary.currentMainEchoCount ?? 0}. Stale historical replay count: ${summary.staleReplayCount ?? 0}.`
     : "";
   const compactNote = summary?.mode === "compact"
     ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).${currentHeadVerdict}`
@@ -393,8 +413,8 @@ function alertEvidenceTable(alerts, summary) {
     "",
     compactNote,
     "",
-    "| Evidence | Disposition | Replay | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Evidence | Verdict | Disposition | Replay | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
 
   for (const alert of alerts) {
@@ -405,7 +425,7 @@ function alertEvidenceTable(alerts, summary) {
     const evidence = alert.sampled ? `${alert.evidence} sample` : alert.evidence;
     const replay = alert.replay ? "historical replay" : "-";
     const reason = alert.replayReason || alert.reason;
-    lines.push(`| ${evidence} | ${alert.disposition} | ${replay} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(reason)} | ${alert.appearances} |`);
+    lines.push(`| ${evidence} | ${escapeMarkdown(alert.verdict || alert.evidence || "-")} | ${alert.disposition} | ${replay} | ${alertedRun} | ${alertedAttempt} | ${currentRun} | ${currentAttempt} | ${escapeMarkdown(alert.workflow || "-")} | \`${escapeMarkdown(alert.branch || "-")}\` | ${escapeMarkdown(alert.status || "-")} | ${escapeMarkdown(alert.conclusion || "-")} | ${escapeMarkdown(reason)} | ${alert.appearances} |`);
   }
 
   return `${lines.join("\n")}\n\n`;

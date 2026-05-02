@@ -10,6 +10,15 @@ historical replay count in `alertSummary.staleReplayCount`. The omitted-count
 maps (`byEvidence`, `byConclusion`) provide evidence that the collapsed rows
 were stale successes rather than new failures.
 
+When the pasted alert is the current completed `main` CI success (for example a
+`git:fooks@main` notice followed by `CI passed · fooks` for the same head run),
+the alert evidence remains `current` and gains `verdict: "current-main-echo"`,
+`echo: true`, and `disposition: "verification-only"`. Treat that as a merge
+verification echo: record it as the current main verdict, but do not re-open a
+fresh development investigation unless a newer actionable/watch run appears.
+Historical success URLs in the same paste stay bounded by compact mode and are
+noise-counted as stale replay rows.
+
 Offline verification example:
 
 ```sh
