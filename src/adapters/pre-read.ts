@@ -10,16 +10,20 @@ import {
   REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
 } from "../core/payload-policy/react-web";
 import type { FrontendPayloadPolicyDecision } from "../core/payload-policy/types";
+import { assessWebViewPayloadPolicy, WEBVIEW_BOUNDARY_FALLBACK_POLICY } from "../core/payload-policy/webview";
 import type { PreReadDecision } from "../core/schema";
 
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
-export { CUSTOM_WRAPPER_DOM_SIGNAL_GAP, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY };
+export {
+  CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
+  REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+  WEBVIEW_BOUNDARY_FALLBACK_POLICY,
+};
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
 export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
-export const WEBVIEW_BOUNDARY_FALLBACK_POLICY = "webview-boundary-fallback";
 const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
   "react-native:primitive:View",
   "react-native:primitive:Text",
@@ -104,16 +108,8 @@ export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResu
   const reactWebPolicy = assessReactWebPayloadPolicy(domainDetection);
   if (reactWebPolicy) return reactWebPolicy;
 
-  if (
-    domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
-    hasAnySignalWithPrefix(domainDetection, "webview:")
-  ) {
-    return {
-      name: WEBVIEW_BOUNDARY_FALLBACK_POLICY,
-      allowed: false,
-      reason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
-    };
-  }
+  const webViewPolicy = assessWebViewPayloadPolicy(domainDetection);
+  if (webViewPolicy) return webViewPolicy;
 
   if (domainDetection.classification !== "react-native") return undefined;
 
