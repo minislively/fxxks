@@ -9,6 +9,7 @@ import {
   UNKNOWN_FRONTEND_DEFERRED_PAYLOAD_POLICY,
   UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
 } from "../core/payload-policy/fallback";
+import { assessFrontendProfilePayloadReuse } from "../core/payload-policy/profile-gate";
 import { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } from "../core/payload-policy/registry";
 import {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
@@ -22,7 +23,6 @@ import type { PreReadDecision } from "../core/schema";
 
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
-const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } from "../core/payload-policy/registry";
 export {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
@@ -46,29 +46,6 @@ function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<st
 function relativePath(filePath: string, cwd: string): string {
   const relative = path.relative(cwd, filePath);
   return relative || path.basename(filePath);
-}
-
-function assessFrontendProfilePayloadReuse(
-  extension: string,
-  domainDetection: DomainDetectionResult,
-  payload: ReturnType<typeof toModelFacingPayload>,
-  frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
-): { allowed: true } | { allowed: false; reason: string } {
-  if (!FRONTEND_PROFILE_GATE_EXTENSIONS.has(extension)) {
-    return { allowed: true };
-  }
-
-  if (domainDetection.profile.lane === "react-web" && domainDetection.profile.claimStatus === "current-supported-lane") {
-    return payload.domainPayload?.domain === "react-web" && payload.domainPayload.plannerDecision === "compact-safe"
-      ? { allowed: true }
-      : { allowed: false, reason: "missing-react-web-domain-payload" };
-  }
-
-  if (frontendPayloadPolicy?.allowed === true) {
-    return { allowed: true };
-  }
-
-  return { allowed: false, reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON };
 }
 
 function frontendDebug(
