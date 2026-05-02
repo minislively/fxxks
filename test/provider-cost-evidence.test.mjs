@@ -1446,7 +1446,11 @@ test("provider cost repeated CLI live mode without credentials writes controlled
       tasks: ["component", "refactor", "tests"].map((id) => ({
         id,
         targetPairCount: 5,
-        qualityGate: { id: "applied-validation", version: "v1", command: "manual review" },
+        qualityGate: {
+          id: "provider-cost-imported-artifact-gate",
+          version: "v1",
+          command: "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke",
+        },
       })),
     }));
     const stdout = execFileSync(process.execPath, [
@@ -1473,6 +1477,30 @@ test("provider cost repeated CLI live mode without credentials writes controlled
     assert.equal(ledger.plannedPairCount, 15);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("provider cost task manifests use concrete imported-artifact gates instead of manual review commands", () => {
+  const manifestPaths = [
+    path.join(repoRoot, "benchmarks", "layer2-frontend-task", "provider-cost-live-campaign-tasks.json"),
+    path.join(repoRoot, "benchmarks", "layer2-frontend-task", "provider-cost-tasks.json"),
+    path.join(repoRoot, "benchmarks", "layer2-frontend-task", "fixtures", "provider-cost-import-kit", "campaign-manifest.json"),
+  ];
+
+  for (const manifestPath of manifestPaths) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const tasks = manifest.tasks || manifest.taskClasses || [];
+    assert.ok(tasks.length > 0, `${manifestPath} should declare provider-cost tasks`);
+
+    for (const task of tasks) {
+      const gate = task.qualityGate || {};
+      assert.equal(gate.id, "provider-cost-imported-artifact-gate");
+      assert.match(gate.command || "", /^npm run bench:layer2:provider-cost:repeated -- --import-manifest=/);
+      assert.match(gate.command || "", /fixtures\/provider-cost-import-kit\/import-manifest\.json/);
+      assert.doesNotMatch(gate.command || "", /manual review|manual\/imported/i);
+    }
+
+    assert.doesNotMatch(JSON.stringify(manifest), /manual review|manual\/imported/i);
   }
 });
 

@@ -105,6 +105,20 @@ Live OpenAI campaign template:
 
 This template predeclares 3 task classes × 5 matched pairs. It is the live path for estimated API cost evidence, but it requires an OpenAI credential and explicit spend caps. The default auth mode is `auto`: `OPENAI_API_KEY`/`OPEN_AI_APIKEY` first, then Codex OAuth from `$FOOKS_CODEX_HOME/auth.json`, `$CODEX_HOME/auth.json`, or `~/.codex/auth.json`. Use `--auth-mode=codex-oauth --transport=codex-exec` when validating the common Codex/ChatGPT sign-in path; that transport shells out to `codex exec --json` and reads the `turn.completed.usage` event instead of requiring a platform API key. Without credentials, the runner records a local blocker artifact and makes no request.
 
+Its task quality gates are imported-artifact gates, not manual-review
+instructions. The recorded gate command is:
+
+```bash
+npm run bench:layer2:provider-cost:repeated -- \
+  --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json \
+  --run-id=provider-cost-import-kit-smoke
+```
+
+That command validates the local provider-cost import kit, including evidence
+shape, source provenance, denominator accounting, and recorded quality-gate
+pass/fail status. It is intentionally mechanics-scoped; semantic product
+mechanism proof remains the corrected real-payload campaign lane below.
+
 Corrected real-payload campaign builder:
 
 - `build-provider-cost-corrected-manifest.js`

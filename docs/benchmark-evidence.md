@@ -222,6 +222,12 @@ without a resolved OpenAI credential writes a local blocker artifact under
 still requires explicit spend caps. Auth resolution is `--auth-mode=auto` by
 default: environment API key first, then Codex OAuth from
 `$FOOKS_CODEX_HOME/auth.json`, `$CODEX_HOME/auth.json`, or `~/.codex/auth.json`.
+The task manifest quality gates point at the imported-artifact mechanics gate:
+`npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke`.
+That gate validates the provider-cost evidence import shape, provenance,
+denominator, and recorded pass/fail quality-gate status; it is not a manual
+semantic-review path and does not replace the corrected real-payload campaign
+needed for product-mechanism proof.
 Use `--auth-mode=codex-oauth --transport=codex-exec` to force the common
 Codex/ChatGPT sign-in path. That transport shells out to `codex exec --json`
 and parses the `turn.completed.usage` event instead of requiring a platform API

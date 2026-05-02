@@ -6,9 +6,9 @@
       "id": "frontend-component-summary",
       "targetPairCount": 1,
       "qualityGate": {
-        "id": "provider-cost-import-smoke",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual review or imported artifact gate"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       },
       "baselinePrompt": "Summarize the responsibilities of a React combobox component and list likely extraction boundaries.",
       "fooksPrompt": "Using a compact prepared context, summarize the responsibilities of a React combobox component and list likely extraction boundaries."
@@ -17,12 +17,15 @@
       "id": "frontend-refactor-plan",
       "targetPairCount": 1,
       "qualityGate": {
-        "id": "provider-cost-import-smoke",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual review or imported artifact gate"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       },
       "baselinePrompt": "Draft a concise refactor plan for splitting a large TSX form section into components, hooks, utils, and types.",
       "fooksPrompt": "Using a compact prepared context, draft a concise refactor plan for splitting a large TSX form section into components, hooks, utils, and types."
     }
+  ],
+  "nonGoals": [
+    "The capped smoke manifest validates imported provider-cost evidence mechanics only; it is not launch-grade positive cost evidence by itself."
   ]
 }

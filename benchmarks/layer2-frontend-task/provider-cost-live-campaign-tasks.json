@@ -8,9 +8,9 @@
       "id": "frontend-component-summary",
       "targetPairCount": 5,
       "qualityGate": {
-        "id": "applied-validation",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual review: baseline and fooks answers must both correctly summarize responsibilities and extraction boundaries"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       },
       "baselinePrompt": "Summarize the responsibilities of a React combobox component and list likely extraction boundaries. Include accessibility, keyboard handling, option rendering, and state management concerns.",
       "fooksPrompt": "Using a compact prepared context for a React combobox, summarize responsibilities and extraction boundaries: accessibility, keyboard handling, option rendering, state management."
@@ -19,9 +19,9 @@
       "id": "frontend-refactor-plan",
       "targetPairCount": 5,
       "qualityGate": {
-        "id": "applied-validation",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual review: baseline and fooks answers must both provide an actionable TSX refactor plan"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       },
       "baselinePrompt": "Draft a concise refactor plan for splitting a large TypeScript React form section into components, hooks, utilities, and types. Include migration steps, test coverage, and rollback strategy.",
       "fooksPrompt": "Using compact prepared context for a large TS React form section, draft a concise split plan: components, hooks, utilities, types, tests, rollback."
@@ -30,12 +30,16 @@
       "id": "frontend-test-strategy",
       "targetPairCount": 5,
       "qualityGate": {
-        "id": "applied-validation",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual review: baseline and fooks answers must both identify behavior-preserving tests and risk coverage"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       },
       "baselinePrompt": "Create a behavior-preserving test strategy for extracting frontend utilities from a mixed React component. Cover unit tests, integration tests, snapshot risks, edge cases, and acceptance criteria.",
       "fooksPrompt": "Using compact prepared context for frontend utility extraction, create a behavior-preserving test strategy: unit, integration, snapshot risks, edge cases, acceptance criteria."
     }
+  ],
+  "nonGoals": [
+    "The synthetic live campaign template does not replace corrected real-payload campaigns for product-mechanism proof.",
+    "The imported-artifact gate validates provider-cost evidence shape, provenance, denominator, and recorded pass/fail gate status; it is not a human semantic review process."
   ]
 }

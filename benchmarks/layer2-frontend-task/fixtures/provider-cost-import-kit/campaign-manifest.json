@@ -16,27 +16,27 @@
       "id": "frontend-component-summary",
       "targetPairCount": 5,
       "qualityGate": {
-        "id": "artifact-shape-and-output-review",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual/imported artifact gate"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       }
     },
     {
       "id": "frontend-refactor-plan",
       "targetPairCount": 5,
       "qualityGate": {
-        "id": "artifact-shape-and-output-review",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual/imported artifact gate"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       }
     },
     {
       "id": "frontend-type-extraction",
       "targetPairCount": 5,
       "qualityGate": {
-        "id": "artifact-shape-and-output-review",
+        "id": "provider-cost-imported-artifact-gate",
         "version": "v1",
-        "command": "manual/imported artifact gate"
+        "command": "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke"
       }
     }
   ],
