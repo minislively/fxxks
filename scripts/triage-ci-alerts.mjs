@@ -215,10 +215,31 @@ function summarizeOmittedAlerts(omitted) {
   return { byEvidence, byConclusion };
 }
 
+function alertKey(alert) {
+  return `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`;
+}
+
+function alertSummaryFields(allEvidence, focusBranch) {
+  const currentHeadRunIds = [
+    ...new Set(
+      allEvidence
+        .filter((alert) => alert.evidence === "current" && alert.branch === focusBranch)
+        .map((alert) => alert.alertedRunId),
+    ),
+  ];
+
+  return {
+    currentHeadCount: currentHeadRunIds.length,
+    currentHeadRunIds,
+    staleReplayCount: allEvidence.filter((alert) => alert.replay).length,
+  };
+}
+
 function buildAlertEvidence(alertRefs, rows, options = {}) {
   const allEvidence = buildRawAlertEvidence(alertRefs, rows);
   const focusBranch = options.branch || "main";
   const limit = options.alertEvidenceLimit || DEFAULT_ALERT_EVIDENCE_LIMIT;
+  const summaryFields = alertSummaryFields(allEvidence, focusBranch);
 
   if (allEvidence.length <= limit) {
     return {
@@ -229,6 +250,7 @@ function buildAlertEvidence(alertRefs, rows, options = {}) {
         shown: allEvidence.length,
         omitted: 0,
         focusBranch,
+        ...summaryFields,
       },
     };
   }
@@ -236,7 +258,7 @@ function buildAlertEvidence(alertRefs, rows, options = {}) {
   const kept = [];
   const keptKeys = new Set();
   const keep = (alert, sampled = false) => {
-    const key = `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`;
+    const key = alertKey(alert);
     if (keptKeys.has(key)) return;
     keptKeys.add(key);
     kept.push(sampled ? { ...alert, sampled: true } : alert);
@@ -261,8 +283,8 @@ function buildAlertEvidence(alertRefs, rows, options = {}) {
     return rightTime - leftTime || Number(right.appearances) - Number(left.appearances);
   });
 
-  const keptKeySet = new Set(kept.map((alert) => `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`));
-  const omitted = allEvidence.filter((alert) => !keptKeySet.has(`${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`));
+  const keptKeySet = new Set(kept.map(alertKey));
+  const omitted = allEvidence.filter((alert) => !keptKeySet.has(alertKey(alert)));
 
   return {
     alerts: kept,
@@ -273,6 +295,7 @@ function buildAlertEvidence(alertRefs, rows, options = {}) {
       omitted: omitted.length,
       focusBranch,
       staleSampleLimit: STALE_ALERT_SAMPLE_LIMIT,
+      ...summaryFields,
       ...summarizeOmittedAlerts(omitted),
     },
   };
@@ -359,9 +382,12 @@ function formatCountMap(map) {
 
 function alertEvidenceTable(alerts, summary) {
   if (!alerts || alerts.length === 0) return "";
+  const currentHeadVerdict = summary?.currentHeadRunIds?.length
+    ? ` Current-head verdict${summary.currentHeadRunIds.length === 1 ? "" : "s"}: ${summary.currentHeadRunIds.map((id) => `\`${escapeMarkdown(id)}\``).join(", ")}. Stale historical replay count: ${summary.staleReplayCount ?? 0}.`
+    : "";
   const compactNote = summary?.mode === "compact"
-    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).`
-    : `Full mode: showing all ${summary?.shown ?? alerts.length} pasted alert URLs.`;
+    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).${currentHeadVerdict}`
+    : `Full mode: showing all ${summary?.shown ?? alerts.length} pasted alert URLs.${currentHeadVerdict}`;
   const lines = [
     "## Pasted alert URL evidence",
     "",

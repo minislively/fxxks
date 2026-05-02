@@ -484,3 +484,77 @@ test("CI alert triage compacts bulk replay URLs around current main and cancelle
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("CI alert triage collapses success-heavy clawhip bursts to current head plus stale count", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-green-burst-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  const currentRun = {
+    databaseId: 700,
+    workflowName: "CI",
+    name: "Validate",
+    headBranch: "main",
+    event: "push",
+    status: "completed",
+    conclusion: "success",
+    createdAt: "2026-05-01T12:00:00Z",
+    updatedAt: "2026-05-01T12:05:00Z",
+    url: "https://github.com/minislively/fooks/actions/runs/700",
+  };
+  const historicalRuns = Array.from({ length: 20 }, (_, index) => {
+    const id = 600 + index;
+    return {
+      databaseId: id,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: `2026-04-30T${String(index).padStart(2, "0")}:00:00Z`,
+      updatedAt: `2026-04-30T${String(index).padStart(2, "0")}:05:00Z`,
+      url: `https://github.com/minislively/fooks/actions/runs/${id}`,
+    };
+  });
+
+  fs.writeFileSync(runsPath, JSON.stringify([currentRun, ...historicalRuns]));
+  fs.writeFileSync(alertsPath, [
+    ...historicalRuns.map((run) => `clawhip green replay https://github.com/minislively/fooks/actions/runs/${run.databaseId}`),
+    "current main-head green verdict https://github.com/minislively/fooks/actions/runs/700",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.alertSummary.mode, "compact");
+    assert.equal(result.alertSummary.total, 21);
+    assert.equal(result.alertSummary.shown, 1);
+    assert.equal(result.alertSummary.omitted, 20);
+    assert.equal(result.alertSummary.currentHeadCount, 1);
+    assert.deepEqual(result.alertSummary.currentHeadRunIds, ["700"]);
+    assert.equal(result.alertSummary.staleReplayCount, 20);
+    assert.equal(result.alertSummary.byEvidence.stale, 20);
+    assert.equal(result.alertSummary.byConclusion.success, 20);
+    assert.equal(result.alerts.length, 1);
+    assert.equal(result.alerts[0].alertedRunId, "700");
+    assert.equal(result.alerts[0].evidence, "current");
+    assert.equal(result.alerts[0].conclusion, "success");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
