@@ -30,7 +30,8 @@
     "bench:layer2:billing-import": "node benchmarks/layer2-frontend-task/billing-import-evidence.js",
     "branch:audit": "node scripts/audit-remote-branches.mjs",
     "ci:alerts": "node scripts/triage-ci-alerts.mjs",
-    "pr:alerts": "node scripts/guard-pr-alerts.mjs"
+    "pr:alerts": "node scripts/guard-pr-alerts.mjs",
+    "pr:merge-cleanup": "node scripts/classify-pr-merge-cleanup.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
