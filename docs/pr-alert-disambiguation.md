@@ -4,6 +4,7 @@ Clawhip/relay-style alert text can describe a `fooks#NNN` close/comment as PR wo
 
 - `pull_request` present: safe to continue PR-specific handling.
 - `pull_request` absent: stop PR recovery and treat it as an issue event.
+- Alert says `PR fooks#NNN <new> -> merged` and GitHub already reports the PR as merged: treat it as a verification-only echo, not fresh actionable PR recovery.
 
 The guard is read-only. It never comments, closes, reopens, deletes branches, or changes worktrees.
 
@@ -23,4 +24,4 @@ For issue-only payloads like `fooks#226`, expect `kind: "issue"` and `prHandling
 npm run --silent pr:guard -- --repo minislively/fooks --alerts /tmp/alerts.txt
 ```
 
-This invokes `gh api repos/<owner>/<repo>/issues/<number>` for each matching alert reference and prints a small markdown report. Use rows with `prHandling=skip` as a hard stop before any PR recovery workflow.
+This invokes `gh api repos/<owner>/<repo>/issues/<number>` for each matching alert reference and prints a small markdown report. Use rows with `prHandling=skip` as a hard stop before any PR recovery workflow. Use `prHandling=echo` rows only to verify the already-merged GitHub state; do not start fresh PR recovery from that alert.

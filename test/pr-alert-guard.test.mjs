@@ -93,3 +93,49 @@ test("PR alert guard allows pull requests when GitHub issue payload has pull_req
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("PR alert guard treats new-to-merged alerts for already merged PRs as verification-only echo", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-echo-"));
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  const eventsPath = path.join(tempDir, "events.json");
+
+  fs.writeFileSync(alertsPath, "clawhip: PR fooks#348 <new> -> merged");
+  fs.writeFileSync(eventsPath, JSON.stringify({
+    number: 348,
+    title: "Already merged PR",
+    state: "closed",
+    html_url: "https://github.com/minislively/fooks/pull/348",
+    pull_request: {
+      url: "https://api.github.com/repos/minislively/fooks/pulls/348",
+      html_url: "https://github.com/minislively/fooks/pull/348",
+      merged_at: "2026-05-02T09:00:00Z",
+    },
+  }));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      guardScript,
+      "--repo",
+      "minislively/fooks",
+      "--alerts",
+      alertsPath,
+      "--events",
+      eventsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.totalRefs, 1);
+    assert.equal(result.counts.pull_request, 1);
+    assert.equal(result.counts.echo, 1);
+    assert.equal(result.rows[0].kind, "pull_request");
+    assert.equal(result.rows[0].prHandling, "echo");
+    assert.equal(result.rows[0].reason, "Alert reports <new> -> merged and GitHub state is already merged; verification-only echo");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

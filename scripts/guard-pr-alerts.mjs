@@ -104,8 +104,28 @@ function fetchIssue(ref) {
   return JSON.parse(stdout);
 }
 
-function classifyIssue(ref, issue) {
+function alertLooksLikeNewToMergedEcho(alertText, ref) {
+  if (!/<new>\s*->\s*merged/i.test(alertText)) return false;
+  const refPatterns = [
+    new RegExp(`\\b${escapeRegExp(ref.repo)}#${ref.number}\\b`, "i"),
+    new RegExp(`\\b${escapeRegExp(ref.owner)}/${escapeRegExp(ref.repo)}#${ref.number}\\b`, "i"),
+    new RegExp(`github\\.com/${escapeRegExp(ref.owner)}/${escapeRegExp(ref.repo)}/(?:issues|pull)/${ref.number}\\b`, "i"),
+  ];
+  return refPatterns.some((pattern) => pattern.test(alertText));
+}
+
+function githubStateIsMerged(issue) {
+  return Boolean(issue?.pull_request) && (
+    Boolean(issue.pull_request.merged_at) ||
+    Boolean(issue.merged_at) ||
+    issue.pull_request.merged === true ||
+    issue.merged === true
+  );
+}
+
+function classifyIssue(ref, issue, alertText) {
   const isPullRequest = Boolean(issue?.pull_request);
+  const isNewToMergedEcho = isPullRequest && githubStateIsMerged(issue) && alertLooksLikeNewToMergedEcho(alertText, ref);
   return {
     repo: `${ref.owner}/${ref.repo}`,
     number: ref.number,
@@ -114,8 +134,10 @@ function classifyIssue(ref, issue) {
     state: issue?.state ?? "unknown",
     htmlUrl: issue?.html_url ?? `https://github.com/${ref.owner}/${ref.repo}/issues/${ref.number}`,
     kind: isPullRequest ? "pull_request" : "issue",
-    prHandling: isPullRequest ? "allow" : "skip",
-    reason: isPullRequest ? "GitHub issue API response includes pull_request" : "GitHub issue API response has no pull_request field",
+    prHandling: isNewToMergedEcho ? "echo" : isPullRequest ? "allow" : "skip",
+    reason: isNewToMergedEcho
+      ? "Alert reports <new> -> merged and GitHub state is already merged; verification-only echo"
+      : isPullRequest ? "GitHub issue API response includes pull_request" : "GitHub issue API response has no pull_request field",
   };
 }
 
@@ -125,7 +147,7 @@ function buildReport(options) {
   const eventFixtures = readEvents(options.eventsInput);
   const rows = refs.map((ref) => {
     const issue = eventFixtures.get(String(ref.number)) ?? fetchIssue(ref);
-    return classifyIssue(ref, issue);
+    return classifyIssue(ref, issue, alertText);
   });
 
   const counts = rows.reduce((acc, row) => {
@@ -164,6 +186,7 @@ function renderMarkdown(result) {
     `- Issues: ${result.counts.issue ?? 0}`,
     `- PR handling allowed: ${result.counts.allow ?? 0}`,
     `- PR handling skipped: ${result.counts.skip ?? 0}`,
+    `- Verification-only echoes: ${result.counts.echo ?? 0}`,
     "",
     "## Rows",
     "",
