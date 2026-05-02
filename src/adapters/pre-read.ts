@@ -5,6 +5,12 @@ import { detectDomainFromSource, type DomainDetectionResult } from "../core/doma
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import {
+  assessFallbackPayloadPolicy,
+  MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
+  UNKNOWN_FRONTEND_DEFERRED_PAYLOAD_POLICY,
+  UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+} from "../core/payload-policy/fallback";
+import {
   assessReactWebPayloadPolicy,
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
@@ -26,13 +32,15 @@ const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
+  MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
   REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
   TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY,
+  UNKNOWN_FRONTEND_DEFERRED_PAYLOAD_POLICY,
+  UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
   WEBVIEW_BOUNDARY_FALLBACK_POLICY,
 };
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
-export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
 
 export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
 export type { FrontendPayloadPolicyDecision };
@@ -89,7 +97,10 @@ export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResu
   const tuiInkPolicy = assessTuiInkPayloadPolicy(domainDetection);
   if (tuiInkPolicy) return tuiInkPolicy;
 
-  return assessReactNativePayloadPolicy(domainDetection);
+  const reactNativePolicy = assessReactNativePayloadPolicy(domainDetection);
+  if (reactNativePolicy) return reactNativePolicy;
+
+  return assessFallbackPayloadPolicy(domainDetection);
 }
 
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
