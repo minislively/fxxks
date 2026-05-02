@@ -9,6 +9,13 @@ Issue #198 locked the frontend-domain contract before detector or profile promot
 - **WebView and TUI/Ink remain evidence lanes**, not product/runtime support claims.
 - **WebView is fallback-first.** WebView boundary signals must keep normal source reading unless a later gate explicitly approves a narrower detector/profile promotion.
 - **Mixed and Unknown classifications are safety states.** They prevent ambiguous syntax evidence from becoming semantic support.
+- **Domain classification is evidence, not permission.** A classifier, detector, or profile may identify React Web, React Native, WebView, TUI/Ink, Mixed, or Unknown evidence, but that classification is not a support claim and does not authorize compact payload reuse by itself.
+
+Architecture shorthand:
+
+> One parser. Many domain profiles. One resolver. Many payload policies. Many runtime adapters. One proof/claim boundary.
+
+This shorthand describes the intended separation of responsibilities for future implementation work. It does not add runtime behavior, setup eligibility, compact payload reuse, domain support wording, or team/worktree launch authorization.
 
 ## Domain taxonomy
 
@@ -93,6 +100,8 @@ A promotion candidate must pass every gate below before it changes runtime detec
 ### Parallel domain ownership matrix
 
 This matrix enables future multi-branch domain work, but it is not itself runtime behavior change, domain promotion, support claim expansion, or a shared-file free-for-all. Domain lanes may proceed in parallel only when they stay inside their primary owned surfaces. Changes to serialized shared surfaces require one named owner and a merge-order note for that PR wave.
+
+The frontend-family architecture docs baseline is a single-owner shared-policy docs wave. Its launch status is `planning-only`: it may align roadmap, profile, architecture, and contract wording, but it does not authorize RN/WebView/TUI implementation worktrees, runtime source changes, fixture expansion, manifest changes, or README support wording.
 
 #### Serialized shared surfaces
 

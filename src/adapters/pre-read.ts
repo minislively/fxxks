@@ -3,17 +3,21 @@ import path from "node:path";
 import { extractFile } from "../core/extract";
 import { detectDomainFromSource, type DomainDetectionResult } from "../core/domain-detector";
 import { toModelFacingPayload, type ModelFacingPayloadOptions } from "../core/payload/model-facing";
-import { REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "../core/payload/domain-payload";
 import { assessPayloadReadiness } from "../core/payload/readiness";
+import {
+  assessReactWebPayloadPolicy,
+  CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
+  REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+} from "../core/payload-policy/react-web";
+import type { FrontendPayloadPolicyDecision } from "../core/payload-policy/types";
 import type { PreReadDecision } from "../core/schema";
 
 const REACT_ELIGIBLE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
+export { CUSTOM_WRAPPER_DOM_SIGNAL_GAP, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY };
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
-export const REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY = REACT_WEB_DOMAIN_PAYLOAD_POLICY;
-export const CUSTOM_WRAPPER_DOM_SIGNAL_GAP = "custom-wrapper-dom-signal-gap";
 export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
 export const WEBVIEW_BOUNDARY_FALLBACK_POLICY = "webview-boundary-fallback";
 const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
@@ -44,12 +48,7 @@ const RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS = [
 ];
 
 export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
-export type FrontendPayloadPolicyDecision = {
-  name: string;
-  allowed: boolean;
-  reason?: string;
-  evidenceGates?: string[];
-};
+export type { FrontendPayloadPolicyDecision };
 
 function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<string> {
   return runtime === "codex" ? CODEX_TS_JS_BETA_EXTENSIONS : REACT_ELIGIBLE_EXTENSIONS;
@@ -91,18 +90,6 @@ function hasAnySignalWithPrefix(domainDetection: DomainDetectionResult, prefix: 
   return domainDetection.signals.some((signal) => signal.startsWith(prefix));
 }
 
-function reactWebEvidenceGates(domainDetection: DomainDetectionResult): string[] {
-  if (domainDetection.classification !== "react-web") return [];
-  if (domainDetection.profile.claimStatus !== "current-supported-lane") return [];
-
-  const hasDomTagEvidence = domainDetection.evidence.some((item) => item.domain === "react-web" && item.signal === "dom-tag");
-  const hasWebJsxAttributeEvidence = domainDetection.evidence.some(
-    (item) => item.domain === "react-web" && item.signal === "jsx-attribute",
-  );
-
-  return !hasDomTagEvidence && hasWebJsxAttributeEvidence ? [CUSTOM_WRAPPER_DOM_SIGNAL_GAP] : [];
-}
-
 function frontendDebug(
   domainDetection: DomainDetectionResult,
   frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
@@ -114,14 +101,8 @@ function frontendDebug(
 }
 
 export function assessFrontendPayloadPolicy(domainDetection: DomainDetectionResult): FrontendPayloadPolicyDecision | undefined {
-  if (domainDetection.classification === "react-web" && domainDetection.profile.claimStatus === "current-supported-lane") {
-    const evidenceGates = reactWebEvidenceGates(domainDetection);
-    return {
-      name: REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
-      allowed: true,
-      ...(evidenceGates.length > 0 ? { evidenceGates } : {}),
-    };
-  }
+  const reactWebPolicy = assessReactWebPayloadPolicy(domainDetection);
+  if (reactWebPolicy) return reactWebPolicy;
 
   if (
     domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&

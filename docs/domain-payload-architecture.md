@@ -8,11 +8,17 @@ This document is the canonical architecture note for how fooks should evolve fro
 
 Current broad frontend support remains the measured React Web same-file TSX/JSX lane described in the README and roadmap. React Native, WebView, TUI/Ink, Mixed, and Unknown domains require separate policy decisions before their signals can affect compact payload behavior.
 
+Architecture shorthand:
+
+> One parser. Many domain profiles. One resolver. Many payload policies. Many runtime adapters. One proof/claim boundary.
+
+The shorthand is a future-facing separation rule, not a statement that all of those seams already exist in source code. Domain evidence must pass through an explicit policy decision before it can become compact model context.
+
 This document does not add:
 
 - runtime behavior;
 - setup eligibility;
-- detector, pre-read, or payload schema changes;
+- detector behavior, pre-read behavior, or payload schema changes;
 - React Native broad support;
 - WebView support, bridge safety, or compact-payload reuse;
 - broad TUI semantic support or terminal correctness;
@@ -25,8 +31,19 @@ The intended long-term pipeline is:
 ```text
 input file
 → shared syntax layer
-→ domain detector
-→ domain profile
+→ domain profile registry
+→ domain resolver
+→ payload policy
+→ runtime adapter
+→ proof / claim boundary
+```
+
+That high-level shape can still be implemented through narrower internal seams:
+
+```text
+input file
+→ shared syntax layer
+→ domain detector / profile registry
 → domain scanner
 → domain payload planner
 → domain payload builder
@@ -153,12 +170,15 @@ For fallback decisions, the builder can emit guidance that normal source reading
 
 The recommended implementation sequence after this docs pass is:
 
-1. **React Web wrapper-first** — introduce scanner/planner/builder seams around the existing compact-safe React Web behavior without changing output shape first.
-2. **React Native narrow structural** — keep RN evidence/fallback by default and expand only around a measured primitive/input scope compatible with the existing `F1` narrow gate.
-3. **WebView fallback builder** — keep WebView fallback-first while making boundary guidance explicit; do not compact HTML, injected JavaScript, or bridge message contracts by default.
-4. **TUI/Ink evidence/narrow lane** — treat Ink-style TSX as separate from DOM/RN semantics; preserve terminal correctness and token/cost claim boundaries.
+1. **Domain profile registry shell** — introduce profile/registry seams without support expansion, output-shape changes, setup eligibility changes, or runtime behavior changes. This is the first behavior-neutral seam to land before domain-specific expansion.
+2. **React Web split first** — wrap and then move the existing compact-safe React Web behavior into profile/policy seams while preserving current payload shape and regression behavior.
+3. **RN/WebView/TUI detection move** — move React Native, WebView, and TUI/Ink signal detection into profile-owned files without expanding compact-payload behavior, support wording, or setup eligibility.
+4. **Payload-policy split** — separate profile evidence from the policy decision that may allow compact, narrow, boundary-aware, fallback, or deferred model context.
+5. **Per-domain evidence expansion** — only after the seams are stable, expand fixtures, tests, and measured evidence for individual domain lanes.
 
 Each step needs its own plan and verification. This document does not authorize all of them at once.
+
+The older scanner/planner/builder sequence remains the internal responsibility model for payload work: scanner output is evidence, the planner owns permission, and the builder formats only what the planner authorizes. The new registry-first order describes how to make those seams parallel-worktree friendly before broadening any domain lane.
 
 ## Cache and repeated-read policy
 

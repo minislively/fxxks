@@ -23,6 +23,36 @@ TSX/JSX parsing is syntax evidence, not domain semantic evidence. Future fronten
 4. **Layer 3 — promotion gates**
    - A profile only moves forward when fixtures, pass/fail rules, fallback rules, and wording boundaries are documented and verified.
 
+Domain profiles produce evidence, not permission. A file classified as React Native, WebView, TUI/Ink, Mixed, or Unknown still needs a separate payload-policy decision before fooks may emit compact or narrow model-facing context.
+
+Architecture shorthand:
+
+> One parser. Many domain profiles. One resolver. Many payload policies. Many runtime adapters. One proof/claim boundary.
+
+## Target module split
+
+The registry shell should make future domain work easier to split across worktrees without changing runtime behavior. The target ownership shape is:
+
+```text
+src/core/domain-profiles/
+  types.ts
+  registry.ts
+  react-web.ts
+  react-native.ts
+  webview.ts
+  tui-ink.ts
+
+src/core/payload-policy/
+  types.ts
+  react-web.ts
+  react-native.ts
+  webview.ts
+  tui-ink.ts
+  fallback.ts
+```
+
+Those paths are an ownership boundary, not support wording. `react-web` remains the current supported lane; `react-native`, `webview`, and `tui-ink` remain governed by the promotion gates below until a later evidence-backed plan changes their policy.
+
 ## Promotion gates and public wording
 
 | Level | Gate | Stop condition | Allowed public wording |
@@ -68,6 +98,10 @@ Do not introduce extractor behavior for RN, WebView, or TUI from an abstract pro
 
 ## Next executable lanes
 
-1. **Docs/process lane** — keep this document, `docs/roadmap.md`, and `docs/rn-webview-fixture-candidates.md` aligned.
-2. **Fixture/test-shape lane** — maintain the selected/deferred fixture baseline and expected outcomes in [`Frontend domain fixture expectations`](frontend-domain-fixture-expectations.md) without changing extraction behavior.
-3. **Experimental implementation lane** — only after fixture/test-shape evidence is explicit and current web/RN-WebView fallback regressions are protected.
+1. **Domain registry docs lane** — keep this document, `docs/roadmap.md`, `docs/domain-payload-architecture.md`, and `docs/frontend-domain-contract.md` aligned around evidence-vs-permission separation before implementation work starts.
+2. **Registry shell lane** — introduce profile/registry seams without support expansion, runtime behavior changes, setup eligibility changes, or payload shape changes.
+3. **React Web split lane** — move the current supported React Web behavior behind the new seams first, with no regression to measured same-file behavior.
+4. **RN/WebView/TUI detection move lane** — move detection into profile-owned files while preserving RN narrow-gate limits, WebView fallback-first behavior, and TUI/Ink evidence-only wording.
+5. **Payload-policy split lane** — make compact/narrow/fallback/deferred permission a separate policy layer.
+6. **Fixture/test-shape lane** — maintain the selected/deferred fixture baseline and expected outcomes in [`Frontend domain fixture expectations`](frontend-domain-fixture-expectations.md) without changing extraction behavior.
+7. **Experimental implementation lane** — only after fixture/test-shape evidence is explicit and current web/RN-WebView fallback regressions are protected.

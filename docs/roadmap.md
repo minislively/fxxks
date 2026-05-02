@@ -31,9 +31,27 @@ If the answer you want sounds like “React Native?”, “WebView?”, “TUI/C
 | Read interception / provider-native read hooks | Would make runtime behavior broader than Codex repeated-file hooks. | Not claimed; unsupported cases should fall back to normal source reading. |
 | LSP-backed semantic locations | Would strengthen rename/reference/edit safety beyond line-aware hints. | Decided in [`docs/lsp-extraction-boundary.md`](lsp-extraction-boundary.md): product extraction stays AST-only by default; LSP remains optional evaluation/proof work, not current support. |
 
+## Frontend-family architecture direction
+
+The next step for RN/WebView/TUI is not broad support wording. It is a behavior-neutral architecture split that lets each frontend-family lane grow behind explicit evidence and policy gates:
+
+> One parser. Many domain profiles. One resolver. Many payload policies. Many runtime adapters. One proof/claim boundary.
+
+Domain detection and classification are evidence only. They do not imply compact payload permission, setup eligibility, runtime support, terminal correctness, bridge safety, provider-token savings, or public support claims.
+
+The safe implementation order is:
+
+1. introduce a domain profile registry shell without support expansion;
+2. split React Web first while preserving the current measured same-file behavior;
+3. move RN/WebView/TUI detection into profile-owned files without behavior expansion;
+4. split payload-policy decisions away from profile evidence;
+5. expand per-domain fixtures and evidence only after the seams are stable.
+
+This roadmap entry is a single-owner shared-policy docs baseline. It does not authorize domain-parallel implementation worktrees or team launches; future parallel work still needs the launch contract described in [`frontend-domain-contract.md`](frontend-domain-contract.md).
+
 ### React Native / WebView promotion ladder
 
-React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” The canonical taxonomy, outcome vocabulary, and claim boundaries are defined in [Frontend domain contract](frontend-domain-contract.md). The pipeline architecture is described in [Domain payload architecture](domain-payload-architecture.md): shared syntax facts flow through domain detector/profile, domain scanner, payload planner, payload builder, and then cache/repeated-read policy. The React Native / WebView-specific direction is documented in [React Native / WebView architecture direction](rn-webview-architecture.md): keep the shared TypeScript AST core, split web/RN/WebView/TUI into domain signal profiles, and start WebView as a boundary/fallback profile. Treat this as a `frontend-family candidate` ladder:
+React Native and embedded WebView should move through explicit evidence gates instead of jumping from “TSX parses” to “supported.” The canonical taxonomy, outcome vocabulary, and claim boundaries are defined in [Frontend domain contract](frontend-domain-contract.md). The pipeline architecture is described in [Domain payload architecture](domain-payload-architecture.md): shared syntax facts flow through a domain profile registry/resolver, scanner facts, payload-policy planning, payload building, runtime delivery, and proof/claim boundaries. The React Native / WebView-specific direction is documented in [React Native / WebView architecture direction](rn-webview-architecture.md): keep the shared TypeScript AST core, split web/RN/WebView/TUI into domain signal profiles, and start WebView as a boundary/fallback profile. Treat this as a `frontend-family candidate` ladder:
 
 | Level | Name | What must be true | Public wording allowed |
 | --- | --- | --- | --- |
