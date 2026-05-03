@@ -44,6 +44,14 @@ function expectedTuiEvidenceOnlyPolicy() {
   };
 }
 
+function assertFallbackWithoutPayload(decision) {
+  assert.equal(decision.eligible, true);
+  assert.equal(decision.decision, "fallback");
+  assert.ok(decision.reasons.length > 0);
+  assert.equal(decision.fallback.action, "full-read");
+  assert.equal("payload" in decision, false);
+}
+
 function assertTuiFallbackWithoutPayload(decision, reason) {
   assert.equal(decision.eligible, true);
   assert.equal(decision.decision, "fallback");
@@ -118,6 +126,30 @@ test("TUI/Ink interactive list fixture remains evidence-only and fallback-safe",
   assertTuiFallbackWithoutPayload(decision, "raw-mode");
 });
 
+test("non-Ink CLI renderer fixture stays outside TUI/Ink payload policy", () => {
+  const relativeFixturePath = path.join(
+    "test",
+    "fixtures",
+    "frontend-domain-expectations",
+    "tui-non-ink-cli-renderer.tsx",
+  );
+  const fixturePath = path.join(repoRoot, relativeFixturePath);
+  const domainDetection = detect(readFixture(relativeFixturePath), "tui-non-ink-cli-renderer.tsx");
+
+  assert.notEqual(domainDetection.classification, "tui-ink");
+  assert.equal(domainDetection.classification, "unknown");
+  assert.equal(domainDetection.profile.claimStatus, "deferred");
+  assert.equal(domainDetection.signals.some((signal) => signal.startsWith("tui-ink:")), false);
+  assert.equal(assessTuiInkPayloadPolicy(domainDetection), undefined);
+
+  const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
+
+  assertFallbackWithoutPayload(decision);
+  assert.equal(decision.debug.domainDetection.classification, "unknown");
+  assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+  assert.equal(decision.debug.frontendPayloadPolicy.reason, preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+});
+
 test("TUI/Ink policy seam source avoids broad terminal support claims", () => {
   for (const relativePath of [path.join("src", "core", "payload-policy", "tui-ink.ts")]) {
     assert.doesNotMatch(fs.readFileSync(path.join(repoRoot, relativePath), "utf8"), forbiddenSupportClaims, relativePath);
@@ -131,5 +163,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /tui-ink-basic\.tsx/);
   assert.match(survey, /tui-ink-interactive-list\.tsx/);
   assert.match(survey, /unsupported-frontend-domain-profile/);
+  assert.match(survey, /tui-non-ink-cli-renderer\.tsx/);
+  assert.match(survey, /Negative\/fallback reinforcement/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
 });

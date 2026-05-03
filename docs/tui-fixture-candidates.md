@@ -55,6 +55,12 @@ Reviewers should check that TUI evidence remains separate from payload permissio
 
 Any future step that changes one of those outcomes is no longer a fixture reinforcement PR; it needs a serialized shared-policy plan with its own fixtures, measured acceptance bar, and claim-boundary review.
 
+### Negative/fallback reinforcement
+
+The next safe TUI fixture shape is a non-Ink CLI renderer that looks terminal-oriented to humans but has no `ink` import, `Box`, `Text`, or `useInput` evidence. `test/fixtures/frontend-domain-expectations/tui-non-ink-cli-renderer.tsx` exists to keep that boundary explicit: it should remain outside the `tui-ink` lane, receive no TUI payload policy authorization, and fall back without a model-facing payload.
+
+This fixture does not activate the deferred F7 manifest slot or broaden TUI package support. It is a local negative/fallback regression only; any manifest promotion still needs a serialized shared-policy plan.
+
 ## Candidate source notes
 
 If a future PR names public repositories, keep the list conservative and verify license, activity, file paths, and commit SHAs at that time. Good seed sources are likely to be established Ink examples, React-based CLI apps, or prompt/status UI components with inspectable TSX/JSX. Do not use curated lists, stale forks, or runtime-only demos as evidence fixtures unless a pinned source file clearly exercises one category above.
