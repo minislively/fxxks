@@ -61,6 +61,18 @@ The next safe TUI fixture shape is a non-Ink CLI renderer that looks terminal-or
 
 This fixture does not activate the deferred F7 manifest slot or broaden TUI package support. It is a local negative/fallback regression only; any manifest promotion still needs a serialized shared-policy plan.
 
+## Current TUI evidence matrix
+
+This matrix is the current review contract for TUI-related fixtures. It is intentionally docs/test scoped: it records evidence and fallback expectations, but it does not grant compact payload permission.
+
+| Fixture | Expected domain classification | Payload policy expectation | Pre-read expectation | Claim boundary |
+| --- | --- | --- | --- | --- |
+| `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | `tui-ink`, `evidence-only` | `tui-ink-evidence-only-payload`, denied | fallback with `unsupported-frontend-domain-profile`, no payload | Syntax evidence only; no TUI support or terminal correctness claim. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | `tui-ink`, `evidence-only` | `tui-ink-evidence-only-payload`, denied | fallback with `raw-mode`, no payload | Behavior-heavy Ink evidence only; no runtime, token, or compact extraction claim. |
+| `test/fixtures/frontend-domain-expectations/tui-non-ink-cli-renderer.tsx` | `unknown`, `deferred` | no TUI/Ink policy authorization | fallback with no payload; unsupported-profile policy remains denied in debug evidence | Negative/fallback evidence only; no F7 manifest promotion or package-support claim. |
+
+If a future PR changes any row from fallback/no-payload to payload emission, it is no longer a TUI evidence matrix update and must go through a serialized shared-policy plan.
+
 ## Candidate source notes
 
 If a future PR names public repositories, keep the list conservative and verify license, activity, file paths, and commit SHAs at that time. Good seed sources are likely to be established Ink examples, React-based CLI apps, or prompt/status UI components with inspectable TSX/JSX. Do not use curated lists, stale forks, or runtime-only demos as evidence fixtures unless a pinned source file clearly exercises one category above.

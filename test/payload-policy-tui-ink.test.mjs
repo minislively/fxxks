@@ -36,6 +36,34 @@ function tuiInkSource() {
     }`;
 }
 
+const tuiEvidenceMatrix = [
+  {
+    fileName: "tui-ink-basic.tsx",
+    classification: "tui-ink",
+    claimStatus: "evidence-only",
+    expectedPolicy: expectedTuiEvidenceOnlyPolicy,
+    fallbackReason: () => preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+  },
+  {
+    fileName: "tui-ink-interactive-list.tsx",
+    classification: "tui-ink",
+    claimStatus: "evidence-only",
+    expectedPolicy: expectedTuiEvidenceOnlyPolicy,
+    fallbackReason: () => "raw-mode",
+  },
+  {
+    fileName: "tui-non-ink-cli-renderer.tsx",
+    classification: "unknown",
+    claimStatus: "deferred",
+    expectedPolicy: () => undefined,
+    fallbackReason: () => undefined,
+  },
+];
+
+function tuiFixturePath(fileName) {
+  return path.join("test", "fixtures", "frontend-domain-expectations", fileName);
+}
+
 function expectedTuiEvidenceOnlyPolicy() {
   return {
     name: TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY,
@@ -150,6 +178,28 @@ test("non-Ink CLI renderer fixture stays outside TUI/Ink payload policy", () => 
   assert.equal(decision.debug.frontendPayloadPolicy.reason, preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
 });
 
+test("TUI evidence matrix rows stay aligned with policy and pre-read boundaries", () => {
+  for (const row of tuiEvidenceMatrix) {
+    const relativeFixturePath = tuiFixturePath(row.fileName);
+    const fixturePath = path.join(repoRoot, relativeFixturePath);
+    const domainDetection = detect(readFixture(relativeFixturePath), row.fileName);
+    const expectedPolicy = row.expectedPolicy();
+    const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
+
+    assert.equal(domainDetection.classification, row.classification, row.fileName);
+    assert.equal(domainDetection.profile.claimStatus, row.claimStatus, row.fileName);
+    assert.deepEqual(assessTuiInkPayloadPolicy(domainDetection), expectedPolicy, row.fileName);
+    assert.equal(decision.decision, "fallback", row.fileName);
+    assert.equal("payload" in decision, false, row.fileName);
+
+    const fallbackReason = row.fallbackReason();
+    if (fallbackReason) {
+      assert.deepEqual(decision.reasons, [fallbackReason], row.fileName);
+      assert.equal(decision.fallback.reason, fallbackReason, row.fileName);
+    }
+  }
+});
+
 test("TUI/Ink policy seam source avoids broad terminal support claims", () => {
   for (const relativePath of [path.join("src", "core", "payload-policy", "tui-ink.ts")]) {
     assert.doesNotMatch(fs.readFileSync(path.join(repoRoot, relativePath), "utf8"), forbiddenSupportClaims, relativePath);
@@ -165,5 +215,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /unsupported-frontend-domain-profile/);
   assert.match(survey, /tui-non-ink-cli-renderer\.tsx/);
   assert.match(survey, /Negative\/fallback reinforcement/);
+  assert.match(survey, /Current TUI evidence matrix/);
+  assert.match(survey, /tui-ink-evidence-only-payload/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
 });
