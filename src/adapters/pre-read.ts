@@ -74,6 +74,27 @@ function buildPreReadFallbackDecision(input: PreReadFallbackDecisionInput): PreR
   };
 }
 
+type PreReadPayloadDecisionInput = {
+  runtime: PreReadDecision["runtime"];
+  filePath: string;
+  payload: NonNullable<PreReadDecision["payload"]>;
+  readiness: NonNullable<PreReadDecision["readiness"]>;
+  debug: PreReadDecision["debug"];
+};
+
+function buildPreReadPayloadDecision(input: PreReadPayloadDecisionInput): PreReadDecision {
+  return {
+    runtime: input.runtime,
+    filePath: input.filePath,
+    eligible: true,
+    decision: "payload",
+    reasons: [],
+    payload: input.payload,
+    readiness: input.readiness,
+    debug: input.debug,
+  };
+}
+
 function frontendDebug(
   domainDetection: DomainDetectionResult,
   frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
@@ -155,16 +176,13 @@ export function decidePreRead(
   if (readiness.ready) {
     const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection, payload, frontendPayloadPolicy);
     if (profileGate.allowed) {
-      return {
+      return buildPreReadPayloadDecision({
         runtime,
         filePath: outputPath,
-        eligible: true,
-        decision: "payload",
-        reasons: [],
         payload,
         readiness,
         debug,
-      };
+      });
     }
 
     return buildPreReadFallbackDecision({
