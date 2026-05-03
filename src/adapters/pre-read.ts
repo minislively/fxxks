@@ -48,6 +48,32 @@ function relativePath(filePath: string, cwd: string): string {
   return relative || path.basename(filePath);
 }
 
+type PreReadFallbackDecisionInput = {
+  runtime: PreReadDecision["runtime"];
+  filePath: string;
+  eligible: boolean;
+  reasons: string[];
+  readiness?: PreReadDecision["readiness"];
+  debug?: PreReadDecision["debug"];
+  fallbackReason?: string;
+};
+
+function buildPreReadFallbackDecision(input: PreReadFallbackDecisionInput): PreReadDecision {
+  return {
+    runtime: input.runtime,
+    filePath: input.filePath,
+    eligible: input.eligible,
+    decision: "fallback",
+    reasons: input.reasons,
+    ...(input.readiness ? { readiness: input.readiness } : {}),
+    debug: input.debug ?? {},
+    fallback: {
+      action: "full-read",
+      reason: input.fallbackReason ?? input.reasons[0] ?? "missing-structure",
+    },
+  };
+}
+
 function frontendDebug(
   domainDetection: DomainDetectionResult,
   frontendPayloadPolicy?: FrontendPayloadPolicyDecision,
@@ -74,18 +100,12 @@ export function decidePreRead(
   const extension = path.extname(resolvedPath).toLowerCase();
 
   if (!eligibleExtensions(runtime).has(extension)) {
-    return {
+    return buildPreReadFallbackDecision({
       runtime,
       filePath: outputPath,
       eligible: false,
-      decision: "fallback",
       reasons: ["ineligible-extension"],
-      debug: {},
-      fallback: {
-        action: "full-read",
-        reason: "ineligible-extension",
-      },
-    };
+    });
   }
 
   const sourceText = fs.readFileSync(resolvedPath, "utf8");
@@ -96,33 +116,23 @@ export function decidePreRead(
     domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
     domainDetection.classification !== "react-native"
   ) {
-    return {
+    return buildPreReadFallbackDecision({
       runtime,
       filePath: outputPath,
       eligible: true,
-      decision: "fallback",
       reasons: [REACT_NATIVE_WEBVIEW_BOUNDARY_REASON],
       debug: frontendDebug(domainDetection, frontendPayloadPolicy),
-      fallback: {
-        action: "full-read",
-        reason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
-      },
-    };
+    });
   }
 
   if (domainDetection.classification === "react-native" && frontendPayloadPolicy?.allowed !== true) {
-    return {
+    return buildPreReadFallbackDecision({
       runtime,
       filePath: outputPath,
       eligible: true,
-      decision: "fallback",
       reasons: [UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON],
       debug: frontendDebug(domainDetection, frontendPayloadPolicy),
-      fallback: {
-        action: "full-read",
-        reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
-      },
-    };
+    });
   }
 
   const result = extractFile(resolvedPath);
@@ -157,32 +167,22 @@ export function decidePreRead(
       };
     }
 
-    return {
+    return buildPreReadFallbackDecision({
       runtime,
       filePath: outputPath,
       eligible: true,
-      decision: "fallback",
       reasons: [profileGate.reason],
       readiness,
       debug,
-      fallback: {
-        action: "full-read",
-        reason: profileGate.reason,
-      },
-    };
+    });
   }
 
-  return {
+  return buildPreReadFallbackDecision({
     runtime,
     filePath: outputPath,
     eligible: true,
-    decision: "fallback",
     reasons: readiness.reasons,
     readiness,
     debug,
-    fallback: {
-      action: "full-read",
-      reason: readiness.reasons[0] ?? "missing-structure",
-    },
-  };
+  });
 }
