@@ -122,6 +122,38 @@ function buildPreReadPayloadDebug(input: PreReadPayloadDebugInput): NonNullable<
   };
 }
 
+type PreReadPayloadPlanInput = {
+  resolvedPath: string;
+  cwd: string;
+  includeEditGuidance: boolean;
+  domainDetection: DomainDetectionResult;
+  frontendPayloadPolicy?: FrontendPayloadPolicyDecision;
+};
+
+type PreReadPayloadPlan = {
+  payload: NonNullable<PreReadDecision["payload"]>;
+  readiness: NonNullable<PreReadDecision["readiness"]>;
+  debug: NonNullable<PreReadDecision["debug"]>;
+};
+
+function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreReadPayloadPlan {
+  const { frontendPayloadPolicy } = input;
+  const result = extractFile(input.resolvedPath);
+  const payloadBuildOptions = toFrontendPayloadBuildOptions(frontendPayloadPolicy);
+  const payload = toModelFacingPayload(result, input.cwd, {
+    includeEditGuidance: input.includeEditGuidance,
+    ...payloadBuildOptions,
+  });
+  const readiness = assessPayloadReadiness(result, payload);
+  const debug = buildPreReadPayloadDebug({
+    result,
+    domainDetection: input.domainDetection,
+    frontendPayloadPolicy,
+  });
+
+  return { payload, readiness, debug };
+}
+
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
   const domainDetection = detectDomainFromSource(sourceText);
   return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
@@ -173,15 +205,10 @@ export function decidePreRead(
     });
   }
 
-  const result = extractFile(resolvedPath);
-  const payloadBuildOptions = toFrontendPayloadBuildOptions(frontendPayloadPolicy);
-  const payload = toModelFacingPayload(result, cwd, {
+  const { payload, readiness, debug } = buildPreReadPayloadPlan({
+    resolvedPath,
+    cwd,
     includeEditGuidance: options.includeEditGuidance === true,
-    ...payloadBuildOptions,
-  });
-  const readiness = assessPayloadReadiness(result, payload);
-  const debug = buildPreReadPayloadDebug({
-    result,
     domainDetection,
     frontendPayloadPolicy,
   });
