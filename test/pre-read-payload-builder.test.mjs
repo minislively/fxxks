@@ -30,6 +30,12 @@ test("pre-read centralizes payload preparation phase", () => {
   assert.doesNotMatch(preReadSource, /const result = extractFile\(resolvedPath\);[\s\S]*?const readiness = assessPayloadReadiness\(result, payload\);/);
 });
 
+test("pre-read centralizes payload plan outcome decision", () => {
+  assert.match(preReadSource, /function buildPreReadDecisionFromPayloadPlan\(/);
+  assert.match(preReadSource, /return buildPreReadDecisionFromPayloadPlan\(\{/);
+  assert.doesNotMatch(preReadSource, /if \(readiness\.ready\) \{[\s\S]*?const profileGate = assessFrontendProfilePayloadReuse\(extension, domainDetection, payload, frontendPayloadPolicy\);/);
+});
+
 test("pre-read payload builder preserves React Web payload success envelope", () => {
   const decision = preRead.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
     includeEditGuidance: true,

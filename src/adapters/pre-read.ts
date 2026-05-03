@@ -154,6 +154,55 @@ function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreReadPayload
   return { payload, readiness, debug };
 }
 
+type PreReadDecisionFromPayloadPlanInput = {
+  runtime: PreReadDecision["runtime"];
+  filePath: string;
+  extension: string;
+  domainDetection: DomainDetectionResult;
+  frontendPayloadPolicy?: FrontendPayloadPolicyDecision;
+  payload: NonNullable<PreReadDecision["payload"]>;
+  readiness: NonNullable<PreReadDecision["readiness"]>;
+  debug: NonNullable<PreReadDecision["debug"]>;
+};
+
+function buildPreReadDecisionFromPayloadPlan(input: PreReadDecisionFromPayloadPlanInput): PreReadDecision {
+  if (input.readiness.ready) {
+    const profileGate = assessFrontendProfilePayloadReuse(
+      input.extension,
+      input.domainDetection,
+      input.payload,
+      input.frontendPayloadPolicy,
+    );
+    if (profileGate.allowed) {
+      return buildPreReadPayloadDecision({
+        runtime: input.runtime,
+        filePath: input.filePath,
+        payload: input.payload,
+        readiness: input.readiness,
+        debug: input.debug,
+      });
+    }
+
+    return buildPreReadFallbackDecision({
+      runtime: input.runtime,
+      filePath: input.filePath,
+      eligible: true,
+      reasons: [profileGate.reason],
+      readiness: input.readiness,
+      debug: input.debug,
+    });
+  }
+
+  return buildPreReadFallbackDecision({
+    runtime: input.runtime,
+    filePath: input.filePath,
+    eligible: true,
+    reasons: input.readiness.reasons,
+    readiness: input.readiness,
+    debug: input.debug,
+  });
+}
+
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
   const domainDetection = detectDomainFromSource(sourceText);
   return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
@@ -213,33 +262,13 @@ export function decidePreRead(
     frontendPayloadPolicy,
   });
 
-  if (readiness.ready) {
-    const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection, payload, frontendPayloadPolicy);
-    if (profileGate.allowed) {
-      return buildPreReadPayloadDecision({
-        runtime,
-        filePath: outputPath,
-        payload,
-        readiness,
-        debug,
-      });
-    }
-
-    return buildPreReadFallbackDecision({
-      runtime,
-      filePath: outputPath,
-      eligible: true,
-      reasons: [profileGate.reason],
-      readiness,
-      debug,
-    });
-  }
-
-  return buildPreReadFallbackDecision({
+  return buildPreReadDecisionFromPayloadPlan({
     runtime,
     filePath: outputPath,
-    eligible: true,
-    reasons: readiness.reasons,
+    extension,
+    domainDetection,
+    frontendPayloadPolicy,
+    payload,
     readiness,
     debug,
   });
