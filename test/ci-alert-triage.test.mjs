@@ -640,3 +640,82 @@ test("CI alert triage classifies pasted current main CI success as verification-
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("CI alert triage dedupes duplicate current main success run and job URLs", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-current-success-dedupe-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 902,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-02T12:00:00Z",
+      updatedAt: "2026-05-02T12:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/902",
+    },
+    {
+      databaseId: 901,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-02T11:00:00Z",
+      updatedAt: "2026-05-02T11:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/901",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "current green run URL https://github.com/minislively/fooks/actions/runs/902",
+    "current green job URL https://github.com/minislively/fooks/actions/runs/902/job/123456789",
+    "historical green replay https://github.com/minislively/fooks/actions/runs/901",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const currentEchoes = result.alerts.filter((alert) => alert.alertedRunId === "902");
+    const staleReplay = result.alerts.find((alert) => alert.alertedRunId === "901");
+
+    assert.equal(currentEchoes.length, 1);
+    assert.equal(currentEchoes[0].appearances, 2);
+    assert.equal(currentEchoes[0].alertedUrl, "https://github.com/minislively/fooks/actions/runs/902");
+    assert.equal(currentEchoes[0].evidence, "current");
+    assert.equal(currentEchoes[0].verdict, "current-main-echo");
+    assert.equal(currentEchoes[0].disposition, "verification-only");
+
+    assert.equal(staleReplay.evidence, "stale");
+    assert.equal(staleReplay.replay, true);
+    assert.equal(staleReplay.conclusion, "success");
+    assert.equal(result.alertSummary.total, 2);
+    assert.equal(result.alertSummary.currentMainEchoCount, 1);
+    assert.equal(result.alertSummary.verificationOnlyCount, 1);
+    assert.equal(result.alertSummary.staleReplayCount, 1);
+    assert.equal(result.alertSummary.staleSuccessReplayCount, 1);
+    assert.equal(result.alertSummary.actionableAlertCount, 0);
+    assert.equal(result.counts.actionable ?? 0, 0);
+    assert.equal(result.counts.watch ?? 0, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
