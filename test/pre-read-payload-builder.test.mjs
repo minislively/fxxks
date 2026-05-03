@@ -29,4 +29,38 @@ test("pre-read payload builder preserves React Web payload success envelope", ()
   assert.equal(decision.debug.language, "tsx");
   assert.equal(decision.debug.domainDetection.classification, "react-web");
   assert.equal(decision.debug.frontendPayloadPolicy.allowed, true);
+  assert.ok(decision.payload.reactWebContext);
+  assert.equal(decision.debug.reactWebContextBudget.included, true);
+  assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+});
+
+test("pre-read payload builder omits React Web context metadata when payload budget is exceeded", () => {
+  const decision = preRead.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
+    includeEditGuidance: true,
+  });
+  assert.equal(decision.decision, "payload");
+  assert.ok(decision.payload.reactWebContext);
+
+  const originalStringify = JSON.stringify;
+  try {
+    JSON.stringify = (value, replacer, space) => {
+      const json = originalStringify(value, replacer, space);
+      if (value && typeof value === "object" && "reactWebContext" in value) {
+        return `${json}${"x".repeat(20_000)}`;
+      }
+      return json;
+    };
+
+    const budgeted = preRead.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
+      includeEditGuidance: true,
+    });
+
+    assert.equal(budgeted.decision, "payload");
+    assert.equal("reactWebContext" in budgeted.payload, false);
+    assert.equal(budgeted.payload.domainPayload.domain, "react-web");
+    assert.equal(budgeted.debug.reactWebContextBudget.included, false);
+    assert.equal(budgeted.debug.reactWebContextBudget.reason, "budget-exceeded");
+  } finally {
+    JSON.stringify = originalStringify;
+  }
 });

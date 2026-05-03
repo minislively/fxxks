@@ -12,6 +12,7 @@ export type FrontendPayloadPolicyAssessor = (
 
 export type FrontendPayloadBuildOptions = {
   includeDomainPayload: boolean;
+  includeReactWebContextMetadata?: boolean;
   domainPayloadPolicy?: string;
 };
 
@@ -43,9 +44,10 @@ export function assessFrontendPayloadPolicy(
 export function toFrontendPayloadBuildOptions(
   policy: FrontendPayloadPolicyDecision | undefined,
 ): FrontendPayloadBuildOptions {
+  const isReactWebCurrentSupported = policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY;
   return {
-    includeDomainPayload:
-      policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY || policy?.name === RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    includeDomainPayload: isReactWebCurrentSupported || policy?.name === RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    ...(isReactWebCurrentSupported ? { includeReactWebContextMetadata: true } : {}),
     ...(policy?.name ? { domainPayloadPolicy: policy.name } : {}),
   };
 }

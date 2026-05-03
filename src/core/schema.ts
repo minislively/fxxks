@@ -289,6 +289,12 @@ export type PreReadDecision = {
       reason?: string;
       evidenceGates?: string[];
     };
+    reactWebContextBudget?: {
+      included: boolean;
+      estimatedPayloadBytes: number;
+      maxPayloadBytes: number;
+      reason?: "within-budget" | "budget-exceeded" | "not-requested" | "not-emitted";
+    };
   };
   fallback?: {
     action: "full-read";

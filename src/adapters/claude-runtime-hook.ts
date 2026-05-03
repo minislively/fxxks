@@ -433,7 +433,10 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
     canAttemptRuntimeEditGuidance(prompt, target, cwd, policy, freshness);
   if (editGuidanceAllowed) {
     try {
-      const optInDecision = decidePreRead(resolvedTarget, cwd, "claude", { includeEditGuidance: true });
+      const optInDecision = decidePreRead(resolvedTarget, cwd, "claude", {
+        includeEditGuidance: true,
+        includeReactWebContextMetadata: false,
+      });
       if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
         const optInContextMode = payloadContextMode(optInDecision.payload);
         const optInPayloadContext = buildPayloadContext(target, optInDecision.payload, optInContextMode);

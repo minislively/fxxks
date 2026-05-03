@@ -97,6 +97,7 @@ test("frontend payload build options include domain payload for React Web and me
 
   assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactWebPolicy), {
     includeDomainPayload: true,
+    includeReactWebContextMetadata: true,
     domainPayloadPolicy: reactWebPolicy.name,
   });
   assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactNativePolicy), {

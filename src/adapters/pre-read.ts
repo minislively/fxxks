@@ -41,7 +41,7 @@ export {
 };
 export { hasReactNativeWebViewBoundaryMarker, REACT_NATIVE_WEBVIEW_BOUNDARY_REASON } from "./pre-read-stack";
 
-export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance">;
+export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance" | "includeReactWebContextMetadata">;
 export type { FrontendPayloadPolicyDecision };
 
 function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<string> {
@@ -99,6 +99,7 @@ export function decidePreRead(
     resolvedPath,
     cwd,
     includeEditGuidance: options.includeEditGuidance === true,
+    includeReactWebContextMetadata: options.includeReactWebContextMetadata,
     domainDetection,
     frontendPayloadPolicy,
   });

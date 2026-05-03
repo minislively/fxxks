@@ -80,6 +80,32 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
   assert.deepEqual(secondInject.debug.decision.payload.editGuidance.freshness, secondInject.debug.decision.payload.sourceFingerprint);
 
+  const contextSession = `bridge-contract-react-web-context-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: contextSession }, repoRoot);
+  const firstContext = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: contextSession,
+      prompt: "Inspect fixtures/compressed/FormSection.tsx",
+    },
+    repoRoot,
+  );
+  const secondContext = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: contextSession,
+      prompt: "Inspect fixtures/compressed/FormSection.tsx again",
+    },
+    repoRoot,
+  );
+
+  assert.equal(firstContext.action, "record");
+  assert.equal(secondContext.action, "inject");
+  assert.equal(secondContext.contextModeReason, "repeated-exact-file-react-web-payload");
+  assert.equal(secondContext.additionalContext.includes("\"reactWebContext\""), true);
+  assert.equal(secondContext.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
+  assert.equal(secondContext.debug.decision.debug.reactWebContextBudget.included, true);
+
   const wrapperSession = `bridge-contract-wrapper-debug-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: wrapperSession }, repoRoot);
   const firstWrapper = handleCodexRuntimeHook(

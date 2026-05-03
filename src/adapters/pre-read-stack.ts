@@ -8,6 +8,8 @@ import type { FrontendPayloadPolicyDecision } from "../core/payload-policy/types
 import type { PreReadDecision } from "../core/schema";
 
 export const REACT_NATIVE_WEBVIEW_BOUNDARY_REASON = "unsupported-react-native-webview-boundary";
+const REACT_WEB_CONTEXT_METADATA_MIN_BUDGET_BYTES = 4_096;
+const REACT_WEB_CONTEXT_METADATA_MAX_BUDGET_BYTES = 16_384;
 
 export type PreReadFallbackDecisionInput = {
   runtime: PreReadDecision["runtime"];
@@ -87,6 +89,7 @@ export type PreReadPayloadPlanInput = {
   resolvedPath: string;
   cwd: string;
   includeEditGuidance: boolean;
+  includeReactWebContextMetadata?: boolean;
   domainDetection: DomainDetectionResult;
   frontendPayloadPolicy?: FrontendPayloadPolicyDecision;
 };
@@ -97,20 +100,64 @@ export type PreReadPayloadPlan = {
   debug: NonNullable<PreReadDecision["debug"]>;
 };
 
+function estimatePayloadBytes(payload: NonNullable<PreReadDecision["payload"]>): number {
+  return Buffer.byteLength(JSON.stringify(payload), "utf8");
+}
+
+function reactWebContextPayloadBudget(rawSizeBytes: number): number {
+  return Math.min(
+    REACT_WEB_CONTEXT_METADATA_MAX_BUDGET_BYTES,
+    Math.max(rawSizeBytes, REACT_WEB_CONTEXT_METADATA_MIN_BUDGET_BYTES),
+  );
+}
+
 export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreReadPayloadPlan {
   const { frontendPayloadPolicy } = input;
   const result = extractFile(input.resolvedPath);
   const payloadBuildOptions = toFrontendPayloadBuildOptions(frontendPayloadPolicy);
-  const payload = toModelFacingPayload(result, input.cwd, {
+  const includeReactWebContextMetadata =
+    input.includeReactWebContextMetadata ?? payloadBuildOptions.includeReactWebContextMetadata;
+  let payload = toModelFacingPayload(result, input.cwd, {
     includeEditGuidance: input.includeEditGuidance,
     ...payloadBuildOptions,
+    includeReactWebContextMetadata,
   });
+  let reactWebContextBudget: NonNullable<PreReadDecision["debug"]>["reactWebContextBudget"];
+
+  if (includeReactWebContextMetadata) {
+    const estimatedPayloadBytes = estimatePayloadBytes(payload);
+    const maxPayloadBytes = reactWebContextPayloadBudget(result.meta.rawSizeBytes);
+    if (payload.reactWebContext && estimatedPayloadBytes > maxPayloadBytes) {
+      payload = toModelFacingPayload(result, input.cwd, {
+        includeEditGuidance: input.includeEditGuidance,
+        ...payloadBuildOptions,
+        includeReactWebContextMetadata: false,
+      });
+      reactWebContextBudget = {
+        included: false,
+        estimatedPayloadBytes,
+        maxPayloadBytes,
+        reason: "budget-exceeded",
+      };
+    } else {
+      reactWebContextBudget = {
+        included: Boolean(payload.reactWebContext),
+        estimatedPayloadBytes,
+        maxPayloadBytes,
+        reason: payload.reactWebContext ? "within-budget" : "not-emitted",
+      };
+    }
+  }
+
   const readiness = assessPayloadReadiness(result, payload);
   const debug = buildPreReadPayloadDebug({
     result,
     domainDetection: input.domainDetection,
     frontendPayloadPolicy,
   });
+  if (reactWebContextBudget) {
+    debug.reactWebContextBudget = reactWebContextBudget;
+  }
 
   return { payload, readiness, debug };
 }

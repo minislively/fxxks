@@ -318,7 +318,10 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     canAttemptRuntimeEditGuidance(prompt, target, cwd, policy, freshness);
   if (editGuidanceAllowed) {
     try {
-      const optInDecision = decidePreRead(path.join(cwd, target), cwd, "codex", { includeEditGuidance: true });
+      const optInDecision = decidePreRead(path.join(cwd, target), cwd, "codex", {
+        includeEditGuidance: true,
+        includeReactWebContextMetadata: false,
+      });
       if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
         const optInContextMode = payloadContextMode(optInDecision.payload);
         const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode);

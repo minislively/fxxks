@@ -21,6 +21,7 @@ const PAYLOAD_DEBUG_KEYS = [
   "frontendPayloadPolicy",
   "language",
   "mode",
+  "reactWebContextBudget",
 ];
 
 function assertNoPayloadPlanningArtifacts(decision) {
