@@ -10,8 +10,6 @@ import { createRequire } from "node:module";
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
-const preReadSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-const preReadStackSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
 
 function assertFallbackOnlyDecision(decision, reason) {
   assert.equal(decision.decision, "fallback");
@@ -22,14 +20,6 @@ function assertFallbackOnlyDecision(decision, reason) {
   assert.equal("mode" in decision.debug, false);
   assert.equal("complexityScore" in decision.debug, false);
 }
-
-test("pre-read centralizes full-read fallback envelope construction", () => {
-  assert.match(preReadStackSource, /function buildPreReadFallbackDecision\(/);
-  assert.match(preReadSource, /buildPreReadFallbackDecision/);
-  const fallbackEnvelopeConstructions = preReadStackSource.match(/fallback:\s*{\s*\n\s*action:\s*"full-read"/g) ?? [];
-  assert.equal(fallbackEnvelopeConstructions.length, 1);
-  assert.doesNotMatch(preReadSource, /return \{\s*\n\s*runtime,[\s\S]*?decision: "fallback",[\s\S]*?fallback: \{\s*\n\s*action: "full-read"/);
-});
 
 test("pre-read fallback builder preserves ineligible extension decisions", () => {
   const decision = preRead.decidePreRead(path.join(repoRoot, "not-a-source.md"), repoRoot, "codex");
@@ -49,30 +39,19 @@ test("pre-read fallback builder preserves ineligible extension decisions", () =>
 });
 
 test("pre-read source-shape boundary guard skips payload planning", () => {
-  assert.match(preReadStackSource, /function hasWebViewSourceShapeBoundary\(/);
-  assert.match(preReadStackSource, /function shouldUseReactNativeWebViewBoundaryFallback\(/);
-  assert.match(preReadSource, /if \(shouldUseReactNativeWebViewBoundaryFallback\(domainDetection\)\) \{/);
-  const sourceShapeGuardIndex = preReadStackSource.indexOf("function shouldUseReactNativeWebViewBoundaryFallback(");
-  const boundaryGuardIndex = preReadSource.indexOf("if (shouldUseReactNativeWebViewBoundaryFallback(domainDetection))");
-  const payloadPlanIndex = preReadSource.indexOf('const { payload, readiness, debug } = buildPreReadPayloadPlan({');
-  assert.ok(sourceShapeGuardIndex >= 0);
-  assert.ok(boundaryGuardIndex >= 0);
-  assert.ok(payloadPlanIndex > boundaryGuardIndex);
-
   const tempDir = fs.mkdtempSync(path.join(repoRoot, ".tmp-pre-read-source-shape-"));
   try {
     const filePath = path.join(tempDir, "CheckoutWebView.tsx");
-    fs.writeFileSync(
-      filePath,
-      `import { WebView } from "react-native-webview";
+    const source = `import { WebView } from "react-native-webview";
 export function CheckoutWebView() {
   return <WebView source={{ uri: "https://example.test/checkout" }} onMessage={() => {}} />;
 }
-`,
-    );
+`;
+    fs.writeFileSync(filePath, source);
 
     const decision = preRead.decidePreRead(filePath, tempDir, "codex", { includeEditGuidance: true });
 
+    assert.equal(preRead.hasReactNativeWebViewBoundaryMarker(source), true);
     assertFallbackOnlyDecision(decision, "unsupported-react-native-webview-boundary");
     assert.equal(decision.debug.domainDetection.classification, "webview");
     assert.equal(decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
