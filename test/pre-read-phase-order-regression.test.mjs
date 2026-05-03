@@ -114,10 +114,65 @@ test("pre-read payload-plan seam keeps live fallback reasons ahead of stale cach
   });
 
   assert.equal(decision.decision, "fallback");
+  assertNoPayloadPlanningArtifacts(decision);
   assert.equal("payload" in decision, false, "stale React Web payload must not widen a live WebView fallback");
   assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
   assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
   assert.equal(decision.debug.domainDetection.classification, "webview");
   assert.equal(decision.debug.domainDetection.reason, "unsupported-react-native-webview-boundary");
+  assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+});
+
+test("live RN policy downgrade does not reuse stale RN narrow payload", () => {
+  const stalePayloadDecision = preRead.decidePreRead(
+    path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-primitive-basic.tsx"),
+    repoRoot,
+    "codex",
+    { includeEditGuidance: true },
+  );
+
+  assert.equal(stalePayloadDecision.decision, "payload");
+  assert.equal(stalePayloadDecision.readiness.ready, true);
+  assert.ok(stalePayloadDecision.payload);
+  assert.equal(stalePayloadDecision.payload.domainPayload, undefined);
+  assert.equal(stalePayloadDecision.debug.domainDetection.classification, "react-native");
+  assert.equal(stalePayloadDecision.debug.frontendPayloadPolicy.name, "rn-primitive-input-narrow-payload");
+  assert.equal(stalePayloadDecision.debug.frontendPayloadPolicy.allowed, true);
+
+  const unsupportedRnPath = path.join(
+    repoRoot,
+    "test",
+    "fixtures",
+    "frontend-domain-expectations",
+    "rn-style-platform-navigation.tsx",
+  );
+  const liveDomainDetection = detectDomainFromSource(fs.readFileSync(unsupportedRnPath, "utf8"), unsupportedRnPath);
+  const livePayloadPolicy = preRead.assessFrontendPayloadPolicy(liveDomainDetection);
+
+  assert.equal(liveDomainDetection.classification, "react-native");
+  assert.equal(livePayloadPolicy.name, "rn-primitive-input-narrow-payload");
+  assert.equal(livePayloadPolicy.allowed, false);
+  assert.match(livePayloadPolicy.reason, /^forbidden-signal:react-native:primitive:ScrollView/);
+
+  // This intentionally adversarial pairing models cached/pre-read drift: a stale
+  // RN narrow payload is ready, but the live source evidence has left the narrow
+  // primitive/input lane and must remain a full-read fallback.
+  const decision = buildPreReadDecisionFromPayloadPlan({
+    runtime: "codex",
+    filePath: path.join("test", "fixtures", "frontend-domain-expectations", "rn-style-platform-navigation.tsx"),
+    extension: ".tsx",
+    domainDetection: liveDomainDetection,
+    frontendPayloadPolicy: livePayloadPolicy,
+    payload: stalePayloadDecision.payload,
+    readiness: stalePayloadDecision.readiness,
+    debug: stalePayloadDecision.debug,
+  });
+
+  assert.equal(decision.decision, "fallback");
+  assertNoPayloadPlanningArtifacts(decision);
+  assert.deepEqual(decision.reasons, ["unsupported-frontend-domain-profile"]);
+  assert.equal(decision.fallback.reason, "unsupported-frontend-domain-profile");
+  assert.equal(decision.debug.domainDetection.classification, "react-native");
+  assert.equal(decision.debug.frontendPayloadPolicy.name, "rn-primitive-input-narrow-payload");
   assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
 });

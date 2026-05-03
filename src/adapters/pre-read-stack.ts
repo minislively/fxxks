@@ -144,13 +144,15 @@ export function buildPreReadDecisionFromPayloadPlan(input: PreReadDecisionFromPa
       });
     }
 
-    const reason = input.domainDetection.reason ?? profileGate.reason;
+    const reason =
+      input.domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON && input.domainDetection.classification !== "react-native"
+        ? input.domainDetection.reason
+        : profileGate.reason;
     return buildPreReadFallbackDecision({
       runtime: input.runtime,
       filePath: input.filePath,
       eligible: true,
       reasons: [reason],
-      readiness: input.readiness,
       debug: frontendDebug(input.domainDetection, input.frontendPayloadPolicy),
       fallbackReason: reason,
     });
