@@ -1,6 +1,6 @@
 import path from "node:path";
 import { deriveDesignReviewMetadata } from "../design-review-metadata";
-import { buildReactWebDomainPayload, REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "./domain-payload";
+import { buildFrontendDomainPayload, REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "./domain-payload";
 import type { EditGuidance, ExtractionResult, ModelFacingPayload, PatchTarget, PatchTargetKind, SourceFingerprint, SourceRange } from "../schema";
 
 const PATCH_TARGET_LIMIT = 12;
@@ -129,7 +129,7 @@ function buildEditGuidance(result: ExtractionResult, freshness: SourceFingerprin
 
 export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd(), options: ModelFacingPayloadOptions = {}): ModelFacingPayload {
   const domainPayload = options.includeDomainPayload
-    ? buildReactWebDomainPayload(result, result.domainDetection, options.domainPayloadPolicy ?? REACT_WEB_DOMAIN_PAYLOAD_POLICY)
+    ? buildFrontendDomainPayload(result, result.domainDetection, options.domainPayloadPolicy ?? REACT_WEB_DOMAIN_PAYLOAD_POLICY)
     : undefined;
 
   if (result.useOriginal && result.mode === "raw" && result.rawText) {

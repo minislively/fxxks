@@ -15,6 +15,7 @@ const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "pa
 const {
   assessFrontendProfilePayloadReuse,
   MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON,
+  MISSING_REACT_NATIVE_DOMAIN_PAYLOAD_REASON,
 } = require(path.join(repoRoot, "dist", "core", "payload-policy", "profile-gate.js"));
 const { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } = require(path.join(repoRoot, "dist", "core", "payload-policy", "registry.js"));
 const { UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON } = require(path.join(repoRoot, "dist", "core", "payload-policy", "fallback.js"));
@@ -65,7 +66,25 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
 
   assert.equal(domainDetection.classification, "react-native");
   assert.equal(policy.allowed, true);
+  assert.equal(payload.domainPayload.domain, "react-native");
+  assert.equal(payload.domainPayload.policy, policy.name);
+  assert.deepEqual(payload.domainPayload.facts.primitives, ["Pressable", "Text", "TextInput", "View"]);
+  assert.deepEqual(payload.domainPayload.facts.jsxProps, ["onChangeText", "onPress"]);
   assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), { allowed: true });
+});
+
+test("frontend profile gate requires RN domain payload for the measured narrow RN policy", () => {
+  const source = `import { View, TextInput, Text, Pressable } from "react-native"; export function Native() { return <View><TextInput onChangeText={() => null} /><Pressable onPress={() => null}><Text>Save</Text></Pressable></View>; }`;
+  const { domainDetection, policy, payload } = payloadForSource(source, "Native.tsx");
+  const withoutDomainPayload = { ...payload };
+  delete withoutDomainPayload.domainPayload;
+
+  assert.equal(domainDetection.classification, "react-native");
+  assert.equal(policy.allowed, true);
+  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, withoutDomainPayload, policy), {
+    allowed: false,
+    reason: MISSING_REACT_NATIVE_DOMAIN_PAYLOAD_REASON,
+  });
 });
 
 test("frontend profile gate denies unsupported frontend profile reuse", () => {

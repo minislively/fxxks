@@ -1,4 +1,8 @@
 import type { DomainDetectionResult } from "../domain-detector";
+import {
+  assessReactNativePrimitiveInputSignalGate,
+  RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+} from "../payload-policy/react-native";
 import type { ExtractionResult, FormControlSignal, StyleSystem } from "../schema";
 
 export const DOMAIN_PAYLOAD_SCHEMA_VERSION = "domain-payload.v1";
@@ -30,7 +34,27 @@ export type ReactWebDomainPayload = {
   warnings: string[];
 };
 
-export type DomainPayload = ReactWebDomainPayload;
+export type ReactNativePrimitiveInputDomainPayload = {
+  schemaVersion: typeof DOMAIN_PAYLOAD_SCHEMA_VERSION;
+  domain: "react-native";
+  policy: typeof RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY;
+  plannerDecision: "narrow-primitive-input-payload";
+  claimStatus: "measured-evidence-only";
+  claimBoundary: "rn-primitive-input-narrow-payload-only";
+  evidence: string[];
+  facts: {
+    primitives: string[];
+    jsxProps: string[];
+    componentName?: string;
+    exports?: Pick<ExtractionResult["exports"][number], "name" | "kind" | "type">[];
+    hooks?: string[];
+    eventHandlers?: string[];
+    jsxDepth?: number;
+  };
+  warnings: string[];
+};
+
+export type DomainPayload = ReactWebDomainPayload | ReactNativePrimitiveInputDomainPayload;
 
 type ReactWebPayloadEvidenceFacts = {
   evidence: string[];
@@ -41,6 +65,17 @@ type ReactWebPayloadEvidenceFacts = {
 type ReactWebPayloadPlan = {
   result: ExtractionResult;
   evidenceFacts: ReactWebPayloadEvidenceFacts;
+};
+
+type ReactNativePayloadEvidenceFacts = {
+  evidence: string[];
+  primitives: string[];
+  jsxProps: string[];
+};
+
+type ReactNativePayloadPlan = {
+  result: ExtractionResult;
+  evidenceFacts: ReactNativePayloadEvidenceFacts;
 };
 
 function uniqueSorted(values: Iterable<string>): string[] {
@@ -83,6 +118,17 @@ function collectReactWebPayloadEvidence(domainDetection: DomainDetectionResult):
   };
 }
 
+function collectReactNativePayloadEvidence(domainDetection: DomainDetectionResult): ReactNativePayloadEvidenceFacts | undefined {
+  const reactNativeEvidence = domainDetection.evidence.filter((item) => item.domain === "react-native");
+  if (reactNativeEvidence.length === 0) return undefined;
+
+  return {
+    evidence: uniqueSorted(reactNativeEvidence.map((item) => `${item.domain}:${item.signal}:${item.detail}`)),
+    primitives: uniqueSorted(reactNativeEvidence.filter((item) => item.signal === "primitive").map((item) => item.detail)),
+    jsxProps: uniqueSorted(reactNativeEvidence.filter((item) => item.signal === "jsx-prop").map((item) => item.detail)),
+  };
+}
+
 function planReactWebPayload(
   result: ExtractionResult,
   domainDetection: DomainDetectionResult | undefined,
@@ -95,6 +141,22 @@ function planReactWebPayload(
   if (domainDetection.profile.claimBoundary !== "react-web-measured-extraction") return undefined;
 
   const evidenceFacts = collectReactWebPayloadEvidence(domainDetection);
+  if (!evidenceFacts) return undefined;
+
+  return { result, evidenceFacts };
+}
+
+function planReactNativePrimitiveInputPayload(
+  result: ExtractionResult,
+  domainDetection: DomainDetectionResult | undefined,
+  policy: string,
+): ReactNativePayloadPlan | undefined {
+  if (policy !== RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY) return undefined;
+  if (!domainDetection) return undefined;
+  if (domainDetection.classification !== "react-native") return undefined;
+  if (!assessReactNativePrimitiveInputSignalGate(domainDetection).allowed) return undefined;
+
+  const evidenceFacts = collectReactNativePayloadEvidence(domainDetection);
   if (!evidenceFacts) return undefined;
 
   return { result, evidenceFacts };
@@ -128,6 +190,25 @@ function buildReactWebPayloadFacts(
   };
 }
 
+function buildReactNativePayloadFacts(
+  result: ExtractionResult,
+  evidenceFacts: ReactNativePayloadEvidenceFacts,
+): ReactNativePrimitiveInputDomainPayload["facts"] {
+  const eventHandlers = uniqueSorted(result.behavior?.eventHandlers ?? []);
+  const hooks = uniqueSorted(result.behavior?.hooks ?? []);
+  const exportFacts = compactExports(result.exports);
+
+  return {
+    primitives: evidenceFacts.primitives,
+    jsxProps: evidenceFacts.jsxProps,
+    ...(result.componentName ? { componentName: result.componentName } : {}),
+    ...(exportFacts && exportFacts.length > 0 ? { exports: exportFacts } : {}),
+    ...(hooks.length > 0 ? { hooks } : {}),
+    ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
+    ...(typeof result.structure?.jsxDepth === "number" ? { jsxDepth: result.structure.jsxDepth } : {}),
+  };
+}
+
 export function buildReactWebDomainPayload(
   result: ExtractionResult,
   domainDetection: DomainDetectionResult | undefined = result.domainDetection,
@@ -150,4 +231,40 @@ export function buildReactWebDomainPayload(
       "Planner decision depends on current extractor readiness and domain profile evidence; rerun extraction if the source changes.",
     ],
   };
+}
+
+export function buildReactNativePrimitiveInputDomainPayload(
+  result: ExtractionResult,
+  domainDetection: DomainDetectionResult | undefined = result.domainDetection,
+  policy = RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+): ReactNativePrimitiveInputDomainPayload | undefined {
+  const plan = planReactNativePrimitiveInputPayload(result, domainDetection, policy);
+  if (!plan) return undefined;
+
+  return {
+    schemaVersion: DOMAIN_PAYLOAD_SCHEMA_VERSION,
+    domain: "react-native",
+    policy: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    plannerDecision: "narrow-primitive-input-payload",
+    claimStatus: "measured-evidence-only",
+    claimBoundary: "rn-primitive-input-narrow-payload-only",
+    evidence: plan.evidenceFacts.evidence,
+    facts: buildReactNativePayloadFacts(plan.result, plan.evidenceFacts),
+    warnings: [
+      "React Native primitive/input payload reuse is limited to the measured F1-style gate.",
+      "Do not reinterpret React Native primitives as DOM controls, web form semantics, navigation behavior, native platform behavior, or WebView bridge behavior.",
+      "Planner decision depends on current extractor readiness and domain profile evidence; rerun extraction if the source changes.",
+    ],
+  };
+}
+
+export function buildFrontendDomainPayload(
+  result: ExtractionResult,
+  domainDetection: DomainDetectionResult | undefined = result.domainDetection,
+  policy = REACT_WEB_DOMAIN_PAYLOAD_POLICY,
+): DomainPayload | undefined {
+  return (
+    buildReactWebDomainPayload(result, domainDetection, policy) ??
+    buildReactNativePrimitiveInputDomainPayload(result, domainDetection, policy)
+  );
 }

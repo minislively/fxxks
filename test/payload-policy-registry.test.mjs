@@ -91,15 +91,20 @@ test("pre-read compatibility entrypoint exports the core policy registry APIs", 
   }
 });
 
-test("frontend payload build options include domain payload only for React Web policy", () => {
+test("frontend payload build options include domain payload for React Web and measured RN narrow policies", () => {
   const reactWebPolicy = registry.assessFrontendPayloadPolicy(samples["react-web"]);
+  const reactNativePolicy = registry.assessFrontendPayloadPolicy(samples["react-native"]);
 
   assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactWebPolicy), {
     includeDomainPayload: true,
     domainPayloadPolicy: reactWebPolicy.name,
   });
+  assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactNativePolicy), {
+    includeDomainPayload: true,
+    domainPayloadPolicy: reactNativePolicy.name,
+  });
 
-  for (const lane of ["webview", "tui-ink", "react-native", "mixed", "unknown"]) {
+  for (const lane of ["webview", "tui-ink", "mixed", "unknown"]) {
     const policy = registry.assessFrontendPayloadPolicy(samples[lane]);
     assert.deepEqual(
       registry.toFrontendPayloadBuildOptions(policy),

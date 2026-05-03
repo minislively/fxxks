@@ -319,8 +319,10 @@ test("codex runtime activates React Web payload semantics only for the React Web
   assert.equal(rnPrimitive.second.debug.decision.debug.domainDetection.classification, "react-native");
   assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.allowed, true);
-  assert.equal("domainPayload" in rnPrimitive.second.debug.decision.payload, false);
-  assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), false);
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.domain, "react-native");
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), true);
+  assert.match(rnPrimitive.second.additionalContext, /"domain":\s*"react-native"/);
 
   for (const [label, fixture, forbiddenSignal] of [
     ["rn-style-platform", "rn-style-platform-navigation.tsx", "react-native:primitive:ScrollView"],
@@ -550,8 +552,10 @@ test("claude runtime keeps RN F1 narrow payload separate from broader RN domains
   assert.equal(rnPrimitive.second.debug.decision.debug.domainDetection.classification, "react-native");
   assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.allowed, true);
-  assert.equal("domainPayload" in rnPrimitive.second.debug.decision.payload, false);
-  assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), false);
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.domain, "react-native");
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), true);
+  assert.match(rnPrimitive.second.additionalContext, /"domain":\s*"react-native"/);
 
   for (const [label, fixture] of [
     ["rn-style-platform", "rn-style-platform-navigation.tsx"],

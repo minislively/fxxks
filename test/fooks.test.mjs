@@ -1256,7 +1256,10 @@ export function CustomOnlyForm() {
   assert.equal(rnPrimitive.readiness.ready, true);
   assert.equal(rnPrimitive.readiness.signals.hasContract, true);
   assert.ok(rnPrimitive.payload.contract.propsName);
-  assert.equal("domainPayload" in rnPrimitive.payload, false);
+  assert.equal(rnPrimitive.payload.domainPayload.domain, "react-native");
+  assert.equal(rnPrimitive.payload.domainPayload.policy, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.deepEqual(rnPrimitive.payload.domainPayload.facts.primitives, ["Pressable", "Text", "TextInput", "View"]);
+  assert.deepEqual(rnPrimitive.payload.domainPayload.facts.jsxProps, ["onChangeText", "onPress"]);
 
   for (const rnFixture of [
     "rn-style-platform-navigation.tsx",

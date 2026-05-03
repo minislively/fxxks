@@ -1,6 +1,6 @@
 import type { DomainDetectionResult } from "../domain-detector";
 import { assessFallbackPayloadPolicy } from "./fallback";
-import { assessReactNativePayloadPolicy } from "./react-native";
+import { assessReactNativePayloadPolicy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY } from "./react-native";
 import { assessReactWebPayloadPolicy, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY } from "./react-web";
 import { assessTuiInkPayloadPolicy } from "./tui-ink";
 import type { FrontendPayloadPolicyDecision } from "./types";
@@ -44,7 +44,8 @@ export function toFrontendPayloadBuildOptions(
   policy: FrontendPayloadPolicyDecision | undefined,
 ): FrontendPayloadBuildOptions {
   return {
-    includeDomainPayload: policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY,
+    includeDomainPayload:
+      policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY || policy?.name === RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
     ...(policy?.name ? { domainPayloadPolicy: policy.name } : {}),
   };
 }

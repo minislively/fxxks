@@ -45,7 +45,7 @@ Pre-read behavior must stay conservative for TUI/Ink: `F5` can remain extractabl
 
 ## RN component semantics readiness gate
 
-The RN fixture lane is a readiness gate, not a support promise. `F1` is the first narrow runtime candidate and is limited to primitive/input payload reuse through `rn-primitive-input-narrow-payload`; it is not broad React Native support. Other selected RN fixtures stay fallback/evidence-only until a later detector/profile promotion plan explicitly changes runtime behavior. The current fallback reason, `unsupported-react-native-webview-boundary`, is still the shared source-reading boundary reason for detector evidence and WebView/mixed boundaries; it must not be treated as a permanent domain model for every RN semantic.
+The RN fixture lane is a readiness gate, not a support promise. `F1` is the first narrow runtime candidate and is limited to primitive/input payload reuse through `rn-primitive-input-narrow-payload`; that payload may include an RN-shaped `domainPayload` with primitive and input/press evidence, but it is not broad React Native support. Other selected RN fixtures stay fallback/evidence-only until a later detector/profile promotion plan explicitly changes runtime behavior. The current fallback reason, `unsupported-react-native-webview-boundary`, is still the shared source-reading boundary reason for detector evidence and WebView/mixed boundaries; it must not be treated as a permanent domain model for every RN semantic.
 
 | Semantics group | Selected slots | Evidence examples | Required boundary |
 | --- | --- | --- | --- |

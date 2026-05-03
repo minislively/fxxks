@@ -6,7 +6,7 @@ This document is the canonical architecture note for how fooks should evolve fro
 
 ## Status and boundaries
 
-Current broad frontend support remains the measured React Web same-file TSX/JSX lane described in the README and roadmap. React Native, WebView, TUI/Ink, Mixed, and Unknown domains require separate policy decisions before their signals can affect compact payload behavior.
+Current broad frontend support remains the measured React Web same-file TSX/JSX lane described in the README and roadmap. React Native, WebView, TUI/Ink, Mixed, and Unknown domains require separate policy decisions before their signals can affect compact payload behavior. The only current non-web compact exception is the measured `F1` React Native primitive/input gate, which may emit an RN-shaped `domainPayload` through `rn-primitive-input-narrow-payload`; this remains measured evidence only.
 
 Architecture shorthand:
 
@@ -18,7 +18,7 @@ This document does not add:
 
 - runtime behavior;
 - setup eligibility;
-- detector behavior, pre-read behavior, or payload schema changes;
+- detector behavior, pre-read behavior, or payload schema changes outside the measured React Web lane and the existing `F1` RN primitive/input narrow gate;
 - React Native broad support;
 - WebView support, bridge safety, or compact-payload reuse;
 - broad TUI semantic support or terminal correctness;
@@ -160,7 +160,7 @@ type PayloadDecision = {
 The planner is where domain-specific risk belongs:
 
 - React Web can be compact-safe when existing extractor/readiness rules prove it.
-- React Native is evidence/fallback by default, except the existing measured `F1` primitive/input narrow gate named in the frontend-domain contract.
+- React Native is evidence/fallback by default, except the existing measured `F1` primitive/input narrow gate named in the frontend-domain contract. That gate may build a React-Native-specific domain payload containing primitive/input evidence, but it must not reinterpret RN primitives as DOM controls or broaden to style/platform/navigation/list/media semantics.
 - WebView is boundary-aware or fallback-full-read by default.
 - TUI/Ink remains bounded by measured TSX syntax/payload behavior and does not imply terminal correctness.
 - Mixed and Unknown should choose fallback or defer when signals are weak or conflicting.

@@ -5,6 +5,7 @@ import type { FrontendPayloadPolicyDecision } from "./types";
 
 const FRONTEND_PROFILE_GATE_EXTENSIONS = new Set([".tsx", ".jsx"]);
 export const MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON = "missing-react-web-domain-payload";
+export const MISSING_REACT_NATIVE_DOMAIN_PAYLOAD_REASON = "missing-react-native-domain-payload";
 
 export type FrontendProfilePayloadReuseDecision = { allowed: true } | { allowed: false; reason: string };
 
@@ -25,6 +26,12 @@ export function assessFrontendProfilePayloadReuse(
   }
 
   if (frontendPayloadPolicy?.allowed === true) {
+    if (domainDetection.profile.lane === "react-native") {
+      return payload.domainPayload?.domain === "react-native" && payload.domainPayload.policy === frontendPayloadPolicy.name
+        ? { allowed: true }
+        : { allowed: false, reason: MISSING_REACT_NATIVE_DOMAIN_PAYLOAD_REASON };
+    }
+
     return { allowed: true };
   }
 

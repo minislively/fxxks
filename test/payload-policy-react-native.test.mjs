@@ -11,9 +11,16 @@ const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
 const {
+  assessReactNativePrimitiveInputSignalGate,
   assessReactNativePayloadPolicy,
+  RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
+  RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+  RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
 } = require(path.join(repoRoot, "dist", "core", "payload-policy", "react-native.js"));
+const { buildReactNativePrimitiveInputDomainPayload } = require(
+  path.join(repoRoot, "dist", "core", "payload", "domain-payload.js"),
+);
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 
 const forbiddenSupportClaims = /React Native support is available|React Native is supported today|React Native support will ship|broad React Native support|default React Native compact extraction is enabled/i;
@@ -27,6 +34,15 @@ function rnPrimitiveInputSource(extraJsx = "") {
     export function NativeInput() {
       return <View><Text>Email</Text><TextInput value="" onChangeText={() => null} /><Pressable onPress={() => null}><Text>Save</Text></Pressable>${extraJsx}</View>;
     }`;
+}
+
+function signalToEvidence(signal) {
+  const [, signalKind, ...detailParts] = signal.split(":");
+  return {
+    domain: "react-native",
+    signal: signalKind,
+    detail: detailParts.join(":"),
+  };
 }
 
 test("React Native payload policy allows the measured primitive/input signal set only", () => {
@@ -96,6 +112,88 @@ test("pre-read compatibility entrypoint delegates RN primitive/input decisions t
 
   assert.deepEqual(preRead.assessFrontendPayloadPolicy(domainDetection), assessReactNativePayloadPolicy(domainDetection));
   assert.equal(preRead.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+});
+
+test("React Native F1 signal gate is the shared source of truth for policy and payload builder", () => {
+  const requiredSignals = [
+    "react-native:primitive:View",
+    "react-native:primitive:Text",
+    "react-native:primitive:TextInput",
+    "react-native:primitive:Pressable",
+    "react-native:jsx-prop:onChangeText",
+    "react-native:jsx-prop:onPress",
+  ];
+  const forbiddenExactSignals = [
+    "react-native:primitive:FlatList",
+    "react-native:primitive:Image",
+    "react-native:primitive:ScrollView",
+    "react-native:primitive:TouchableOpacity",
+    "react-native:style-factory:StyleSheet.create",
+    "react-native:platform-select:Platform.select",
+    "react-native:style-prop:resizeMode",
+    "react-native:jsx-prop:activeOpacity",
+    "react-native:jsx-prop:pagingEnabled",
+  ];
+
+  assert.deepEqual(RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS, requiredSignals);
+  assert.deepEqual(RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS, forbiddenExactSignals);
+  assert.deepEqual(RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES, [
+    "webview:",
+    "tui-ink:",
+    "react-native:navigation-",
+    "react-native:api-call:Dimensions.",
+    "react-native:api-call:PanResponder.",
+  ]);
+
+  const extractionResult = {
+    componentName: "NativeInput",
+    exports: [],
+    behavior: {},
+    structure: {},
+    domainDetection: undefined,
+  };
+  const allowedDetection = {
+    classification: "react-native",
+    signals: requiredSignals,
+    evidence: requiredSignals.map(signalToEvidence),
+    profile: { lane: "react-native", claimStatus: "evidence-only", claimBoundary: "unsupported-react-native-webview-boundary" },
+  };
+
+  assert.deepEqual(assessReactNativePrimitiveInputSignalGate(allowedDetection), { allowed: true });
+  assert.deepEqual(assessReactNativePayloadPolicy(allowedDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: true,
+  });
+  assert.equal(
+    buildReactNativePrimitiveInputDomainPayload(extractionResult, allowedDetection)?.policy,
+    RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+  );
+
+  for (const missingSignal of requiredSignals) {
+    const domainDetection = {
+      ...allowedDetection,
+      signals: requiredSignals.filter((signal) => signal !== missingSignal),
+    };
+
+    assert.deepEqual(assessReactNativePrimitiveInputSignalGate(domainDetection), {
+      allowed: false,
+      reason: `missing-signal:${missingSignal}`,
+    });
+    assert.equal(buildReactNativePrimitiveInputDomainPayload(extractionResult, domainDetection), undefined);
+  }
+
+  for (const forbiddenSignal of forbiddenExactSignals) {
+    const domainDetection = {
+      ...allowedDetection,
+      signals: [...requiredSignals, forbiddenSignal],
+    };
+
+    assert.deepEqual(assessReactNativePrimitiveInputSignalGate(domainDetection), {
+      allowed: false,
+      reason: `forbidden-signal:${forbiddenSignal}`,
+    });
+    assert.equal(buildReactNativePrimitiveInputDomainPayload(extractionResult, domainDetection), undefined);
+  }
 });
 
 test("React Native policy seam source avoids broad React Native support claims", () => {

@@ -134,7 +134,8 @@ test("live RN policy downgrade does not reuse stale RN narrow payload", () => {
   assert.equal(stalePayloadDecision.decision, "payload");
   assert.equal(stalePayloadDecision.readiness.ready, true);
   assert.ok(stalePayloadDecision.payload);
-  assert.equal(stalePayloadDecision.payload.domainPayload, undefined);
+  assert.equal(stalePayloadDecision.payload.domainPayload.domain, "react-native");
+  assert.equal(stalePayloadDecision.payload.domainPayload.policy, "rn-primitive-input-narrow-payload");
   assert.equal(stalePayloadDecision.debug.domainDetection.classification, "react-native");
   assert.equal(stalePayloadDecision.debug.frontendPayloadPolicy.name, "rn-primitive-input-narrow-payload");
   assert.equal(stalePayloadDecision.debug.frontendPayloadPolicy.allowed, true);
