@@ -99,6 +99,29 @@ type DomainProfile = {
 
 This shape is illustrative architecture language, not a declaration that these exact types exist today.
 
+## Domain profiles vs concern profiles
+
+Domain profiles and concern profiles answer different questions. A domain profile answers "where does this code run or which UI/runtime family does it resemble?" A concern profile answers "what task-context signal should an editor preserve while changing this file?"
+
+Examples of concern signals include:
+
+- form state such as `react-hook-form` `useForm`, `register`, `Controller`, and `handleSubmit`;
+- validation/schema libraries such as Zod, Yup, or Valibot;
+- client state such as Zustand, Jotai, Redux, or reducer/store modules;
+- server state and data fetching such as TanStack Query or SWR;
+- routing/navigation concerns such as route params, links, redirects, and navigation side effects;
+- styling concerns such as `className`, `cva`, `clsx`, variants, and style-object boundaries.
+
+Concern evidence is editor-context guidance. It can help a future packet explain what not to break, but it does not promote a domain and does not authorize compact payload reuse by itself. Payload permission still belongs to the payload planner/policy layer after domain evidence, boundary evidence, source ranges, and current maturity gates have been evaluated.
+
+Concrete examples:
+
+- `react-hook-form` plus DOM-like `<form>` and `<input>` signals can be React Web domain evidence plus a form-state concern.
+- `react-hook-form` plus React Native `TextInput` and `onChangeText` signals can be React Native domain evidence plus a form-state concern, but it still remains bounded by the measured RN `F1` policy gate.
+- A Zustand store file can be a client-state concern without being a UI-domain payload candidate at all.
+
+This is future-facing architecture language, not a declaration that concern-profile extraction exists today. Concern profiles should become another evidence input to policy; they should not bypass the domain resolver, fallback rules, or proof/claim boundary.
+
 ## Domain scanner
 
 A domain scanner observes facts for one profile family. It should avoid deciding whether a compact payload is allowed.
