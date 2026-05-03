@@ -18,8 +18,7 @@ const {
 } = require(path.join(repoRoot, "dist", "core", "payload-policy", "profile-gate.js"));
 const { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } = require(path.join(repoRoot, "dist", "core", "payload-policy", "registry.js"));
 const { UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON } = require(path.join(repoRoot, "dist", "core", "payload-policy", "fallback.js"));
-const preReadSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-const preReadStackSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
+const { buildPreReadDecisionFromPayloadPlan } = require(path.join(repoRoot, "dist", "adapters", "pre-read-stack.js"));
 
 function payloadForSource(source, fileName, options = {}) {
   const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-profile-gate-"));
@@ -81,10 +80,33 @@ test("frontend profile gate denies unsupported frontend profile reuse", () => {
   });
 });
 
-test("pre-read adapter delegates frontend profile reuse gate to payload-policy seam", () => {
-  const combinedPreReadSource = `${preReadSource}\n${preReadStackSource}`;
+test("pre-read payload-plan seam surfaces frontend profile reuse denial", () => {
+  const source = `export function Form() { return <form><input name="email" /></form>; }`;
+  const { domainDetection, policy, payload } = payloadForSource(source, "Form.tsx");
+  const withoutDomainPayload = { ...payload };
+  delete withoutDomainPayload.domainPayload;
 
-  assert.match(preReadStackSource, /import \{ assessFrontendProfilePayloadReuse \} from "\.\.\/core\/payload-policy\/profile-gate"/);
-  assert.doesNotMatch(combinedPreReadSource, /function assessFrontendProfilePayloadReuse\(/);
-  assert.doesNotMatch(combinedPreReadSource, /FRONTEND_PROFILE_GATE_EXTENSIONS/);
+  const directGateDecision = assessFrontendProfilePayloadReuse(".tsx", domainDetection, withoutDomainPayload, policy);
+  const preReadDecision = buildPreReadDecisionFromPayloadPlan({
+    runtime: "codex",
+    filePath: "Form.tsx",
+    extension: ".tsx",
+    domainDetection,
+    frontendPayloadPolicy: policy,
+    payload: withoutDomainPayload,
+    readiness: { ready: true, reasons: [], signals: {} },
+    debug: { domainDetection, frontendPayloadPolicy: policy },
+  });
+
+  assert.deepEqual(directGateDecision, {
+    allowed: false,
+    reason: MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON,
+  });
+  assert.equal(preReadDecision.decision, "fallback");
+  assert.deepEqual(preReadDecision.reasons, [MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON]);
+  assert.equal(preReadDecision.fallback.reason, MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON);
+  assert.equal("payload" in preReadDecision, false);
+  assert.equal("readiness" in preReadDecision, false);
+  assert.equal(preReadDecision.debug.domainDetection.classification, "react-web");
+  assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
 });
