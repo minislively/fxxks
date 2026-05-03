@@ -36,6 +36,43 @@ test("pre-read fallback builder preserves ineligible extension decisions", () =>
   });
 });
 
+test("pre-read source-shape boundary guard skips payload planning", () => {
+  assert.match(preReadSource, /function hasWebViewSourceShapeBoundary\(/);
+  assert.match(preReadSource, /if \(hasWebViewSourceShapeBoundary\(domainDetection\) && domainDetection\.classification !== "react-native"\) \{/);
+  const sourceShapeGuardIndex = preReadSource.indexOf('if (hasWebViewSourceShapeBoundary(domainDetection)');
+  const payloadPlanIndex = preReadSource.indexOf('const { payload, readiness, debug } = buildPreReadPayloadPlan({');
+  assert.ok(sourceShapeGuardIndex >= 0);
+  assert.ok(payloadPlanIndex > sourceShapeGuardIndex);
+
+  const tempDir = fs.mkdtempSync(path.join(repoRoot, ".tmp-pre-read-source-shape-"));
+  try {
+    const filePath = path.join(tempDir, "CheckoutWebView.tsx");
+    fs.writeFileSync(
+      filePath,
+      `import { WebView } from "react-native-webview";
+export function CheckoutWebView() {
+  return <WebView source={{ uri: "https://example.test/checkout" }} onMessage={() => {}} />;
+}
+`,
+    );
+
+    const decision = preRead.decidePreRead(filePath, tempDir, "codex", { includeEditGuidance: true });
+
+    assert.equal(decision.decision, "fallback");
+    assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
+    assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
+    assert.equal("payload" in decision, false);
+    assert.equal("readiness" in decision, false);
+    assert.equal("mode" in decision.debug, false);
+    assert.equal("complexityScore" in decision.debug, false);
+    assert.equal(decision.debug.domainDetection.classification, "webview");
+    assert.equal(decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
+    assert.ok(decision.debug.domainDetection.signals.includes("webview:source-shape:uri"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("pre-read fallback debug remains domain and policy shaped", () => {
   const tempDir = fs.mkdtempSync(path.join(repoRoot, ".tmp-pre-read-debug-"));
   try {

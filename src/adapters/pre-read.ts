@@ -203,6 +203,14 @@ function buildPreReadDecisionFromPayloadPlan(input: PreReadDecisionFromPayloadPl
   });
 }
 
+function hasWebViewSourceShapeBoundary(domainDetection: DomainDetectionResult): boolean {
+  return (
+    domainDetection.outcome === "fallback" &&
+    domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
+    domainDetection.evidence.some((item) => item.domain === "webview" && item.signal === "source-shape")
+  );
+}
+
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
   const domainDetection = detectDomainFromSource(sourceText);
   return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
@@ -230,6 +238,16 @@ export function decidePreRead(
   const sourceText = fs.readFileSync(resolvedPath, "utf8");
   const domainDetection = detectDomainFromSource(sourceText, resolvedPath);
   const frontendPayloadPolicy = assessFrontendPayloadPolicy(domainDetection);
+  if (hasWebViewSourceShapeBoundary(domainDetection) && domainDetection.classification !== "react-native") {
+    return buildPreReadFallbackDecision({
+      runtime,
+      filePath: outputPath,
+      eligible: true,
+      reasons: [REACT_NATIVE_WEBVIEW_BOUNDARY_REASON],
+      debug: frontendDebug(domainDetection, frontendPayloadPolicy),
+    });
+  }
+
   if (
     domainDetection.outcome === "fallback" &&
     domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
