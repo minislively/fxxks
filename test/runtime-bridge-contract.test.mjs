@@ -371,6 +371,70 @@ test("codex runtime activates React Web payload semantics only for the React Web
   }
 });
 
+test("runtime boundary fallbacks do not bypass into edit-guidance injection", () => {
+  const target = "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx";
+
+  const codexSession = `bridge-contract-boundary-edit-codex-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: codexSession }, repoRoot);
+  const codexFirst = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: codexSession,
+      prompt: `Please update ${target}`,
+    },
+    repoRoot,
+  );
+  const codexSecond = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: codexSession,
+      prompt: `Again, update ${target}`,
+    },
+    repoRoot,
+  );
+
+  assert.equal(codexFirst.action, "record");
+  assert.equal(codexSecond.action, "fallback");
+  assert.equal(codexSecond.contextModeReason, REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.equal(codexSecond.fallback.reason, REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.equal(codexSecond.reasons.includes("edit-guidance-opt-in"), false);
+  assert.equal(codexSecond.additionalContext, undefined);
+  assert.equal("payload" in codexSecond.debug.decision, false);
+  assert.equal(codexSecond.debug.decision.debug.domainDetection.classification, "webview");
+  assert.equal(codexSecond.debug.decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
+
+  const claudeSession = `bridge-contract-boundary-edit-claude-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId: claudeSession }, repoRoot);
+  const claudeFirst = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: claudeSession,
+      prompt: `Please update ${target}`,
+    },
+    repoRoot,
+  );
+  const claudeSecond = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: claudeSession,
+      prompt: `Again, update ${target}`,
+    },
+    repoRoot,
+  );
+
+  assert.equal(claudeFirst.action, "record");
+  assert.equal(claudeSecond.action, "fallback");
+  assert.equal(claudeSecond.contextModeReason, REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.equal(claudeSecond.fallback.reason, REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.equal(claudeSecond.reasons.includes("edit-guidance-opt-in"), false);
+  assert.equal(claudeSecond.additionalContext.includes(REACT_NATIVE_WEBVIEW_BOUNDARY_REASON), true);
+  assert.equal(claudeSecond.additionalContext.includes('"domainPayload"'), false);
+  assert.equal(claudeSecond.additionalContext.includes('"editGuidance"'), false);
+  assert.equal(claudeSecond.debug.repeatedFile, true);
+  assert.equal(claudeSecond.debug.eligible, true);
+  assert.equal(claudeSecond.debug.bounded, true);
+});
+
 test("claude runtime keeps RN F1 narrow payload separate from broader RN domains", () => {
   const runRepeatedPrompt = (label, prompt) => {
     const sessionId = `bridge-contract-claude-rn-domain-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
