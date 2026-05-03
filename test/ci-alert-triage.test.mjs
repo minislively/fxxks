@@ -267,6 +267,82 @@ test("CI alert triage keeps explicit rerun attempt evidence distinct", () => {
   }
 });
 
+test("CI alert triage separates stale attempt replay from current main success echo", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-attempt-echo-order-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 960,
+      attempt: 2,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-02T13:00:00Z",
+      updatedAt: "2026-05-02T13:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/960",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "current successful main run https://github.com/minislively/fooks/actions/runs/960",
+    "stale replayed attempt https://github.com/minislively/fooks/actions/runs/960/attempts/1",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const staleAttempt = result.alerts.find((alert) => alert.alertedRunId === "960" && alert.alertedAttempt === 1);
+    const currentRun = result.alerts.find((alert) => alert.alertedRunId === "960" && alert.alertedAttempt === null);
+
+    assert.equal(result.alerts.length, 2);
+    assert.equal(result.counts.informational, 1);
+    assert.equal(result.counts.stale ?? 0, 0);
+    assert.equal(result.counts.actionable ?? 0, 0);
+
+    assert.equal(staleAttempt.alertedUrl, "https://github.com/minislively/fooks/actions/runs/960/attempts/1");
+    assert.equal(staleAttempt.evidence, "stale");
+    assert.equal(staleAttempt.verdict, "stale");
+    assert.equal(staleAttempt.replay, true);
+    assert.equal(staleAttempt.disposition, "suppress-replay");
+    assert.equal(staleAttempt.reason, "superseded by attempt 2");
+
+    assert.equal(currentRun.alertedUrl, "https://github.com/minislively/fooks/actions/runs/960");
+    assert.equal(currentRun.evidence, "current");
+    assert.equal(currentRun.verdict, "current-main-echo");
+    assert.equal(currentRun.echo, true);
+    assert.equal(currentRun.disposition, "verification-only");
+    assert.equal(currentRun.reason, "verification-only current main success echo");
+
+    assert.equal(result.alertSummary.total, 2);
+    assert.equal(result.alertSummary.currentHeadCount, 1);
+    assert.deepEqual(result.alertSummary.currentHeadRunIds, ["960"]);
+    assert.equal(result.alertSummary.currentMainEchoCount, 1);
+    assert.equal(result.alertSummary.verificationOnlyCount, 1);
+    assert.equal(result.alertSummary.staleReplayCount, 1);
+    assert.equal(result.alertSummary.staleSuccessReplayCount, 1);
+    assert.equal(result.alertSummary.actionableAlertCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("CI alert triage identifies replayed historical main alerts for suppression", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-replay-storm-"));
   const runsPath = path.join(tempDir, "runs.json");
