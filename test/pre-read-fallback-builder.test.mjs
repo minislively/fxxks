@@ -35,3 +35,18 @@ test("pre-read fallback builder preserves ineligible extension decisions", () =>
     },
   });
 });
+
+test("pre-read fallback debug remains domain and policy shaped", () => {
+  const tempDir = fs.mkdtempSync(path.join(repoRoot, ".tmp-pre-read-debug-"));
+  try {
+    const filePath = path.join(tempDir, "Cli.tsx");
+    fs.writeFileSync(filePath, `import { Box } from "ink"; export function Cli() { return <Box />; }`);
+    const decision = preRead.decidePreRead(filePath, tempDir, "codex");
+
+    assert.equal(decision.decision, "fallback");
+    assert.equal(decision.debug.domainDetection.classification, "tui-ink");
+    assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

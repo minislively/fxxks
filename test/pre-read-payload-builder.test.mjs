@@ -18,6 +18,12 @@ test("pre-read centralizes payload success decision construction", () => {
   assert.doesNotMatch(preReadSource, /return \{\s*\n\s*runtime,[\s\S]*?decision: "payload",[\s\S]*?payload,[\s\S]*?readiness,/);
 });
 
+test("pre-read centralizes payload debug construction", () => {
+  assert.match(preReadSource, /function buildPreReadPayloadDebug\(/);
+  assert.match(preReadSource, /const debug = buildPreReadPayloadDebug\(\{/);
+  assert.doesNotMatch(preReadSource, /const debug = \{\s*\n\s*mode: result\.mode,[\s\S]*?language: result\.language,[\s\S]*?domainDetection,/);
+});
+
 test("pre-read payload builder preserves React Web payload success envelope", () => {
   const decision = preRead.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
     includeEditGuidance: true,
@@ -30,6 +36,11 @@ test("pre-read payload builder preserves React Web payload success envelope", ()
   assert.deepEqual(decision.reasons, []);
   assert.equal(decision.readiness.ready, true);
   assert.ok(decision.payload);
+  assert.equal(decision.debug.mode, "compressed");
+  assert.equal(typeof decision.debug.complexityScore, "number");
+  assert.deepEqual(decision.debug.decideReason, ["repeated-rendering"]);
+  assert.equal(decision.debug.decideConfidence, "medium");
+  assert.equal(decision.debug.language, "tsx");
   assert.equal(decision.debug.domainDetection.classification, "react-web");
   assert.equal(decision.debug.frontendPayloadPolicy.allowed, true);
 });

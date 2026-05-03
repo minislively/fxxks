@@ -105,6 +105,23 @@ function frontendDebug(
   };
 }
 
+type PreReadPayloadDebugInput = {
+  result: ReturnType<typeof extractFile>;
+  domainDetection: DomainDetectionResult;
+  frontendPayloadPolicy?: FrontendPayloadPolicyDecision;
+};
+
+function buildPreReadPayloadDebug(input: PreReadPayloadDebugInput): NonNullable<PreReadDecision["debug"]> {
+  return {
+    mode: input.result.mode,
+    complexityScore: input.result.meta.complexityScore,
+    decideReason: input.result.meta.decideReason,
+    decideConfidence: input.result.meta.decideConfidence,
+    language: input.result.language,
+    ...frontendDebug(input.domainDetection, input.frontendPayloadPolicy),
+  };
+}
+
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
   const domainDetection = detectDomainFromSource(sourceText);
   return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
@@ -163,15 +180,11 @@ export function decidePreRead(
     ...payloadBuildOptions,
   });
   const readiness = assessPayloadReadiness(result, payload);
-  const debug = {
-    mode: result.mode,
-    complexityScore: result.meta.complexityScore,
-    decideReason: result.meta.decideReason,
-    decideConfidence: result.meta.decideConfidence,
-    language: result.language,
+  const debug = buildPreReadPayloadDebug({
+    result,
     domainDetection,
-    ...(frontendPayloadPolicy ? { frontendPayloadPolicy } : {}),
-  };
+    frontendPayloadPolicy,
+  });
 
   if (readiness.ready) {
     const profileGate = assessFrontendProfilePayloadReuse(extension, domainDetection, payload, frontendPayloadPolicy);
