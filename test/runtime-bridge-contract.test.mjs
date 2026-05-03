@@ -435,6 +435,105 @@ test("runtime boundary fallbacks do not bypass into edit-guidance injection", ()
   assert.equal(claudeSecond.debug.bounded, true);
 });
 
+test("runtime fallback bridges preserve direct pre-read fallback decisions", () => {
+  const cases = [
+    {
+      label: "webview-boundary",
+      target: "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx",
+      expectedClassification: "webview",
+      expectedPolicyName: WEBVIEW_BOUNDARY_FALLBACK_POLICY,
+      expectedReason: REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
+    },
+    {
+      label: "rn-style-platform",
+      target: "test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx",
+      expectedClassification: "react-native",
+      expectedPolicyName: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+      expectedReason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+    },
+  ];
+
+  const repeatedCodexPrompt = (label, target) => {
+    const sessionId = `bridge-contract-fallback-parity-codex-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Please update ${target}`,
+      },
+      repoRoot,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      repoRoot,
+    );
+    return { first, second };
+  };
+
+  const repeatedClaudePrompt = (label, target) => {
+    const sessionId = `bridge-contract-claude-fallback-parity-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+    const first = handleClaudeRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Please update ${target}`,
+      },
+      repoRoot,
+    );
+    const second = handleClaudeRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      repoRoot,
+    );
+    return { first, second };
+  };
+
+  for (const fixture of cases) {
+    const direct = decidePreRead(path.join(repoRoot, fixture.target), repoRoot, "codex", {
+      includeEditGuidance: true,
+    });
+
+    assert.equal(direct.decision, "fallback", `${fixture.label} direct pre-read should fallback`);
+    assert.equal(direct.fallback.reason, fixture.expectedReason, `${fixture.label} direct fallback reason should stay stable`);
+    assert.equal(direct.debug.domainDetection.classification, fixture.expectedClassification);
+    assert.equal(direct.debug.frontendPayloadPolicy.name, fixture.expectedPolicyName);
+    assert.equal(direct.debug.frontendPayloadPolicy.allowed, false);
+
+    const codex = repeatedCodexPrompt(fixture.label, fixture.target);
+    assert.equal(codex.first.action, "record", `${fixture.label} first Codex prompt should record`);
+    assert.equal(codex.second.action, "fallback", `${fixture.label} repeated Codex prompt should fallback`);
+    assert.equal(codex.second.contextModeReason, direct.fallback.reason);
+    assert.equal(codex.second.fallback.reason, direct.fallback.reason);
+    assert.equal(codex.second.debug.decision.fallback.reason, direct.fallback.reason);
+    assert.equal(codex.second.debug.decision.debug.domainDetection.classification, fixture.expectedClassification);
+    assert.equal(codex.second.debug.decision.debug.frontendPayloadPolicy.name, fixture.expectedPolicyName);
+    assert.equal(codex.second.debug.decision.debug.frontendPayloadPolicy.allowed, false);
+    assert.equal("payload" in codex.second.debug.decision, false);
+    assert.equal(codex.second.additionalContext, undefined);
+
+    const claude = repeatedClaudePrompt(fixture.label, fixture.target);
+    assert.equal(claude.first.action, "record", `${fixture.label} first Claude prompt should record`);
+    assert.equal(claude.second.action, "fallback", `${fixture.label} repeated Claude prompt should fallback`);
+    assert.equal(claude.second.contextModeReason, direct.fallback.reason);
+    assert.equal(claude.second.fallback.reason, direct.fallback.reason);
+    assert.equal(claude.second.additionalContext.includes(direct.fallback.reason), true);
+    assert.equal(claude.second.additionalContext.includes('"domainPayload"'), false);
+    assert.equal(claude.second.additionalContext.includes('"editGuidance"'), false);
+    assert.equal(claude.second.debug.repeatedFile, true);
+    assert.equal(claude.second.debug.eligible, true);
+    assert.equal(claude.second.debug.bounded, true);
+  }
+});
+
 test("claude runtime keeps RN F1 narrow payload separate from broader RN domains", () => {
   const runRepeatedPrompt = (label, prompt) => {
     const sessionId = `bridge-contract-claude-rn-domain-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
