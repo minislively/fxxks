@@ -22,6 +22,26 @@ fresh development investigation unless a newer actionable/watch run appears.
 Historical success URLs in the same paste stay bounded by compact mode and are
 noise-counted as stale replay rows.
 
+## Tmux pane-history keyword replay
+
+`ci:alerts --alerts <file>` also scans pasted tmux pane text for blocker-looking
+keyword lines such as `error`, `failed`, and `TS7006`. This scan is deliberately
+separate from GitHub Actions URL evidence: an actionable/watch run URL still
+requires inspection even if an older pane-history keyword is marked stale.
+
+Pane-history keyword suppression is conservative. A keyword line is marked
+`stale-history` with `disposition: "suppress-replay"` only when it appears at or
+before an explicit recovery/terminal marker such as `npm test passed`,
+`tests passed`, `PR #379 opened`, `ralplan terminal`, `tmux session killed`, or
+`process exited code 0`. Keyword lines after the last marker, and keyword lines
+with no marker at all, remain `current` with `disposition: "inspect"` so fresh
+errors are not hidden by scrollback cleanup.
+
+The JSON output exposes line-auditable `tmuxHistory` rows plus
+`tmuxHistorySummary` counts. Use `tmuxHistorySummary.disposition === "inspect"`
+as a hard signal that the pasted pane still contains a current blocker-looking
+line; use `suppress-replay` only for stale-only keyword evidence.
+
 Offline verification example:
 
 ```sh

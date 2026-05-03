@@ -804,3 +804,271 @@ test("CI alert triage dedupes duplicate current main success run and job URLs", 
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("CI alert triage suppresses stale tmux pane history blockers after recovery markers", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-tmux-stale-history-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 3790,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "fooks-issue-376-prune-remote-branch-noise",
+      event: "pull_request",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-02T13:00:00Z",
+      updatedAt: "2026-05-02T13:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/3790",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "src/foo.ts(12,9): error TS7006: Parameter 'event' implicitly has an 'any' type.",
+    "npm test passed",
+    "PR #379 opened",
+    "ralplan terminal",
+    "tmux session killed",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.counts.actionable ?? 0, 0);
+    assert.equal(result.tmuxHistorySummary.verdict, "stale-history-replay");
+    assert.equal(result.tmuxHistorySummary.totalKeywordLines, 1);
+    assert.equal(result.tmuxHistorySummary.staleKeywordLines, 1);
+    assert.equal(result.tmuxHistorySummary.currentKeywordLines, 0);
+    assert.equal(result.tmuxHistorySummary.lastMarkerLine, 5);
+    assert.equal(result.tmuxHistory[0].evidence, "stale-history");
+    assert.equal(result.tmuxHistory[0].verdict, "tmux-history-replay");
+    assert.equal(result.tmuxHistory[0].disposition, "suppress-replay");
+    assert.match(result.tmuxHistory[0].reason, /before recovery\/terminal marker/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage keeps fresh tmux blockers after recovery markers inspectable", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-tmux-fresh-history-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 3880,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "fix/issue-388-stale-tmux-error-realert",
+      event: "pull_request",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-03T08:00:00Z",
+      updatedAt: "2026-05-03T08:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/3880",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "npm test passed",
+    "PR #379 opened",
+    "new command output after recovery",
+    "src/current.ts(4,2): error TS7006: Parameter 'value' implicitly has an 'any' type.",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.tmuxHistorySummary.verdict, "fresh-blocker");
+    assert.equal(result.tmuxHistorySummary.totalKeywordLines, 1);
+    assert.equal(result.tmuxHistorySummary.staleKeywordLines, 0);
+    assert.equal(result.tmuxHistorySummary.currentKeywordLines, 1);
+    assert.equal(result.tmuxHistorySummary.lastMarkerLine, 2);
+    assert.equal(result.tmuxHistory[0].evidence, "current");
+    assert.equal(result.tmuxHistory[0].verdict, "fresh-blocker");
+    assert.equal(result.tmuxHistory[0].disposition, "inspect");
+    assert.match(result.tmuxHistory[0].reason, /after recovery\/terminal marker/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage treats tmux blocker keywords without recovery markers as current", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-tmux-no-marker-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([]));
+  fs.writeFileSync(alertsPath, "src/current.ts(4,2): error TS7006: Parameter 'value' implicitly has an 'any' type.\n");
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.tmuxHistorySummary.disposition, "inspect");
+    assert.equal(result.tmuxHistorySummary.verdict, "fresh-blocker");
+    assert.equal(result.tmuxHistorySummary.lastMarkerLine, null);
+    assert.equal(result.tmuxHistory[0].matchedKeyword, "error");
+    assert.equal(result.tmuxHistory[0].evidence, "current");
+    assert.equal(result.tmuxHistory[0].disposition, "inspect");
+    assert.match(result.tmuxHistory[0].reason, /no later recovery\/terminal marker/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage keeps URL actionable evidence inspectable when tmux history is stale", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-url-actionable-tmux-stale-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 9901,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      event: "push",
+      status: "completed",
+      conclusion: "failure",
+      createdAt: "2026-05-03T08:00:00Z",
+      updatedAt: "2026-05-03T08:05:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/9901",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "old pane line: error TS7006 from prior attempt",
+    "npm test passed",
+    "fresh CI URL still failing https://github.com/minislively/fooks/actions/runs/9901",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.alertSummary.actionableAlertCount, 1);
+    assert.equal(result.alerts[0].evidence, "actionable");
+    assert.equal(result.alerts[0].disposition, "inspect");
+    assert.equal(result.tmuxHistorySummary.disposition, "suppress-replay");
+    assert.equal(result.tmuxHistory[0].disposition, "suppress-replay");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage recognizes process exited code 0 as a tmux recovery marker", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-tmux-process-exited-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([]));
+  fs.writeFileSync(alertsPath, [
+    "src/x.ts: error TS7006",
+    "process exited code 0",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.tmuxHistorySummary.lastMarkerLine, 2);
+    assert.equal(result.tmuxHistorySummary.disposition, "suppress-replay");
+    assert.equal(result.tmuxHistory[0].evidence, "stale-history");
+    assert.equal(result.tmuxHistory[0].disposition, "suppress-replay");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage does not let benign error counts hide failed keywords", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-tmux-failed-zero-errors-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([]));
+  fs.writeFileSync(alertsPath, [
+    "summary: 1 failed, 0 errors",
+    "npm test passed",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.tmuxHistorySummary.totalKeywordLines, 1);
+    assert.equal(result.tmuxHistorySummary.staleKeywordLines, 1);
+    assert.equal(result.tmuxHistory[0].matchedKeyword, "failed");
+    assert.equal(result.tmuxHistory[0].evidence, "stale-history");
+    assert.equal(result.tmuxHistory[0].disposition, "suppress-replay");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

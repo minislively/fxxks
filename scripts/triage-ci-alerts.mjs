@@ -12,6 +12,16 @@ const OMITTED_ALERT_RUN_EVIDENCE_LIMIT = 12;
 const STALE_CONCLUSIONS = new Set(["cancelled", "skipped"]);
 const ACTIONABLE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure"]);
 const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
+const TMUX_BLOCKER_PATTERN = /\b(TS\d{4}|error|errors|failed|failure|exception)\b/i;
+const TMUX_NON_BLOCKER_PATTERN = /\b(?:0|zero|no)\s+errors?\b/i;
+const TMUX_RECOVERY_PATTERNS = [
+  /\bnpm\s+(?:run\s+)?test\b.*\bpass(?:ed|ing)?\b/i,
+  /\btests?\s+pass(?:ed|ing)?\b/i,
+  /\bPR\s+#?\d+\s+(?:opened|created|ready|merged)\b/i,
+  /\bralplan\s+terminal\b/i,
+  /\btmux\s+session\s+(?:killed|terminated|closed|exited)\b/i,
+  /\b(?:process\s+)?exited\s+(?:with\s+)?code\s+0\b/i,
+];
 
 function parseArgs(argv) {
   const options = {
@@ -95,6 +105,63 @@ function readAlertText(alertsInput) {
   if (!alertsInput) return "";
   if (alertsInput === "-") return fs.readFileSync(0, "utf8");
   return fs.readFileSync(path.resolve(repoRoot, alertsInput), "utf8");
+}
+
+function matchedTmuxKeyword(line) {
+  const withoutBenignErrorCounts = line.replace(TMUX_NON_BLOCKER_PATTERN, "");
+  return withoutBenignErrorCounts.match(TMUX_BLOCKER_PATTERN)?.[1] ?? "";
+}
+
+function isTmuxRecoveryLine(line) {
+  return TMUX_RECOVERY_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function buildTmuxHistoryEvidence(alertText) {
+  const rawLines = String(alertText || "").split(/\r?\n/);
+  const lines = rawLines.map((text, index) => ({
+    line: index + 1,
+    text,
+    marker: isTmuxRecoveryLine(text),
+    matchedKeyword: matchedTmuxKeyword(text),
+  }));
+  const markerLines = lines.filter((line) => line.marker);
+  const lastRecoveryLine = markerLines.length ? markerLines.at(-1).line : null;
+  const rows = lines
+    .filter((line) => line.matchedKeyword)
+    .map((line) => {
+      const staleHistory = lastRecoveryLine !== null && line.line <= lastRecoveryLine;
+      return {
+        lineNumber: line.line,
+        excerpt: line.text.trim(),
+        matchedKeyword: line.matchedKeyword,
+        lastRecoveryMarkerLine: lastRecoveryLine,
+        evidence: staleHistory ? "stale-history" : "current",
+        verdict: staleHistory ? "tmux-history-replay" : "fresh-blocker",
+        disposition: staleHistory ? "suppress-replay" : "inspect",
+        reason: staleHistory
+          ? `blocker keyword appears before recovery/terminal marker on line ${lastRecoveryLine}`
+          : lastRecoveryLine === null
+            ? "blocker keyword has no later recovery/terminal marker in pasted pane history"
+            : `blocker keyword appears after recovery/terminal marker on line ${lastRecoveryLine}`,
+      };
+    });
+  const staleHistoryCount = rows.filter((row) => row.evidence === "stale-history").length;
+  const freshBlockerCount = rows.filter((row) => row.disposition === "inspect").length;
+
+  return {
+    rows,
+    summary: {
+      mode: alertText ? "scanned" : "empty",
+      totalLines: rawLines.length === 1 && rawLines[0] === "" ? 0 : rawLines.length,
+      recoveryMarkerCount: markerLines.length,
+      lastMarkerLine: lastRecoveryLine,
+      totalKeywordLines: rows.length,
+      staleKeywordLines: staleHistoryCount,
+      currentKeywordLines: freshBlockerCount,
+      disposition: freshBlockerCount > 0 ? "inspect" : staleHistoryCount > 0 ? "suppress-replay" : "none",
+      verdict: freshBlockerCount > 0 ? "fresh-blocker" : staleHistoryCount > 0 ? "stale-history-replay" : "no-keyword-evidence",
+    },
+  };
 }
 
 function normalizePositiveInteger(value) {
@@ -455,6 +522,24 @@ function alertEvidenceTable(alerts, summary) {
   return `${lines.join("\n")}\n\n`;
 }
 
+function tmuxHistoryTable(rows, summary) {
+  if (!summary || summary.totalKeywordLines === 0) return "";
+  const lines = [
+    "## Tmux pane history keyword evidence",
+    "",
+    `Verdict: \`${escapeMarkdown(summary.verdict)}\`; disposition: \`${escapeMarkdown(summary.disposition)}\`. Recovery/terminal markers: ${summary.recoveryMarkerCount}; last marker line: ${summary.lastMarkerLine ?? "-"}. Fresh blocker lines needing inspection: ${summary.currentKeywordLines}; stale history replay lines: ${summary.staleKeywordLines}.`,
+    "",
+    "Use `disposition=suppress-replay` only when the blocker keyword is older than the recovery/terminal marker. Lines after the marker remain `inspect` so fresh errors are not suppressed.",
+    "",
+    "| Disposition | Evidence | Line | Reason | Text |",
+    "| --- | --- | --- | --- | --- |",
+  ];
+  for (const row of rows) {
+    lines.push(`| ${row.disposition} | ${row.evidence} | ${row.lineNumber} | ${escapeMarkdown(row.reason)} | ${escapeMarkdown(row.excerpt)} |`);
+  }
+  return `${lines.join("\n")}\n\n`;
+}
+
 function renderMarkdown(result) {
   const actionable = result.rows.filter((row) => row.bucket === "actionable" || row.bucket === "watch");
   const stale = result.rows.filter((row) => row.bucket === "stale");
@@ -477,8 +562,10 @@ Use this report to collapse replayed GitHub Actions alert buffers: inspect only 
 - Pasted alert evidence needing inspection: ${result.alertSummary?.actionableAlertCount ?? 0}
 - Verification-only current-main echoes: ${result.alertSummary?.verificationOnlyCount ?? 0}
 - Stale success replay evidence: ${result.alertSummary?.staleSuccessReplayCount ?? 0}
+- Tmux pane history fresh blockers: ${result.tmuxHistorySummary?.currentKeywordLines ?? 0}
+- Tmux pane history stale replay lines: ${result.tmuxHistorySummary?.staleKeywordLines ?? 0}
 
-${alertEvidenceTable(result.alerts, result.alertSummary)}## Actionable / watch
+${alertEvidenceTable(result.alerts, result.alertSummary)}${tmuxHistoryTable(result.tmuxHistory, result.tmuxHistorySummary)}## Actionable / watch
 
 ${markdownTable(actionable)}
 ## Stale replay rows
@@ -490,11 +577,15 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const rawRuns = readRuns(options);
   if (!Array.isArray(rawRuns)) throw new Error("Expected an array of GitHub Actions runs");
+  const alertText = readAlertText(options.alertsInput);
   const result = classifyRuns(rawRuns);
-  const alertRefs = extractAlertRunRefs(readAlertText(options.alertsInput));
+  const alertRefs = extractAlertRunRefs(alertText);
   const alertEvidence = buildAlertEvidence(alertRefs, result.rows, options);
+  const tmuxHistoryEvidence = buildTmuxHistoryEvidence(alertText);
   result.alerts = alertEvidence.alerts;
   result.alertSummary = alertEvidence.summary;
+  result.tmuxHistory = tmuxHistoryEvidence.rows;
+  result.tmuxHistorySummary = tmuxHistoryEvidence.summary;
   const output = options.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : renderMarkdown(result);
 
   if (options.output) fs.writeFileSync(path.resolve(repoRoot, options.output), output);
