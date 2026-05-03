@@ -105,6 +105,11 @@ printf '%s\n' '[]'
       env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    assert.match(markdown, /## Safe closeout procedure/);
+    assert.match(markdown, /evidence, not authority/);
+    assert.match(markdown, /does not approve remote deletion, merging branch tips, or replaying stale-tree deletes/);
+    assert.match(markdown, /Do not delete, merge, or replay changes from this artifact alone/);
+    assert.match(markdown, /remote pruning requires explicit operator approval/);
     assert.match(markdown, /## Discord-friendly valid-candidate next-action shortlist/);
     assert.match(markdown, /Read-only operator shortlist for Discord handoff/);
     assert.match(markdown, /does not recommend deleting branches or merging code/);
@@ -231,6 +236,8 @@ JSON
       stdio: ["ignore", "pipe", "pipe"],
     });
     assert.match(markdown, /Archived valid candidates suppressed: 2/);
+    assert.match(markdown, /## Safe closeout procedure/);
+    assert.match(markdown, /Confirm the fresh audit still reports 1 valid-candidate branches and 1 open PR branches/);
     assert.match(markdown, /## Archived valid candidates/);
     assert.match(markdown, /not a recommendation to delete remote branches, merge stale trees, or replay stale-tree deletes/);
     assert.doesNotMatch(markdown.split("## Discord-friendly valid-candidate next-action shortlist")[1].split("## Valid candidates without open PRs")[0], /feature-archived/);
