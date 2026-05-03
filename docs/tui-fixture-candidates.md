@@ -34,6 +34,27 @@ Start with a small source-only corpus before any extractor or runtime change:
 4. **Command status/progress fixture** — one component that renders command status or progress UI without requiring command execution to interpret it.
 5. **Negative/fallback fixture** — one file that looks like CLI code but should remain full-source because it is non-React, mixed-domain, generated, or too behavior-heavy.
 
+## Current evidence-only reinforcement slice
+
+The current committed TUI / Ink fixtures are useful as domain evidence, not as compact-payload permission:
+
+| Fixture | Evidence it should prove | Required current outcome |
+| --- | --- | --- |
+| `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | Ink import, `Box`, `Text`, and `useInput` signals in a compact React CLI component. | Classify as `tui-ink`, mark the profile `evidence-only`, deny the TUI payload policy, and fall back with `unsupported-frontend-domain-profile`. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | Ink import, `Box`, `Text`, `useInput`, keyboard navigation, selected-row rendering, and list mapping in a behavior-heavy prompt surface. | Classify as `tui-ink`, keep the profile `evidence-only`, deny the TUI payload policy, emit no payload, and fall back through the readiness/profile gate. The current pre-read reason is `raw-mode` because extraction preserves the original raw source before any TUI payload could be emitted. |
+
+This reinforcement slice is intentionally small so it can run alongside RN, React Web, and WebView worktrees without touching shared detector, runtime, manifest, or payload-policy implementation files. A TUI fixture PR should prove the evidence boundary above before it proposes any source or runtime change.
+
+Reviewers should check that TUI evidence remains separate from payload permission:
+
+1. Classification may say `tui-ink`.
+2. Profile claim status must stay `evidence-only`.
+3. Payload policy must stay denied with the TUI evidence-only reason.
+4. Pre-read must keep normal source fallback through `unsupported-frontend-domain-profile`, `raw-mode`, or another explicit denied-readiness reason that emits no payload.
+5. No model-facing payload should be emitted for these fixtures.
+
+Any future step that changes one of those outcomes is no longer a fixture reinforcement PR; it needs a serialized shared-policy plan with its own fixtures, measured acceptance bar, and claim-boundary review.
+
 ## Candidate source notes
 
 If a future PR names public repositories, keep the list conservative and verify license, activity, file paths, and commit SHAs at that time. Good seed sources are likely to be established Ink examples, React-based CLI apps, or prompt/status UI components with inspectable TSX/JSX. Do not use curated lists, stale forks, or runtime-only demos as evidence fixtures unless a pinned source file clearly exercises one category above.
