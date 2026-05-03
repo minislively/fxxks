@@ -98,3 +98,22 @@ test("release smoke: WebView boundary falls back instead of becoming React Web s
   assert.equal(domainDetection.profile.claimStatus, "fallback-boundary");
   assert.ok(domainDetection.signals.includes("webview:component:WebView"));
 });
+
+test("release smoke: React Native boundary falls back instead of becoming React Web support", () => {
+  const { first, second } = repeatedPrompt(
+    "test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx",
+    "react-native-boundary",
+  );
+
+  assert.equal(first.action, "record");
+  assert.equal(second.action, "fallback");
+  assert.equal(second.debug.decision.decision, "fallback");
+  assert.deepEqual(second.debug.decision.reasons, ["unsupported-frontend-domain-profile"]);
+  assert.equal(second.debug.decision.fallback.reason, "unsupported-frontend-domain-profile");
+  assert.equal("payload" in second.debug.decision, false);
+
+  const domainDetection = second.debug.decision.debug.domainDetection;
+  assert.equal(domainDetection.classification, "react-native");
+  assert.equal(domainDetection.profile.claimStatus, "fallback-boundary");
+  assert.notEqual(domainDetection.classification, "react-web");
+});
