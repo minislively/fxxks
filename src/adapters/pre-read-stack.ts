@@ -144,13 +144,15 @@ export function buildPreReadDecisionFromPayloadPlan(input: PreReadDecisionFromPa
       });
     }
 
+    const reason = input.domainDetection.reason ?? profileGate.reason;
     return buildPreReadFallbackDecision({
       runtime: input.runtime,
       filePath: input.filePath,
       eligible: true,
-      reasons: [profileGate.reason],
+      reasons: [reason],
       readiness: input.readiness,
-      debug: input.debug,
+      debug: frontendDebug(input.domainDetection, input.frontendPayloadPolicy),
+      fallbackReason: reason,
     });
   }
 
