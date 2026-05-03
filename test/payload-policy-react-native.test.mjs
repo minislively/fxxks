@@ -29,6 +29,14 @@ function detect(source, filePath = "Native.tsx") {
   return detectDomainFromSource(source, filePath);
 }
 
+function fixturePath(fileName) {
+  return path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", fileName);
+}
+
+function fixtureSource(fileName) {
+  return fs.readFileSync(fixturePath(fileName), "utf8");
+}
+
 function rnPrimitiveInputSource(extraJsx = "") {
   return `import { View, Text, TextInput, Pressable } from "react-native";
     export function NativeInput() {
@@ -53,6 +61,86 @@ test("React Native payload policy allows the measured primitive/input signal set
     name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
     allowed: true,
   });
+});
+
+
+test("React Native F13 inline action fixture remains inside the narrow payload lane", () => {
+  const filePath = fixturePath("rn-primitive-inline-action.tsx");
+  const domainDetection = detect(fixtureSource("rn-primitive-inline-action.tsx"), filePath);
+
+  assert.equal(domainDetection.classification, "react-native");
+  assert.deepEqual(assessReactNativePayloadPolicy(domainDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: true,
+  });
+
+  const payload = buildReactNativePrimitiveInputDomainPayload(
+    {
+      componentName: "InlineActionRow",
+      exports: [],
+      behavior: {},
+      structure: {},
+      domainDetection,
+    },
+    domainDetection,
+  );
+
+  assert.equal(payload?.domain, "react-native");
+  assert.equal(payload?.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(payload?.plannerDecision, "narrow-primitive-input-payload");
+  assert.equal(payload?.claimStatus, "measured-evidence-only");
+  assert.equal(payload?.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(payload?.reuseContract.supportBoundary, "measured-evidence-only; no broad RN/WebView/TUI support");
+  assert.deepEqual(payload?.reuseContract.requiredSignals, [...RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS]);
+
+  const preReadDecision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
+  assert.equal(preReadDecision.decision, "payload");
+  assert.equal(preReadDecision.payload.domainPayload.domain, "react-native");
+  assert.equal(preReadDecision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(preReadDecision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(preReadDecision.debug.domainDetection.classification, "react-native");
+  assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
+});
+
+test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {
+  const richerFixtures = [
+    ["rn-style-platform-navigation.tsx", /^forbidden-signal:react-native:primitive:ScrollView/],
+    ["rn-interaction-gesture.tsx", /^forbidden-signal:react-native:primitive:FlatList/],
+    ["rn-image-scrollview.tsx", /^forbidden-signal:react-native:primitive:Image/],
+  ];
+
+  for (const [fileName, expectedReason] of richerFixtures) {
+    const filePath = fixturePath(fileName);
+    const domainDetection = detect(fixtureSource(fileName), filePath);
+    const policy = assessReactNativePayloadPolicy(domainDetection);
+
+    assert.equal(domainDetection.classification, "react-native", fileName);
+    assert.equal(policy?.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY, fileName);
+    assert.equal(policy?.allowed, false, fileName);
+    assert.match(policy?.reason, expectedReason, fileName);
+    assert.equal(
+      buildReactNativePrimitiveInputDomainPayload(
+        {
+          componentName: "RicherNativeFixture",
+          exports: [],
+          behavior: {},
+          structure: {},
+          domainDetection,
+        },
+        domainDetection,
+      ),
+      undefined,
+      `${fileName} must not build an RN narrow domain payload`,
+    );
+
+    const preReadDecision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
+    assert.equal(preReadDecision.decision, "fallback", fileName);
+    assert.equal("payload" in preReadDecision, false, `${fileName} fallback must not expose payload`);
+    assert.equal("readiness" in preReadDecision, false, `${fileName} fallback must not expose readiness`);
+    assert.equal(preReadDecision.fallback.reason, "unsupported-frontend-domain-profile", fileName);
+    assert.equal(preReadDecision.debug.domainDetection.classification, "react-native", fileName);
+    assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, false, fileName);
+  }
 });
 
 test("React Native payload policy denies missing required primitive/input signals with stable reasons", () => {
