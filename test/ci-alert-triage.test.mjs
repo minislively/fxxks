@@ -439,6 +439,153 @@ test("CI alert triage identifies replayed historical main alerts for suppression
   }
 });
 
+test("CI alert triage classifies cancelled main run as superseded only with later success evidence", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-superseded-cancel-success-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 25288224129,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      headSha: "ce4848a",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-03T18:12:00Z",
+      updatedAt: "2026-05-03T18:14:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/25288224129",
+    },
+    {
+      databaseId: 25288202907,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      headSha: "c0d5ac7",
+      event: "push",
+      status: "completed",
+      conclusion: "cancelled",
+      createdAt: "2026-05-03T18:02:00Z",
+      updatedAt: "2026-05-03T18:04:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/25288202907",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "stacked merge cancelled main echo https://github.com/minislively/fooks/actions/runs/25288202907",
+    "later green main evidence https://github.com/minislively/fooks/actions/runs/25288224129",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
+    const cancelledEcho = byAlertId.get("25288202907");
+    const laterSuccess = byAlertId.get("25288224129");
+
+    assert.equal(cancelledEcho.verdict, "superseded-main-ci-cancel-echo");
+    assert.equal(cancelledEcho.supersededMainCancellationEcho, true);
+    assert.equal(cancelledEcho.replay, true);
+    assert.equal(cancelledEcho.disposition, "suppress-replay");
+    assert.equal(cancelledEcho.currentRunId, 25288224129);
+    assert.equal(cancelledEcho.headSha, "c0d5ac7");
+    assert.equal(cancelledEcho.latestHeadSha, "ce4848a");
+    assert.equal(cancelledEcho.latestConclusion, "success");
+    assert.equal(cancelledEcho.reason, "cancelled main run superseded by successful run 25288224129");
+
+    assert.equal(laterSuccess.verdict, "current-main-echo");
+    assert.equal(laterSuccess.disposition, "verification-only");
+    assert.equal(result.alertSummary.supersededMainCancellationEchoCount, 1);
+    assert.equal(result.alertSummary.currentMainEchoCount, 1);
+    assert.equal(result.alertSummary.staleReplayCount, 1);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage does not suppress cancelled main run without later success evidence", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-cancel-no-success-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 25288230000,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      headSha: "badf00d",
+      event: "push",
+      status: "completed",
+      conclusion: "failure",
+      createdAt: "2026-05-03T18:12:00Z",
+      updatedAt: "2026-05-03T18:14:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/25288230000",
+    },
+    {
+      databaseId: 25288202907,
+      workflowName: "CI",
+      name: "Validate",
+      headBranch: "main",
+      headSha: "c0d5ac7",
+      event: "push",
+      status: "completed",
+      conclusion: "cancelled",
+      createdAt: "2026-05-03T18:02:00Z",
+      updatedAt: "2026-05-03T18:04:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/25288202907",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, "cancelled main echo without green successor https://github.com/minislively/fooks/actions/runs/25288202907\n");
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "main",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const cancelledEcho = result.alerts[0];
+
+    assert.equal(result.counts.actionable, 1);
+    assert.equal(cancelledEcho.evidence, "stale");
+    assert.equal(cancelledEcho.verdict, "stale");
+    assert.equal(cancelledEcho.supersededMainCancellationEcho, false);
+    assert.equal(cancelledEcho.replay, false);
+    assert.equal(cancelledEcho.disposition, "review");
+    assert.equal(cancelledEcho.currentRunId, 25288230000);
+    assert.equal(cancelledEcho.latestConclusion, "failure");
+    assert.equal(cancelledEcho.reason, "cancelled main run has no later success evidence");
+    assert.equal(result.alertSummary.supersededMainCancellationEchoCount, 0);
+    assert.equal(result.alertSummary.staleReplayCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("CI alert triage does not call a latest cancelled alert a historical replay", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-replay-negative-"));
   const runsPath = path.join(tempDir, "runs.json");
@@ -475,9 +622,9 @@ test("CI alert triage does not call a latest cancelled alert a historical replay
     });
     const result = JSON.parse(stdout);
     assert.equal(result.alerts[0].evidence, "stale");
-    assert.equal(result.alerts[0].reason, "completed cancelled");
+    assert.equal(result.alerts[0].reason, "cancelled main run has no later success evidence");
     assert.equal(result.alerts[0].replay, false);
-    assert.equal(result.alerts[0].disposition, "suppress-stale");
+    assert.equal(result.alerts[0].disposition, "review");
     assert.equal(result.alerts[0].replayReason, "");
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

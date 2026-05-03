@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,7 +65,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/triage-ci-alerts.mjs [options]\n\nClassifies recent GitHub Actions CI runs so replayed alert buffers can be skimmed\nfor only the latest actionable failures. Cancelled/skipped runs and older runs\nsuperseded by newer runs on the same workflow+branch are marked stale.\n\nOptions:\n  --input <path>     Read gh run list JSON from a file instead of invoking gh\n  --alerts <path>    Read pasted alert text / run URLs from a file, or - for stdin\n  --limit <n>        Number of runs to fetch when using gh (default: ${DEFAULT_LIMIT})\n  --branch <name>    Restrict to a branch/head branch\n  --workflow <name>  Restrict to a workflow display name\n  --json             Emit machine-readable JSON instead of markdown\n  --markdown         Emit markdown (default)\n  --output <path>    Write output to a file instead of stdout\n  -h, --help         Show this help\n\nLive usage:\n  npm run --silent ci:alerts -- --branch main\n\nOffline/replay usage:\n  gh run list --limit 100 --json attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url > /tmp/runs.json\n  npm run --silent ci:alerts -- --input /tmp/runs.json --json
+  console.log(`Usage: node scripts/triage-ci-alerts.mjs [options]\n\nClassifies recent GitHub Actions CI runs so replayed alert buffers can be skimmed\nfor only the latest actionable failures. Cancelled/skipped runs and older runs\nsuperseded by newer runs on the same workflow+branch are marked stale.\n\nOptions:\n  --input <path>     Read gh run list JSON from a file instead of invoking gh\n  --alerts <path>    Read pasted alert text / run URLs from a file, or - for stdin\n  --limit <n>        Number of runs to fetch when using gh (default: ${DEFAULT_LIMIT})\n  --branch <name>    Restrict to a branch/head branch\n  --workflow <name>  Restrict to a workflow display name\n  --json             Emit machine-readable JSON instead of markdown\n  --markdown         Emit markdown (default)\n  --output <path>    Write output to a file instead of stdout\n  -h, --help         Show this help\n\nLive usage:\n  npm run --silent ci:alerts -- --branch main\n\nOffline/replay usage:\n  gh run list --limit 100 --json attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,event,name,workflowName,url > /tmp/runs.json\n  npm run --silent ci:alerts -- --input /tmp/runs.json --json
 
 Pasted alert URL usage:
   pbpaste > /tmp/discord-alerts.txt
@@ -88,17 +88,21 @@ function readRuns(options) {
     "--limit",
     String(options.limit),
     "--json",
-    "attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url",
+    "attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,event,name,workflowName,url",
   ];
   if (options.branch) args.push("--branch", options.branch);
   if (options.workflow) args.push("--workflow", options.workflow);
 
-  const stdout = execFileSync("gh", args, {
+  const result = spawnSync("gh", args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  return JSON.parse(stdout);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `gh run list exited with status ${result.status}`);
+  }
+  return JSON.parse(result.stdout);
 }
 
 function readAlertText(alertsInput) {
@@ -201,6 +205,7 @@ function normalizeRun(run) {
     name: run.name || run.workflowName || "unknown-run",
     branch: run.headBranch || "unknown-branch",
     event: run.event || "unknown-event",
+    headSha: run.headSha || "",
     status: run.status || "unknown-status",
     conclusion: run.conclusion || "",
     attempt: normalizePositiveInteger(run.attempt),
@@ -218,9 +223,41 @@ function alertEvidenceState(row) {
   return "current";
 }
 
-function isHistoricalReplayEvidence(row, isStaleAttempt) {
+function isLaterSuccessfulRunEvidence(row) {
+  return row
+    && row.latestRunId !== null
+    && row.id !== null
+    && String(row.latestRunId) !== String(row.id)
+    && row.latestStatus === "completed"
+    && row.latestConclusion === "success"
+    && row.latestUpdatedAt
+    && runTime({ updatedAt: row.latestUpdatedAt }) > runTime(row);
+}
+
+function isSupersededMainCancellationEcho(row, focusBranch) {
+  return row
+    && row.bucket === "stale"
+    && row.branch === focusBranch
+    && row.status === "completed"
+    && row.conclusion === "cancelled"
+    && isLaterSuccessfulRunEvidence(row);
+}
+
+function needsMainCancellationSuccessEvidence(row, focusBranch) {
+  return row
+    && row.bucket === "stale"
+    && row.branch === focusBranch
+    && row.status === "completed"
+    && row.conclusion === "cancelled"
+    && !isLaterSuccessfulRunEvidence(row);
+}
+
+function isHistoricalReplayEvidence(row, isStaleAttempt, focusBranch) {
   if (isStaleAttempt) return true;
   if (!row || row.bucket !== "stale") return false;
+  if (row.branch === focusBranch && row.conclusion === "cancelled") {
+    return isLaterSuccessfulRunEvidence(row);
+  }
   return row.latestRunId !== null && row.id !== null && String(row.latestRunId) !== String(row.id);
 }
 
@@ -235,8 +272,9 @@ function isCurrentMainSuccessEcho(row, focusBranch) {
     && String(row.latestRunId) === String(row.id);
 }
 
-function alertDisposition(evidence, replay, echo = false) {
+function alertDisposition(evidence, replay, echo = false, review = false) {
   if (evidence === "actionable" || evidence === "watch") return "inspect";
+  if (review) return "review";
   if (echo) return "verification-only";
   if (replay) return "suppress-replay";
   if (evidence === "stale") return "suppress-stale";
@@ -250,15 +288,25 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
     const row = rowsById.get(ref.id);
     const currentAttempt = row?.attempt ?? null;
     const isStaleAttempt = ref.alertedAttempt !== null && currentAttempt !== null && ref.alertedAttempt < currentAttempt;
-    const replay = isHistoricalReplayEvidence(row, isStaleAttempt);
+    const replay = isHistoricalReplayEvidence(row, isStaleAttempt, focusBranch);
     const echo = !isStaleAttempt && isCurrentMainSuccessEcho(row, focusBranch);
+    const supersededMainCancellationEcho = !isStaleAttempt && isSupersededMainCancellationEcho(row, focusBranch);
+    const cancellationNeedsSuccessEvidence = !isStaleAttempt && needsMainCancellationSuccessEvidence(row, focusBranch);
     const evidence = isStaleAttempt ? "stale" : alertEvidenceState(row);
-    const verdict = echo ? "current-main-echo" : evidence;
+    const verdict = echo
+      ? "current-main-echo"
+      : supersededMainCancellationEcho
+        ? "superseded-main-ci-cancel-echo"
+        : evidence;
     const reason = isStaleAttempt
       ? `superseded by attempt ${currentAttempt}`
       : echo
         ? `verification-only current ${focusBranch} success echo`
-        : row?.reason ?? "run URL was not present in the inspected gh run list window";
+        : supersededMainCancellationEcho
+          ? `cancelled ${focusBranch} run superseded by successful run ${row.latestRunId}`
+          : cancellationNeedsSuccessEvidence
+            ? `cancelled ${focusBranch} run has no later success evidence`
+            : row?.reason ?? "run URL was not present in the inspected gh run list window";
     return {
       alertedRunId: ref.id,
       alertedAttempt: ref.alertedAttempt,
@@ -267,8 +315,9 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
       evidence,
       verdict,
       echo,
+      supersededMainCancellationEcho,
       replay,
-      disposition: alertDisposition(evidence, replay, echo),
+      disposition: alertDisposition(evidence, replay, echo, cancellationNeedsSuccessEvidence),
       reason,
       replayReason: replay ? `historical replay of ${reason}` : "",
       currentRunId: row?.latestRunId ?? null,
@@ -278,6 +327,11 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
       status: row?.status ?? "",
       conclusion: row?.conclusion ?? "",
       updatedAt: row?.updatedAt ?? "",
+      headSha: row?.headSha ?? "",
+      latestStatus: row?.latestStatus ?? "",
+      latestConclusion: row?.latestConclusion ?? "",
+      latestHeadSha: row?.latestHeadSha ?? "",
+      latestUpdatedAt: row?.latestUpdatedAt ?? "",
       runUrl: ref.url,
     };
   });
@@ -308,6 +362,7 @@ function summarizeOmittedAlerts(omitted) {
         evidence: alert.evidence || "unknown",
         disposition: alert.disposition || "review",
         replay: Boolean(alert.replay),
+        supersededMainCancellationEcho: Boolean(alert.supersededMainCancellationEcho),
       });
     }
   }
@@ -336,6 +391,7 @@ function alertSummaryFields(allEvidence, focusBranch) {
     currentHeadCount: currentHeadRunIds.length,
     currentHeadRunIds,
     currentMainEchoCount: allEvidence.filter((alert) => alert.echo).length,
+    supersededMainCancellationEchoCount: allEvidence.filter((alert) => alert.supersededMainCancellationEcho).length,
     verificationOnlyCount: allEvidence.filter((alert) => alert.disposition === "verification-only").length,
     actionableAlertCount: allEvidence.filter((alert) => alert.disposition === "inspect").length,
     staleReplayCount: allEvidence.filter((alert) => alert.replay).length,
@@ -447,7 +503,16 @@ function classifyRuns(rawRuns) {
       reason = `latest ${run.conclusion}`;
     }
 
-    return { ...run, bucket, reason, latestRunId: latest?.id ?? null };
+    return {
+      ...run,
+      bucket,
+      reason,
+      latestRunId: latest?.id ?? null,
+      latestStatus: latest?.status ?? "",
+      latestConclusion: latest?.conclusion ?? "",
+      latestHeadSha: latest?.headSha ?? "",
+      latestUpdatedAt: latest?.updatedAt ?? latest?.createdAt ?? "",
+    };
   });
 
   const counts = rows.reduce((acc, row) => {
@@ -561,6 +626,7 @@ Use this report to collapse replayed GitHub Actions alert buffers: inspect only 
 - Pasted alert evidence omitted: ${result.alertSummary?.omitted ?? 0}
 - Pasted alert evidence needing inspection: ${result.alertSummary?.actionableAlertCount ?? 0}
 - Verification-only current-main echoes: ${result.alertSummary?.verificationOnlyCount ?? 0}
+- Superseded main cancellation echoes: ${result.alertSummary?.supersededMainCancellationEchoCount ?? 0}
 - Stale success replay evidence: ${result.alertSummary?.staleSuccessReplayCount ?? 0}
 - Tmux pane history fresh blockers: ${result.tmuxHistorySummary?.currentKeywordLines ?? 0}
 - Tmux pane history stale replay lines: ${result.tmuxHistorySummary?.staleKeywordLines ?? 0}

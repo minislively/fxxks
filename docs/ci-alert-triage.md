@@ -22,6 +22,16 @@ fresh development investigation unless a newer actionable/watch run appears.
 Historical success URLs in the same paste stay bounded by compact mode and are
 noise-counted as stale replay rows.
 
+Cancelled `main` CI URLs are cut even more narrowly. A pasted cancelled
+`main` run is classified with `verdict: "superseded-main-ci-cancel-echo"`,
+`supersededMainCancellationEcho: true`, and `disposition: "suppress-replay"`
+only when the inspected run window also contains a later completed successful
+run on the same workflow/branch/event key. The JSON row keeps the cancelled
+`headSha` plus `latestHeadSha`, `latestConclusion`, and `latestUpdatedAt` so an
+operator can see the newer green head evidence. If that later success evidence
+is absent, the cancelled `main` alert stays `disposition: "review"` and is not
+counted as stale replay.
+
 ## Tmux pane-history keyword replay
 
 `ci:alerts --alerts <file>` also scans pasted tmux pane text for blocker-looking
@@ -45,7 +55,7 @@ line; use `suppress-replay` only for stale-only keyword evidence.
 Offline verification example:
 
 ```sh
-gh run list --limit 100 --json attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,event,name,workflowName,url > /tmp/runs.json
+gh run list --limit 100 --json attempt,databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,event,name,workflowName,url > /tmp/runs.json
 pbpaste > /tmp/clawhip-alerts.txt
 npm run --silent ci:alerts -- --input /tmp/runs.json --alerts /tmp/clawhip-alerts.txt --branch main --json
 ```
