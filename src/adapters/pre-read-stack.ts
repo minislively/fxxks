@@ -111,6 +111,34 @@ function reactWebContextPayloadBudget(rawSizeBytes: number): number {
   );
 }
 
+function trimEditTargetRoutingToBudget(
+  payload: NonNullable<PreReadDecision["payload"]>,
+  maxPayloadBytes: number,
+): { payload: NonNullable<PreReadDecision["payload"]>; estimatedPayloadBytes: number } {
+  const reactWebContext = payload.reactWebContext;
+  if (!reactWebContext || !reactWebContext.editTargetRouting || reactWebContext.editTargetRouting.length === 0) {
+    return { payload, estimatedPayloadBytes: estimatePayloadBytes(payload) };
+  }
+  const routes = reactWebContext.editTargetRouting;
+
+  for (let routeCount = routes.length - 1; routeCount > 0; routeCount -= 1) {
+    const trimmedReactWebContext = {
+      ...reactWebContext,
+      editTargetRouting: routes.slice(0, routeCount),
+    };
+    const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
+    const estimatedPayloadBytes = estimatePayloadBytes(trimmedPayload);
+    if (estimatedPayloadBytes <= maxPayloadBytes) {
+      return { payload: trimmedPayload, estimatedPayloadBytes };
+    }
+  }
+
+  const trimmedReactWebContext = { ...reactWebContext };
+  delete trimmedReactWebContext.editTargetRouting;
+  const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
+  return { payload: trimmedPayload, estimatedPayloadBytes: estimatePayloadBytes(trimmedPayload) };
+}
+
 export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreReadPayloadPlan {
   const { frontendPayloadPolicy } = input;
   const result = extractFile(input.resolvedPath);
@@ -128,10 +156,9 @@ export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreRead
     let estimatedPayloadBytes = estimatePayloadBytes(payload);
     const maxPayloadBytes = reactWebContextPayloadBudget(result.meta.rawSizeBytes);
     if (payload.reactWebContext?.editTargetRouting && estimatedPayloadBytes > maxPayloadBytes) {
-      const trimmedReactWebContext = { ...payload.reactWebContext };
-      delete trimmedReactWebContext.editTargetRouting;
-      payload = { ...payload, reactWebContext: trimmedReactWebContext };
-      estimatedPayloadBytes = estimatePayloadBytes(payload);
+      const trimmed = trimEditTargetRoutingToBudget(payload, maxPayloadBytes);
+      payload = trimmed.payload;
+      estimatedPayloadBytes = trimmed.estimatedPayloadBytes;
     }
     if (payload.reactWebContext && estimatedPayloadBytes > maxPayloadBytes) {
       payload = toModelFacingPayload(result, input.cwd, {

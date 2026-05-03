@@ -3,6 +3,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 
@@ -63,5 +65,60 @@ test("pre-read payload builder omits React Web context metadata when payload bud
     assert.equal(budgeted.debug.reactWebContextBudget.reason, "budget-exceeded");
   } finally {
     JSON.stringify = originalStringify;
+  }
+});
+
+test("pre-read payload builder trims React Web edit-target routing as an ordered prefix before metadata fallback", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-routing-budget-"));
+  try {
+    const target = path.join(tempDir, "HookEffectPanel.tsx");
+    const source = fs.readFileSync(path.join(repoRoot, "fixtures", "compressed", "HookEffectPanel.tsx"), "utf8");
+    fs.writeFileSync(target, `${source}\n/* ${"budget-pad ".repeat(600)} */\n`);
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: true,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(decision.debug.reactWebContextBudget.estimatedPayloadBytes <= decision.debug.reactWebContextBudget.maxPayloadBytes);
+    assert.equal(decision.payload.reactWebContext.editTargetRouting.length < 8, true);
+    assert.deepEqual(
+      decision.payload.reactWebContext.editTargetRouting.map((item) => ({
+        kind: item.kind,
+        label: item.label,
+        priority: item.priority,
+        source: item.source,
+        evidence: item.evidence,
+      })),
+      [
+        {
+          kind: "primary-component",
+          label: "HookEffectPanel",
+          priority: 1,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.component"],
+        },
+        {
+          kind: "props-contract",
+          label: "HookEffectPanelProps",
+          priority: 2,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.props"],
+        },
+        {
+          kind: "effect",
+          label: "useEffect deps:[loadUser, userId]",
+          priority: 3,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.effect"],
+        },
+      ],
+    );
+    assert.ok(decision.payload.reactWebContext.stateHints.length > 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
