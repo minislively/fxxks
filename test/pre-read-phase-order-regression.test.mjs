@@ -12,6 +12,12 @@ const require = createRequire(import.meta.url);
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const { buildPreReadDecisionFromPayloadPlan } = require(path.join(repoRoot, "dist", "adapters", "pre-read-stack.js"));
 const { detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+const {
+  MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON,
+} = require(path.join(repoRoot, "dist", "core", "payload-policy", "profile-gate.js"));
+const {
+  UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+} = require(path.join(repoRoot, "dist", "core", "payload-policy", "fallback.js"));
 
 const PAYLOAD_DEBUG_KEYS = [
   "complexityScore",
@@ -177,4 +183,81 @@ test("live RN policy downgrade does not reuse stale RN narrow payload", () => {
   assert.equal(decision.debug.domainDetection.classification, "react-native");
   assert.equal(decision.debug.frontendPayloadPolicy.name, "rn-primitive-input-narrow-payload");
   assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+});
+
+test("cached RN narrow payload cannot cross live frontend domain and profile boundaries", () => {
+  const stalePayloadDecision = preRead.decidePreRead(
+    path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-primitive-basic.tsx"),
+    repoRoot,
+    "codex",
+    { includeEditGuidance: true },
+  );
+
+  assert.equal(stalePayloadDecision.decision, "payload");
+  assert.equal(stalePayloadDecision.readiness.ready, true);
+  assert.ok(stalePayloadDecision.payload);
+  assert.equal(stalePayloadDecision.payload.domainPayload.domain, "react-native");
+  assert.equal(stalePayloadDecision.payload.domainPayload.policy, "rn-primitive-input-narrow-payload");
+  assert.equal(stalePayloadDecision.debug.domainDetection.classification, "react-native");
+  assert.equal(stalePayloadDecision.debug.frontendPayloadPolicy.allowed, true);
+
+  const liveMismatchCases = [
+    {
+      label: "live React Web profile requires a React Web domain payload",
+      filePath: path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"),
+      expectedClassification: "react-web",
+      expectedPolicyName: "react-web-current-supported-lane",
+      expectedPolicyAllowed: true,
+      expectedReason: MISSING_REACT_WEB_DOMAIN_PAYLOAD_REASON,
+    },
+    {
+      label: "live TUI profile remains generic unsupported fallback",
+      filePath: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "tui-ink-basic.tsx"),
+      expectedClassification: "tui-ink",
+      expectedPolicyName: "tui-ink-evidence-only-payload",
+      expectedPolicyAllowed: false,
+      expectedReason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+    },
+  ];
+
+  for (const {
+    label,
+    filePath,
+    expectedClassification,
+    expectedPolicyName,
+    expectedPolicyAllowed,
+    expectedReason,
+  } of liveMismatchCases) {
+    const liveDomainDetection = detectDomainFromSource(fs.readFileSync(filePath, "utf8"), filePath);
+    const livePayloadPolicy = preRead.assessFrontendPayloadPolicy(liveDomainDetection);
+
+    assert.equal(liveDomainDetection.classification, expectedClassification, label);
+    assert.equal(livePayloadPolicy.name, expectedPolicyName, label);
+    assert.equal(livePayloadPolicy.allowed, expectedPolicyAllowed, label);
+
+    // This intentionally adversarial pairing models cached/pre-read drift: a
+    // stale RN narrow payload is ready, but the live source belongs to a
+    // different frontend profile. Live evidence and policy must remain
+    // authoritative over the cached RN domain payload.
+    const decision = buildPreReadDecisionFromPayloadPlan({
+      runtime: "codex",
+      filePath: path.relative(repoRoot, filePath),
+      extension: path.extname(filePath).toLowerCase(),
+      domainDetection: liveDomainDetection,
+      frontendPayloadPolicy: livePayloadPolicy,
+      payload: stalePayloadDecision.payload,
+      readiness: stalePayloadDecision.readiness,
+      debug: stalePayloadDecision.debug,
+    });
+
+    assert.equal(decision.decision, "fallback", label);
+    assertNoPayloadPlanningArtifacts(decision);
+    assert.equal("payload" in decision, false, label);
+    assert.equal("readiness" in decision, false, label);
+    assert.deepEqual(decision.reasons, [expectedReason], label);
+    assert.equal(decision.fallback.reason, expectedReason, label);
+    assert.equal(decision.debug.domainDetection.classification, expectedClassification, label);
+    assert.equal(decision.debug.frontendPayloadPolicy.name, expectedPolicyName, label);
+    assert.equal(decision.debug.frontendPayloadPolicy.allowed, expectedPolicyAllowed, label);
+  }
 });
