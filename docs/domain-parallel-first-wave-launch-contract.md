@@ -20,6 +20,31 @@ This document is not a runtime/source change, fixture expansion, domain support 
 | Claim posture | React Web remains the current supported lane; RN stays narrow F1 only, WebView stays fallback-first, and TUI/Ink stays evidence-only. |
 | This PR | Contract only; no lane implementation worktree is part of this PR. |
 
+## Current capability usage guard
+
+The integration / usage guard lane is the single-owner coordination pass that keeps parallel domain work aligned with the capabilities already present on `main`. It does not implement RN, React Web, WebView, or TUI behavior. Instead, it tells lane owners how to dogfood the current payload-policy seams without treating evidence as a support promotion.
+
+Current capability boundaries for lane PRs:
+
+- React Web remains the current broad measured lane for compact payload reuse when existing readiness rules allow it.
+- React Native may dogfood only the measured `F1` primitive/input narrow payload path. RN evidence outside that gate stays fallback/evidence and must not be described as broad support.
+- WebView remains fallback-first boundary evidence. WebView bridge/source/message signals do not authorize compact payload reuse or bridge-safety wording.
+- TUI/Ink remains evidence-only. Ink syntax or key-input facts do not imply terminal correctness, terminal UX safety, or runtime-token savings.
+
+Before a lane PR asks for review, its owner should add or confirm this usage evidence in the PR body:
+
+```text
+Current capability used:
+Dogfood target or fixture:
+Payload-policy decision observed:
+Fallback/evidence boundary preserved:
+Shared seams touched: none
+Support-claim grep result:
+Next lane blocked by this PR: yes/no
+```
+
+A lane may cite this guard as merge evidence only when it stays inside its allowed write set and preserves the current capability boundary above. If a lane needs to edit runtime/source shared seams, reinterpret RN primitives beyond `F1`, reuse WebView compact payloads, or promote TUI evidence into terminal behavior, stop the lane and open a shared-policy plan before implementation continues.
+
 ## Lane table
 
 | Lane | Branch/worktree prefix | Allowed write set | Forbidden write set | Required lane verification |
