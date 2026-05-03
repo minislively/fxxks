@@ -16,6 +16,8 @@ const require = createRequire(import.meta.url);
 const {
   WORKTREE_EVIDENCE_CLAIM_BOUNDARY,
   WORKTREE_STATUS_COMMAND,
+  WORKTREE_BRANCH_DIVERGENCE_SOURCE,
+  captureBranchDivergence,
   captureWorktreeSnapshot,
   currentWorktreeEvidenceStatus,
   finalizeWorktreeEvidenceSafe,
@@ -25,6 +27,7 @@ const {
 const { sessionWorktreeEvidencePath } = require(path.join(repoRoot, "dist", "core", "paths.js"));
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const { handleClaudeRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-hook.js"));
+const { runDoctor } = require(path.join(repoRoot, "dist", "cli", "doctor.js"));
 
 function makeTempProject() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-worktree-evidence-"));
@@ -193,6 +196,147 @@ test("status worktree emits parseable JSON and default status remains metric-sha
   );
 });
 
+test("captureBranchDivergence reports mocked available, quiet, and unknown states", () => {
+  const calls = [];
+  const available = captureBranchDivergence("/tmp/project", {
+    gitRunner: (_cwd, args) => {
+      calls.push(args.join(" "));
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "2\t3\n";
+      throw new Error(`unexpected ${args.join(" ")}`);
+    },
+  });
+  assert.deepEqual(available, {
+    kind: "available",
+    branch: "main",
+    upstream: "origin/main",
+    ahead: 2,
+    behind: 3,
+    source: WORKTREE_BRANCH_DIVERGENCE_SOURCE,
+  });
+  assert.deepEqual(calls, [
+    "symbolic-ref --quiet --short HEAD",
+    "rev-parse --abbrev-ref --symbolic-full-name @{u}",
+    "rev-list --left-right --count HEAD...@{u}",
+  ]);
+
+  assert.equal(captureBranchDivergence("/tmp/project", { gitRunner: () => { throw new Error("detached"); } }).kind, "detached");
+  assert.deepEqual(captureBranchDivergence("/tmp/project", {
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "feature\n";
+      throw new Error("no upstream");
+    },
+  }), { kind: "no-upstream", branch: "feature", source: WORKTREE_BRANCH_DIVERGENCE_SOURCE });
+  const unknown = captureBranchDivergence("/tmp/project", {
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      throw new Error("rev-list failed");
+    },
+  });
+  assert.equal(unknown.kind, "unknown");
+  assert.match(unknown.reason, /rev-list failed/);
+});
+
+function git(cwd, args) {
+  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+}
+
+function makeTrackedRepo() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-branch-divergence-"));
+  const seed = path.join(tempDir, "seed");
+  const remote = path.join(tempDir, "remote.git");
+  const clone = path.join(tempDir, "clone");
+  fs.mkdirSync(seed);
+  git(seed, ["init", "-b", "main"]);
+  git(seed, ["config", "user.email", "fooks@example.test"]);
+  git(seed, ["config", "user.name", "Fooks Test"]);
+  fs.writeFileSync(path.join(seed, "file.txt"), "base\n");
+  git(seed, ["add", "file.txt"]);
+  git(seed, ["commit", "-m", "base"]);
+  git(seed, ["init", "--bare", remote]);
+  git(seed, ["remote", "add", "origin", remote]);
+  git(seed, ["push", "-u", "origin", "main"]);
+  git(remote, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+  git(tempDir, ["clone", remote, clone]);
+  git(clone, ["branch", "--set-upstream-to", "origin/main", "main"]);
+  git(clone, ["config", "user.email", "fooks@example.test"]);
+  git(clone, ["config", "user.name", "Fooks Test"]);
+  return { tempDir, seed, clone };
+}
+
+function commitFile(cwd, name, content, message) {
+  fs.writeFileSync(path.join(cwd, name), content);
+  git(cwd, ["add", name]);
+  git(cwd, ["commit", "-m", message]);
+}
+
+function pushRemoteCommit(repo, name, content, message) {
+  commitFile(repo.seed, name, content, message);
+  git(repo.seed, ["push", "origin", "main"]);
+  git(repo.clone, ["fetch", "origin", "main"]);
+}
+
+test("status worktree reports clean branches behind, ahead, and diverged using local tracking refs", () => {
+  const behindRepo = makeTrackedRepo();
+  pushRemoteCommit(behindRepo, "behind.txt", "behind\n", "behind");
+  const behind = run(["status", "worktree"], behindRepo.clone);
+  assert.equal(behind.snapshot.clean, true);
+  assert.deepEqual(behind.branchDivergence, behind.snapshot.branchDivergence);
+  assert.equal(behind.branchDivergence.kind, "available");
+  assert.equal(behind.branchDivergence.behind, 1);
+  assert.equal(behind.branchDivergence.ahead, 0);
+  assert.equal(behind.branchDivergence.source, WORKTREE_BRANCH_DIVERGENCE_SOURCE);
+
+  const aheadRepo = makeTrackedRepo();
+  commitFile(aheadRepo.clone, "ahead.txt", "ahead\n", "ahead");
+  const ahead = run(["status", "worktree"], aheadRepo.clone);
+  assert.equal(ahead.snapshot.clean, true);
+  assert.equal(ahead.branchDivergence.kind, "available");
+  assert.equal(ahead.branchDivergence.ahead, 1);
+  assert.equal(ahead.branchDivergence.behind, 0);
+
+  const divergedRepo = makeTrackedRepo();
+  commitFile(divergedRepo.clone, "local.txt", "local\n", "local");
+  pushRemoteCommit(divergedRepo, "remote.txt", "remote\n", "remote");
+  const diverged = run(["status", "worktree"], divergedRepo.clone);
+  assert.equal(diverged.snapshot.clean, true);
+  assert.equal(diverged.branchDivergence.kind, "available");
+  assert.equal(diverged.branchDivergence.ahead, 1);
+  assert.equal(diverged.branchDivergence.behind, 1);
+});
+
+test("branch divergence keeps no-upstream and detached states quiet", () => {
+  const repo = makeTrackedRepo();
+  git(repo.clone, ["checkout", "-b", "local-only"]);
+  const noUpstream = run(["status", "worktree"], repo.clone);
+  assert.equal(noUpstream.branchDivergence.kind, "no-upstream");
+  assert.equal(noUpstream.branchDivergence.branch, "local-only");
+
+  git(repo.clone, ["checkout", "--detach"]);
+  const detached = run(["status", "worktree"], repo.clone);
+  assert.equal(detached.branchDivergence.kind, "detached");
+});
+
+test("doctor warns for clean local tracking divergence but suppresses dirty divergence", () => {
+  const cleanRepo = makeTrackedRepo();
+  pushRemoteCommit(cleanRepo, "remote-clean.txt", "remote\n", "remote clean");
+  const cleanDoctor = runDoctor({ target: "all", cwd: cleanRepo.clone, cliName: "fooks" });
+  const cleanCheck = cleanDoctor.checks.find((check) => check.name === "Worktree upstream divergence");
+  assert.ok(cleanCheck);
+  assert.equal(cleanCheck.status, "warn");
+  assert.match(cleanCheck.message, /local tracking refs only; no fetch performed/);
+  assert.equal(cleanCheck.evidence.behind, 1);
+
+  const dirtyRepo = makeTrackedRepo();
+  pushRemoteCommit(dirtyRepo, "remote-dirty.txt", "remote\n", "remote dirty");
+  fs.writeFileSync(path.join(dirtyRepo.clone, "dirty.txt"), "dirty\n");
+  const dirtyDoctor = runDoctor({ target: "all", cwd: dirtyRepo.clone, cliName: "fooks" });
+  assert.equal(dirtyDoctor.checks.some((check) => check.name === "Worktree upstream divergence"), false);
+});
+
+
 test("worktree evidence implementation is read-only and keeps claim boundaries local", () => {
   const implementationFiles = [
     path.join(repoRoot, "src", "core", "worktree-evidence.ts"),
@@ -201,6 +345,8 @@ test("worktree evidence implementation is read-only and keeps claim boundaries l
   ];
   const source = implementationFiles.map((filePath) => fs.readFileSync(filePath, "utf8")).join("\n");
   assert.match(source, /git status --porcelain=v1 -z/);
+  assert.match(source, /git rev-list --left-right --count HEAD\.\.\.@\{u\}/);
+  assert.doesNotMatch(source, /execFileSync\(\s*["']git["']\s*,\s*\[\s*["'](?:fetch|pull|push|add|stash|reset|restore|checkout|clean|commit|rm|mv)["']/);
   for (const term of ["add", "stash", "reset", "restore", "checkout", "clean", "commit", "rm", "mv"]) {
     assert.doesNotMatch(source, new RegExp(`\\bgit\\s+${term}\\b`));
   }

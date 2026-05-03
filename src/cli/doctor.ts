@@ -9,6 +9,7 @@ import { CacheMonitor } from "../core/cache-monitor";
 import { adapterDir, canonicalProjectDataDir } from "../core/paths";
 import { discoverProjectFiles } from "../core/discover";
 import { discoverSetupEligibleSources } from "../core/setup-eligibility";
+import { currentWorktreeEvidenceStatus, WORKTREE_BRANCH_DIVERGENCE_SOURCE } from "../core/worktree-evidence";
 
 export type DoctorTarget = "all" | "codex" | "claude";
 export type DoctorRuntime = "core" | "codex" | "claude";
@@ -329,6 +330,35 @@ function claudeTypeScriptLspCheck(): DoctorCheck {
   };
 }
 
+function worktreeTrackingDivergenceCheck(cwd: string): DoctorCheck | undefined {
+  try {
+    const status = currentWorktreeEvidenceStatus(cwd);
+    const snapshot = status.snapshot;
+    const divergence = status.branchDivergence ?? snapshot?.branchDivergence;
+    if (!snapshot?.clean || divergence?.kind !== "available" || (divergence.ahead === 0 && divergence.behind === 0)) {
+      return undefined;
+    }
+
+    return {
+      runtime: "core",
+      name: "Worktree upstream divergence",
+      status: "warn",
+      message: `Worktree is clean, but branch differs from configured upstream ref: behind ${divergence.behind}, ahead ${divergence.ahead} vs ${divergence.upstream} (${WORKTREE_BRANCH_DIVERGENCE_SOURCE}).`,
+      fix: "Run git fetch/pull outside fooks if you want to update local refs or integrate upstream changes.",
+      evidence: {
+        clean: snapshot.clean,
+        branch: divergence.branch,
+        upstream: divergence.upstream,
+        ahead: divergence.ahead,
+        behind: divergence.behind,
+        source: divergence.source,
+      },
+    };
+  } catch (error) {
+    return undefined;
+  }
+}
+
 function worktreeHealthCheck(cwd: string): DoctorCheck {
   try {
     const result = spawnSync("git", ["worktree", "list", "--porcelain"], { cwd, encoding: "utf8" });
@@ -513,6 +543,10 @@ function aggregateChecks(cwd: string, cliName: string): DoctorCheck[] {
     ...codexDoctorChecks(cwd, cliName),
     ...claudeDoctorChecks(cwd, false),
   ];
+  const divergenceCheck = worktreeTrackingDivergenceCheck(cwd);
+  if (divergenceCheck) {
+    checks.push(divergenceCheck);
+  }
   if (process.env.FOOKS_OPERATOR === "1") {
     checks.push(worktreeHealthCheck(cwd));
     checks.push(tmuxSessionHealthCheck());
