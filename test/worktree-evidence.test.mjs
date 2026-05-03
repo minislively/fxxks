@@ -288,6 +288,12 @@ test("status worktree reports clean branches behind, ahead, and diverged using l
   assert.equal(behind.branchDivergence.behind, 1);
   assert.equal(behind.branchDivergence.ahead, 0);
   assert.equal(behind.branchDivergence.source, WORKTREE_BRANCH_DIVERGENCE_SOURCE);
+  assert.equal(behind.worktreeVerdict.kind, "clean-behind");
+  assert.equal(behind.worktreeVerdict.severity, "warning");
+  assert.equal(behind.worktreeVerdict.primary, "upstream-divergence");
+  assert.equal(behind.worktreeVerdict.behind, 1);
+  assert.equal(behind.worktreeVerdict.ahead, 0);
+  assert.match(behind.worktreeVerdict.summary, /behind origin\/main by 1/);
 
   const aheadRepo = makeTrackedRepo();
   commitFile(aheadRepo.clone, "ahead.txt", "ahead\n", "ahead");
@@ -296,6 +302,12 @@ test("status worktree reports clean branches behind, ahead, and diverged using l
   assert.equal(ahead.branchDivergence.kind, "available");
   assert.equal(ahead.branchDivergence.ahead, 1);
   assert.equal(ahead.branchDivergence.behind, 0);
+  assert.equal(ahead.worktreeVerdict.kind, "clean-ahead");
+  assert.equal(ahead.worktreeVerdict.severity, "warning");
+  assert.equal(ahead.worktreeVerdict.primary, "upstream-divergence");
+  assert.equal(ahead.worktreeVerdict.ahead, 1);
+  assert.equal(ahead.worktreeVerdict.behind, 0);
+  assert.match(ahead.worktreeVerdict.summary, /ahead of origin\/main by 1/);
 
   const divergedRepo = makeTrackedRepo();
   commitFile(divergedRepo.clone, "local.txt", "local\n", "local");
@@ -305,6 +317,12 @@ test("status worktree reports clean branches behind, ahead, and diverged using l
   assert.equal(diverged.branchDivergence.kind, "available");
   assert.equal(diverged.branchDivergence.ahead, 1);
   assert.equal(diverged.branchDivergence.behind, 1);
+  assert.equal(diverged.worktreeVerdict.kind, "clean-diverged");
+  assert.equal(diverged.worktreeVerdict.severity, "warning");
+  assert.equal(diverged.worktreeVerdict.primary, "upstream-divergence");
+  assert.equal(diverged.worktreeVerdict.ahead, 1);
+  assert.equal(diverged.worktreeVerdict.behind, 1);
+  assert.match(diverged.worktreeVerdict.summary, /diverged from origin\/main: 1 ahead, 1 behind/);
 });
 
 test("branch divergence keeps no-upstream and detached states quiet", () => {
@@ -313,10 +331,33 @@ test("branch divergence keeps no-upstream and detached states quiet", () => {
   const noUpstream = run(["status", "worktree"], repo.clone);
   assert.equal(noUpstream.branchDivergence.kind, "no-upstream");
   assert.equal(noUpstream.branchDivergence.branch, "local-only");
+  assert.equal(noUpstream.worktreeVerdict.kind, "neutral");
+  assert.equal(noUpstream.worktreeVerdict.severity, "ok");
+  assert.equal(noUpstream.worktreeVerdict.primary, "neutral");
+  assert.equal(noUpstream.worktreeVerdict.reason, "no-upstream");
 
   git(repo.clone, ["checkout", "--detach"]);
   const detached = run(["status", "worktree"], repo.clone);
   assert.equal(detached.branchDivergence.kind, "detached");
+  assert.equal(detached.worktreeVerdict.kind, "neutral");
+  assert.equal(detached.worktreeVerdict.severity, "ok");
+  assert.equal(detached.worktreeVerdict.primary, "neutral");
+  assert.equal(detached.worktreeVerdict.reason, "detached");
+});
+
+test("dirty worktrees keep dirty verdict primary even with local tracking divergence", () => {
+  const repo = makeTrackedRepo();
+  pushRemoteCommit(repo, "remote-dirty-status.txt", "remote\n", "remote dirty status");
+  fs.writeFileSync(path.join(repo.clone, "dirty.txt"), "dirty\n");
+  const dirty = run(["status", "worktree"], repo.clone);
+  assert.equal(dirty.snapshot.clean, false);
+  assert.equal(dirty.branchDivergence.kind, "available");
+  assert.equal(dirty.branchDivergence.behind, 1);
+  assert.equal(dirty.branchDivergence.ahead, 0);
+  assert.equal(dirty.worktreeVerdict.kind, "dirty");
+  assert.equal(dirty.worktreeVerdict.severity, "warning");
+  assert.equal(dirty.worktreeVerdict.primary, "dirty");
+  assert.equal(dirty.worktreeVerdict.summary, "dirty worktree");
 });
 
 test("doctor warns for clean local tracking divergence but suppresses dirty divergence", () => {

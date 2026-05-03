@@ -72,6 +72,7 @@ export type WorktreeCurrentStatus = {
   snapshot?: WorktreeSnapshot;
   blockers: string[];
   branchDivergence?: BranchDivergence;
+  worktreeVerdict: WorktreeOperatorVerdict;
 };
 
 export type WorktreeEvidenceOptions = {
@@ -79,6 +80,39 @@ export type WorktreeEvidenceOptions = {
   gitRunner?: WorktreeGitRunner;
   now?: () => string;
 };
+
+export type WorktreeOperatorVerdict =
+  | {
+      kind: "dirty";
+      severity: "warning";
+      primary: "dirty";
+      summary: "dirty worktree";
+    }
+  | {
+      kind: "clean";
+      severity: "ok";
+      primary: "clean";
+      summary: "clean worktree";
+    }
+  | {
+      kind: "clean-behind" | "clean-ahead" | "clean-diverged";
+      severity: "warning";
+      primary: "upstream-divergence";
+      summary: string;
+      branch: string;
+      upstream: string;
+      ahead: number;
+      behind: number;
+      source: typeof WORKTREE_BRANCH_DIVERGENCE_SOURCE;
+    }
+  | {
+      kind: "neutral";
+      severity: "ok";
+      primary: "neutral";
+      summary: "no upstream tracking branch" | "detached HEAD" | "worktree status unavailable" | "branch divergence unavailable";
+      reason: "no-upstream" | "detached" | "missing-snapshot" | "unknown-divergence";
+      source?: typeof WORKTREE_BRANCH_DIVERGENCE_SOURCE;
+    };
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -207,6 +241,109 @@ export function captureWorktreeSnapshot(cwd = process.cwd(), options: WorktreeEv
   }
 }
 
+export function summarizeWorktreeOperatorVerdict(snapshot: WorktreeSnapshot | undefined, branchDivergence: BranchDivergence | undefined): WorktreeOperatorVerdict {
+  if (!snapshot) {
+    return {
+      kind: "neutral",
+      severity: "ok",
+      primary: "neutral",
+      summary: "worktree status unavailable",
+      reason: "missing-snapshot",
+      source: branchDivergence?.source,
+    };
+  }
+
+  if (!snapshot.clean) {
+    return {
+      kind: "dirty",
+      severity: "warning",
+      primary: "dirty",
+      summary: "dirty worktree",
+    };
+  }
+
+  if (!branchDivergence || branchDivergence.kind === "unknown") {
+    return {
+      kind: "neutral",
+      severity: "ok",
+      primary: "neutral",
+      summary: "branch divergence unavailable",
+      reason: "unknown-divergence",
+      source: branchDivergence?.source,
+    };
+  }
+
+  if (branchDivergence.kind === "no-upstream") {
+    return {
+      kind: "neutral",
+      severity: "ok",
+      primary: "neutral",
+      summary: "no upstream tracking branch",
+      reason: "no-upstream",
+      source: branchDivergence.source,
+    };
+  }
+
+  if (branchDivergence.kind === "detached") {
+    return {
+      kind: "neutral",
+      severity: "ok",
+      primary: "neutral",
+      summary: "detached HEAD",
+      reason: "detached",
+      source: branchDivergence.source,
+    };
+  }
+
+  const { ahead, behind, branch, upstream, source } = branchDivergence;
+  if (ahead > 0 && behind > 0) {
+    return {
+      kind: "clean-diverged",
+      severity: "warning",
+      primary: "upstream-divergence",
+      summary: `clean worktree diverged from ${upstream}: ${ahead} ahead, ${behind} behind`,
+      branch,
+      upstream,
+      ahead,
+      behind,
+      source,
+    };
+  }
+  if (behind > 0) {
+    return {
+      kind: "clean-behind",
+      severity: "warning",
+      primary: "upstream-divergence",
+      summary: `clean worktree behind ${upstream} by ${behind}`,
+      branch,
+      upstream,
+      ahead,
+      behind,
+      source,
+    };
+  }
+  if (ahead > 0) {
+    return {
+      kind: "clean-ahead",
+      severity: "warning",
+      primary: "upstream-divergence",
+      summary: `clean worktree ahead of ${upstream} by ${ahead}`,
+      branch,
+      upstream,
+      ahead,
+      behind,
+      source,
+    };
+  }
+
+  return {
+    kind: "clean",
+    severity: "ok",
+    primary: "clean",
+    summary: "clean worktree",
+  };
+}
+
 export function computeWorktreeDelta(baseline: WorktreeSnapshot, latest: WorktreeSnapshot): WorktreeDelta {
   const baselineDirty = new Set(baseline.changedPaths);
   const latestDirty = new Set(latest.changedPaths);
@@ -294,6 +431,7 @@ export function finalizeWorktreeEvidenceSafe(
 export function currentWorktreeEvidenceStatus(cwd = process.cwd(), options: WorktreeEvidenceOptions = {}): WorktreeCurrentStatus {
   const capturedAt = options.now?.() ?? nowIso();
   const capture = captureWorktreeSnapshot(cwd, { ...options, now: () => capturedAt });
+  const branchDivergence = capture.snapshot?.branchDivergence ?? captureBranchDivergence(cwd, options);
   return {
     schemaVersion: WORKTREE_EVIDENCE_SCHEMA_VERSION,
     claimBoundary: WORKTREE_EVIDENCE_CLAIM_BOUNDARY,
@@ -302,6 +440,7 @@ export function currentWorktreeEvidenceStatus(cwd = process.cwd(), options: Work
     capturedAt,
     snapshot: capture.snapshot,
     blockers: capture.blockers,
-    branchDivergence: capture.snapshot?.branchDivergence ?? captureBranchDivergence(cwd, options),
+    branchDivergence,
+    worktreeVerdict: summarizeWorktreeOperatorVerdict(capture.snapshot, branchDivergence),
   };
 }
