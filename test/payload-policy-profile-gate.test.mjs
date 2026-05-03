@@ -19,6 +19,7 @@ const {
 const { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } = require(path.join(repoRoot, "dist", "core", "payload-policy", "registry.js"));
 const { UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON } = require(path.join(repoRoot, "dist", "core", "payload-policy", "fallback.js"));
 const preReadSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
+const preReadStackSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
 
 function payloadForSource(source, fileName, options = {}) {
   const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-profile-gate-"));
@@ -81,7 +82,9 @@ test("frontend profile gate denies unsupported frontend profile reuse", () => {
 });
 
 test("pre-read adapter delegates frontend profile reuse gate to payload-policy seam", () => {
-  assert.match(preReadSource, /import \{ assessFrontendProfilePayloadReuse \} from "\.\.\/core\/payload-policy\/profile-gate"/);
-  assert.doesNotMatch(preReadSource, /function assessFrontendProfilePayloadReuse\(/);
-  assert.doesNotMatch(preReadSource, /FRONTEND_PROFILE_GATE_EXTENSIONS/);
+  const combinedPreReadSource = `${preReadSource}\n${preReadStackSource}`;
+
+  assert.match(preReadStackSource, /import \{ assessFrontendProfilePayloadReuse \} from "\.\.\/core\/payload-policy\/profile-gate"/);
+  assert.doesNotMatch(combinedPreReadSource, /function assessFrontendProfilePayloadReuse\(/);
+  assert.doesNotMatch(combinedPreReadSource, /FRONTEND_PROFILE_GATE_EXTENSIONS/);
 });

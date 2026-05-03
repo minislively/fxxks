@@ -11,27 +11,30 @@ const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const preReadSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
+const preReadStackSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
 
 test("pre-read centralizes payload success decision construction", () => {
-  assert.match(preReadSource, /function buildPreReadPayloadDecision\(/);
-  assert.match(preReadSource, /return buildPreReadPayloadDecision\(\{/);
+  assert.match(preReadStackSource, /function buildPreReadPayloadDecision\(/);
+  assert.match(preReadStackSource, /function buildPreReadDecisionFromPayloadPlan\(/);
+  assert.match(preReadStackSource, /return buildPreReadPayloadDecision\(\{/);
+  assert.match(preReadSource, /buildPreReadDecisionFromPayloadPlan/);
   assert.doesNotMatch(preReadSource, /return \{\s*\n\s*runtime,[\s\S]*?decision: "payload",[\s\S]*?payload,[\s\S]*?readiness,/);
 });
 
 test("pre-read centralizes payload debug construction", () => {
-  assert.match(preReadSource, /function buildPreReadPayloadDebug\(/);
-  assert.match(preReadSource, /const debug = buildPreReadPayloadDebug\(\{/);
+  assert.match(preReadStackSource, /function buildPreReadPayloadDebug\(/);
+  assert.match(preReadStackSource, /const debug = buildPreReadPayloadDebug\(\{/);
   assert.doesNotMatch(preReadSource, /const debug = \{\s*\n\s*mode: result\.mode,[\s\S]*?language: result\.language,[\s\S]*?domainDetection,/);
 });
 
 test("pre-read centralizes payload preparation phase", () => {
-  assert.match(preReadSource, /function buildPreReadPayloadPlan\(/);
+  assert.match(preReadStackSource, /function buildPreReadPayloadPlan\(/);
   assert.match(preReadSource, /const \{ payload, readiness, debug \} = buildPreReadPayloadPlan\(\{/);
   assert.doesNotMatch(preReadSource, /const result = extractFile\(resolvedPath\);[\s\S]*?const readiness = assessPayloadReadiness\(result, payload\);/);
 });
 
 test("pre-read centralizes payload plan outcome decision", () => {
-  assert.match(preReadSource, /function buildPreReadDecisionFromPayloadPlan\(/);
+  assert.match(preReadStackSource, /function buildPreReadDecisionFromPayloadPlan\(/);
   assert.match(preReadSource, /return buildPreReadDecisionFromPayloadPlan\(\{/);
   assert.doesNotMatch(preReadSource, /if \(readiness\.ready\) \{[\s\S]*?const profileGate = assessFrontendProfilePayloadReuse\(extension, domainDetection, payload, frontendPayloadPolicy\);/);
 });

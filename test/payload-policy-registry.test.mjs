@@ -88,15 +88,17 @@ test("frontend payload build options include domain payload only for React Web p
 
 test("pre-read adapter no longer owns hardcoded policy assessment order", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
+  const stackSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
+  const combinedSource = `${source}\n${stackSource}`;
 
   assert.match(source, /import \{ assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions \} from "\.\.\/core\/payload-policy\/registry"/);
-  assert.doesNotMatch(source, /assessReactWebPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(source, /assessWebViewPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(source, /assessTuiInkPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(source, /assessReactNativePayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(source, /assessFallbackPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(source, /includeDomainPayload:\s*frontendPayloadPolicy\?\.name ===/);
-  assert.match(source, /toFrontendPayloadBuildOptions\(frontendPayloadPolicy\)/);
+  assert.doesNotMatch(combinedSource, /assessReactWebPayloadPolicy\(domainDetection\)/);
+  assert.doesNotMatch(combinedSource, /assessWebViewPayloadPolicy\(domainDetection\)/);
+  assert.doesNotMatch(combinedSource, /assessTuiInkPayloadPolicy\(domainDetection\)/);
+  assert.doesNotMatch(combinedSource, /assessReactNativePayloadPolicy\(domainDetection\)/);
+  assert.doesNotMatch(combinedSource, /assessFallbackPayloadPolicy\(domainDetection\)/);
+  assert.doesNotMatch(combinedSource, /includeDomainPayload:\s*frontendPayloadPolicy\?\.name ===/);
+  assert.match(stackSource, /toFrontendPayloadBuildOptions\(frontendPayloadPolicy\)/);
 });
 
 test("payload policy registry source avoids broad support claims", () => {

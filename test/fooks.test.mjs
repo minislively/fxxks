@@ -4071,6 +4071,7 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   const fixtureExpectations = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-fixture-expectations.md"), "utf8");
   const webviewBridgePlan = fs.readFileSync(path.join(repoRoot, "docs", "webview-bridge-boundary-plan.md"), "utf8");
   const preRead = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
+  const preReadStack = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
   const combined = `${readme}\n${roadmap}\n${release}\n${taxonomy}\n${candidates}\n${architecture}\n${domainProfiles}\n${fixtureExpectations}\n${webviewBridgePlan}`;
 
   assert.match(combined, /React Native(?:\/WebView| and embedded WebView| \/ embedded WebView)/);
@@ -4115,7 +4116,7 @@ test("docs and pre-read boundary keep React Native and WebView unsupported", () 
   assert.match(combined, /domain signal profiles/);
   assert.match(combined, /architecture direction and staged gates/);
   assert.match(combined, /not default compact extraction|not default WebView compact extraction|default WebView compact extraction/);
-  assert.match(preRead, /unsupported-react-native-webview-boundary/);
+  assert.match(`${preRead}\n${preReadStack}`, /unsupported-react-native-webview-boundary/);
   assert.doesNotMatch(combined, /React Native support is available/i);
   assert.doesNotMatch(combined, /React Native(?: \/ WebView)? is supported today/i);
   assert.doesNotMatch(combined, /default WebView compact extraction is enabled/i);
