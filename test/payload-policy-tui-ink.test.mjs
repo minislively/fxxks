@@ -250,3 +250,17 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /tui-ink-evidence-only-payload/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
 });
+
+test("TUI operational readiness guide keeps payload planning separate", () => {
+  const guide = fs.readFileSync(path.join(repoRoot, "docs", "tui-operational-readiness.md"), "utf8");
+
+  assert.match(guide, /## Current state/);
+  assert.match(guide, /## Fixture roles/);
+  assert.match(guide, /## Allowed next work/);
+  assert.match(guide, /## Promotion criteria before payload-design planning/);
+  assert.match(guide, /## Stop rules/);
+  assert.match(guide, /tui-ink-evidence-only-payload/);
+  assert.match(guide, /fallback\/no-payload/);
+  assert.match(guide, /serialized shared-policy plan/);
+  assert.doesNotMatch(guide, forbiddenSupportClaims);
+});
