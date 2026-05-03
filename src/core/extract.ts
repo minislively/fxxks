@@ -10,7 +10,7 @@ const HOOK_NAMES = new Set(["useState", "useEffect", "useMemo", "useCallback", "
 const EFFECT_HOOK_NAMES = new Set(["useEffect", "useLayoutEffect"]);
 const CALLBACK_HOOK_NAMES = new Set(["useMemo", "useCallback"]);
 const FORM_CONTROL_TAGS = new Set(["form", "input", "select", "textarea"]);
-const CONTROL_PROP_NAMES = new Set(["name", "type", "value", "defaultValue", "required", "disabled", "readOnly", "checked", "defaultChecked"]);
+const CONTROL_PROP_NAMES = new Set(["id", "name", "type", "value", "defaultValue", "required", "disabled", "readOnly", "checked", "defaultChecked"]);
 const MAX_EFFECT_SIGNALS = 8;
 const MAX_CALLBACK_SIGNALS = 8;
 const MAX_EVENT_HANDLER_SIGNALS = 12;
@@ -389,6 +389,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const submitHandlers: NonNullable<FormSurface["submitHandlers"]> = [];
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
+  const stateConditions: NonNullable<FormSurface["stateConditions"]> = [];
   const a11yAnchors: A11yAnchorSignal[] = [];
   const conditionalRenders = new Set<string>();
   const repeatedBlocks = new Set<string>();
@@ -440,7 +441,9 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     }
 
     const propNames: string[] = [];
+    const propValues: Record<string, string> = {};
     const handlers: string[] = [];
+    const handlerValues: Record<string, string> = {};
     let controlName: string | undefined;
     let controlType: string | undefined;
     for (const property of node.attributes.properties) {
@@ -459,6 +462,8 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       const attrName = property.name.getText(sourceFile);
       if (CONTROL_PROP_NAMES.has(attrName)) {
         propNames.push(attrName);
+        const value = jsxAttributeValue(property);
+        if (value) propValues[attrName] = value;
       }
       if (tag === "label") {
         addA11yAnchor("label", jsxAttributeValue(property) ?? tag, property);
@@ -477,12 +482,18 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       }
       if (attrName === "disabled") {
         addA11yAnchor("disabled", controlName ? `${tag}[name=${controlName}]` : tag, property);
+        const value = jsxAttributeValue(property);
+        if (value && value !== "true") {
+          addLocatedAnchor(stateConditions, value, property);
+        }
       }
       if (attrName === "readOnly") {
         addA11yAnchor("readonly", controlName ? `${tag}[name=${controlName}]` : tag, property);
       }
       if (/^on[A-Z]/.test(attrName)) {
         handlers.push(attrName);
+        const value = jsxAttributeValue(property);
+        if (value) handlerValues[attrName] = value;
       }
       if (attrName === "name") {
         controlName = jsxAttributeValue(property);
@@ -502,7 +513,9 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       ...(controlName ? { name: controlName } : {}),
       ...(controlType ? { type: controlType } : {}),
       ...(propNames.length ? { props: [...new Set(propNames)].slice(0, MAX_CONTROL_PROPS) } : {}),
+      ...(Object.keys(propValues).length ? { propValues } : {}),
       ...(handlers.length ? { handlers: [...new Set(handlers)].slice(0, MAX_CONTROL_PROPS) } : {}),
+      ...(Object.keys(handlerValues).length ? { handlerValues } : {}),
       loc: sourceRangeOf(sourceFile, node),
     });
   };
@@ -591,8 +604,9 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     controls: dedupeBy(formControls, (item) => `${item.tag}:${item.name ?? ""}:${item.type ?? ""}:${item.loc?.startLine ?? ""}`).slice(0, MAX_FORM_CONTROLS),
     submitHandlers: dedupeBy(submitHandlers, (item) => `${item.value}:${item.loc?.startLine ?? ""}`).slice(0, MAX_FORM_ANCHORS),
     validationAnchors: dedupeBy(validationAnchors, (item) => `${item.value}:${item.loc?.startLine ?? ""}`).slice(0, MAX_FORM_ANCHORS),
+    stateConditions: dedupeBy(stateConditions, (item) => `${item.value}:${item.loc?.startLine ?? ""}`).slice(0, MAX_FORM_ANCHORS),
   };
-  const hasFormSurface = formSurface.controls.length > 0 || formSurface.submitHandlers.length > 0 || formSurface.validationAnchors.length > 0;
+  const hasFormSurface = formSurface.controls.length > 0 || formSurface.submitHandlers.length > 0 || formSurface.validationAnchors.length > 0 || formSurface.stateConditions.length > 0;
   const effectSignalList = dedupeBy(effectSignals, (item) => `${item.hook}:${item.loc?.startLine ?? ""}:${item.deps?.join(",") ?? ""}`).slice(0, MAX_EFFECT_SIGNALS);
   const callbackSignalList = dedupeBy(callbackSignals, (item) => `${item.hook}:${item.loc?.startLine ?? ""}:${item.deps?.join(",") ?? ""}`).slice(0, MAX_CALLBACK_SIGNALS);
   const eventHandlerList = [...eventHandlers];
@@ -613,6 +627,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
               ...(formSurface.controls.length ? { controls: formSurface.controls } : {}),
               ...(formSurface.submitHandlers.length ? { submitHandlers: formSurface.submitHandlers } : {}),
               ...(formSurface.validationAnchors.length ? { validationAnchors: formSurface.validationAnchors } : {}),
+              ...(formSurface.stateConditions.length ? { stateConditions: formSurface.stateConditions } : {}),
             },
           }
         : {}),

@@ -2,8 +2,10 @@ import {
   REACT_WEB_CONTEXT_METADATA_SCHEMA_VERSION,
   type EditGuidance,
   type ExtractionResult,
+  type FormControlSignal,
   type ReactWebContextA11yAnchor,
   type ReactWebContextEditTargetRoute,
+  type ReactWebContextFormStateFlowEntry,
   type ReactWebContextIntentTarget,
   type ReactWebContextLocalDependency,
   type ReactWebContextMetadataV0,
@@ -19,6 +21,7 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   localDependencies: 12,
   intentTargets: 16,
   editTargetRouting: 8,
+  formStateFlow: 10,
 } as const;
 
 const REACT_WEB_CONTEXT_WARNINGS = [
@@ -279,6 +282,172 @@ function buildEditTargetRouting(result: ExtractionResult, editGuidance: EditGuid
   );
 }
 
+function controlLabel(control: FormControlSignal): string {
+  if (control.name) return `${control.tag}[name=${control.name}]`;
+  const id = control.propValues?.id;
+  if (id) return `${control.tag}#${id}`;
+  return control.tag;
+}
+
+function conditionRole(expr: string): NonNullable<ReactWebContextFormStateFlowEntry["condition"]>["role"] {
+  if (/disabled/i.test(expr)) return "disabled";
+  if (/loading|pending|saving|submitting|isLoading|isPending|isSaving|isSubmitting/.test(expr)) return "loading";
+  if (/error|invalid|aria-invalid/.test(expr)) return "error";
+  return "unknown";
+}
+
+function identifierTokens(value: string | undefined): string[] {
+  if (!value || value === "true") return [];
+  return value.match(/[A-Za-z_$][\w$]*/g) ?? [];
+}
+
+function relationTokens(result: ExtractionResult): string[] {
+  const tokens = new Set<string>();
+  for (const control of result.behavior?.formSurface?.controls ?? []) {
+    for (const value of [
+      control.propValues?.value,
+      control.propValues?.checked,
+      control.propValues?.disabled,
+      control.handlerValues?.onChange,
+      control.handlerValues?.onInput,
+    ]) {
+      for (const token of identifierTokens(value)) {
+        tokens.add(token);
+      }
+    }
+  }
+  for (const submit of result.behavior?.formSurface?.submitHandlers ?? []) {
+    for (const token of identifierTokens(submit.value)) {
+      tokens.add(token);
+    }
+  }
+  for (const condition of result.behavior?.formSurface?.stateConditions ?? []) {
+    for (const token of identifierTokens(condition.value)) {
+      tokens.add(token);
+    }
+  }
+  return [...tokens];
+}
+
+function buildFormStateFlow(result: ExtractionResult): ReactWebContextFormStateFlowEntry[] {
+  const entries: ReactWebContextFormStateFlowEntry[] = [];
+  const controls = result.behavior?.formSurface?.controls ?? [];
+  const controlDisabledExprs = new Set<string>();
+
+  for (const control of controls) {
+    const valueExpr = control.propValues?.value;
+    const checkedExpr = control.propValues?.checked;
+    const onChangeExpr = control.handlerValues?.onChange;
+    if (valueExpr || checkedExpr) {
+      const label = controlLabel(control);
+      entries.push({
+        kind: "controlled-control",
+        label: compact(label),
+        ...(control.loc ? { loc: control.loc } : {}),
+        control: {
+          tag: control.tag,
+          ...(control.name ? { name: control.name } : {}),
+          ...(control.propValues?.id ? { id: control.propValues.id } : {}),
+          ...(valueExpr ? { valueExpr: compact(valueExpr) } : {}),
+          ...(checkedExpr ? { checkedExpr: compact(checkedExpr) } : {}),
+          ...(onChangeExpr ? { onChangeExpr: compact(onChangeExpr) } : {}),
+        },
+        evidence: ["behavior.formSurface.controls"],
+      });
+    }
+
+    const disabledExpr = control.propValues?.disabled;
+    if (disabledExpr && disabledExpr !== "true") {
+      controlDisabledExprs.add(disabledExpr);
+      entries.push({
+        kind: "state-condition",
+        label: compact(`${controlLabel(control)} disabled`),
+        ...(control.loc ? { loc: control.loc } : {}),
+        condition: {
+          role: conditionRole(disabledExpr),
+          expr: compact(disabledExpr),
+        },
+        evidence: ["behavior.formSurface.controls.propValues.disabled"],
+      });
+    }
+  }
+
+  for (const condition of result.behavior?.formSurface?.stateConditions ?? []) {
+    if (controlDisabledExprs.has(condition.value)) continue;
+    entries.push({
+      kind: "state-condition",
+      label: compact(`disabled:${condition.value}`),
+      ...(condition.loc ? { loc: condition.loc } : {}),
+      condition: {
+        role: conditionRole(condition.value),
+        expr: compact(condition.value),
+      },
+      evidence: ["behavior.formSurface.stateConditions"],
+    });
+  }
+
+  for (const submit of result.behavior?.formSurface?.submitHandlers ?? []) {
+    const submitControl = controls.find((control) => control.tag === "form" && control.handlerValues?.onSubmit === submit.value);
+    entries.push({
+      kind: "submit-flow",
+      label: compact(`form onSubmit=${submit.value}`),
+      ...(submit.loc ? { loc: submit.loc } : {}),
+      submit: {
+        onSubmitExpr: compact(submit.value),
+        handler: compact(submit.value),
+      },
+      evidence: [
+        "behavior.formSurface.submitHandlers",
+        ...(submitControl ? ["behavior.formSurface.controls.handlerValues.onSubmit"] : []),
+      ],
+    });
+  }
+
+  for (const anchor of result.behavior?.a11yAnchors ?? []) {
+    if (anchor.kind !== "role" && anchor.kind !== "aria" && anchor.kind !== "error-text") continue;
+    if (!/alert|invalid|error/i.test(anchor.label)) continue;
+    entries.push({
+      kind: "state-condition",
+      label: compact(anchor.label),
+      ...(anchor.loc ? { loc: anchor.loc } : {}),
+      condition: {
+        role: "error",
+        expr: compact(anchor.label),
+      },
+      evidence: ["behavior.a11yAnchors"],
+    });
+  }
+
+  const tokens = relationTokens(result);
+  const hookSignals = [...(result.behavior?.effectSignals ?? []), ...(result.behavior?.callbackSignals ?? [])];
+  for (const signal of hookSignals) {
+    if (!signal.deps || signal.deps.length === 0) continue;
+    const relatesTo = signal.deps.filter((dep) => tokens.includes(dep));
+    if (relatesTo.length === 0) continue;
+    entries.push({
+      kind: signal.hook === "useMemo" ? "derived-state" : "hook-dependency-link",
+      label: compact(`${signal.hook} deps:[${signal.deps.join(", ")}]`),
+      ...(signal.loc ? { loc: signal.loc } : {}),
+      hook: {
+        hook: signal.hook as NonNullable<ReactWebContextFormStateFlowEntry["hook"]>["hook"],
+        deps: signal.deps,
+        ...(relatesTo.length ? { relatesTo } : {}),
+      },
+      evidence: [signal.hook === "useMemo" ? "behavior.callbackSignals.useMemo" : "behavior.effectOrCallbackSignals"],
+    });
+  }
+
+  return dedupeBy(
+    entries,
+    (item) => {
+      if (item.kind === "state-condition") {
+        return `${item.kind}:${item.loc?.startLine ?? ""}:${item.loc?.endLine ?? ""}:${item.condition?.expr ?? ""}`;
+      }
+      return `${item.kind}:${item.label}:${item.loc?.startLine ?? ""}:${item.control?.valueExpr ?? ""}:${item.control?.checkedExpr ?? ""}:${item.control?.onChangeExpr ?? ""}:${item.submit?.onSubmitExpr ?? ""}`;
+    },
+  );
+}
+
 function buildIntentTargets(result: ExtractionResult, editGuidance: EditGuidance | undefined): ReactWebContextIntentTarget[] {
   const targets: ReactWebContextIntentTarget[] = [];
 
@@ -329,8 +498,9 @@ export function buildReactWebContextMetadata(
     buildEditTargetRouting(result, editGuidance),
     REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.editTargetRouting,
   );
+  const formStateFlow = pruneArray(buildFormStateFlow(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.formStateFlow);
 
-  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || intentTargets || editTargetRouting);
+  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || intentTargets || editTargetRouting || formStateFlow);
   if (!hasContext) return undefined;
 
   return {
@@ -348,6 +518,7 @@ export function buildReactWebContextMetadata(
     ...(localDependencies ? { localDependencies } : {}),
     ...(intentTargets ? { intentTargets } : {}),
     ...(editTargetRouting ? { editTargetRouting } : {}),
+    ...(formStateFlow ? { formStateFlow } : {}),
     warnings: REACT_WEB_CONTEXT_WARNINGS,
   };
 }

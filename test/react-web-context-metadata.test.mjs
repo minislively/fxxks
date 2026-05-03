@@ -222,6 +222,205 @@ test("React Web form controls emit source-observed a11y anchors only", () => {
   assert.equal(payload.reactWebContext.warnings.some((item) => item.includes("not an accessibility audit")), true);
 });
 
+test("React Web formStateFlow links controlled controls submit and state conditions", () => {
+  const source = `
+    import React, { useCallback, useMemo, useState } from "react";
+
+    export function SignupForm() {
+      const [email, setEmail] = useState("");
+      const [accepted, setAccepted] = useState(false);
+      const [saving, setSaving] = useState(false);
+      const [error, setError] = useState("");
+      const canSubmit = useMemo(() => email.includes("@") && accepted, [email, accepted]);
+      const handleEmailChange = useCallback((event) => setEmail(event.target.value), []);
+      const handleSubmit = useCallback((event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError("");
+      }, [email, canSubmit]);
+
+      return (
+        <form onSubmit={handleSubmit}>
+          <input id="email" name="email" value={email} onChange={handleEmailChange} />
+          <input
+            name="accepted"
+            type="checkbox"
+            checked={accepted}
+            onChange={() => setAccepted(!accepted)}
+          />
+          <button type="submit" disabled={saving || !canSubmit}>Save</button>
+          {error ? <p role="alert">{error}</p> : null}
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "SignupForm.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext);
+  const flow = payload.reactWebContext.formStateFlow;
+  assert.ok(flow);
+  assert.ok(flow.length <= 10);
+  assert.ok(
+    flow.some(
+      (item) =>
+        item.kind === "controlled-control" &&
+        item.control?.tag === "input" &&
+        item.control?.name === "email" &&
+        item.control?.id === "email" &&
+        item.control?.valueExpr === "email" &&
+        item.control?.onChangeExpr === "handleEmailChange" &&
+        item.loc,
+    ),
+  );
+  assert.ok(
+    flow.some(
+      (item) =>
+        item.kind === "controlled-control" &&
+        item.control?.name === "accepted" &&
+        item.control?.checkedExpr === "accepted" &&
+        item.control?.onChangeExpr.includes("setAccepted"),
+    ),
+  );
+  assert.ok(
+    flow.some(
+      (item) =>
+        item.kind === "submit-flow" &&
+        item.submit?.onSubmitExpr === "handleSubmit" &&
+        !item.submit?.disabledExpr,
+    ),
+  );
+  assert.ok(
+    flow.some(
+      (item) =>
+        item.kind === "state-condition" &&
+        item.condition?.role === "loading" &&
+        item.condition?.expr === "saving || !canSubmit",
+    ),
+  );
+  assert.ok(flow.some((item) => item.kind === "state-condition" && item.condition?.role === "error"));
+  assert.ok(
+    flow.some(
+      (item) =>
+        item.kind === "derived-state" &&
+        item.hook?.hook === "useMemo" &&
+        item.hook?.deps.includes("email") &&
+        item.hook?.relatesTo?.includes("accepted"),
+    ),
+  );
+  assert.ok(
+    flow.some(
+      (item) =>
+        item.kind === "hook-dependency-link" &&
+        item.hook?.hook === "useCallback" &&
+        item.hook?.deps.includes("canSubmit") &&
+        item.hook?.relatesTo?.includes("email") &&
+        item.hook?.relatesTo?.includes("canSubmit"),
+    ),
+  );
+  assert.equal(
+    flow.filter((item) => item.kind === "state-condition" && item.condition?.expr === "saving || !canSubmit").length,
+    1,
+  );
+  assert.equal(
+    flow.filter((item) => item.kind === "hook-dependency-link" || item.kind === "derived-state").length <
+      payload.reactWebContext.stateHints.length,
+    true,
+  );
+  assert.notDeepEqual(
+    flow.map((item) => [item.kind, item.label]),
+    payload.reactWebContext.editTargetRouting.map((item) => [item.kind, item.label]),
+  );
+});
+
+test("React Web formStateFlow is omitted without form or relational state-flow facts", () => {
+  const payload = payloadFor("fixtures/compressed/FormSection.tsx", {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext);
+  assert.equal("formStateFlow" in payload.reactWebContext, false);
+});
+
+test("React Web formStateFlow dedupes multiline disabled control conditions", () => {
+  const source = `
+    import React, { useState } from "react";
+
+    export function DisabledPanel() {
+      const [saving, setSaving] = useState(false);
+      const [email, setEmail] = useState("");
+
+      return (
+        <form>
+          <p className="text-sm text-slate-500">
+            This fixture is intentionally long enough for compressed extraction while keeping the disabled condition local.
+          </p>
+          <input
+            name="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            disabled={saving}
+          />
+          <p className="text-sm text-slate-500">
+            The second paragraph keeps this fixture in compressed mode for React Web context metadata.
+          </p>
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "DisabledPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext?.formStateFlow);
+  assert.equal(
+    payload.reactWebContext.formStateFlow.filter(
+      (item) => item.kind === "state-condition" && item.condition?.expr === "saving",
+    ).length,
+    1,
+  );
+});
+
+test("React Web formStateFlow does not link hooks from uncontrolled name or id tokens", () => {
+  const source = `
+    import React, { useEffect } from "react";
+
+    export function UncontrolledEmail({ email }) {
+      useEffect(() => {
+        console.log(email);
+      }, [email]);
+
+      return (
+        <form>
+          <input id="email" name="email" onChange={() => undefined} />
+          <p className="text-sm text-slate-500">
+            This fixture is long enough for compressed React Web metadata while staying uncontrolled.
+          </p>
+          <p className="text-sm text-slate-500">
+            The hook dep matches only the field name/id, not a value or checked expression.
+          </p>
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "UncontrolledEmail.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext);
+  assert.equal(
+    payload.reactWebContext.formStateFlow?.some(
+      (item) => item.kind === "hook-dependency-link" && item.hook?.deps.includes("email"),
+    ) ?? false,
+    false,
+  );
+});
+
 test("React Web opt-in emits source-observed role aria and readOnly anchors", () => {
   const source = `
     import React from "react";

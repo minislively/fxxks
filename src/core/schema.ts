@@ -52,7 +52,9 @@ export type FormControlSignal = {
   name?: string;
   type?: string;
   props?: string[];
+  propValues?: Record<string, string>;
   handlers?: string[];
+  handlerValues?: Record<string, string>;
   loc?: SourceRange;
 };
 
@@ -60,6 +62,7 @@ export type FormSurface = {
   controls?: FormControlSignal[];
   submitHandlers?: LocatedString[];
   validationAnchors?: LocatedString[];
+  stateConditions?: LocatedString[];
 };
 
 export type A11yAnchorSignal = {
@@ -155,6 +158,35 @@ export type ReactWebContextEditTargetRoute = {
   evidence: string[];
 };
 
+export type ReactWebContextFormStateFlowEntry = {
+  kind: "controlled-control" | "submit-flow" | "state-condition" | "derived-state" | "hook-dependency-link";
+  label: string;
+  loc?: SourceRange;
+  control?: {
+    tag?: string;
+    name?: string;
+    id?: string;
+    valueExpr?: string;
+    checkedExpr?: string;
+    onChangeExpr?: string;
+  };
+  submit?: {
+    onSubmitExpr?: string;
+    handler?: string;
+    disabledExpr?: string;
+  };
+  condition?: {
+    role: "loading" | "error" | "disabled" | "unknown";
+    expr: string;
+  };
+  hook?: {
+    hook: "useEffect" | "useLayoutEffect" | "useCallback" | "useMemo";
+    deps: string[];
+    relatesTo?: string[];
+  };
+  evidence: string[];
+};
+
 export type ReactWebContextMetadataV0 = {
   schemaVersion: typeof REACT_WEB_CONTEXT_METADATA_SCHEMA_VERSION;
   freshness: SourceFingerprint;
@@ -170,6 +202,7 @@ export type ReactWebContextMetadataV0 = {
   localDependencies?: ReactWebContextLocalDependency[];
   intentTargets?: ReactWebContextIntentTarget[];
   editTargetRouting?: ReactWebContextEditTargetRoute[];
+  formStateFlow?: ReactWebContextFormStateFlowEntry[];
   warnings: string[];
 };
 
