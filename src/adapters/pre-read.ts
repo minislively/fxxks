@@ -211,6 +211,18 @@ function hasWebViewSourceShapeBoundary(domainDetection: DomainDetectionResult): 
   );
 }
 
+function shouldUseReactNativeWebViewBoundaryFallback(domainDetection: DomainDetectionResult): boolean {
+  if (domainDetection.classification === "react-native") {
+    return false;
+  }
+
+  if (hasWebViewSourceShapeBoundary(domainDetection)) {
+    return true;
+  }
+
+  return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
+}
+
 export function hasReactNativeWebViewBoundaryMarker(sourceText: string): boolean {
   const domainDetection = detectDomainFromSource(sourceText);
   return domainDetection.outcome === "fallback" && domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON;
@@ -238,21 +250,7 @@ export function decidePreRead(
   const sourceText = fs.readFileSync(resolvedPath, "utf8");
   const domainDetection = detectDomainFromSource(sourceText, resolvedPath);
   const frontendPayloadPolicy = assessFrontendPayloadPolicy(domainDetection);
-  if (hasWebViewSourceShapeBoundary(domainDetection) && domainDetection.classification !== "react-native") {
-    return buildPreReadFallbackDecision({
-      runtime,
-      filePath: outputPath,
-      eligible: true,
-      reasons: [REACT_NATIVE_WEBVIEW_BOUNDARY_REASON],
-      debug: frontendDebug(domainDetection, frontendPayloadPolicy),
-    });
-  }
-
-  if (
-    domainDetection.outcome === "fallback" &&
-    domainDetection.reason === REACT_NATIVE_WEBVIEW_BOUNDARY_REASON &&
-    domainDetection.classification !== "react-native"
-  ) {
+  if (shouldUseReactNativeWebViewBoundaryFallback(domainDetection)) {
     return buildPreReadFallbackDecision({
       runtime,
       filePath: outputPath,

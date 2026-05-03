@@ -12,6 +12,16 @@ const require = createRequire(import.meta.url);
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 const preReadSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
 
+function assertFallbackOnlyDecision(decision, reason) {
+  assert.equal(decision.decision, "fallback");
+  assert.deepEqual(decision.reasons, [reason]);
+  assert.equal(decision.fallback.reason, reason);
+  assert.equal("payload" in decision, false);
+  assert.equal("readiness" in decision, false);
+  assert.equal("mode" in decision.debug, false);
+  assert.equal("complexityScore" in decision.debug, false);
+}
+
 test("pre-read centralizes full-read fallback envelope construction", () => {
   assert.match(preReadSource, /function buildPreReadFallbackDecision\(/);
   const fallbackEnvelopeConstructions = preReadSource.match(/fallback:\s*{\s*\n\s*action:\s*"full-read"/g) ?? [];
@@ -38,11 +48,14 @@ test("pre-read fallback builder preserves ineligible extension decisions", () =>
 
 test("pre-read source-shape boundary guard skips payload planning", () => {
   assert.match(preReadSource, /function hasWebViewSourceShapeBoundary\(/);
-  assert.match(preReadSource, /if \(hasWebViewSourceShapeBoundary\(domainDetection\) && domainDetection\.classification !== "react-native"\) \{/);
-  const sourceShapeGuardIndex = preReadSource.indexOf('if (hasWebViewSourceShapeBoundary(domainDetection)');
+  assert.match(preReadSource, /function shouldUseReactNativeWebViewBoundaryFallback\(/);
+  assert.match(preReadSource, /if \(shouldUseReactNativeWebViewBoundaryFallback\(domainDetection\)\) \{/);
+  const sourceShapeGuardIndex = preReadSource.indexOf("function shouldUseReactNativeWebViewBoundaryFallback(");
+  const boundaryGuardIndex = preReadSource.indexOf("if (shouldUseReactNativeWebViewBoundaryFallback(domainDetection))");
   const payloadPlanIndex = preReadSource.indexOf('const { payload, readiness, debug } = buildPreReadPayloadPlan({');
   assert.ok(sourceShapeGuardIndex >= 0);
-  assert.ok(payloadPlanIndex > sourceShapeGuardIndex);
+  assert.ok(boundaryGuardIndex > sourceShapeGuardIndex);
+  assert.ok(payloadPlanIndex > boundaryGuardIndex);
 
   const tempDir = fs.mkdtempSync(path.join(repoRoot, ".tmp-pre-read-source-shape-"));
   try {
@@ -58,16 +71,33 @@ export function CheckoutWebView() {
 
     const decision = preRead.decidePreRead(filePath, tempDir, "codex", { includeEditGuidance: true });
 
-    assert.equal(decision.decision, "fallback");
-    assert.deepEqual(decision.reasons, ["unsupported-react-native-webview-boundary"]);
-    assert.equal(decision.fallback.reason, "unsupported-react-native-webview-boundary");
-    assert.equal("payload" in decision, false);
-    assert.equal("readiness" in decision, false);
-    assert.equal("mode" in decision.debug, false);
-    assert.equal("complexityScore" in decision.debug, false);
+    assertFallbackOnlyDecision(decision, "unsupported-react-native-webview-boundary");
     assert.equal(decision.debug.domainDetection.classification, "webview");
     assert.equal(decision.debug.domainDetection.profile.claimStatus, "fallback-boundary");
     assert.ok(decision.debug.domainDetection.signals.includes("webview:source-shape:uri"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("pre-read unsupported RN fallback skips payload planning", () => {
+  const tempDir = fs.mkdtempSync(path.join(repoRoot, ".tmp-pre-read-rn-unsupported-"));
+  try {
+    const filePath = path.join(tempDir, "UnsupportedScreen.tsx");
+    fs.writeFileSync(
+      filePath,
+      `import { ScrollView, View } from "react-native";
+export function UnsupportedScreen() {
+  return <ScrollView><View /></ScrollView>;
+}
+`,
+    );
+
+    const decision = preRead.decidePreRead(filePath, tempDir, "codex", { includeEditGuidance: true });
+
+    assertFallbackOnlyDecision(decision, "unsupported-frontend-domain-profile");
+    assert.equal(decision.debug.domainDetection.classification, "react-native");
+    assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
