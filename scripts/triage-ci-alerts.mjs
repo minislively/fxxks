@@ -8,6 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const DEFAULT_LIMIT = 100;
 const DEFAULT_ALERT_EVIDENCE_LIMIT = 12;
 const STALE_ALERT_SAMPLE_LIMIT = 3;
+const OMITTED_ALERT_RUN_EVIDENCE_LIMIT = 12;
 const STALE_CONCLUSIONS = new Set(["cancelled", "skipped"]);
 const ACTIONABLE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure"]);
 const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
@@ -225,13 +226,30 @@ function shouldKeepCompactAlert(alert, focusBranch) {
 function summarizeOmittedAlerts(omitted) {
   const byEvidence = {};
   const byConclusion = {};
+  const omittedRunEvidence = [];
   for (const alert of omitted) {
     const evidence = alert.evidence || "unknown";
     const conclusion = alert.conclusion || "unknown";
     byEvidence[evidence] = (byEvidence[evidence] ?? 0) + 1;
     byConclusion[conclusion] = (byConclusion[conclusion] ?? 0) + 1;
+    if (omittedRunEvidence.length < OMITTED_ALERT_RUN_EVIDENCE_LIMIT) {
+      omittedRunEvidence.push({
+        runId: alert.alertedRunId,
+        attempt: alert.alertedAttempt,
+        currentRunId: alert.currentRunId,
+        conclusion: alert.conclusion || "unknown",
+        evidence: alert.evidence || "unknown",
+        disposition: alert.disposition || "review",
+        replay: Boolean(alert.replay),
+      });
+    }
   }
-  return { byEvidence, byConclusion };
+  return {
+    byEvidence,
+    byConclusion,
+    omittedRunEvidenceLimit: OMITTED_ALERT_RUN_EVIDENCE_LIMIT,
+    omittedRunEvidence,
+  };
 }
 
 function alertKey(alert) {
@@ -408,8 +426,11 @@ function alertEvidenceTable(alerts, summary) {
   const currentHeadVerdict = summary?.currentHeadRunIds?.length
     ? ` Current-head verdict${summary.currentHeadRunIds.length === 1 ? "" : "s"}: ${summary.currentHeadRunIds.map((id) => `\`${escapeMarkdown(id)}\``).join(", ")}. Current-main echo count: ${summary.currentMainEchoCount ?? 0}. Stale historical replay count: ${summary.staleReplayCount ?? 0}.`
     : "";
+  const omittedEvidence = summary?.omittedRunEvidence?.length
+    ? ` Bounded omitted run evidence: ${summary.omittedRunEvidence.map((evidence) => `\`${escapeMarkdown(evidence.runId)}:${escapeMarkdown(evidence.conclusion)}:${escapeMarkdown(evidence.disposition)}\``).join(", ")}${summary.omitted > summary.omittedRunEvidence.length ? ` (+${summary.omitted - summary.omittedRunEvidence.length} more)` : ""}.`
+    : "";
   const compactNote = summary?.mode === "compact"
-    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).${currentHeadVerdict}`
+    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).${currentHeadVerdict}${omittedEvidence}`
     : `Full mode: showing all ${summary?.shown ?? alerts.length} pasted alert URLs.${currentHeadVerdict}`;
   const lines = [
     "## Pasted alert URL evidence",

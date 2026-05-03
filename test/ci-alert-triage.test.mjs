@@ -555,6 +555,15 @@ test("CI alert triage collapses success-heavy clawhip bursts to current head plu
     assert.equal(result.alertSummary.staleSuccessReplayCount, 20);
     assert.equal(result.alertSummary.byEvidence.stale, 20);
     assert.equal(result.alertSummary.byConclusion.success, 20);
+    assert.equal(result.alertSummary.omittedRunEvidenceLimit, 12);
+    assert.equal(result.alertSummary.omittedRunEvidence.length, 12);
+    assert.deepEqual(
+      result.alertSummary.omittedRunEvidence.map((evidence) => evidence.runId),
+      historicalRuns.slice(0, 12).map((run) => String(run.databaseId)),
+    );
+    assert.ok(result.alertSummary.omittedRunEvidence.every((evidence) => evidence.evidence === "stale"));
+    assert.ok(result.alertSummary.omittedRunEvidence.every((evidence) => evidence.disposition === "suppress-replay"));
+    assert.ok(result.alertSummary.omittedRunEvidence.every((evidence) => evidence.replay === true));
     assert.equal(result.counts.actionable ?? 0, 0);
     assert.equal(result.counts.watch ?? 0, 0);
     assert.equal(result.alerts.length, 1);
