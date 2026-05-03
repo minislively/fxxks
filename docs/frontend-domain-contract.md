@@ -208,6 +208,20 @@ Allowed launch statuses are:
 
 Until a launch contract names one of those statuses and lists the required fields above, domain-parallel work remains planning-only and no implementation worktree is authorized.
 
+#### First disjoint-domain wave template
+
+When a later launch contract lists the required fields, status `disjoint-domain-writers`, build/typecheck preflight evidence, and ownership/scope evidence, the first lane split should use stable branch/worktree prefixes and disjoint write sets like this. The template is bookkeeping for that later contract only; it is not support wording, not a runtime/source change, and not permission to edit serialized shared surfaces.
+
+| Lane | Branch/worktree prefix | Allowed write set for the lane | Must not edit in that lane |
+| --- | --- | --- | --- |
+| `react-web` | `lane/react-web-*` / `fooks-react-web-*` | React Web profile/policy tests, React Web fixtures, React Web docs scoped to the current supported lane. | Shared detector, pre-read, registry, manifest, claim-boundary, or fallback-policy files unless this branch is the named shared-policy owner. |
+| `react-native` | `lane/rn-*` / `fooks-rn-*` | RN primitive/input evidence, RN policy tests, RN fixtures, and narrow-gate docs. | Shared fallback reason changes, WebView bridge wording, broad RN support wording, or serialized shared surfaces. |
+| `webview-boundary` | `lane/webview-*` / `fooks-webview-*` | WebView boundary fixtures, source/onMessage/injected-JS evidence, and fallback-first tests/docs. | Compact-payload reuse, bridge-safety wording, RN fallback ownership, or serialized shared surfaces. |
+| `tui-ink` | `lane/tui-ink-*` / `fooks-tui-ink-*` | Ink/TUI syntax evidence, evidence-only tests, and terminal-profile docs. | Terminal correctness wording, runtime-token savings wording, default compact extraction, or serialized shared surfaces. |
+| `shared-policy` | `lane/shared-policy-*` / `fooks-shared-policy-*` | One named shared-seam owner branch for registry, detector, pre-read, manifest, or claim-boundary changes. | Parallel execution with other shared-seam writers; dependent domain lanes wait and rebase after this branch lands. |
+
+The leader merges `shared-policy` first when present, then rebases and verifies domain lanes in the PR-order field. If no `shared-policy` lane participates, every domain lane still needs a disjoint-file proof and the aggregate verification matrix before merge.
+
 Shared fallback reasons and denial markers are boundary evidence, not support claims. In particular, `unsupported-react-native-webview-boundary`, `unsupported-frontend-domain-profile`, `webview-boundary-fallback`, and domain-specific payload policy strings must not be reused as React Native, WebView, TUI/Ink, Mixed, or Unknown support wording.
 
 Domain promotion must follow this ordered ladder and stop at the first failed gate:

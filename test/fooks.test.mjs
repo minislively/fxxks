@@ -4297,6 +4297,19 @@ test("frontend domain contract locks taxonomy and pre-detector promotion gates",
     assert.ok(ownershipMatrix.includes(`| \`${launchStatus}\` |`), `${launchStatus} launch status must be documented`);
   }
   assert.match(ownershipMatrix, /domain-parallel work remains planning-only and no implementation worktree is authorized/);
+  assert.match(ownershipMatrix, /#### First disjoint-domain wave template/);
+  assert.match(ownershipMatrix, /status `disjoint-domain-writers`, build\/typecheck preflight evidence, and ownership\/scope evidence/);
+  for (const lanePrefix of [
+    "`lane/react-web-*` / `fooks-react-web-*`",
+    "`lane/rn-*` / `fooks-rn-*`",
+    "`lane/webview-*` / `fooks-webview-*`",
+    "`lane/tui-ink-*` / `fooks-tui-ink-*`",
+    "`lane/shared-policy-*` / `fooks-shared-policy-*`",
+  ]) {
+    assert.ok(ownershipMatrix.includes(lanePrefix), `${lanePrefix} must stay in the first disjoint-domain wave template`);
+  }
+  assert.match(ownershipMatrix, /The leader merges `shared-policy` first when present/);
+  assert.match(ownershipMatrix, /every domain lane still needs a disjoint-file proof and the aggregate verification matrix before merge/);
   for (const handoffItem of [
     "Base branch or base commit prerequisite",
     "Lane name",
