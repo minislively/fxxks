@@ -4,13 +4,13 @@ import ts from "typescript";
 import { hashText } from "./hash";
 import { decideMode } from "./decide";
 import { detectDomainFromSource } from "./domain-detector";
-import type { ExtractionResult, FormSurface, Language, SourceRange, StyleSystem } from "./schema";
+import type { A11yAnchorSignal, ExtractionResult, FormSurface, Language, SourceRange, StyleSystem } from "./schema";
 
 const HOOK_NAMES = new Set(["useState", "useEffect", "useMemo", "useCallback", "useRef", "useReducer", "useLayoutEffect", "useContext", "useId", "useTransition"]);
 const EFFECT_HOOK_NAMES = new Set(["useEffect", "useLayoutEffect"]);
 const CALLBACK_HOOK_NAMES = new Set(["useMemo", "useCallback"]);
 const FORM_CONTROL_TAGS = new Set(["form", "input", "select", "textarea"]);
-const CONTROL_PROP_NAMES = new Set(["name", "type", "value", "defaultValue", "required", "disabled", "checked", "defaultChecked"]);
+const CONTROL_PROP_NAMES = new Set(["name", "type", "value", "defaultValue", "required", "disabled", "readOnly", "checked", "defaultChecked"]);
 const MAX_EFFECT_SIGNALS = 8;
 const MAX_CALLBACK_SIGNALS = 8;
 const MAX_EVENT_HANDLER_SIGNALS = 12;
@@ -389,6 +389,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const submitHandlers: NonNullable<FormSurface["submitHandlers"]> = [];
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
+  const a11yAnchors: A11yAnchorSignal[] = [];
   const conditionalRenders = new Set<string>();
   const repeatedBlocks = new Set<string>();
   const snippetCandidates: NonNullable<ExtractionResult["snippets"]> = [];
@@ -415,6 +416,12 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     const compacted = compactText(value);
     if (!compacted) return;
     items.push({ value: compacted, loc: sourceRangeOf(sourceFile, node) });
+  };
+
+  const addA11yAnchor = (kind: A11yAnchorSignal["kind"], label: string, node: ts.Node): void => {
+    const compacted = compactText(label);
+    if (!compacted) return;
+    a11yAnchors.push({ kind, label: compacted, loc: sourceRangeOf(sourceFile, node) });
   };
 
   const jsxAttributeValue = (attribute: ts.JsxAttribute): string | undefined => {
@@ -452,6 +459,27 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       const attrName = property.name.getText(sourceFile);
       if (CONTROL_PROP_NAMES.has(attrName)) {
         propNames.push(attrName);
+      }
+      if (tag === "label") {
+        addA11yAnchor("label", jsxAttributeValue(property) ?? tag, property);
+      }
+      if (attrName === "htmlFor") {
+        addA11yAnchor("htmlFor", jsxAttributeValue(property) ?? attrName, property);
+      }
+      if (attrName === "role") {
+        addA11yAnchor("role", jsxAttributeValue(property) ?? attrName, property);
+      }
+      if (attrName.startsWith("aria-")) {
+        addA11yAnchor("aria", `${attrName}=${jsxAttributeValue(property) ?? "true"}`, property);
+      }
+      if (attrName === "required") {
+        addA11yAnchor("required", controlName ? `${tag}[name=${controlName}]` : tag, property);
+      }
+      if (attrName === "disabled") {
+        addA11yAnchor("disabled", controlName ? `${tag}[name=${controlName}]` : tag, property);
+      }
+      if (attrName === "readOnly") {
+        addA11yAnchor("readonly", controlName ? `${tag}[name=${controlName}]` : tag, property);
       }
       if (/^on[A-Z]/.test(attrName)) {
         handlers.push(attrName);
@@ -569,6 +597,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const callbackSignalList = dedupeBy(callbackSignals, (item) => `${item.hook}:${item.loc?.startLine ?? ""}:${item.deps?.join(",") ?? ""}`).slice(0, MAX_CALLBACK_SIGNALS);
   const eventHandlerList = [...eventHandlers];
   const eventHandlerSignalList = dedupeBy(eventHandlerSignals, (item) => `${item.name}:${item.trigger ?? ""}:${item.loc?.startLine ?? ""}`).slice(0, MAX_EVENT_HANDLER_SIGNALS);
+  const a11yAnchorList = dedupeBy(a11yAnchors, (item) => `${item.kind}:${item.label}:${item.loc?.startLine ?? ""}`).slice(0, 16);
   return {
     behavior: {
       hooks: [...hooks],
@@ -587,6 +616,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
             },
           }
         : {}),
+      ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
       hasSideEffects,
     },
     structure: {

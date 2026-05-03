@@ -62,6 +62,12 @@ export type FormSurface = {
   validationAnchors?: LocatedString[];
 };
 
+export type A11yAnchorSignal = {
+  kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
+  label: string;
+  loc?: SourceRange;
+};
+
 export type ModuleDeclarationSignal = LocatedString & {
   kind: "function" | "class" | "variable" | "type" | "interface" | "enum";
   exported?: boolean;
@@ -89,6 +95,61 @@ export type EditGuidance = {
   freshness: SourceFingerprint;
   instructions: string[];
   patchTargets: PatchTarget[];
+};
+
+export const REACT_WEB_CONTEXT_METADATA_SCHEMA_VERSION = "react-web-context.v0" as const;
+
+export type ReactWebContextStateHint = {
+  label: string;
+  kind: "state" | "effect" | "callback";
+  loc?: SourceRange;
+  deps?: string[];
+  evidence: string[];
+};
+
+export type ReactWebContextRenderState = {
+  label: string;
+  kind: "conditional" | "repeated";
+  condition?: string;
+  evidence: string[];
+};
+
+export type ReactWebContextA11yAnchor = {
+  kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
+  label: string;
+  loc?: SourceRange;
+  evidence: string[];
+};
+
+export type ReactWebContextLocalDependency = {
+  symbol: string;
+  kind: "local-declaration";
+  loc?: SourceRange;
+  usedBy?: string[];
+};
+
+export type ReactWebContextIntentTarget = {
+  intent: "style" | "form" | "handler" | "state" | "branch" | "props" | "component";
+  label: string;
+  loc?: SourceRange;
+  source: "editGuidance" | "behavior" | "structure" | "contract" | "style";
+};
+
+export type ReactWebContextMetadataV0 = {
+  schemaVersion: typeof REACT_WEB_CONTEXT_METADATA_SCHEMA_VERSION;
+  freshness: SourceFingerprint;
+  scope: {
+    kind: "same-file" | "same-component";
+    filePath: string;
+    componentName?: string;
+    componentLoc?: SourceRange;
+  };
+  stateHints?: ReactWebContextStateHint[];
+  renderStates?: ReactWebContextRenderState[];
+  a11yAnchors?: ReactWebContextA11yAnchor[];
+  localDependencies?: ReactWebContextLocalDependency[];
+  intentTargets?: ReactWebContextIntentTarget[];
+  warnings: string[];
 };
 
 export type ExtractionResult = {
@@ -119,6 +180,7 @@ export type ExtractionResult = {
     eventHandlers?: string[];
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
+    a11yAnchors?: A11yAnchorSignal[];
     hasSideEffects?: boolean;
   };
   structure?: {
@@ -188,6 +250,7 @@ export type ModelFacingPayload = {
   snippets?: ExtractionResult["snippets"];
   editGuidance?: EditGuidance;
   designReviewMetadata?: DesignReviewMetadataV0;
+  reactWebContext?: ReactWebContextMetadataV0;
   domainPayload?: DomainPayload;
 };
 
