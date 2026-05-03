@@ -11,6 +11,7 @@
     "test": "npm run build && node --test test/*.test.mjs",
     "test:integration": "npm run build && node --test test/*.test.mjs",
     "bench:cache": "npm run build && node scripts/benchmark-cache.mjs",
+    "evidence:react-web-context": "npm run build && node scripts/react-web-context-evidence.mjs",
     "clean": "rm -rf dist",
     "bench": "npm run build && node benchmarks/scripts/run-all.mjs",
     "bench:scan": "npm run build && node benchmarks/scripts/scan-cache.mjs",
