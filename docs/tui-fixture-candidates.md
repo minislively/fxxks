@@ -42,6 +42,7 @@ The current committed TUI / Ink fixtures are useful as domain evidence, not as c
 | --- | --- | --- |
 | `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | Ink import, `Box`, `Text`, and `useInput` signals in a compact React CLI component. | Classify as `tui-ink`, mark the profile `evidence-only`, deny the TUI payload policy, and fall back with `unsupported-frontend-domain-profile`. |
 | `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | Ink import, `Box`, `Text`, `useInput`, keyboard navigation, selected-row rendering, and list mapping in a behavior-heavy prompt surface. | Classify as `tui-ink`, keep the profile `evidence-only`, deny the TUI payload policy, emit no payload, and fall back through the readiness/profile gate. The current pre-read reason is `raw-mode` because extraction preserves the original raw source before any TUI payload could be emitted. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-status-panel.tsx` | Ink import, `Box`, `Text`, nested status rows, command phase labels, elapsed time, and mapped log lines without `useInput`. | Classify as `tui-ink`, keep the profile `evidence-only`, deny the TUI payload policy, emit no payload, and fall back with `raw-mode`; this proves fixture breadth without treating non-interactive status UI as supported terminal behavior. |
 
 This reinforcement slice is intentionally small so it can run alongside RN, React Web, and WebView worktrees without touching shared detector, runtime, manifest, or payload-policy implementation files. A TUI fixture PR should prove the evidence boundary above before it proposes any source or runtime change.
 
@@ -69,6 +70,7 @@ This matrix is the current review contract for TUI-related fixtures. It is inten
 | --- | --- | --- | --- | --- |
 | `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | `tui-ink`, `evidence-only` | `tui-ink-evidence-only-payload`, denied | fallback with `unsupported-frontend-domain-profile`, no payload | Syntax evidence only; no TUI support or terminal correctness claim. |
 | `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | `tui-ink`, `evidence-only` | `tui-ink-evidence-only-payload`, denied | fallback with `raw-mode`, no payload | Behavior-heavy Ink evidence only; no runtime, token, or compact extraction claim. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-status-panel.tsx` | `tui-ink`, `evidence-only` | `tui-ink-evidence-only-payload`, denied | fallback with `raw-mode`, no payload | Status/progress UI syntax evidence only; no terminal progress, command execution, token, or compact extraction claim. |
 | `test/fixtures/frontend-domain-expectations/tui-non-ink-cli-renderer.tsx` | `unknown`, `deferred` | no TUI/Ink policy authorization | fallback with no payload; unsupported-profile policy remains denied in debug evidence | Negative/fallback evidence only; no F7 manifest promotion or package-support claim. |
 
 If a future PR changes any row from fallback/no-payload to payload emission, it is no longer a TUI evidence matrix update and must go through a serialized shared-policy plan.

@@ -52,6 +52,13 @@ const tuiEvidenceMatrix = [
     fallbackReason: () => "raw-mode",
   },
   {
+    fileName: "tui-ink-status-panel.tsx",
+    classification: "tui-ink",
+    claimStatus: "evidence-only",
+    expectedPolicy: expectedTuiEvidenceOnlyPolicy,
+    fallbackReason: () => "raw-mode",
+  },
+  {
     fileName: "tui-non-ink-cli-renderer.tsx",
     classification: "unknown",
     claimStatus: "deferred",
@@ -154,6 +161,29 @@ test("TUI/Ink interactive list fixture remains evidence-only and fallback-safe",
   assertTuiFallbackWithoutPayload(decision, "raw-mode");
 });
 
+test("TUI/Ink status panel fixture broadens evidence without payload permission", () => {
+  const relativeFixturePath = path.join(
+    "test",
+    "fixtures",
+    "frontend-domain-expectations",
+    "tui-ink-status-panel.tsx",
+  );
+  const fixturePath = path.join(repoRoot, relativeFixturePath);
+  const domainDetection = detect(readFixture(relativeFixturePath), "tui-ink-status-panel.tsx");
+
+  assert.equal(domainDetection.classification, "tui-ink");
+  assert.equal(domainDetection.profile.claimStatus, "evidence-only");
+  assert.ok(domainDetection.signals.includes("tui-ink:import:ink"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Box"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Text"));
+  assert.equal(domainDetection.signals.includes("tui-ink:hook:useInput"), false);
+  assert.deepEqual(assessTuiInkPayloadPolicy(domainDetection), expectedTuiEvidenceOnlyPolicy());
+
+  const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
+
+  assertTuiFallbackWithoutPayload(decision, "raw-mode");
+});
+
 test("non-Ink CLI renderer fixture stays outside TUI/Ink payload policy", () => {
   const relativeFixturePath = path.join(
     "test",
@@ -212,6 +242,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /Current evidence-only reinforcement slice/);
   assert.match(survey, /tui-ink-basic\.tsx/);
   assert.match(survey, /tui-ink-interactive-list\.tsx/);
+  assert.match(survey, /tui-ink-status-panel\.tsx/);
   assert.match(survey, /unsupported-frontend-domain-profile/);
   assert.match(survey, /tui-non-ink-cli-renderer\.tsx/);
   assert.match(survey, /Negative\/fallback reinforcement/);
