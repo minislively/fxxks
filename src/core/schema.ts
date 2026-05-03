@@ -135,6 +135,26 @@ export type ReactWebContextIntentTarget = {
   source: "editGuidance" | "behavior" | "structure" | "contract" | "style";
 };
 
+export type ReactWebContextEditTargetRoute = {
+  kind:
+    | "primary-component"
+    | "props-contract"
+    | "effect"
+    | "callback"
+    | "event-handler"
+    | "form-control"
+    | "submit-handler"
+    | "validation-anchor"
+    | "conditional-region"
+    | "repeated-block"
+    | "style-region";
+  label: string;
+  priority: number;
+  loc?: SourceRange;
+  source: "editGuidance.patchTargets" | "structure" | "style";
+  evidence: string[];
+};
+
 export type ReactWebContextMetadataV0 = {
   schemaVersion: typeof REACT_WEB_CONTEXT_METADATA_SCHEMA_VERSION;
   freshness: SourceFingerprint;
@@ -149,6 +169,7 @@ export type ReactWebContextMetadataV0 = {
   a11yAnchors?: ReactWebContextA11yAnchor[];
   localDependencies?: ReactWebContextLocalDependency[];
   intentTargets?: ReactWebContextIntentTarget[];
+  editTargetRouting?: ReactWebContextEditTargetRoute[];
   warnings: string[];
 };
 

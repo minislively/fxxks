@@ -30,6 +30,7 @@ test("pre-read payload builder preserves React Web payload success envelope", ()
   assert.equal(decision.debug.domainDetection.classification, "react-web");
   assert.equal(decision.debug.frontendPayloadPolicy.allowed, true);
   assert.ok(decision.payload.reactWebContext);
+  assert.equal("editTargetRouting" in decision.payload.reactWebContext, false);
   assert.equal(decision.debug.reactWebContextBudget.included, true);
   assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
 });

@@ -125,8 +125,14 @@ export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreRead
   let reactWebContextBudget: NonNullable<PreReadDecision["debug"]>["reactWebContextBudget"];
 
   if (includeReactWebContextMetadata) {
-    const estimatedPayloadBytes = estimatePayloadBytes(payload);
+    let estimatedPayloadBytes = estimatePayloadBytes(payload);
     const maxPayloadBytes = reactWebContextPayloadBudget(result.meta.rawSizeBytes);
+    if (payload.reactWebContext?.editTargetRouting && estimatedPayloadBytes > maxPayloadBytes) {
+      const trimmedReactWebContext = { ...payload.reactWebContext };
+      delete trimmedReactWebContext.editTargetRouting;
+      payload = { ...payload, reactWebContext: trimmedReactWebContext };
+      estimatedPayloadBytes = estimatePayloadBytes(payload);
+    }
     if (payload.reactWebContext && estimatedPayloadBytes > maxPayloadBytes) {
       payload = toModelFacingPayload(result, input.cwd, {
         includeEditGuidance: input.includeEditGuidance,

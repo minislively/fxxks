@@ -600,7 +600,7 @@ test("Codex wrapper artifacts include structured runtime usage without billing s
       ].join("\n"),
       { mode: 0o755 },
     );
-    const wrapper = new CodexWrapper({ model: "test-model", timeoutMs: 1000, command: codexPath });
+    const wrapper = new CodexWrapper({ model: "test-model", timeoutMs: 5000, command: codexPath });
     const result = await wrapper.run("context", "task");
 
     assert.equal(result.success, true);

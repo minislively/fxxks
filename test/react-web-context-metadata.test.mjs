@@ -37,6 +37,74 @@ test("React Web opt-in emits context without emitting domainPayload", () => {
   assert.ok(payload.reactWebContext.stateHints.some((item) => item.kind === "callback" && item.deps.includes("name")));
   assert.ok(payload.reactWebContext.intentTargets.some((item) => item.intent === "handler" && item.source === "editGuidance"));
   assert.ok(payload.reactWebContext.intentTargets.some((item) => item.intent === "style" && item.source === "style"));
+  assert.deepEqual(
+    payload.reactWebContext.editTargetRouting.map((item) => ({
+      kind: item.kind,
+      label: item.label,
+      priority: item.priority,
+      loc: item.loc,
+      source: item.source,
+    })),
+    [
+      {
+        kind: "primary-component",
+        label: "HookEffectPanel",
+        priority: 1,
+        loc: { startLine: 9, endLine: 51 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "props-contract",
+        label: "HookEffectPanelProps",
+        priority: 2,
+        loc: { startLine: 3, endLine: 7 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "effect",
+        label: "useEffect deps:[loadUser, userId]",
+        priority: 3,
+        loc: { startLine: 12, endLine: 28 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "callback",
+        label: "useMemo deps:[name]",
+        priority: 4,
+        loc: { startLine: 30, endLine: 32 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "callback",
+        label: "useCallback deps:[loadUser, userId]",
+        priority: 5,
+        loc: { startLine: 34, endLine: 38 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "event-handler",
+        label: "handleRefresh",
+        priority: 6,
+        loc: { startLine: 34, endLine: 38 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "event-handler",
+        label: "handleRefresh",
+        priority: 7,
+        loc: { startLine: 44, endLine: 44 },
+        source: "editGuidance.patchTargets",
+      },
+      {
+        kind: "conditional-region",
+        label: "useEffect",
+        priority: 8,
+        loc: { startLine: 12, endLine: 28 },
+        source: "editGuidance.patchTargets",
+      },
+    ],
+  );
+  assert.deepEqual(payload.reactWebContext.editTargetRouting[0].evidence, ["editGuidance.patchTargets.component"]);
 
   const warnings = payload.reactWebContext.warnings.join("\n");
   assert.match(warnings, /React Web current supported lane only/);
@@ -63,6 +131,84 @@ test("React Web opt-in can emit context and domainPayload with stable top-level 
   assert.ok(keys.indexOf("designReviewMetadata") < keys.indexOf("reactWebContext"));
   assert.ok(keys.indexOf("reactWebContext") < keys.indexOf("domainPayload"));
   assert.ok(keys.indexOf("domainPayload") < keys.indexOf("exports"));
+});
+
+test("React Web edit-target routing is compact and keeps broad intent targets separate", () => {
+  const payload = payloadFor("fixtures/compressed/FormControls.tsx", {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext);
+  assert.equal(payload.reactWebContext.editTargetRouting.length, 8);
+  assert.deepEqual(
+    payload.reactWebContext.editTargetRouting.map((item) => [item.kind, item.label, item.priority, item.source]),
+    [
+      ["primary-component", "FormControls", 1, "editGuidance.patchTargets"],
+      ["event-handler", "onSubmit", 2, "editGuidance.patchTargets"],
+      ["event-handler", "() => undefined", 3, "editGuidance.patchTargets"],
+      ["form-control", "form", 4, "editGuidance.patchTargets"],
+      ["form-control", "input[name=email]", 5, "editGuidance.patchTargets"],
+      ["form-control", "select[name=role]", 6, "editGuidance.patchTargets"],
+      ["form-control", "textarea[name=notes]", 7, "editGuidance.patchTargets"],
+      ["form-control", "Controller[name=email]", 8, "editGuidance.patchTargets"],
+    ],
+  );
+  assert.ok(payload.reactWebContext.editTargetRouting.every((item) => item.loc));
+  assert.ok(payload.reactWebContext.intentTargets.some((item) => item.intent === "form" && item.label === "useForm"));
+});
+
+test("React Web edit-target routing can use lower-priority range-less style facts", () => {
+  const payload = payloadFor("fixtures/compressed/HookEffectPanel.tsx", {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext);
+  assert.deepEqual(payload.reactWebContext.editTargetRouting, [
+    {
+      kind: "style-region",
+      label: "tailwind",
+      priority: 1,
+      source: "style",
+      evidence: ["style"],
+    },
+  ]);
+});
+
+test("React Web edit-target routing skips broad-only patch targets but keeps lower-priority source facts", () => {
+  const payload = payloadFor("fixtures/compressed/FormSection.tsx", {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext);
+  assert.deepEqual(
+    payload.reactWebContext.editTargetRouting.map((item) => ({
+      kind: item.kind,
+      label: item.label,
+      priority: item.priority,
+      source: item.source,
+      loc: item.loc,
+    })),
+    [
+      {
+        kind: "style-region",
+        label: "tailwind",
+        priority: 1,
+        source: "style",
+        loc: undefined,
+      },
+      {
+        kind: "repeated-block",
+        label: "array-map-render",
+        priority: 2,
+        source: "structure",
+        loc: undefined,
+      },
+    ],
+  );
+  assert.ok(payload.reactWebContext.intentTargets.some((item) => item.intent === "component" && item.label === "FormSection"));
+  assert.ok(payload.reactWebContext.intentTargets.some((item) => item.intent === "props" && item.label === "FormSectionProps"));
 });
 
 test("React Web form controls emit source-observed a11y anchors only", () => {

@@ -3,6 +3,7 @@ import {
   type EditGuidance,
   type ExtractionResult,
   type ReactWebContextA11yAnchor,
+  type ReactWebContextEditTargetRoute,
   type ReactWebContextIntentTarget,
   type ReactWebContextLocalDependency,
   type ReactWebContextMetadataV0,
@@ -17,14 +18,15 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   a11yAnchors: 16,
   localDependencies: 12,
   intentTargets: 16,
+  editTargetRouting: 8,
 } as const;
 
 const REACT_WEB_CONTEXT_WARNINGS = [
-  "React Web current supported lane only; this metadata does not imply React Native, WebView, TUI, Mixed, or Unknown support.",
-  "Source-derived repeated-read context hints only; not LSP-backed and not a dependency graph.",
+  "React Web current supported lane only; not React Native/WebView/TUI/Mixed/Unknown support.",
+  "Source-derived repeated-read context hints only; not LSP-backed or dependency graph.",
   "A11y anchors are source-observed hints only, not an accessibility audit.",
-  "This metadata is not proof of runtime/provider token savings.",
-  "Rerun extraction or read current source if sourceFingerprint.fileHash or sourceFingerprint.lineCount changes.",
+  "not proof of runtime/provider token savings.",
+  "Rerun extraction or read current source if sourceFingerprint changes.",
 ];
 
 function compact(value: string, maxLength = 80): string {
@@ -203,6 +205,80 @@ function intentForPatchTarget(kind: EditGuidance["patchTargets"][number]["kind"]
   }
 }
 
+function routeKindForPatchTarget(kind: EditGuidance["patchTargets"][number]["kind"]): ReactWebContextEditTargetRoute["kind"] {
+  switch (kind) {
+    case "component":
+      return "primary-component";
+    case "props":
+      return "props-contract";
+    case "snippet":
+      return "conditional-region";
+    default:
+      return kind;
+  }
+}
+
+function buildEditTargetRouting(result: ExtractionResult, editGuidance: EditGuidance | undefined): ReactWebContextEditTargetRoute[] {
+  const routes: ReactWebContextEditTargetRoute[] = [];
+  let priority = 1;
+  const patchTargets = editGuidance?.patchTargets ?? [];
+  const hasSpecificPatchTarget = patchTargets.some((target) => target.kind !== "component" && target.kind !== "props");
+
+  for (const target of patchTargets) {
+    if (!hasSpecificPatchTarget && (target.kind === "component" || target.kind === "props")) {
+      continue;
+    }
+    routes.push({
+      kind: routeKindForPatchTarget(target.kind),
+      label: target.label,
+      priority,
+      loc: target.loc,
+      source: "editGuidance.patchTargets",
+      evidence: [`editGuidance.patchTargets.${target.kind}`],
+    });
+    priority += 1;
+  }
+
+  if (result.style?.hasStyleBranching || (result.style?.system && result.style.system !== "unknown")) {
+    routes.push({
+      kind: "style-region",
+      label: result.style.system ?? "style",
+      priority,
+      source: "style",
+      evidence: ["style"],
+    });
+    priority += 1;
+  }
+
+  for (const condition of result.structure?.conditionalRenders ?? []) {
+    routes.push({
+      kind: "conditional-region",
+      label: compact(condition),
+      priority,
+      source: "structure",
+      evidence: ["structure.conditionalRenders"],
+    });
+    priority += 1;
+  }
+
+  for (const repeated of result.structure?.repeatedBlocks ?? []) {
+    routes.push({
+      kind: "repeated-block",
+      label: compact(repeated),
+      priority,
+      source: "structure",
+      evidence: ["structure.repeatedBlocks"],
+    });
+    priority += 1;
+  }
+
+  return dedupeBy(
+    routes,
+    (item) =>
+      `${item.kind}:${item.label}:${item.loc?.startLine ?? ""}:${item.loc?.endLine ?? ""}:${item.source}`,
+  );
+}
+
 function buildIntentTargets(result: ExtractionResult, editGuidance: EditGuidance | undefined): ReactWebContextIntentTarget[] {
   const targets: ReactWebContextIntentTarget[] = [];
 
@@ -249,8 +325,12 @@ export function buildReactWebContextMetadata(
   const a11yAnchors = pruneArray(buildA11yAnchors(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.a11yAnchors);
   const localDependencies = pruneArray(buildLocalDependencies(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.localDependencies);
   const intentTargets = pruneArray(buildIntentTargets(result, editGuidance), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.intentTargets);
+  const editTargetRouting = pruneArray(
+    buildEditTargetRouting(result, editGuidance),
+    REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.editTargetRouting,
+  );
 
-  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || intentTargets);
+  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || intentTargets || editTargetRouting);
   if (!hasContext) return undefined;
 
   return {
@@ -267,6 +347,7 @@ export function buildReactWebContextMetadata(
     ...(a11yAnchors ? { a11yAnchors } : {}),
     ...(localDependencies ? { localDependencies } : {}),
     ...(intentTargets ? { intentTargets } : {}),
+    ...(editTargetRouting ? { editTargetRouting } : {}),
     warnings: REACT_WEB_CONTEXT_WARNINGS,
   };
 }
