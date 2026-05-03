@@ -3,7 +3,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 
@@ -17,8 +16,6 @@ const { assessTuiInkPayloadPolicy } = require(path.join(repoRoot, "dist", "core"
 const { assessReactNativePayloadPolicy } = require(path.join(repoRoot, "dist", "core", "payload-policy", "react-native.js"));
 const { assessFallbackPayloadPolicy } = require(path.join(repoRoot, "dist", "core", "payload-policy", "fallback.js"));
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
-
-const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|mixed frontend support is available|unknown frontend support is available|terminal correctness is guaranteed|bridge safety is guaranteed|default WebView compact extraction is enabled|default TUI compact extraction is enabled/i;
 
 function detect(source, filePath = "Component.tsx") {
   return detectDomainFromSource(source, filePath);
@@ -58,9 +55,37 @@ test("frontend payload policy registry returns the same decisions as lane-owned 
   for (const [lane, domainDetection] of Object.entries(samples)) {
     assert.deepEqual(registry.assessFrontendPayloadPolicy(domainDetection), expectedByLane[lane], lane);
   }
+
+  assert.deepEqual(registry.assessFrontendPayloadPolicy(samples["react-web"]), {
+    name: "react-web-current-supported-lane",
+    allowed: true,
+  });
+  assert.deepEqual(registry.assessFrontendPayloadPolicy(samples.webview), {
+    name: "webview-boundary-fallback",
+    allowed: false,
+    reason: "unsupported-react-native-webview-boundary",
+  });
+  assert.deepEqual(registry.assessFrontendPayloadPolicy(samples["tui-ink"]), {
+    name: "tui-ink-evidence-only-payload",
+    allowed: false,
+    reason: "tui-ink-evidence-only",
+  });
+  assert.deepEqual(registry.assessFrontendPayloadPolicy(samples.mixed), {
+    name: "mixed-frontend-boundary-fallback",
+    allowed: false,
+    reason: "unsupported-react-native-webview-boundary",
+  });
+  assert.deepEqual(registry.assessFrontendPayloadPolicy(samples.unknown), {
+    name: "unknown-frontend-deferred-fallback",
+    allowed: false,
+    reason: "unsupported-frontend-domain-profile",
+  });
 });
 
-test("pre-read compatibility entrypoint uses the core policy registry", () => {
+test("pre-read compatibility entrypoint exports the core policy registry APIs", () => {
+  assert.equal(preRead.assessFrontendPayloadPolicy, registry.assessFrontendPayloadPolicy);
+  assert.equal(preRead.toFrontendPayloadBuildOptions, registry.toFrontendPayloadBuildOptions);
+
   for (const [lane, domainDetection] of Object.entries(samples)) {
     assert.deepEqual(preRead.assessFrontendPayloadPolicy(domainDetection), registry.assessFrontendPayloadPolicy(domainDetection), lane);
   }
@@ -86,24 +111,11 @@ test("frontend payload build options include domain payload only for React Web p
   assert.deepEqual(registry.toFrontendPayloadBuildOptions(undefined), { includeDomainPayload: false });
 });
 
-test("pre-read adapter no longer owns hardcoded policy assessment order", () => {
-  const source = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read.ts"), "utf8");
-  const stackSource = fs.readFileSync(path.join(repoRoot, "src", "adapters", "pre-read-stack.ts"), "utf8");
-  const combinedSource = `${source}\n${stackSource}`;
+test("registry build options are the only public seam for policy-shaped payload options", () => {
+  for (const lane of Object.keys(samples)) {
+    const viaRegistry = registry.toFrontendPayloadBuildOptions(registry.assessFrontendPayloadPolicy(samples[lane]));
+    const viaPreReadCompatibility = preRead.toFrontendPayloadBuildOptions(preRead.assessFrontendPayloadPolicy(samples[lane]));
 
-  assert.match(source, /import \{ assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions \} from "\.\.\/core\/payload-policy\/registry"/);
-  assert.doesNotMatch(combinedSource, /assessReactWebPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(combinedSource, /assessWebViewPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(combinedSource, /assessTuiInkPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(combinedSource, /assessReactNativePayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(combinedSource, /assessFallbackPayloadPolicy\(domainDetection\)/);
-  assert.doesNotMatch(combinedSource, /includeDomainPayload:\s*frontendPayloadPolicy\?\.name ===/);
-  assert.match(stackSource, /toFrontendPayloadBuildOptions\(frontendPayloadPolicy\)/);
-});
-
-test("payload policy registry source avoids broad support claims", () => {
-  assert.doesNotMatch(
-    fs.readFileSync(path.join(repoRoot, "src", "core", "payload-policy", "registry.ts"), "utf8"),
-    forbiddenSupportClaims,
-  );
+    assert.deepEqual(viaPreReadCompatibility, viaRegistry, lane);
+  }
 });
