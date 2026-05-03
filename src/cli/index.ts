@@ -647,6 +647,7 @@ Everyday commands:
   ${displayCliName} status cache
   ${displayCliName} status worktree
   ${displayCliName} status artifacts
+  ${displayCliName} status activity [--include-remote-counts]
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -1099,7 +1100,18 @@ async function run(): Promise<void> {
         print(auditArtifacts(process.cwd()));
         return;
       }
-      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', or 'artifacts'");
+      if (arg1 === "activity") {
+        const allowed = new Set(["--include-remote-counts", "--json"]);
+        for (const arg of rest.slice(1)) {
+          if (!allowed.has(arg)) {
+            throw new Error(`Unexpected status activity argument: ${arg}`);
+          }
+        }
+        const { readOperatorActivitySnapshot } = await import("../core/operator-activity.js");
+        print(readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: rest.includes("--include-remote-counts") }));
+        return;
+      }
+      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', 'artifacts', or 'activity'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");

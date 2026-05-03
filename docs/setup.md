@@ -78,6 +78,7 @@ fooks status codex
 fooks status claude
 fooks status cache
 fooks status artifacts
+fooks status activity [--include-remote-counts]
 ```
 
 Good signs:
@@ -88,10 +89,13 @@ Good signs:
 - Claude status is `context-hook-ready` when the local adapter files, Claude attachment manifest, and project-local Claude hooks are present. It may be `handoff-ready` when adapter/manifest artifacts exist but the project-local hooks have not been installed yet. This is not a Claude `Read` interception or runtime-token savings claim.
 - Cache status is `empty` for a fresh repo or `healthy` after scan/use.
 - Artifact status reports fooks-scoped tmux sessions, git worktrees, and branches as local read-only cleanup candidates; it may show zero candidates or blockers when git/tmux are unavailable.
+- Activity status reports a compact read-only operator snapshot: current worktree branch/divergence/current dirty-path delta plus active fooks-like tmux panes when tmux is available. Open issue/PR counts are omitted unless `--include-remote-counts` is passed.
 
 `fooks doctor [codex|claude] [--json]` is read-only. It checks local fooks setup artifacts, runtime manifests, hook event installation, Codex trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also includes an optional TypeScript language server host-tooling check as warning-only. It does not mutate `.fooks/`, Codex hooks, Claude project-local settings, or runtime-home manifests. It also does not prove live provider health; it is not a ccusage replacement and not provider usage/billing-token telemetry, invoices, dashboards, or charged costs.
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
+
+`fooks status activity` is read-only and local-first. It does not alter bare `fooks status`, `fooks status worktree`, or `fooks status artifacts` JSON contracts. By default it reads only local git status/local tracking refs and tmux panes, reports current dirty-path counts as a current-status delta rather than a session baseline comparison, and treats missing tmux as a non-fatal blocker. Passing `--include-remote-counts` explicitly opts in to non-blocking GitHub CLI (`gh`) open issue/PR counts with failures captured in JSON; no remote counts are attempted by default.
 
 `fooks status artifacts` is also read-only. It audits local fooks-scoped tmux panes, git worktrees, and branches against `origin/main` when available, falling back to `main`. It reports conservative statuses (`activeOrUnknown`, `likelyMerged`, `missingPath`, `candidateCleanup`) and a claim boundary that local evidence does not prove inactivity. The command never deletes anything and never runs cleanup commands. If JSON includes `manualCleanupCommands`, copy them only after verifying the PR merged and the session/worktree is inactive. Missing worktree paths only suggest `git worktree prune --dry-run`; inspect that output before deciding whether to run any real cleanup manually. If stale tmux panes still point at deleted worktree paths, `staleRuntimeCleanups` documents the safe manual order: verify inactivity, stop the tmux/OMX/Codex session, then run git worktree prune/remove follow-up only after the runtime is stopped.
 

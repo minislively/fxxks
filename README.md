@@ -97,6 +97,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 | `fooks doctor` | current project + runtime-home inspection | Reads local setup and hook-readiness artifacts without writing files; it is not live provider health, billing-token, cost, or `ccusage` proof. |
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
 | `fooks status artifacts` | current project + local git/tmux inspection | Read-only audit of fooks-scoped tmux sessions, git worktrees, and branches that may be merged into the selected base; it does not prove inactivity and never deletes artifacts. |
+| `fooks status activity` | current project + local git/tmux inspection | Compact read-only operator snapshot for dogfood nudges; remote issue/PR counts require explicit `--include-remote-counts`. |
 
 By default, `fooks setup` prints a short readiness summary so the command does not look like a wall of debug JSON. Use `fooks setup --json` when you need the full `scope` object and support/debug paths that show what is project-local versus user-runtime/home scoped.
 
@@ -219,6 +220,7 @@ fooks status codex   # check Codex attach/hook state
 fooks status claude  # check Claude project-local context hook / handoff health
 fooks status cache   # check local fooks cache health
 fooks status artifacts # read-only fooks tmux/worktree/branch artifact audit
+fooks status activity  # compact read-only operator activity snapshot
 fooks compare src/components/Button.tsx --json  # local original-vs-fooks payload estimate
 ```
 
@@ -230,6 +232,8 @@ fooks scan
 ```
 
 `fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement.
+
+`fooks status activity` is a compact read-only dogfood operator snapshot. It preserves the existing bare status, worktree, and artifacts contracts, reports current local worktree branch/divergence and dirty-path delta, and lists fooks-like tmux sessions when available. It does not call GitHub by default; pass `--include-remote-counts` to opt in to non-blocking `gh` open issue/PR counts.
 
 `fooks status artifacts` is a read-only dogfood cleanup audit for local fooks artifacts after PRs merge. It inspects local git worktrees/branches and tmux panes, scopes results to fooks-like names or `.omx-worktrees` paths, and uses conservative labels such as `activeOrUnknown`, `likelyMerged`, `missingPath`, and `candidateCleanup`. The command does not run `git fetch`, `git worktree prune`, `git worktree remove`, `git branch -d`, or `tmux kill-session`; any `manualCleanupCommands` in the JSON are copy/paste suggestions only. Missing worktree paths only suggest `git worktree prune --dry-run` so operators can inspect before deciding whether to run cleanup manually. When tmux panes are still attached to deleted worktree paths, the JSON also includes `staleRuntimeCleanups` with the manual order: verify inactivity, stop the tmux/OMX/Codex session, then run any git worktree prune/remove follow-up. Verify the PR is merged and the session/worktree is inactive before copying any command.
 
