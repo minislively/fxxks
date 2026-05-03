@@ -7,6 +7,7 @@ This is the compact review map for the RN/WebView/TUI fixture boundary. It does 
 | Slot | Lane | Boundary label | Detector expectation | Pre-read expectation | Must not claim | Review cue |
 | --- | --- | --- | --- | --- | --- | --- |
 | `F1` | RN primitive/input | measured narrow payload | `fallback`, `unsupported-react-native-webview-boundary` | `payload` only through `rn-primitive-input-narrow-payload` | React Native support, DOM/form inference, broad RN payload reuse | If this payload gate changes, prove it remains primitive/input-only and does not cover `F2`, `F9`, or `F10`. |
+| `F13` | RN primitive/input adjacent | measured narrow payload | `fallback`, `unsupported-react-native-webview-boundary` | `payload` only through `rn-primitive-input-narrow-payload` | React Native support, DOM/form inference, broad RN payload reuse | Same-file local handler/callback evidence must stay F1-adjacent and must not cover `F2`, `F9`, `F10`, WebView, TUI/Ink, or React Web signals. |
 | `F2` | RN style/platform/navigation | readiness evidence only | `fallback`, `unsupported-react-native-webview-boundary` | `fallback`, `unsupported-frontend-domain-profile` | React Native support, navigation runtime guarantee, DOM/form inference | `StyleSheet`, `Platform`, and navigation markers are evidence only. |
 | `F9` | RN interaction/list | readiness evidence only | `fallback`, `unsupported-react-native-webview-boundary` | `fallback`, `unsupported-frontend-domain-profile` | React Native support, gesture safety, list virtualization support | Touchable/list/gesture markers must not inherit the `F1` payload policy. |
 | `F10` | RN media/layout | readiness evidence only | `fallback`, `unsupported-react-native-webview-boundary` | `fallback`, `unsupported-frontend-domain-profile` | React Native support, image loading safety, layout support | Image/ScrollView/Dimensions markers are evidence only. |
@@ -21,7 +22,7 @@ This is the compact review map for the RN/WebView/TUI fixture boundary. It does 
 - Keep every RN/WebView/TUI selected fixture at `supportClaim: "none"`.
 - Keep WebView slots `F3`, `F4`, and `F6` at `evidenceScope: "fallback-boundary-evidence-only"`.
 - Keep TUI slot `F5` at `evidenceScope: "syntax-evidence-only"`.
-- Keep only RN slot `F1` on `payloadPolicy: "rn-primitive-input-narrow-payload"`; the other selected RN slots stay readiness-only fallback evidence.
+- Keep only RN slots `F1` and `F13` on `payloadPolicy: "rn-primitive-input-narrow-payload"`; the other selected RN slots stay readiness-only fallback evidence.
 - Keep any future RN F1-adjacent fixture gap limited to one primitive/input axis; do not mix in `F2`, `F9`, `F10`, WebView, TUI, or React Web signals.
 - Require a named missing primitive/input acceptance check before adding an F1-adjacent fixture file or changing runtime behavior; otherwise record a no-op audit.
 - Do not add support, setup-eligibility, runtime-token, provider-token, billing, performance, terminal-safety, bridge-safety, or default compact-extraction claims from these fixtures.

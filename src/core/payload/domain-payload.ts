@@ -1,7 +1,10 @@
 import type { DomainDetectionResult } from "../domain-detector";
 import {
   assessReactNativePrimitiveInputSignalGate,
+  RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
+  RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+  RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
 } from "../payload-policy/react-native";
 import type { ExtractionResult, FormControlSignal, StyleSystem } from "../schema";
 
@@ -34,6 +37,21 @@ export type ReactWebDomainPayload = {
   warnings: string[];
 };
 
+export type ReactNativePrimitiveInputReuseContract = {
+  sourceDerivedOnly: true;
+  policy: typeof RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY;
+  plannerDecision: "narrow-primitive-input-payload";
+  freshnessSource: "sourceFingerprint";
+  staleWhen: [
+    "sourceFingerprint.fileHash changes",
+    "sourceFingerprint.lineCount changes",
+    "frontendPayloadPolicy no longer allows RN narrow policy",
+  ];
+  requiredSignals: string[];
+  deniedBySignals: string[];
+  supportBoundary: "measured-evidence-only; no broad RN/WebView/TUI support";
+};
+
 export type ReactNativePrimitiveInputDomainPayload = {
   schemaVersion: typeof DOMAIN_PAYLOAD_SCHEMA_VERSION;
   domain: "react-native";
@@ -42,6 +60,7 @@ export type ReactNativePrimitiveInputDomainPayload = {
   claimStatus: "measured-evidence-only";
   claimBoundary: "rn-primitive-input-narrow-payload-only";
   evidence: string[];
+  reuseContract: ReactNativePrimitiveInputReuseContract;
   facts: {
     primitives: string[];
     jsxProps: string[];
@@ -190,6 +209,26 @@ function buildReactWebPayloadFacts(
   };
 }
 
+function buildReactNativePrimitiveInputReuseContract(): ReactNativePrimitiveInputReuseContract {
+  return {
+    sourceDerivedOnly: true,
+    policy: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    plannerDecision: "narrow-primitive-input-payload",
+    freshnessSource: "sourceFingerprint",
+    staleWhen: [
+      "sourceFingerprint.fileHash changes",
+      "sourceFingerprint.lineCount changes",
+      "frontendPayloadPolicy no longer allows RN narrow policy",
+    ],
+    requiredSignals: [...RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS],
+    deniedBySignals: [
+      ...RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
+      ...RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES.map((prefix) => `${prefix}*`),
+    ],
+    supportBoundary: "measured-evidence-only; no broad RN/WebView/TUI support",
+  };
+}
+
 function buildReactNativePayloadFacts(
   result: ExtractionResult,
   evidenceFacts: ReactNativePayloadEvidenceFacts,
@@ -249,6 +288,7 @@ export function buildReactNativePrimitiveInputDomainPayload(
     claimStatus: "measured-evidence-only",
     claimBoundary: "rn-primitive-input-narrow-payload-only",
     evidence: plan.evidenceFacts.evidence,
+    reuseContract: buildReactNativePrimitiveInputReuseContract(),
     facts: buildReactNativePayloadFacts(plan.result, plan.evidenceFacts),
     warnings: [
       "React Native primitive/input payload reuse is limited to the measured F1-style gate.",

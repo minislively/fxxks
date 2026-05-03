@@ -4467,7 +4467,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     return resolved;
   };
 
-  assert.deepEqual([...selected.keys()], ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F9", "F10", "F11", "F12"]);
+  assert.deepEqual([...selected.keys()], ["F0", "F1", "F13", "F2", "F3", "F4", "F5", "F6", "F9", "F10", "F11", "F12"]);
   assert.deepEqual([...deferred.keys()], ["F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
@@ -4506,6 +4506,10 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F1").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F1").preReadExpectedOutcome, "payload");
   assert.equal(selected.get("F1").payloadPolicy, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(selected.get("F13").expectedOutcome, "fallback");
+  assert.equal(selected.get("F13").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F13").preReadExpectedOutcome, "payload");
+  assert.equal(selected.get("F13").payloadPolicy, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(selected.get("F2").expectedOutcome, "fallback");
   assert.equal(selected.get("F2").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F3").expectedOutcome, "fallback");
@@ -4542,9 +4546,13 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F12").lane, "react-web");
   assert.ok(selected.get("F12").requiredSignals.includes("htmlFor"));
 
-  assert.equal(selected.get("F1").supportClaim, "none", `${selected.get("F1").id} must not claim RN support`);
-  assert.equal(selected.get("F1").evidenceScope, "rn-primitive-input-narrow-payload-only", `${selected.get("F1").id} must stay narrow payload evidence only`);
-  assert.ok(selected.get("F1").forbiddenClaims.some((claim) => /No React Native support claim/.test(claim)), `${selected.get("F1").id} must forbid React Native support claims`);
+  for (const slot of ["F1", "F13"]) {
+    assert.equal(selected.get(slot).supportClaim, "none", `${selected.get(slot).id} must not claim RN support`);
+    assert.equal(selected.get(slot).evidenceScope, "rn-primitive-input-narrow-payload-only", `${selected.get(slot).id} must stay narrow payload evidence only`);
+    assert.ok(selected.get(slot).forbiddenClaims.some((claim) => /No React Native support claim/.test(claim)), `${selected.get(slot).id} must forbid React Native support claims`);
+  }
+  assert.ok(selected.get("F13").requiredSignals.includes("same-file local handler/callback evidence"));
+  assert.match(selected.get("F13").verification, /[Ss]ame-file local handler\/callback evidence/);
 
   for (const slot of ["F2", "F9", "F10"]) {
     assert.equal(selected.get(slot).supportClaim, "none", `${selected.get(slot).id} must not claim RN support`);
@@ -4830,7 +4838,7 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
   );
   const manifestBySlot = new Map([...expectations.selected, ...expectations.deferred].map((item) => [item.slot, item]));
 
-  assert.deepEqual([...docsBySlot.keys()], ["F1", "F2", "F9", "F10", "F3", "F4", "F6", "F5", "F7"]);
+  assert.deepEqual([...docsBySlot.keys()], ["F1", "F13", "F2", "F9", "F10", "F3", "F4", "F6", "F5", "F7"]);
 
   for (const slot of docsBySlot.keys()) {
     assert.ok(manifestBySlot.has(slot), `${slot} boundary map row must exist in manifest`);
@@ -4844,6 +4852,13 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
   assert.match(rnPrimitive.preReadExpectation, /rn-primitive-input-narrow-payload/);
   assert.match(rnPrimitive.mustNotClaim, /React Native support/);
   assert.match(rnPrimitive.reviewCue, /does not cover `F2`, `F9`, or `F10`/);
+
+  const rnAdjacent = docsBySlot.get("F13");
+  assert.equal(rnAdjacent.boundaryLabel, "measured narrow payload");
+  assert.match(rnAdjacent.detectorExpectation, /fallback/);
+  assert.match(rnAdjacent.preReadExpectation, /rn-primitive-input-narrow-payload/);
+  assert.match(rnAdjacent.mustNotClaim, /React Native support/);
+  assert.match(rnAdjacent.reviewCue, /[Ss]ame-file local handler\/callback evidence/);
 
   for (const slot of ["F2", "F9", "F10"]) {
     const row = docsBySlot.get(slot);
@@ -4880,7 +4895,7 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
   assert.match(deferred.preReadExpectation, /no executable fixture path/);
   assert.match(deferred.mustNotClaim, /broad terminal renderer support/);
 
-  for (const slot of ["F1", "F2", "F9", "F10", "F3", "F4", "F6", "F5"]) {
+  for (const slot of ["F1", "F13", "F2", "F9", "F10", "F3", "F4", "F6", "F5"]) {
     assert.equal(manifestBySlot.get(slot).supportClaim, "none", `${slot} must stay no-support in manifest`);
   }
   assert.doesNotMatch(

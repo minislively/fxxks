@@ -347,8 +347,18 @@ test("codex runtime activates React Web payload semantics only for the React Web
   assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.allowed, true);
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.domain, "react-native");
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.reuseContract.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.reuseContract.freshnessSource, "sourceFingerprint");
   assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), true);
+  assert.equal(rnPrimitive.second.additionalContext.includes('"reuseContract"'), true);
   assert.match(rnPrimitive.second.additionalContext, /"domain":\s*"react-native"/);
+
+  const rnAdjacent = runRepeatedPrompt("rn-primitive-adjacent", "inspect test/fixtures/frontend-domain-expectations/rn-primitive-inline-action.tsx");
+  assert.equal(rnAdjacent.second.action, "inject");
+  assert.equal(rnAdjacent.second.contextModeReason, "repeated-exact-file-narrow-payload");
+  assert.equal(rnAdjacent.second.debug.decision.payload.domainPayload.domain, "react-native");
+  assert.equal(rnAdjacent.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnAdjacent.second.debug.decision.payload.domainPayload.reuseContract.supportBoundary, "measured-evidence-only; no broad RN/WebView/TUI support");
 
   for (const [label, fixture, forbiddenSignal] of [
     ["rn-style-platform", "rn-style-platform-navigation.tsx", "react-native:primitive:ScrollView"],
@@ -580,8 +590,18 @@ test("claude runtime keeps RN F1 narrow payload separate from broader RN domains
   assert.equal(rnPrimitive.second.debug.decision.debug.frontendPayloadPolicy.allowed, true);
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.domain, "react-native");
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.reuseContract.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.reuseContract.freshnessSource, "sourceFingerprint");
   assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), true);
+  assert.equal(rnPrimitive.second.additionalContext.includes('"reuseContract"'), true);
   assert.match(rnPrimitive.second.additionalContext, /"domain":\s*"react-native"/);
+
+  const rnAdjacent = runRepeatedPrompt("rn-primitive-adjacent", "inspect test/fixtures/frontend-domain-expectations/rn-primitive-inline-action.tsx");
+  assert.equal(rnAdjacent.second.action, "inject");
+  assert.equal(rnAdjacent.second.contextModeReason, "repeated-exact-file-narrow-payload");
+  assert.equal(rnAdjacent.second.debug.decision.payload.domainPayload.domain, "react-native");
+  assert.equal(rnAdjacent.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(rnAdjacent.second.debug.decision.payload.domainPayload.reuseContract.sourceDerivedOnly, true);
 
   for (const [label, fixture] of [
     ["rn-style-platform", "rn-style-platform-navigation.tsx"],

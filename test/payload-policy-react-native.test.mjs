@@ -164,10 +164,29 @@ test("React Native F1 signal gate is the shared source of truth for policy and p
     name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
     allowed: true,
   });
-  assert.equal(
-    buildReactNativePrimitiveInputDomainPayload(extractionResult, allowedDetection)?.policy,
-    RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
-  );
+  const payload = buildReactNativePrimitiveInputDomainPayload(extractionResult, allowedDetection);
+  assert.equal(payload?.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.deepEqual(payload?.reuseContract, {
+    sourceDerivedOnly: true,
+    policy: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    plannerDecision: "narrow-primitive-input-payload",
+    freshnessSource: "sourceFingerprint",
+    staleWhen: [
+      "sourceFingerprint.fileHash changes",
+      "sourceFingerprint.lineCount changes",
+      "frontendPayloadPolicy no longer allows RN narrow policy",
+    ],
+    requiredSignals,
+    deniedBySignals: [
+      ...forbiddenExactSignals,
+      "webview:*",
+      "tui-ink:*",
+      "react-native:navigation-*",
+      "react-native:api-call:Dimensions.*",
+      "react-native:api-call:PanResponder.*",
+    ],
+    supportBoundary: "measured-evidence-only; no broad RN/WebView/TUI support",
+  });
 
   for (const missingSignal of requiredSignals) {
     const domainDetection = {

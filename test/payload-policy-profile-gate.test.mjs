@@ -70,6 +70,9 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
   assert.equal(payload.domainPayload.policy, policy.name);
   assert.deepEqual(payload.domainPayload.facts.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload.domainPayload.facts.jsxProps, ["onChangeText", "onPress"]);
+  assert.equal(payload.domainPayload.reuseContract.sourceDerivedOnly, true);
+  assert.equal(payload.domainPayload.reuseContract.policy, policy.name);
+  assert.equal(payload.domainPayload.reuseContract.freshnessSource, "sourceFingerprint");
   assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), { allowed: true });
 });
 
