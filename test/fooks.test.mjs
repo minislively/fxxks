@@ -331,6 +331,7 @@ test("extract keeps small fixture raw", () => {
   assert.equal(result.meta.decideConfidence, "high");
   assert.ok(result.contract.propsSummary.some((item) => item.includes("label")));
   assert.ok(result.style.summary.some((item) => item.includes("tailwind")));
+  assert.equal("reactWebContextSummary" in result, false);
 });
 
 test("extract accepts --json before and after the file path", () => {
@@ -372,6 +373,18 @@ test("extract can return model-facing payload without engine metadata", () => {
   assert.ok(result.structure.sections.includes("section"));
   assert.ok(result.structure.repeatedBlocks.includes("array-map-render"));
   assert.equal(result.style.system, "tailwind");
+  assert.equal(result.reactWebContextSummary.present, true);
+  assert.equal(result.reactWebContextSummary.schemaVersion, "react-web-context.v0");
+  assert.equal(result.reactWebContextSummary.scope.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(result.reactWebContextSummary.scope.componentName, "FormSection");
+  assert.ok(result.reactWebContextSummary.fieldCounts.editTargetRouting > 0);
+  assert.ok(result.reactWebContextSummary.fieldCounts.componentApiHints > 0);
+  assert.ok(result.reactWebContextSummary.fieldCounts.a11yAnchors > 0);
+  assert.ok(result.reactWebContextSummary.totalAnchors > 0);
+  assert.equal(result.reactWebContextSummary.claimBoundary, "source-backed-react-web-context-counts-only");
+  assert.doesNotMatch(JSON.stringify(result.reactWebContextSummary), /cross-file|typechecker|lsp|visual proof|billing|latency/i);
+  assert.equal("reactWebContext" in result, false);
+  assert.equal("domainPayload" in result, false);
 });
 
 test("file commands accept --json before or after the file path", () => {
@@ -580,6 +593,15 @@ test("extract produces compressed output for boilerplate-heavy fixture", () => {
   assert.equal(result.style.system, "tailwind");
   assert.ok(result.structure.repeatedBlocks.includes("array-map-render"));
   assert.equal(result.rawText, undefined);
+  assert.equal(result.reactWebContextSummary.present, true);
+  assert.equal(result.reactWebContextSummary.schemaVersion, "react-web-context.v0");
+  assert.equal(result.reactWebContextSummary.scope.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(result.reactWebContextSummary.scope.componentName, "FormSection");
+  assert.ok(result.reactWebContextSummary.fieldCounts.editTargetRouting > 0);
+  assert.ok(result.reactWebContextSummary.fieldCounts.layoutRegionHints > 0);
+  assert.ok(result.reactWebContextSummary.totalAnchors > 0);
+  assert.equal(result.reactWebContextSummary.claimBoundary, "source-backed-react-web-context-counts-only");
+  assert.doesNotMatch(JSON.stringify(result.reactWebContextSummary), /cross-file|typechecker|lsp|visual proof|billing|latency/i);
 });
 
 test("extract produces hybrid output for complex fixture", () => {
@@ -969,6 +991,7 @@ test("design-review helper remains internal and default model-facing payloads st
   assert.equal("editGuidance" in guidedPayload, true);
   assert.equal("editGuidance" in cliPayload && "designReviewMetadata" in cliPayload.editGuidance, false);
   assert.equal("editGuidance" in modulePayload, false);
+  assert.equal("reactWebContextSummary" in modulePayload, false);
 });
 
 test("model-facing payload can explicitly opt into design-review metadata", () => {

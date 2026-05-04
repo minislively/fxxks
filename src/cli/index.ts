@@ -998,12 +998,26 @@ async function run(): Promise<void> {
       const { extractFile } = await import("../core/extract.js");
       const { filePath: file, modelPayload } = parseExtractArgs(rest);
       const result = extractFile(file);
+      const useOriginal = result.useOriginal === true;
+      const { toModelFacingPayload } = await import("../core/payload/model-facing.js");
+      const { reactWebContextSummaryFor } = await import("../core/react-web-context-summary.js");
+      const contextPayload = toModelFacingPayload(result, process.cwd(), {
+        includeDomainPayload: true,
+        includeReactWebContextMetadata: true,
+      });
+      const reactWebContextSummary = reactWebContextSummaryFor(contextPayload, useOriginal);
       if (modelPayload) {
-        const { toModelFacingPayload } = await import("../core/payload/model-facing.js");
-        print(toModelFacingPayload(result, process.cwd(), { includeEditGuidance: true }));
+        const modelFacingPayload = toModelFacingPayload(result, process.cwd(), { includeEditGuidance: true });
+        print({
+          ...modelFacingPayload,
+          ...(reactWebContextSummary ? { reactWebContextSummary } : {}),
+        });
         return;
       }
-      print(result);
+      print({
+        ...result,
+        ...(reactWebContextSummary ? { reactWebContextSummary } : {}),
+      });
       return;
     }
 
