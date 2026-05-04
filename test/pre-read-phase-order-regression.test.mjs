@@ -218,6 +218,22 @@ test("cached RN narrow payload cannot cross live frontend domain and profile bou
       expectedPolicyAllowed: false,
       expectedReason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
     },
+    {
+      label: "live WebView boundary keeps source-reading fallback ahead of cached RN payload",
+      filePath: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "webview-boundary-basic.tsx"),
+      expectedClassification: "webview",
+      expectedPolicyName: "webview-boundary-fallback",
+      expectedPolicyAllowed: false,
+      expectedReason: "unsupported-react-native-webview-boundary",
+    },
+    {
+      label: "live RN/WebView mixed boundary keeps source-reading fallback ahead of cached RN payload",
+      filePath: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "negative-rn-webview-boundary.tsx"),
+      expectedClassification: "mixed",
+      expectedPolicyName: "webview-boundary-fallback",
+      expectedPolicyAllowed: false,
+      expectedReason: "unsupported-react-native-webview-boundary",
+    },
   ];
 
   for (const {
