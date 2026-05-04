@@ -5,10 +5,10 @@ Use this when you want one explicit command to prepare fooks for a supported fro
 ## 1. Install
 
 ```bash
-npm install -g fxxk-frontned-hooks
+npm install -g fxxk-frontend-hooks
 ```
 
-The package is named `fxxk-frontned-hooks`; it installs the `fooks` command. This is a **global CLI install** step: it changes which command is available from your npm global prefix/PATH, but it does not activate any repository by itself.
+The package is named `fxxk-frontend-hooks`; it installs the `fooks` command. This is a **global CLI install** step: it changes which command is available from your npm global prefix/PATH, but it does not activate any repository by itself.
 
 If setup seems to run the wrong binary, check:
 
@@ -52,7 +52,7 @@ Package install alone does not edit Codex hooks, Claude files, or opencode proje
 
 | Scope | Examples | Notes |
 | --- | --- | --- |
-| Global CLI install | `npm install -g fxxk-frontned-hooks`, `fooks` on PATH | This happens before setup. `fooks setup` does not install or update the npm package. |
+| Global CLI install | `npm install -g fxxk-frontend-hooks`, `fooks` on PATH | This happens before setup. `fooks setup` does not install or update the npm package. |
 | Project-local | `.fooks/config.json`, `.fooks/cache/`, `.opencode/tools/fooks_extract.ts`, `.opencode/commands/fooks-extract.md` | These apply to the current project root where you run `fooks setup`. |
 | User runtime/home | `~/.codex/hooks.json`, Codex attachment manifests, Claude handoff manifests | These are runtime integration files. Tests and smoke checks can isolate them with `FOOKS_CODEX_HOME` and `FOOKS_CLAUDE_HOME`. |
 
@@ -92,6 +92,8 @@ Good signs:
 - Activity status reports a compact read-only operator snapshot: current worktree branch/divergence/current dirty-path delta plus active fooks-like tmux panes when tmux is available. Open issue/PR counts are omitted unless `--include-remote-counts` is passed.
 
 `fooks doctor [codex|claude] [--json]` is read-only. Human output starts with status, why, first blocker, and next action, while `--json` exposes the same readiness summary for tools. It checks local fooks setup artifacts, runtime manifests, hook event installation, Codex trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also includes an optional TypeScript language server host-tooling check as warning-only. It does not mutate `.fooks/`, Codex hooks, Claude project-local settings, or runtime-home manifests. It also does not prove live provider health; it is not a ccusage replacement and not provider usage/billing-token telemetry, invoices, dashboards, or charged costs.
+
+For source checkouts, fresh clones, and temporary git worktrees, `fooks doctor` may be `unhealthy` before activation because project-local adapters and runtime manifests are intentionally not committed as universal defaults. Treat that as a setup reminder, not package corruption: run `fooks setup` in the checkout you plan to use, then rerun `fooks doctor` for the real dogfood readiness verdict.
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 
