@@ -53,6 +53,22 @@ Before a TUI payload-design plan is useful, the repo should already have:
 
 Meeting these criteria does not enable a payload. It only means the next plan can discuss whether a narrow payload gate is worth designing.
 
+## Payload design readiness gate
+
+This readiness gate is the review contract for a future TUI payload-design PRD. Passing the gate means the repo has enough bounded evidence to plan a design; it does not mean TUI is supported, compact extraction is allowed, or runtime injection may begin.
+
+A future payload-design PRD may start only when all of these checks are true:
+
+1. positive Ink evidence categories are named and mapped to representative fixtures;
+2. non-Ink, weak, and mixed-domain cases still deny TUI payload authorization;
+3. every current TUI fixture keeps `allowed: false` under the TUI payload policy;
+4. pre-read decisions emit no model-facing TUI payload;
+5. claim-boundary checks reject support, terminal correctness, token, billing, provider-cost, and performance wording;
+6. any future shared-seam edit names the exact files, owners, merge order, and fallback regressions before implementation;
+7. terminal semantics that cannot be proven from AST facts are listed as full-source requirements rather than compact-context facts.
+
+The disqualifier list is intentionally strict. Stop the current lane and write a separate serialized plan if a change needs `allowed: true`, a TUI payload builder, runtime/pre-read injection, detector or registry edits, manifest changes, fixture classification changes, cross-lane RN/React Web/WebView edits, or any measured-value claim.
+
 ## Stop rules
 
 Stop the current PR and switch to serialized shared-policy planning if the change would:

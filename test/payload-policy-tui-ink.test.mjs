@@ -119,6 +119,16 @@ const operationalConcernRows = [
   ["tui-ink-rn-narrow-mixed.tsx", "Mixed-boundary"],
 ];
 
+const payloadReadinessGateTerms = [
+  "Payload design readiness gate",
+  "does not mean TUI is supported",
+  "compact extraction is allowed",
+  "runtime injection may begin",
+  "allowed: false",
+  "model-facing TUI payload",
+  "separate serialized plan",
+];
+
 function tuiFixturePath(fileName) {
   return path.join("test", "fixtures", "frontend-domain-expectations", fileName);
 }
@@ -397,6 +407,7 @@ test("TUI evidence matrix rows stay aligned with policy and pre-read boundaries"
     assert.deepEqual(assessTuiInkPayloadPolicy(domainDetection), expectedPolicy, row.fileName);
     assert.equal(decision.decision, "fallback", row.fileName);
     assert.equal("payload" in decision, false, row.fileName);
+    assert.notEqual(expectedPolicy?.allowed, true, row.fileName);
 
     const fallbackReason = row.fallbackReason();
     if (fallbackReason) {
@@ -419,7 +430,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /TUI concern taxonomy/);
   assert.match(survey, /concern evidence is not payload permission/);
   for (const term of tuiConcernTaxonomyTerms) {
-    assert.match(survey, new RegExp(term.replace("/", "\\/")));
+    assert.ok(survey.includes(term), term);
   }
   assert.match(survey, /tui-ink-basic\.tsx/);
   assert.match(survey, /tui-ink-interactive-list\.tsx/);
@@ -432,6 +443,10 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /tui-ink-rn-narrow-mixed\.tsx/);
   assert.match(survey, /Negative\/fallback reinforcement/);
   assert.match(survey, /Current TUI evidence matrix/);
+  assert.match(survey, /Payload design readiness handoff/);
+  assert.match(survey, /not itself a payload contract/);
+  assert.match(survey, /pre-read emits no model-facing TUI payload/);
+  assert.match(survey, /separate serialized plan/);
   assert.match(survey, /tui-ink-evidence-only-payload/);
   assert.match(survey, /mixed frontend boundary/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
@@ -447,10 +462,14 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /concern evidence is not payload permission/);
   assert.match(guide, /## Allowed next work/);
   assert.match(guide, /## Promotion criteria before payload-design planning/);
+  assert.match(guide, /## Payload design readiness gate/);
   assert.match(guide, /## Stop rules/);
   assert.match(guide, /tui-ink-evidence-only-payload/);
   assert.match(guide, /fallback\/no-payload/);
   assert.match(guide, /serialized shared-policy plan/);
+  for (const term of payloadReadinessGateTerms) {
+    assert.ok(guide.includes(term), term);
+  }
   for (const [fixture, concern] of operationalConcernRows) {
     assert.ok(guide.includes(`${fixture}\` | ${concern}`), fixture);
   }
