@@ -3013,9 +3013,56 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
-  assert.equal(pkg.scripts?.prepack, "npm run build");
+  assert.equal(pkg.name, "fxxk-frontend-hooks");
+  assert.equal(pkg.bin?.fooks, "dist/cli/index.js");
+  assert.equal(pkg.scripts?.prepack, "npm run build && node scripts/release-smoke.mjs --prepack");
+  assert.doesNotMatch(pkg.scripts?.prepack, /npm pack|npm install|release:smoke/);
   assert.match(pkg.scripts?.["release:smoke"], /scripts\/release-smoke\.mjs/);
   assert.doesNotMatch(pkg.scripts?.["release:smoke"], /publish|version|tag/);
+});
+
+test("package identity fixes frontend typo while installed CLI remains fooks", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  const lock = JSON.parse(fs.readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
+  const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+  const readiness = fs.readFileSync(path.join(repoRoot, "docs", "release-readiness.md"), "utf8");
+  const cli = fs.readFileSync(path.join(repoRoot, "src", "cli", "index.ts"), "utf8");
+  const combinedPublic = `${readme}
+${setup}
+${release}
+${readiness}
+${cli}`;
+  const oldTypoPackageName = `fxxk-${"front"}${"ned"}-hooks`;
+  const oldTypoSegment = `${"front"}${"ned"}`;
+
+  assert.equal(pkg.name, "fxxk-frontend-hooks");
+  assert.equal(lock.name, "fxxk-frontend-hooks");
+  assert.equal(lock.packages[""].name, "fxxk-frontend-hooks");
+  assert.equal(pkg.bin.fooks, "dist/cli/index.js");
+  assert.match(combinedPublic, /npm install -g fxxk-frontend-hooks/);
+  assert.equal(combinedPublic.includes(oldTypoPackageName), false);
+  assert.equal(combinedPublic.includes(oldTypoSegment), false);
+  assert.match(release, /fxxk-frontend-hooks-\*\.tgz/);
+  assert.match(readiness, /fxxk-frontend-hooks-0\.1\.3\.tgz/);
+});
+
+test("release lifecycle guards prevent recursive pack and registry mutation automation", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  assert.equal(pkg.scripts.prepack, "npm run build && node scripts/release-smoke.mjs --prepack");
+  assert.doesNotMatch(pkg.scripts.prepack, /npm\s+pack|npm\s+install|release:smoke/);
+
+  const executableSurfaces = Object.entries(pkg.scripts ?? {}).map(([name, value]) => `package.json scripts.${name}: ${value}`);
+  for (const entry of fs.readdirSync(path.join(repoRoot, "scripts"), { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".mjs")) {
+      const content = fs.readFileSync(path.join(repoRoot, "scripts", entry.name), "utf8");
+      executableSurfaces.push(`scripts/${entry.name}:\n${content}`);
+    }
+  }
+  const executableRegistryMutation = /(?:execFileSync|spawn|spawnSync|run)\s*\([^\n]*(?:publish|deprecate|unpublish)|npm\s+(?:publish|deprecate|unpublish)|package\s+delete/i;
+  const hits = executableSurfaces.filter((surface) => executableRegistryMutation.test(surface));
+  assert.deepEqual(hits, []);
 });
 
 test("status artifacts route reports read-only audit JSON", () => {
@@ -4957,7 +5004,7 @@ test("docs give first-run users a clear support and diagnosis path", () => {
   const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
   const combined = `${readme}\n${setup}`;
 
-  assert.match(readme, /npm install -g fxxk-frontned-hooks/);
+  assert.match(readme, /npm install -g fxxk-frontend-hooks/);
   assert.match(readme, /First-run checklist/);
   assert.match(combined, /fooks setup\s+# short ready \/ partial \/ blocked summary/);
   assert.match(combined, /fooks doctor/);
