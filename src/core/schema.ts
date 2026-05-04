@@ -69,6 +69,8 @@ export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
   loc?: SourceRange;
+  sourceId?: string;
+  references?: string[];
 };
 
 export type ModuleDeclarationSignal = LocatedString & {
@@ -117,10 +119,19 @@ export type ReactWebContextRenderState = {
   evidence: string[];
 };
 
+export type ReactWebContextA11yAnchorRelation = {
+  kind: "label-control" | "aria-idrefs" | "invalid-state" | "alert-region";
+  sourceId?: string;
+  targetId?: string;
+  targetIds?: string[];
+  resolvedIds?: string[];
+};
+
 export type ReactWebContextA11yAnchor = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
   loc?: SourceRange;
+  relation?: ReactWebContextA11yAnchorRelation;
   evidence: string[];
 };
 
@@ -235,6 +246,7 @@ export type ExtractionResult = {
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
     a11yAnchors?: A11yAnchorSignal[];
+    a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
   };
   structure?: {
