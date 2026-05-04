@@ -694,6 +694,83 @@ test("React Web wrapper fixture can expose source-observed htmlFor anchor from d
   assert.ok(payload.reactWebContext.a11yAnchors.some((item) => item.kind === "htmlFor"));
 });
 
+test("React Web styling variant hints summarize source-only style variation anchors", () => {
+  const source = `
+    type VariantPanelProps = {
+      variant?: "primary" | "secondary";
+      size?: "sm" | "lg";
+      disabled?: boolean;
+      selected?: boolean;
+    };
+
+    export function VariantPanel({ variant = "primary", size = "sm", disabled, selected }: VariantPanelProps) {
+      const toneClass = variant === "primary" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-900";
+      const sizeClass = size === "lg" ? "px-4 py-3" : "px-2 py-1";
+      return (
+        <section
+          data-state={selected ? "selected" : "idle"}
+          className={disabled ? "opacity-50 pointer-events-none" : toneClass + " " + sizeClass}
+          style={{ opacity: disabled ? 0.5 : 1 }}
+        >
+          <button
+            variant={variant}
+            size={size}
+            disabled={disabled}
+            className="rounded-md border"
+          >
+            Save
+          </button>
+          <p>Extra body copy keeps this fixture past the tiny raw threshold for metadata testing.</p>
+          <p>Styling hints must stay source-derived and avoid design-system semantics.</p>
+        </section>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "VariantPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+  const hints = payload.reactWebContext.stylingVariantHints;
+  assert.ok(hints);
+
+  assert.ok(hints.some((item) => item.kind === "props-contract" && item.propName === "variant" && item.evidence.includes("contract.propsSummary")));
+  assert.ok(hints.some((item) => item.kind === "props-contract" && item.propName === "size"));
+  assert.ok(hints.some((item) => item.kind === "data-state" && item.propName === "data-state" && item.evidence.includes("style.variantSignals.data-state")));
+  assert.ok(hints.some((item) => item.kind === "className-branch" && item.propName === "className" && item.loc));
+  assert.ok(hints.some((item) => item.kind === "inline-style" && item.propName === "style" && item.loc));
+  assert.ok(hints.some((item) => item.kind === "variant-prop" && item.propName === "disabled"));
+});
+
+test("React Web styling variant hints are omitted without source variation anchors", () => {
+  const source = `
+    export function PlainPanel() {
+      return (
+        <section>
+          <h2>Plain panel</h2>
+          <p>This fixture has no className, style, variant-ish props, or data-state anchors.</p>
+          <p>It is intentionally long enough to avoid tiny raw fallback.</p>
+          <p>The React Web context may still include component structure, but not styling variant hints.</p>
+          <p>Additional neutral text keeps this source in the compressed path for the regression.</p>
+          <p>No source-observed style variation anchors should be invented from this plain content.</p>
+          <p>Another neutral line avoids coupling the assertion to tiny raw thresholds.</p>
+          <p>Final neutral line preserves the absence of styling variant evidence.</p>
+        </section>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "PlainPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.equal(result.style.variantSignals, undefined);
+  assert.equal(payload.reactWebContext?.stylingVariantHints, undefined);
+});
+
 test("non React Web and raw/useOriginal payloads omit reactWebContext", () => {
   for (const fixture of [
     "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx",
