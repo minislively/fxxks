@@ -60,13 +60,13 @@ The default setup output is intentionally short. `fooks setup --json` includes a
 
 ## 3. Check status
 
-A first run should be understandable without reading JSON:
+A first run should be understandable without reading JSON; use `--json` only when you need exact support/debug evidence:
 
 ```bash
 fooks setup          # short ready / partial / blocked summary
 fooks doctor         # read-only readiness diagnosis
 fooks status         # local estimated session telemetry after use
-fooks compare src/components/Button.tsx --json
+fooks compare src/components/Button.tsx   # concise verdict; add --json for exact local evidence
 ```
 
 Use focused diagnostics when needed:
@@ -91,7 +91,7 @@ Good signs:
 - Artifact status reports fooks-scoped tmux sessions, git worktrees, and branches as local read-only cleanup candidates; it may show zero candidates or blockers when git/tmux are unavailable.
 - Activity status reports a compact read-only operator snapshot: current worktree branch/divergence/current dirty-path delta plus active fooks-like tmux panes when tmux is available. Open issue/PR counts are omitted unless `--include-remote-counts` is passed.
 
-`fooks doctor [codex|claude] [--json]` is read-only. It checks local fooks setup artifacts, runtime manifests, hook event installation, Codex trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also includes an optional TypeScript language server host-tooling check as warning-only. It does not mutate `.fooks/`, Codex hooks, Claude project-local settings, or runtime-home manifests. It also does not prove live provider health; it is not a ccusage replacement and not provider usage/billing-token telemetry, invoices, dashboards, or charged costs.
+`fooks doctor [codex|claude] [--json]` is read-only. Human output starts with status, why, first blocker, and next action, while `--json` exposes the same readiness summary for tools. It checks local fooks setup artifacts, runtime manifests, hook event installation, Codex trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also includes an optional TypeScript language server host-tooling check as warning-only. It does not mutate `.fooks/`, Codex hooks, Claude project-local settings, or runtime-home manifests. It also does not prove live provider health; it is not a ccusage replacement and not provider usage/billing-token telemetry, invoices, dashboards, or charged costs.
 
 Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summaries written by the Codex automatic hook path and the Claude project-local context-hook path, includes runtime/source breakdowns, omits per-session details from CLI status output, and estimates context size with a simple bytes-to-token approximation. It must not be described as provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement. To remove local fooks state for a repo, delete that repo's `.fooks/` directory.
 

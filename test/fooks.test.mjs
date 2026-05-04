@@ -504,6 +504,9 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.equal(result.useOriginal, false);
   assert.equal(result.metricTier, "estimated");
   assert.equal(result.measurement, "local-model-facing-payload");
+  assert.equal(result.userSummary.verdict, "estimated-reduction");
+  assert.match(result.userSummary.headline, /smaller model-facing payload/);
+  assert.match(result.userSummary.nextAction, /fooks setup/);
   assert.ok(result.sourceBytes > result.modelFacingBytes);
   assert.ok(result.estimatedSourceTokens > result.estimatedModelFacingTokens);
   assert.ok(result.savedEstimatedBytes > 0);
@@ -528,7 +531,20 @@ test("compare keeps tiny raw fallback from reporting false positive savings", ()
   assert.equal(result.reductionPercent, 0);
   assert.equal(result.payloadLarger, true);
   assert.equal(result.nonSavingReason, "original-source-preserved-for-small-raw-file");
+  assert.equal(result.userSummary.verdict, "no-estimated-reduction");
+  assert.match(result.userSummary.headline, /original source/);
   assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
+});
+
+test("compare default output is a concise human verdict with json details opt-in", () => {
+  const output = runText(["compare", "fixtures/compressed/FormSection.tsx"]);
+  assert.match(output, /^fooks compare fixtures\/compressed\/FormSection\.tsx/m);
+  assert.match(output, /Verdict: estimated-reduction/);
+  assert.match(output, /Why: Estimated \d+(?:\.\d+)?% smaller model-facing payload/);
+  assert.match(output, /Next action: Use fooks setup/);
+  assert.match(output, /Boundary: Local model-facing payload estimate only/);
+  assert.match(output, /fooks compare <file> --json/);
+  assert.doesNotMatch(output.trim(), /^\{/);
 });
 
 test("extract produces compressed output for boilerplate-heavy fixture", () => {
@@ -2766,6 +2782,8 @@ test("setup default output is human-readable and points to --json for details", 
   assert.match(output, /Codex: ready \(automatic-ready\)/);
   assert.match(output, /Claude: ready \(context-hook-ready\)/);
   assert.match(output, /opencode: ready \(tool-ready\)/);
+  assert.match(output, /Next action/);
+  assert.match(output, /fooks doctor/);
   assert.match(output, /fooks setup --json/);
   assert.doesNotMatch(output.trim(), /^\{/);
   assert.doesNotMatch(output, /"runtimeProof"/);
@@ -2995,6 +3013,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
+  assert.equal(pkg.scripts?.prepack, "npm run build");
   assert.match(pkg.scripts?.["release:smoke"], /scripts\/release-smoke\.mjs/);
   assert.doesNotMatch(pkg.scripts?.["release:smoke"], /publish|version|tag/);
 });
@@ -3053,6 +3072,10 @@ test("doctor codex reports missing runtime blockers without mutating local state
   assert.ok(result.summary.fail >= 1);
   assert.ok(result.checks.some((item) => item.name === "Codex runtime home" && item.status === "fail"));
   assert.ok(result.checks.some((item) => item.name === "Codex hooks" && item.status === "fail"));
+  assert.equal(result.readiness.state, "unhealthy");
+  assert.match(result.readiness.headline, /Codex readiness is not ready/);
+  assert.match(result.readiness.firstBlocker, /Codex runtime home/);
+  assert.match(result.readiness.nextAction, /FOOKS_CODEX_HOME/);
   assert.ok(result.nextSteps.some((item) => item.includes("FOOKS_CODEX_HOME")));
   assert.deepEqual(fileSnapshot(tempDir), beforeProject);
   assert.deepEqual(fileSnapshot(codexHome), beforeCodex);
@@ -3096,6 +3119,9 @@ test("doctor codex passes after isolated setup and reports readiness evidence", 
   const result = run(["doctor", "codex", "--json"], tempDir, env);
   assert.equal(result.healthy, true);
   assert.equal(result.summary.fail, 0);
+  assert.equal(result.readiness.state, "ready");
+  assert.match(result.readiness.headline, /Codex readiness is ready/);
+  assert.match(result.readiness.nextAction, /Open Codex in this repo/);
   const hooks = result.checks.find((item) => item.name === "Codex hooks");
   assert.equal(hooks.status, "pass");
   assert.deepEqual(hooks.evidence.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
@@ -3182,6 +3208,11 @@ test("doctor human output is readable and includes fixes plus boundaries", () =>
     FOOKS_CLAUDE_HOME: path.join(tempDir, ".missing-claude-home"),
   });
   assert.match(output, /^fooks doctor codex/m);
+  assert.match(output, /Status: unhealthy/);
+  assert.match(output, /Why: Codex readiness is not ready/);
+  assert.match(output, /First blocker: Codex runtime home/);
+  assert.match(output, /Next action: Create the Codex runtime home or set FOOKS_CODEX_HOME/);
+  assert.match(output, /Checks/);
   assert.match(output, /❌ Codex runtime home/);
   assert.match(output, /Fix: Create the Codex runtime home or set FOOKS_CODEX_HOME/);
   assert.match(output, /Summary: \d+ passed, \d+ warnings, \d+ failures/);
