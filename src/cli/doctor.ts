@@ -24,11 +24,19 @@ export type DoctorCheck = {
   evidence?: Record<string, unknown>;
 };
 
+export type DoctorReadiness = {
+  state: "ready" | "ready-with-warnings" | "unhealthy";
+  headline: string;
+  firstBlocker?: string;
+  nextAction: string;
+};
+
 export type DoctorResult = {
   command: "doctor";
   target: DoctorTarget;
   healthy: boolean;
   summary: { pass: number; warn: number; fail: number };
+  readiness: DoctorReadiness;
   checks: DoctorCheck[];
   nextSteps: string[];
   claimBoundaries: string[];
@@ -566,6 +574,42 @@ function unique(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((item): item is string => Boolean(item)))];
 }
 
+function firstNonPassingCheck(checks: DoctorCheck[]): DoctorCheck | undefined {
+  return checks.find((item) => item.status === "fail") ?? checks.find((item) => item.status === "warn");
+}
+
+function targetLabel(target: DoctorTarget): string {
+  if (target === "all") return "local fooks setup";
+  return `${capitalize(target)} readiness`;
+}
+
+function readinessFor(target: DoctorTarget, summary: DoctorResult["summary"], checks: DoctorCheck[], nextSteps: string[]): DoctorReadiness {
+  const firstIssue = firstNonPassingCheck(checks);
+  if (summary.fail > 0) {
+    return {
+      state: "unhealthy",
+      headline: `${targetLabel(target)} is not ready: ${summary.fail} failing check(s) need attention.`,
+      firstBlocker: firstIssue ? `${firstIssue.name}: ${firstIssue.message}` : undefined,
+      nextAction: nextSteps[0] ?? "Review the failing checks above, fix the first blocker, then rerun fooks doctor.",
+    };
+  }
+
+  if (summary.warn > 0) {
+    return {
+      state: "ready-with-warnings",
+      headline: `${targetLabel(target)} is usable, with ${summary.warn} warning(s) to review.`,
+      firstBlocker: firstIssue ? `${firstIssue.name}: ${firstIssue.message}` : undefined,
+      nextAction: nextSteps[0] ?? "Review warnings when convenient; rerun fooks doctor after changes.",
+    };
+  }
+
+  return {
+    state: "ready",
+    headline: `${targetLabel(target)} is ready.`,
+    nextAction: target === "all" ? "Open your agent in this repo and work normally." : `Open ${capitalize(target)} in this repo and use your original prompt directly.`,
+  };
+}
+
 export function doctorClaimBoundaries(): string[] {
   return [
     "Doctor reports local fooks configuration and runtime hook readiness only.",
@@ -584,13 +628,15 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
       ? claudeDoctorChecks(cwd, true)
       : aggregateChecks(cwd, cliName);
   const summary = summaryFor(checks);
+  const nextSteps = unique(checks.filter((item) => item.status !== "pass").map((item) => item.fix));
   return {
     command: "doctor",
     target,
     healthy: summary.fail === 0,
     summary,
+    readiness: readinessFor(target, summary, checks, nextSteps),
     checks,
-    nextSteps: unique(checks.filter((item) => item.status !== "pass").map((item) => item.fix)),
+    nextSteps,
     claimBoundaries: doctorClaimBoundaries(),
   };
 }
@@ -607,6 +653,14 @@ function capitalize(value: string): string {
 
 export function formatDoctor(result: DoctorResult): string {
   const lines: string[] = [`fooks doctor${result.target === "all" ? "" : ` ${result.target}`}`, ""];
+  lines.push(`Status: ${result.readiness.state}`);
+  lines.push(`Why: ${result.readiness.headline}`);
+  if (result.readiness.firstBlocker) {
+    lines.push(`First blocker: ${result.readiness.firstBlocker}`);
+  }
+  lines.push(`Next action: ${result.readiness.nextAction}`);
+  lines.push("");
+  lines.push("Checks");
   for (const check of result.checks) {
     lines.push(`${iconFor(check.status)} ${check.name}`);
     lines.push(`   ${check.message}`);

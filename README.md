@@ -33,7 +33,7 @@ fooks doctor
 fooks compare src/components/Button.tsx --json
 ```
 
-Then open Codex in that repo and work normally. `fooks doctor` is the read-only health check for setup/hook readiness, and `fooks compare` gives an immediate local estimate for one supported file by comparing original source size with the compact fooks model-facing payload.
+Then open Codex in that repo and work normally. `fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local source-vs-payload evidence.
 
 `fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
 
