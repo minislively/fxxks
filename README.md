@@ -2,11 +2,21 @@
 
 Smaller model-facing context for repeated same-file work in Codex.
 
-`fooks` reduces model-facing input for supported repeated frontend file work. On the first eligible `.tsx` / `.jsx` mention, it records compact context; later same-file prompts may reuse it when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
+`fooks` reduces model-facing input for supported repeated frontend same-file work. In the strongest path, a Codex user mentions the same React `.tsx` / `.jsx` file more than once in one repo: the first eligible mention records compact context, and later same-file prompts may reuse a compact model-facing payload when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
 
-`fooks` is for Codex users who repeatedly work on the same supported file in one repo. The strongest path is still React `.tsx` / `.jsx`, and there is now an experimental Codex-first `.ts` / `.js` same-file beta. On the first eligible mention, fooks records the file context; on later same-file prompts, it can send a compact model-facing payload instead of the full source when safe.
+First-minute path:
 
-If your first question is “What about Vue/SFC, React Native, embedded WebView, broader TS/JS coverage, multi-file refactors, read interception, LSP rename/reference safety, or Claude/opencode parity?”, treat those as roadmap asks, not current support.
+```bash
+npm install -g fxxk-frontned-hooks
+cd your-supported-project
+fooks setup
+fooks doctor
+fooks compare src/components/Button.tsx --json
+```
+
+Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
+
+Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. The first-minute proof is local model-facing payload evidence, not provider billing or stable runtime-token proof. React Native/WebView, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
 
 - Public npm package: `fxxk-frontned-hooks`
 - CLI command: `fooks`
@@ -25,17 +35,9 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 
 ## Quick start and local proof
 
-```bash
-npm install -g fxxk-frontned-hooks
-cd your-supported-project
-fooks setup
-fooks doctor
-fooks compare src/components/Button.tsx --json
-```
+The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks compare <supported-file> --json` for local source-vs-payload evidence.
 
-Then open Codex in that repo and work normally. `fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local source-vs-payload evidence.
-
-`fooks setup` is explicit by design. Installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files.
+`fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local source-vs-payload evidence.
 
 ### First-run checklist
 
