@@ -2,7 +2,7 @@
 
 Date: 2026-04-25 UTC
 Branch: `chore/release-readiness-20260425-0000`
-Package: `fxxk-frontned-hooks`
+Package: `fxxk-frontend-hooks`
 Installed CLI: `fooks`
 
 This snapshot records the current pre-public release posture after the #172 LSP boundary cleanup and the separate #174 rejection/cleanup pass. It is intentionally evidence-scoped: it records local checks and remaining authority gates, not a publication decision.
@@ -18,9 +18,9 @@ This snapshot records the current pre-public release posture after the #172 LSP 
 
 ## Current package and CLI boundary
 
-- The npm package is `fxxk-frontned-hooks`.
+- The npm package is `fxxk-frontend-hooks`.
 - The installed command is `fooks`, via `package.json` `bin.fooks = "dist/cli/index.js"`.
-- Public install examples should continue to use `npm install -g fxxk-frontned-hooks`, not `npm install -g fooks`.
+- Public install examples should continue to use `npm install -g fxxk-frontend-hooks`, not `npm install -g fooks`.
 - `fooks setup` remains explicit; installing the package alone must not be described as automatically activating project hooks.
 
 ## Local verification on 2026-04-25 UTC
@@ -30,11 +30,11 @@ Dependencies were not present in this worktree at first, so `npm install` was ru
 | Check | Result | Evidence boundary |
 | --- | --- | --- |
 | `npm run release:smoke` | Passed | Local build, pack/install, isolated setup, hook smoke, doctor, status, and compare smoke evidence only. |
-| `npm pack --dry-run` | Passed | Dry-run package contents for `fxxk-frontned-hooks@0.1.3`; no publish performed. |
+| `npm pack --dry-run` | Passed | Dry-run package contents for `fxxk-frontend-hooks@0.1.3`; no publish performed. |
 
 Observed `release:smoke` summary:
 
-- Package under test: `fxxk-frontned-hooks@0.1.3`.
+- Package under test: `fxxk-frontend-hooks@0.1.3`.
 - Temporary installed binary: `fooks`.
 - Setup summary: `codex:automatic-ready:ready`, `claude:context-hook-ready:ready`, `opencode:tool-ready:ready`.
 - Doctor summary: 11 pass, 0 warn, 0 fail.
@@ -42,7 +42,7 @@ Observed `release:smoke` summary:
 
 Observed `npm pack --dry-run` summary:
 
-- Tarball name: `fxxk-frontned-hooks-0.1.3.tgz`.
+- Tarball name: `fxxk-frontend-hooks-0.1.3.tgz`.
 - Total files: 147.
 - Package size: 147.1 kB.
 - Unpacked size: 714.1 kB.
@@ -53,7 +53,7 @@ Observed `npm pack --dry-run` summary:
 The following remain unresolved until a human-approved publish step:
 
 - `npm publish` was not run.
-- `npm view fxxk-frontned-hooks` was not run as a release authority check in this docs-only PR.
+- `npm view fxxk-frontend-hooks` was not run as a release authority check in this docs-only PR.
 - `npm whoami` was not run; publisher identity was not asserted.
 - Package version and Git tag strategy still need an explicit release decision.
 - Any real publication remains blocked until the release checklist in `docs/release.md` is reviewed and approved.

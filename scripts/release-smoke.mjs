@@ -12,6 +12,7 @@ import {
 } from "./release-benchmark-evidence.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const prepackOnly = process.argv.includes("--prepack");
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -30,12 +31,85 @@ function assert(condition, message) {
 }
 
 function parsePackJson(stdout) {
-  const parsed = JSON.parse(stdout);
+  const trimmed = stdout.trim();
+  const arrayStart = trimmed.lastIndexOf("\n[");
+  const jsonText = arrayStart >= 0 ? trimmed.slice(arrayStart + 1) : trimmed;
+  const parsed = JSON.parse(jsonText);
   assert(Array.isArray(parsed) && parsed.length === 1, "npm pack --json should return one package entry");
   return parsed[0];
 }
 
+function readJson(relativePath) {
+  return JSON.parse(fs.readFileSync(path.join(repoRoot, relativePath), "utf8"));
+}
 
+function assertPackageIdentity() {
+  const pkg = readJson("package.json");
+  const lock = readJson("package-lock.json");
+  assert(pkg.name === "fxxk-frontend-hooks", `package.json name should be fxxk-frontend-hooks, got ${pkg.name}`);
+  assert(lock.name === "fxxk-frontend-hooks", `package-lock.json name should be fxxk-frontend-hooks, got ${lock.name}`);
+  assert(
+    lock.packages?.[""]?.name === "fxxk-frontend-hooks",
+    `package-lock root name should be fxxk-frontend-hooks, got ${lock.packages?.[""]?.name}`,
+  );
+  assert(pkg.bin?.fooks === "dist/cli/index.js", "package bin.fooks should remain dist/cli/index.js");
+  assert(
+    pkg.scripts?.prepack && !/npm\s+pack|npm\s+install|release:smoke/i.test(pkg.scripts.prepack),
+    "prepack must not invoke npm pack, npm install, or release:smoke",
+  );
+  return pkg;
+}
+
+function assertScopedInstallStrings() {
+  const oldTypoPackageName = `fxxk-${"front"}${"ned"}-hooks`;
+  const surfaces = [
+    "README.md",
+    "docs/setup.md",
+    "docs/release.md",
+    "docs/release-readiness.md",
+    "dist/cli/index.js",
+  ];
+  for (const relativePath of surfaces) {
+    const fullPath = path.join(repoRoot, relativePath);
+    assert(fs.existsSync(fullPath), `${relativePath} should exist for release preflight`);
+    const content = fs.readFileSync(fullPath, "utf8");
+    assert(!content.includes(oldTypoPackageName), `${relativePath} still references the old typo package name`);
+  }
+  const publicDocs = ["README.md", "docs/setup.md", "docs/release.md", "docs/release-readiness.md"]
+    .map((relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), "utf8"))
+    .join("\n");
+  assert(publicDocs.includes("npm install -g fxxk-frontend-hooks"), "public docs should show package install command");
+}
+
+function assertNoExecutableRegistryMutationAutomation() {
+  const pkg = readJson("package.json");
+  const executableSurfaces = Object.entries(pkg.scripts ?? {}).map(([name, value]) => `package.json scripts.${name}: ${value}`);
+  for (const entry of fs.readdirSync(path.join(repoRoot, "scripts"), { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".mjs")) {
+      const content = fs.readFileSync(path.join(repoRoot, "scripts", entry.name), "utf8");
+      executableSurfaces.push(`scripts/${entry.name}:\n${content}`);
+    }
+  }
+  const executableRegistryMutation = /(?:execFileSync|spawn|spawnSync|run)\s*\([^\n]*(?:publish|deprecate|unpublish)|npm\s+(?:publish|deprecate|unpublish)|package\s+delete/i;
+  const hits = executableSurfaces.filter((surface) => executableRegistryMutation.test(surface));
+  assert(hits.length === 0, `executable registry mutation automation found: ${hits.join("\n---\n")}`);
+}
+
+function assertPrepackSafeReleaseSurface() {
+  const pkg = assertPackageIdentity();
+  assert(fs.existsSync(path.join(repoRoot, "dist", "cli", "index.js")), "prepack preflight requires built dist/cli/index.js");
+  assert(fs.existsSync(path.join(repoRoot, "dist", "index.js")), "prepack preflight requires built dist/index.js");
+  assertScopedInstallStrings();
+  assertNoExecutableRegistryMutationAutomation();
+  assertPublicSurfaceClaimBoundaries({
+    "README.md": fs.readFileSync(path.join(repoRoot, "README.md"), "utf8"),
+    "docs/setup.md": fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8"),
+    "docs/release.md": fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8"),
+    "docs/release-readiness.md": fs.readFileSync(path.join(repoRoot, "docs", "release-readiness.md"), "utf8"),
+    "dist/cli/index.js": fs.readFileSync(path.join(repoRoot, "dist", "cli", "index.js"), "utf8"),
+  });
+  return pkg;
+}
 
 function runInstalledFooks(fooksBin, args, options = {}) {
   return execFileSync(fooksBin, args, {
@@ -134,6 +208,12 @@ function assertPackedFiles(packEntry) {
   }
 }
 
+const pkg = assertPrepackSafeReleaseSurface();
+if (prepackOnly) {
+  console.log(JSON.stringify({ ok: true, mode: "prepack", package: `${pkg.name}@${pkg.version}`, bin: pkg.bin }, null, 2));
+  process.exit(0);
+}
+
 function copyReleaseBenchmarkInputs(targetRoot) {
   for (const relativePath of ["dist", "fixtures", path.join("test", "fixtures")]) {
     fs.cpSync(path.join(repoRoot, relativePath), path.join(targetRoot, relativePath), { recursive: true });
@@ -162,7 +242,10 @@ async function buildReleaseBenchmarkPreflightSummary() {
 
 const releaseBenchmarkSmokeSummary = await buildReleaseBenchmarkPreflightSummary();
 
+
 const dryRun = parsePackJson(run("npm", ["pack", "--dry-run", "--json"]));
+assert(dryRun.name === "fxxk-frontend-hooks", `dry-run package name should be fxxk-frontend-hooks, got ${dryRun.name}`);
+assert(dryRun.filename === `fxxk-frontend-hooks-${pkg.version}.tgz`, `package tarball filename should be fxxk-frontend-hooks-${pkg.version}.tgz, got ${dryRun.filename}`);
 assertPackedFiles(dryRun);
 
 const packDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pack-"));
@@ -339,6 +422,7 @@ const doctor = JSON.parse(doctorStdout);
 assert(doctor.command === "doctor", `doctor command should be doctor, got ${doctor.command}`);
 assert(doctor.healthy === true, `doctor should be healthy after setup, got ${doctor.healthy}`);
 assert(doctor.summary?.fail === 0, `doctor should have zero failures after setup, got ${doctor.summary?.fail}`);
+assert(typeof doctor.summary?.warn === "number", "doctor should expose an explicit warning count");
 assert(doctor.claimBoundaries?.some((item) => item.includes("local fooks configuration")), "doctor should expose local-configuration claim boundary");
 assert(fs.existsSync(path.join(codexHome, "hooks.json")), "isolated Codex hooks file should be written under FOOKS_CODEX_HOME");
 const claudeLocalSettings = path.join(project, ".claude", "settings.local.json");

@@ -1,5 +1,7 @@
 # fooks
 
+Stop paying the frontend context tax twice.
+
 Smaller model-facing context for repeated same-file work in Codex.
 
 `fooks` reduces model-facing input for supported repeated frontend same-file work. In the strongest path, a Codex user mentions the same React `.tsx` / `.jsx` file more than once in one repo: the first eligible mention records compact context, and later same-file prompts may reuse a compact model-facing payload when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
@@ -7,7 +9,7 @@ Smaller model-facing context for repeated same-file work in Codex.
 First-minute path:
 
 ```bash
-npm install -g fxxk-frontned-hooks
+npm install -g fxxk-frontend-hooks
 cd your-supported-project
 fooks setup
 fooks doctor
@@ -18,7 +20,7 @@ Then open Codex in that repo and work normally on the same supported file. `fook
 
 Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. The first-minute proof is local model-facing payload evidence, not provider billing or stable runtime-token proof. React Native/WebView, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
 
-- Public npm package: `fxxk-frontned-hooks`
+- Public npm package: `fxxk-frontend-hooks`
 - CLI command: `fooks`
 
 ## 30-second version
@@ -39,9 +41,11 @@ The first-minute path above is the shortest setup/proof loop: install the CLI, a
 
 `fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local source-vs-payload evidence.
 
+If you run `fooks doctor` from a source checkout, new git worktree, or freshly cloned project before `fooks setup`, an `unhealthy` result usually means the project-local adapter/runtime manifests have not been activated yet. That is expected for an unprepared checkout; run `fooks setup`, then rerun `fooks doctor` to verify the dogfood state you will actually use.
+
 ### First-run checklist
 
-1. Install the package: `npm install -g fxxk-frontned-hooks`.
+1. Install the package: `npm install -g fxxk-frontend-hooks`.
 2. Confirm the command resolves to the package you expect: `which fooks` and `fooks --help`.
 3. Activate only the repo you are inside: `fooks setup`. The default output should be a short `ready`, `partial`, or `blocked` summary, not a debug JSON wall.
 4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file> --json` for one-file payload proof.
@@ -54,6 +58,15 @@ The first-minute path above is the shortest setup/proof loop: install the CLI, a
 | Repeated same-file React `.tsx` / `.jsx` work in Codex. This includes normal React apps, Next.js components, and Ink-style React CLI components when the target file is real TSX/JSX. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
 | Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior or read-interception parity. |
 | Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider usage/billing-token telemetry, provider tokenizer behavior, provider invoice/dashboard/charged-cost proof, or a `ccusage` replacement. |
+
+## Common scope questions
+
+| Question | Current strongest path | Current limit | Next credible path |
+| --- | --- | --- | --- |
+| “Does this help my general TypeScript project?” | Codex-only same-file `.ts` / `.js` beta when a strong module qualifies. | No broad semantic framework or multi-file refactor claim. | Add measured fixtures and claim gates before widening TS/JS support. |
+| “Can it refactor my whole Next.js app?” | Yes for repeated work on real TSX/JSX component files, including Next.js components. | No whole-app or route-wide refactor compression claim. | Prove larger Next profiles with fixtures, benchmarks, and edit-safety checks. |
+| “Does Claude get the same automation?” | Project-local `SessionStart` / `UserPromptSubmit` context hooks and manual/shared handoff artifacts. | No Claude `Read` interception or runtime-token savings proof. | Promote only with measured Claude runtime evidence and explicit hook boundaries. |
+| “What about opencode?” | Project-local `fooks_extract` custom tool and `/fooks-extract` slash command. | No automatic opencode read interception or automatic runtime-token savings. | A future read-shadow bridge would need separate safety and evidence gates. |
 
 ## Project/file support matrix
 
@@ -94,7 +107,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 
 | Step | Scope | What can change |
 | --- | --- | --- |
-| `npm install -g fxxk-frontned-hooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
+| `npm install -g fxxk-frontend-hooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
 | `fooks setup` | current project + runtime homes | Creates project-local `.fooks/` state, may add project-local `.opencode/` helper files, and may update runtime-home files such as Codex hooks/manifests or Claude handoff manifests. |
 | `fooks doctor` | current project + runtime-home inspection | Reads local setup and hook-readiness artifacts without writing files; it is not live provider health, billing-token, cost, or `ccusage` proof. |
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |

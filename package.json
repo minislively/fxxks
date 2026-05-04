@@ -1,5 +1,5 @@
 {
-  "name": "fxxk-frontned-hooks",
+  "name": "fxxk-frontend-hooks",
   "version": "0.1.3",
   "type": "commonjs",
   "bin": {
@@ -25,7 +25,7 @@
     "lint": "npm run typecheck -- --pretty false",
     "smoke:claude": "npm run build && node scripts/smoke-claude-hook.mjs",
     "smoke:domain-detector": "npm run build && node dist/cli/index.js inspect-domain test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx --json",
-    "prepack": "npm run build",
+    "prepack": "npm run build && node scripts/release-smoke.mjs --prepack",
     "release:smoke": "npm run build && node scripts/release-smoke.mjs",
     "bench:layer2:r4:repeated": "npm run build && node benchmarks/layer2-frontend-task/run-r4-repeated.js",
     "bench:layer2:provider-cost": "node benchmarks/layer2-frontend-task/run-provider-cost-evidence.js",
@@ -40,7 +40,7 @@
   "devDependencies": {
     "@types/node": "^24.5.2"
   },
-  "description": "Frontend context compression CLI for React/TSX projects; npm package fxxk-frontned-hooks installs the fooks command.",
+  "description": "Frontend context compression CLI for React/TSX projects; npm package fxxk-frontend-hooks installs the fooks command.",
   "main": "dist/index.js",
   "files": [
     "dist",
