@@ -74,6 +74,13 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
   assert.equal(payload.domainPayload.policy, policy.name);
   assert.deepEqual(payload.domainPayload.facts.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload.domainPayload.facts.jsxProps, ["onChangeText", "onPress"]);
+  assert.equal(payload.domainPayload.sourceAnchorBeta.contract.contractVersion, "rn-source-anchor-beta.v0");
+  assert.equal(payload.domainPayload.sourceAnchorBeta.contract.scope, "local-proof-only");
+  assert.deepEqual(payload.domainPayload.sourceAnchorBeta.contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);
+  assert.equal(payload.domainPayload.sourceAnchorBeta.contract.runtimeReusePromotion, "not-promoted");
+  assert.deepEqual(payload.domainPayload.sourceAnchorBeta.anchors.primitives, ["Pressable", "Text", "TextInput", "View"]);
+  assert.deepEqual(payload.domainPayload.sourceAnchorBeta.anchors.jsxProps, ["onChangeText", "onPress"]);
+  assert.equal(payload.domainPayload.sourceAnchorBeta.anchors.sourceFingerprintRequired, true);
   assert.equal(payload.domainPayload.reuseContract.sourceDerivedOnly, true);
   assert.equal(payload.domainPayload.reuseContract.policy, policy.name);
   assert.equal(payload.domainPayload.reuseContract.freshnessSource, "sourceFingerprint");
@@ -129,6 +136,31 @@ test("frontend profile gate rejects adversarial RN narrow payload contract and f
     ["wrong policy", () => {
       const stale = clonePayload(payload);
       stale.domainPayload.policy = "react-web-current-supported-lane";
+      return stale;
+    }],
+    ["missing source-anchor beta contract", () => {
+      const stale = clonePayload(payload);
+      delete stale.domainPayload.sourceAnchorBeta;
+      return stale;
+    }],
+    ["wrong source-anchor beta scope", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.sourceAnchorBeta.contract.scope = "runtime";
+      return stale;
+    }],
+    ["wrong source-anchor runtime promotion", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.sourceAnchorBeta.contract.runtimeReusePromotion = "promoted";
+      return stale;
+    }],
+    ["missing source-anchor primitive", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.sourceAnchorBeta.anchors.primitives = stale.domainPayload.sourceAnchorBeta.anchors.primitives.slice(1);
+      return stale;
+    }],
+    ["missing source-anchor fingerprint requirement", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.sourceAnchorBeta.anchors.sourceFingerprintRequired = false;
       return stale;
     }],
     ["missing reuse contract", () => {
