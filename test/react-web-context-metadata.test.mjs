@@ -849,6 +849,94 @@ test("React Web component API hints omit lowercase DOM tags without props contra
   assert.equal(payload.reactWebContext?.componentApiHints, undefined);
 });
 
+test("React Web layout region hints summarize source-only region anchors", () => {
+  const source = `
+    type LayoutPanelProps = {
+      items: Array<{ id: string; label: string }>;
+      isLoading?: boolean;
+      error?: string;
+    };
+
+    export function LayoutPanel({ items, isLoading, error }: LayoutPanelProps) {
+      return (
+        <main className={isLoading ? "grid gap-4" : "flex flex-col gap-4"}>
+          <header>
+            <h1>Account overview</h1>
+          </header>
+          <section>
+            {isLoading && <p>Loading accounts</p>}
+            {error ? <p role="alert">{error}</p> : null}
+            {items.length === 0 && <p>No accounts yet</p>}
+            <ul>
+              {items.map((item) => (
+                <li key={item.id}>{item.label}</li>
+              ))}
+            </ul>
+          </section>
+          <form>
+            <label htmlFor="filter">Filter</label>
+            <input id="filter" name="filter" />
+          </form>
+          <footer>
+            <button type="button">Refresh</button>
+          </footer>
+          <p>Additional neutral copy keeps this fixture above the tiny raw threshold.</p>
+          <p>Layout region hints must stay source-derived and avoid visual understanding claims.</p>
+        </main>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "LayoutPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+  const hints = payload.reactWebContext.layoutRegionHints;
+  assert.ok(hints);
+
+  assert.ok(hints.some((item) => item.kind === "semantic-region" && item.tagName === "main" && item.evidence.includes("structure.sections")));
+  assert.ok(hints.some((item) => item.kind === "semantic-region" && item.tagName === "header"));
+  assert.ok(hints.some((item) => item.kind === "list-region" && item.tagName === "ul"));
+  assert.ok(hints.some((item) => item.kind === "form-region" && item.tagName === "form"));
+  assert.ok(hints.some((item) => item.kind === "form-row" && item.label === "input[name=filter]" && item.loc));
+  assert.ok(hints.some((item) => item.kind === "repeated-region" && item.evidence.includes("structure.repeatedBlocks")));
+  assert.ok(hints.some((item) => item.kind === "state-region" && item.state === "loading"));
+  assert.ok(hints.some((item) => item.kind === "state-region" && item.state === "error"));
+  assert.ok(hints.some((item) => item.kind === "container-region" && item.evidence.includes("style.variantSignals.className-branch")));
+
+  const serialized = JSON.stringify(hints);
+  assert.equal(serialized.includes("visualUnderstanding"), false);
+  assert.equal(serialized.includes("designSystem"), false);
+  assert.equal(serialized.includes("crossFile"), false);
+  assert.equal(serialized.includes("runtimeDom"), false);
+});
+
+test("React Web layout region hints omit plain DOM without region evidence", () => {
+  const source = `
+    export function PlainCopyPanel() {
+      return (
+        <div>
+          <p>Plain copy panel without semantic containers or repeated source anchors.</p>
+          <p>This fixture intentionally avoids form, list, table, header, footer, and className branches.</p>
+          <button type="button">Close</button>
+          <span>Additional neutral inline content keeps this fixture in compressed mode.</span>
+          <p>Another neutral sentence keeps this assertion independent from tiny raw thresholds.</p>
+          <p>No source-observed layout region evidence should be invented here.</p>
+        </div>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "PlainCopyPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.equal(payload.reactWebContext?.layoutRegionHints, undefined);
+});
+
 test("non React Web and raw/useOriginal payloads omit reactWebContext", () => {
   for (const fixture of [
     "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx",
