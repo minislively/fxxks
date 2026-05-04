@@ -71,6 +71,8 @@ export async function measureReactWebFixture({ repoRoot = defaultRepoRoot, relat
   const domainPayload = payload?.domainPayload ?? null;
   const sourceBytes = byteLength(source);
   const runtimePayloadBytes = payload ? byteLength(JSON.stringify(payload)) : 0;
+  const additionalContext = typeof second.additionalContext === "string" ? second.additionalContext : "";
+  const additionalContextBytes = byteLength(additionalContext);
   const domainPayloadBytes = domainPayload ? byteLength(JSON.stringify(domainPayload)) : 0;
 
   return {
@@ -81,10 +83,13 @@ export async function measureReactWebFixture({ repoRoot = defaultRepoRoot, relat
     classification: second.debug?.decision?.debug?.domainDetection?.classification ?? null,
     sourceBytes,
     runtimePayloadBytes,
+    additionalContextBytes,
     domainPayloadBytes,
     runtimePayloadReductionPct: percentReduction(sourceBytes, runtimePayloadBytes),
+    additionalContextReductionPct: percentReduction(sourceBytes, additionalContextBytes),
     domainPayloadReductionPct: percentReduction(sourceBytes, domainPayloadBytes),
     runtimePayloadLargerThanSource: runtimePayloadBytes > sourceBytes,
+    additionalContextLargerThanSource: additionalContextBytes > sourceBytes,
     domainPayloadLargerThanSource: domainPayloadBytes > sourceBytes,
     claimBoundary: domainPayload?.claimBoundary ?? null,
     claimStatus: domainPayload?.claimStatus ?? null,
@@ -96,6 +101,7 @@ export async function buildReactWebContextEvidence({
   fixtures = DEFAULT_REACT_WEB_EVIDENCE_FIXTURES,
   runId = new Date().toISOString().replace(/[:.]/g, "-"),
 } = {}) {
+  cleanupRuntimeSessions(repoRoot, `react-web-context-evidence-${runId}-`);
   const rows = [];
   for (const relativeFile of fixtures) {
     rows.push(await measureReactWebFixture({ repoRoot, relativeFile, runId }));
@@ -105,29 +111,41 @@ export async function buildReactWebContextEvidence({
   const domainReductionValues = rows.map((row) => row.domainPayloadReductionPct);
   const runtimeReductionValues = rows.map((row) => row.runtimePayloadReductionPct);
   const allDomainPayloadsSmaller = rows.every((row) => row.secondAction === "inject" && row.classification === "react-web" && !row.domainPayloadLargerThanSource);
+  const additionalContextReductionValues = rows.map((row) => row.additionalContextReductionPct);
   const allRuntimePayloadsSmaller = rows.every((row) => row.secondAction === "inject" && !row.runtimePayloadLargerThanSource);
+  const allAdditionalContextsSmaller = rows.every((row) => row.secondAction === "inject" && !row.additionalContextLargerThanSource);
 
   return {
-    schemaVersion: "react-web-context-evidence.v1",
+    schemaVersion: "react-web-context-evidence.v2",
     generatedAt: new Date().toISOString(),
     runId,
-    measurement: "local-source-bytes-vs-runtime-json-bytes",
+    measurement: "local-source-bytes-vs-host-facing-additional-context-bytes",
     claimBoundary:
-      "Local fixture byte-size evidence only: source-derived React Web domainPayload compactness, not provider tokenizer output, not runtime-token savings, not cache performance, not latency, and not provider billing or invoice savings.",
+      "Local fixture byte-size evidence only: actual host-facing additionalContext compactness for React Web current-lane reuse; domainPayload is diagnostic-only. This is not provider tokenizer output, not runtime-token savings, not cache performance, not latency, and not provider billing or invoice savings.",
     fixtures: rows,
     summary: {
       fixtureCount: rows.length,
       allReactWebInjects: rows.every((row) => row.firstAction === "record" && row.secondAction === "inject" && row.classification === "react-web"),
+      actualInjectedContextReduction: {
+        claimable: allAdditionalContextsSmaller,
+        minPct: Math.min(...additionalContextReductionValues),
+        maxPct: Math.max(...additionalContextReductionValues),
+        blocker: allAdditionalContextsSmaller
+          ? null
+          : "actual host-facing additionalContext is not smaller than source for every fixture",
+      },
       domainPayloadReduction: {
         claimable: allDomainPayloadsSmaller,
+        diagnosticOnly: true,
         minPct: Math.min(...domainReductionValues),
         maxPct: Math.max(...domainReductionValues),
       },
       fullRuntimePayloadReduction: {
         claimable: allRuntimePayloadsSmaller,
+        diagnosticOnly: true,
         minPct: Math.min(...runtimeReductionValues),
         maxPct: Math.max(...runtimeReductionValues),
-        blocker: allRuntimePayloadsSmaller ? null : "full runtime payload includes envelope/extraction fields and is not smaller than source for every fixture",
+        blocker: allRuntimePayloadsSmaller ? null : "internal runtime payload JSON includes envelope/extraction fields and is not smaller than source for every fixture",
       },
       cachePerformanceImprovement: {
         claimable: false,
@@ -145,7 +163,7 @@ export function renderReactWebContextEvidenceMarkdown(evidence) {
   const rows = evidence.fixtures
     .map(
       (row) =>
-        `| \`${row.file}\` | ${row.sourceBytes} | ${row.domainPayloadBytes} | ${row.domainPayloadReductionPct}% | ${row.runtimePayloadBytes} | ${row.runtimePayloadReductionPct}% |`,
+        `| \`${row.file}\` | ${row.sourceBytes} | ${row.additionalContextBytes} | ${row.additionalContextReductionPct}% | ${row.domainPayloadBytes} | ${row.domainPayloadReductionPct}% | ${row.runtimePayloadBytes} | ${row.runtimePayloadReductionPct}% |`,
     )
     .join("\n");
 
@@ -156,20 +174,21 @@ ${evidence.claimBoundary}
 ## Summary
 
 - React Web repeated same-file injects observed: ${evidence.summary.allReactWebInjects ? "yes" : "no"}
-- Domain payload reduction claimable: ${evidence.summary.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.summary.domainPayloadReduction.minPct}% to ${evidence.summary.domainPayloadReduction.maxPct}% local byte reduction)
-- Full runtime payload reduction claimable: ${evidence.summary.fullRuntimePayloadReduction.claimable ? "yes" : "no"}
+- Actual injected context reduction claimable: ${evidence.summary.actualInjectedContextReduction.claimable ? "yes" : "no"} (${evidence.summary.actualInjectedContextReduction.minPct}% to ${evidence.summary.actualInjectedContextReduction.maxPct}% local byte reduction)
+- Domain payload reduction diagnostic-only: ${evidence.summary.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.summary.domainPayloadReduction.minPct}% to ${evidence.summary.domainPayloadReduction.maxPct}% local byte reduction)
+- Internal runtime payload reduction diagnostic-only: ${evidence.summary.fullRuntimePayloadReduction.claimable ? "yes" : "no"}
 - Cache performance improvement claimable: no
 - Provider billing savings claimable: no
 
 ## Fixture measurements
 
-| Fixture | Source bytes | domainPayload bytes | domainPayload reduction | full runtime payload bytes | full runtime payload reduction |
-| --- | ---: | ---: | ---: | ---: | ---: |
+| Fixture | Source bytes | actual additionalContext bytes | actual additionalContext reduction | diagnostic domainPayload bytes | diagnostic domainPayload reduction | diagnostic runtime payload bytes | diagnostic runtime payload reduction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${rows}
 
 ## Claim boundary
 
-This artifact supports a bounded statement that React Web same-file reuse can carry a smaller source-derived domainPayload. It does not support broad runtime-token, latency, cache-performance, provider-cost, billing, invoice, or charged-cost claims.
+This artifact supports bounded statements only when actual host-facing additionalContext is smaller than source for the measured React Web current-lane fixtures. The source-derived domainPayload metric is diagnostic-only. It does not support broad runtime-token, latency, cache-performance, provider-cost, billing, invoice, or charged-cost claims.
 `;
 }
 
