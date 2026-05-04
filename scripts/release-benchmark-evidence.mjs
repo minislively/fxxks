@@ -1,0 +1,168 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { buildReactWebContextEvidence } from "./react-web-context-evidence.mjs";
+import { buildReactWebReuseEvidence } from "./react-web-reuse-evidence.mjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const defaultRepoRoot = path.resolve(__dirname, "..");
+
+function finite(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function claimLine(contextEvidence, reuseEvidence) {
+  const min = contextEvidence.summary.domainPayloadReduction.minPct;
+  const max = contextEvidence.summary.domainPayloadReduction.maxPct;
+  if (!contextEvidence.summary.domainPayloadReduction.claimable || !reuseEvidence.summary.reuseCorrectnessClaimable) {
+    return "React Web evidence is present, but release wording must stay diagnostic until all claimability gates pass.";
+  }
+  return `React Web same-file reuse is routed correctly, and current-lane fixtures show ${min}% to ${max}% smaller source-derived domainPayloads in local byte-size evidence.`;
+}
+
+export async function buildReleaseBenchmarkEvidence({
+  repoRoot = defaultRepoRoot,
+  runId = new Date().toISOString().replace(/[:.]/g, "-"),
+} = {}) {
+  const contextEvidence = await buildReactWebContextEvidence({ repoRoot, runId: `${runId}-context` });
+  const reuseEvidence = await buildReactWebReuseEvidence({ repoRoot, runId: `${runId}-reuse` });
+
+  const releaseClaims = {
+    npmUpdateClaimable: contextEvidence.summary.domainPayloadReduction.claimable && reuseEvidence.summary.reuseCorrectnessClaimable,
+    headline: claimLine(contextEvidence, reuseEvidence),
+    allowed: [
+      "React Web same-file reuse routes record -> inject for current-lane fixtures.",
+      "React Web source changes refresh before attach and do not reuse stale fingerprints.",
+      `React Web current-lane fixtures show ${contextEvidence.summary.domainPayloadReduction.minPct}% to ${contextEvidence.summary.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads by local byte-size measurement.`,
+      "RN and WebView boundaries fall back instead of becoming React Web payload support.",
+    ],
+    forbidden: [
+      "Caching performance improved.",
+      "Runtime-token savings are proven.",
+      "Provider cost or billing is reduced.",
+      "Full runtime payloads are always smaller than source.",
+      "Broad React Web, React Native, or WebView support is available.",
+    ],
+  };
+
+  return {
+    schemaVersion: "release-benchmark-evidence.v1",
+    generatedAt: new Date().toISOString(),
+    runId,
+    measurement: "release-facing-local-evidence-summary",
+    claimBoundary:
+      "Release-facing local evidence summary only: combines React Web context byte-size and reuse-correctness artifacts; not provider tokenizer output, not runtime-token savings, not wall-clock cache performance, not latency, not provider cost, billing, invoice, or charged-cost evidence.",
+    releaseClaims,
+    context: {
+      schemaVersion: contextEvidence.schemaVersion,
+      fixtureCount: contextEvidence.summary.fixtureCount,
+      allReactWebInjects: contextEvidence.summary.allReactWebInjects,
+      domainPayloadReduction: {
+        claimable: contextEvidence.summary.domainPayloadReduction.claimable,
+        minPct: finite(contextEvidence.summary.domainPayloadReduction.minPct),
+        maxPct: finite(contextEvidence.summary.domainPayloadReduction.maxPct),
+      },
+      fullRuntimePayloadReduction: {
+        claimable: contextEvidence.summary.fullRuntimePayloadReduction.claimable,
+        minPct: finite(contextEvidence.summary.fullRuntimePayloadReduction.minPct),
+        maxPct: finite(contextEvidence.summary.fullRuntimePayloadReduction.maxPct),
+        blocker: contextEvidence.summary.fullRuntimePayloadReduction.blocker,
+      },
+      fixtures: contextEvidence.fixtures.map((row) => ({
+        file: row.file,
+        sourceBytes: row.sourceBytes,
+        domainPayloadBytes: row.domainPayloadBytes,
+        domainPayloadReductionPct: row.domainPayloadReductionPct,
+        runtimePayloadBytes: row.runtimePayloadBytes,
+        runtimePayloadReductionPct: row.runtimePayloadReductionPct,
+      })),
+    },
+    reuse: {
+      schemaVersion: reuseEvidence.schemaVersion,
+      reuseCorrectnessClaimable: reuseEvidence.summary.reuseCorrectnessClaimable,
+      sameFileReactWebReuse: reuseEvidence.checks.sameFileReactWebReuse,
+      sourceChangeRefresh: reuseEvidence.checks.sourceChangeRefresh,
+      unsupportedDomainFallbacks: reuseEvidence.checks.unsupportedDomainFallbacks,
+    },
+    nonClaims: {
+      cachePerformanceImprovement: {
+        claimable: false,
+        blocker: "no wall-clock latency, cache-hit-rate, or end-to-end runtime benchmark is measured by this release-facing artifact",
+      },
+      runtimeTokenSavings: {
+        claimable: false,
+        blocker: "no comparable runtime-token telemetry is measured by this release-facing artifact",
+      },
+      providerBillingSavings: {
+        claimable: false,
+        blocker: "no provider usage, tokenizer, billing dashboard, invoice, or charged-cost data is measured by this release-facing artifact",
+      },
+    },
+  };
+}
+
+export function renderReleaseBenchmarkEvidenceMarkdown(evidence) {
+  const fixtureRows = evidence.context.fixtures
+    .map(
+      (row) =>
+        `| \`${row.file}\` | ${row.sourceBytes} | ${row.domainPayloadBytes} | ${row.domainPayloadReductionPct}% | ${row.runtimePayloadBytes} | ${row.runtimePayloadReductionPct}% |`,
+    )
+    .join("\n");
+
+  return `# Release benchmark evidence
+
+${evidence.claimBoundary}
+
+## Release-safe headline
+
+${evidence.releaseClaims.headline}
+
+## Claimable for this npm update
+
+- npm update wording claimable: ${evidence.releaseClaims.npmUpdateClaimable ? "yes" : "no"}
+- React Web context reduction: ${evidence.context.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.context.domainPayloadReduction.minPct}% to ${evidence.context.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads)
+- React Web reuse correctness: ${evidence.reuse.reuseCorrectnessClaimable ? "yes" : "no"}
+
+## Fixture context-size measurements
+
+| Fixture | Source bytes | domainPayload bytes | domainPayload reduction | full runtime payload bytes | full runtime payload reduction |
+| --- | ---: | ---: | ---: | ---: | ---: |
+${fixtureRows}
+
+## Reuse-correctness checks
+
+- Same-file React Web: ${evidence.reuse.sameFileReactWebReuse.firstAction} -> ${evidence.reuse.sameFileReactWebReuse.secondAction}
+- Source-change refresh: ${evidence.reuse.sourceChangeRefresh.action}; reasons=${evidence.reuse.sourceChangeRefresh.reasons.join(", ")}; stalePayloadReused=${evidence.reuse.sourceChangeRefresh.stalePayloadReused}
+- WebView boundary: ${evidence.reuse.unsupportedDomainFallbacks.webview.secondAction}; reason=${evidence.reuse.unsupportedDomainFallbacks.webview.fallbackReason}
+- React Native boundary: ${evidence.reuse.unsupportedDomainFallbacks.reactNative.secondAction}; reason=${evidence.reuse.unsupportedDomainFallbacks.reactNative.fallbackReason}
+
+## Non-claims
+
+- Cache performance improvement: no
+- Runtime-token savings: no
+- Provider billing/cost savings: no
+- Full runtime payloads always smaller than source: no
+- Broad React Web/RN/WebView support: no
+`;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const runId = process.argv.find((arg) => arg.startsWith("--run-id="))?.slice("--run-id=".length) ?? "local";
+  const outputArg = process.argv.find((arg) => arg.startsWith("--output="))?.slice("--output=".length);
+  const markdownArg = process.argv.find((arg) => arg.startsWith("--markdown-output="))?.slice("--markdown-output=".length);
+  const evidence = await buildReleaseBenchmarkEvidence({ repoRoot: defaultRepoRoot, runId });
+
+  if (outputArg) {
+    const outputPath = path.resolve(defaultRepoRoot, outputArg);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
+  }
+  if (markdownArg) {
+    const markdownPath = path.resolve(defaultRepoRoot, markdownArg);
+    fs.mkdirSync(path.dirname(markdownPath), { recursive: true });
+    fs.writeFileSync(markdownPath, renderReleaseBenchmarkEvidenceMarkdown(evidence));
+  }
+
+  process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`);
+}
