@@ -132,6 +132,7 @@ Automated local checks now covered by `npm run release:smoke`:
 - [x] package/CLI boundary is documented: `fxxk-frontned-hooks` installs `fooks`.
 - [x] possible pre-existing global `fooks` binary conflict is documented.
 - [x] no install, pack, publish, or version lifecycle script mutates user machines or publishes implicitly.
+- [x] `prepack` runs the TypeScript build before packing so a clean npm pack cannot silently ship stale or missing `dist/` artifacts.
 - [x] packed tarball includes `dist/cli/index.js`, `dist/index.js`, `README.md`, `package.json`, and the npm-package public docs allowlist.
 - [x] packed tarball excludes internal notes, benchmark corpora/results, and planning archives.
 - [x] package source and built `dist/` are generated from tracked source before pack/smoke verification.

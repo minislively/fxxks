@@ -3013,6 +3013,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
+  assert.equal(pkg.scripts?.prepack, "npm run build");
   assert.match(pkg.scripts?.["release:smoke"], /scripts\/release-smoke\.mjs/);
   assert.doesNotMatch(pkg.scripts?.["release:smoke"], /publish|version|tag/);
 });
