@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  assertReleaseBenchmarkSmokeGate,
   buildReleaseBenchmarkEvidence,
+  buildReleaseBenchmarkSmokeSummary,
   renderReleaseBenchmarkEvidenceMarkdown,
 } from "../scripts/release-benchmark-evidence.mjs";
 
@@ -49,6 +51,48 @@ test("release benchmark evidence gates npm wording on actual injected context an
   assert.ok(evidence.releaseClaims.forbidden.includes("Caching performance improved."));
   assert.ok(evidence.releaseClaims.forbidden.includes("Provider cost or billing is reduced."));
   assert.ok(evidence.releaseClaims.forbidden.includes("Diagnostic domainPayload reduction proves runtime-token savings."));
+});
+
+test("release benchmark smoke summary exposes only release-safe compact evidence", async () => {
+  const evidence = await buildReleaseBenchmarkEvidence({ runId: `smoke-summary-test-${Date.now()}-${Math.random()}` });
+  const summary = buildReleaseBenchmarkSmokeSummary(evidence);
+
+  assert.equal(summary.npmUpdateClaimable, true);
+  assert.match(summary.headline, /React Web same-file reuse is routed correctly/);
+  assert.match(summary.headline, /actual injected additionalContext/);
+  assert.equal(summary.actualInjectedContextReduction.claimable, true);
+  assert.ok(summary.actualInjectedContextReduction.minPct > 0);
+  assert.ok(summary.actualInjectedContextReduction.maxPct > 70);
+  assert.equal(summary.reuseCorrectnessClaimable, true);
+  assert.deepEqual(summary.nonClaims, {
+    cachePerformanceImprovement: false,
+    runtimeTokenSavings: false,
+    providerBillingSavings: false,
+  });
+  assert.match(summary.claimBoundary, /not provider tokenizer output/);
+  assert.match(summary.claimBoundary, /not runtime-token savings/);
+  assert.match(summary.claimBoundary, /not provider cost, billing, invoice, or charged-cost evidence/);
+});
+
+test("release benchmark smoke gate fails closed when npm update wording is not claimable", () => {
+  const evidence = {
+    releaseClaims: {
+      npmUpdateClaimable: false,
+    },
+    context: {
+      actualInjectedContextReduction: {
+        blocker: "fixture additionalContext is larger than source",
+      },
+    },
+    reuse: {
+      reuseCorrectnessClaimable: false,
+    },
+  };
+
+  assert.throws(
+    () => assertReleaseBenchmarkSmokeGate(evidence),
+    /release benchmark gate failed: npm update wording is not claimable; actual injected context blocker: fixture additionalContext is larger than source; reuse correctness is not claimable/,
+  );
 });
 
 test("release benchmark evidence Markdown gives safe public wording and explicit non-claims", async () => {
