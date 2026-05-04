@@ -4,6 +4,7 @@ import {
   type ExtractionResult,
   type FormControlSignal,
   type ReactWebContextA11yAnchor,
+  type ReactWebContextComponentApiHint,
   type ReactWebContextEditTargetRoute,
   type ReactWebContextFormStateFlowEntry,
   type ReactWebContextImportRoleHint,
@@ -23,6 +24,7 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   localDependencies: 12,
   importRoleHints: 12,
   stylingVariantHints: 12,
+  componentApiHints: 12,
   intentTargets: 16,
   editTargetRouting: 8,
   formStateFlow: 10,
@@ -324,6 +326,60 @@ function buildStylingVariantHints(result: ExtractionResult): ReactWebContextStyl
   }
 
   return dedupeBy(hints, (item) => `${item.kind}:${item.propName ?? ""}:${item.label}:${item.loc?.startLine ?? ""}`);
+}
+
+type ParsedPropSummary = {
+  name: string;
+  typeText: string;
+};
+
+function parsePropSummary(summary: string): ParsedPropSummary | undefined {
+  const match = summary.match(/^([A-Za-z_$][\w$]*)(?:\?)?:\s*(.+)$/);
+  if (!match) return undefined;
+  return {
+    name: match[1],
+    typeText: compact(match[2], 120),
+  };
+}
+
+function componentApiKindFor(prop: ParsedPropSummary): ReactWebContextComponentApiHint["kind"] {
+  if (prop.name === "children") return prop.typeText.includes("=>") ? "render-prop" : "children-prop";
+  if (/^render[A-Z]/.test(prop.name)) return "render-prop";
+  if (/^on[A-Z]/.test(prop.name) || prop.typeText.includes("=>")) return "callback-prop";
+  return "prop";
+}
+
+function isCustomJsxTag(tagName: string): boolean {
+  const rootName = tagName.split(".")[0] ?? "";
+  return /^[A-Z]/.test(rootName);
+}
+
+function buildComponentApiHints(result: ExtractionResult): ReactWebContextComponentApiHint[] {
+  const hints: ReactWebContextComponentApiHint[] = [];
+
+  for (const summary of result.contract?.propsSummary ?? []) {
+    const prop = parsePropSummary(summary);
+    if (!prop) continue;
+    hints.push({
+      kind: componentApiKindFor(prop),
+      label: compact(summary, 120),
+      propName: prop.name,
+      typeText: prop.typeText,
+      ...(result.contract?.propsLoc ? { loc: result.contract.propsLoc } : {}),
+      evidence: ["contract.propsSummary"],
+    });
+  }
+
+  for (const tagName of result.structure?.sections ?? []) {
+    if (!tagName || tagName === result.componentName || !isCustomJsxTag(tagName)) continue;
+    hints.push({
+      kind: "custom-component-usage",
+      label: tagName,
+      evidence: ["structure.sections"],
+    });
+  }
+
+  return dedupeBy(hints, (item) => `${item.kind}:${item.propName ?? item.label}:${item.loc?.startLine ?? ""}:${item.typeText ?? ""}`);
 }
 
 function intentForPatchTarget(kind: EditGuidance["patchTargets"][number]["kind"]): ReactWebContextIntentTarget["intent"] | undefined {
@@ -635,6 +691,7 @@ export function buildReactWebContextMetadata(
   const localDependencies = pruneArray(buildLocalDependencies(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.localDependencies);
   const importRoleHints = pruneArray(buildImportRoleHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.importRoleHints);
   const stylingVariantHints = pruneArray(buildStylingVariantHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.stylingVariantHints);
+  const componentApiHints = pruneArray(buildComponentApiHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.componentApiHints);
   const intentTargets = pruneArray(buildIntentTargets(result, editGuidance), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.intentTargets);
   const editTargetRouting = pruneArray(
     buildEditTargetRouting(result, editGuidance),
@@ -642,7 +699,18 @@ export function buildReactWebContextMetadata(
   );
   const formStateFlow = pruneArray(buildFormStateFlow(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.formStateFlow);
 
-  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || importRoleHints || stylingVariantHints || intentTargets || editTargetRouting || formStateFlow);
+  const hasContext = Boolean(
+    stateHints ||
+      renderStates ||
+      a11yAnchors ||
+      localDependencies ||
+      importRoleHints ||
+      stylingVariantHints ||
+      componentApiHints ||
+      intentTargets ||
+      editTargetRouting ||
+      formStateFlow,
+  );
   if (!hasContext) return undefined;
 
   return {
@@ -660,6 +728,7 @@ export function buildReactWebContextMetadata(
     ...(localDependencies ? { localDependencies } : {}),
     ...(importRoleHints ? { importRoleHints } : {}),
     ...(stylingVariantHints ? { stylingVariantHints } : {}),
+    ...(componentApiHints ? { componentApiHints } : {}),
     ...(intentTargets ? { intentTargets } : {}),
     ...(editTargetRouting ? { editTargetRouting } : {}),
     ...(formStateFlow ? { formStateFlow } : {}),
