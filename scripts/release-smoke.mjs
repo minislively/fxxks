@@ -242,6 +242,41 @@ async function buildReleaseBenchmarkPreflightSummary() {
 
 const releaseBenchmarkSmokeSummary = await buildReleaseBenchmarkPreflightSummary();
 
+function assertCleanProjectPackageInstall(tarballPath) {
+  const installProject = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-clean-install-project-"));
+  fs.writeFileSync(
+    path.join(installProject, "package.json"),
+    `${JSON.stringify({ name: "tmp-fooks-clean-install-smoke", private: true }, null, 2)}\n`,
+  );
+
+  run("npm", ["install", tarballPath], { cwd: installProject });
+
+  const installedPackageRoot = path.join(installProject, "node_modules", "fxxk-frontend-hooks");
+  const installedFooksBin = path.join(
+    installProject,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "fooks.cmd" : "fooks",
+  );
+  assert(fs.existsSync(installedPackageRoot), `clean temp project missing installed package at ${installedPackageRoot}`);
+  assert(fs.existsSync(path.join(installedPackageRoot, "dist", "cli", "index.js")), "clean temp install missing dist/cli/index.js");
+  assert(fs.existsSync(path.join(installedPackageRoot, "dist", "index.js")), "clean temp install missing dist/index.js");
+  assert(fs.existsSync(installedFooksBin), `clean temp project missing node_modules/.bin/fooks at ${installedFooksBin}`);
+
+  const helpStdout = runInstalledFooks(installedFooksBin, ["--help"], { cwd: installProject });
+  assert(helpStdout.includes("fooks setup"), "clean temp installed fooks --help should advertise setup");
+  assert(helpStdout.includes("fooks status"), "clean temp installed fooks --help should advertise status");
+
+  const statusStdout = runInstalledFooks(installedFooksBin, ["status"], { cwd: installProject });
+  const status = JSON.parse(statusStdout);
+  assert(status.metricTier === "estimated", `clean temp installed fooks status should run from package dist, got metric tier ${status.metricTier}`);
+
+  return {
+    project: installProject,
+    packageRoot: installedPackageRoot,
+    binary: installedFooksBin,
+  };
+}
 
 const dryRun = parsePackJson(run("npm", ["pack", "--dry-run", "--json"]));
 assert(dryRun.name === "fxxk-frontend-hooks", `dry-run package name should be fxxk-frontend-hooks, got ${dryRun.name}`);
@@ -252,6 +287,8 @@ const packDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pack-"));
 const tarballName = run("npm", ["pack", "--pack-destination", packDir]).trim().split(/\r?\n/).at(-1);
 const tarballPath = path.join(packDir, tarballName);
 assert(fs.existsSync(tarballPath), `tarball not found at ${tarballPath}`);
+
+const cleanProjectInstall = assertCleanProjectPackageInstall(tarballPath);
 
 const prefix = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-prefix-"));
 run("npm", ["install", "-g", "--prefix", prefix, tarballPath]);
@@ -570,6 +607,11 @@ console.log(JSON.stringify({
   package: dryRun.id,
   tarball: tarballPath,
   installedBinary: fooksBin,
+  cleanProjectInstall: {
+    project: cleanProjectInstall.project,
+    packageRoot: cleanProjectInstall.packageRoot,
+    binary: cleanProjectInstall.binary,
+  },
   setupSummary: setup.summary,
   hookSmokeEvidence: {
     releaseBenchmark: releaseBenchmarkSmokeSummary,
