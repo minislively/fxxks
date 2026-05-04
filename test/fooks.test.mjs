@@ -4063,6 +4063,23 @@ test("package release surface keeps internal docs out of the npm tarball", () =>
   assert.match(gitignore, /\.opencode\//);
 });
 
+test("release smoke runs release benchmark gate before package npm smoke work", () => {
+  const releaseSmoke = fs.readFileSync(path.join(repoRoot, "scripts", "release-smoke.mjs"), "utf8");
+  const gateIndex = releaseSmoke.indexOf("assertReleaseBenchmarkSmokeGate");
+  const firstNpmRunIndex = releaseSmoke.indexOf('run("npm",');
+
+  assert.ok(gateIndex >= 0, "release smoke should import/use release benchmark gate helper");
+  assert.ok(firstNpmRunIndex >= 0, "release smoke should still run npm package smoke checks");
+  assert.ok(gateIndex < firstNpmRunIndex, "release benchmark gate should run before package npm smoke work");
+  assert.match(releaseSmoke, /fooks-release-benchmark-preflight-/);
+  assert.match(releaseSmoke, /symlinkSync\(nodeModules/);
+  assert.ok(
+    releaseSmoke.indexOf("buildReleaseBenchmarkPreflightSummary") < firstNpmRunIndex,
+    "release benchmark preflight should be isolated before package npm smoke work",
+  );
+  assert.doesNotMatch(releaseSmoke, /evidence:release-benchmark|bench:|npm publish|npm version|git tag/);
+});
+
 test("red-team report marks cache corruption finding as historical after recovery fix", () => {
   const redTeam = fs.readFileSync(path.join(repoRoot, "RED_TEAM_REPORT.md"), "utf8");
 

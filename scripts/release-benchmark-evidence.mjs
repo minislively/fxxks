@@ -118,6 +118,38 @@ export async function buildReleaseBenchmarkEvidence({
   };
 }
 
+export function buildReleaseBenchmarkSmokeSummary(evidence) {
+  return {
+    npmUpdateClaimable: evidence.releaseClaims.npmUpdateClaimable,
+    headline: evidence.releaseClaims.headline,
+    actualInjectedContextReduction: evidence.context.actualInjectedContextReduction,
+    reuseCorrectnessClaimable: evidence.reuse.reuseCorrectnessClaimable,
+    nonClaims: {
+      cachePerformanceImprovement: evidence.nonClaims.cachePerformanceImprovement.claimable,
+      runtimeTokenSavings: evidence.nonClaims.runtimeTokenSavings.claimable,
+      providerBillingSavings: evidence.nonClaims.providerBillingSavings.claimable,
+    },
+    claimBoundary: evidence.claimBoundary,
+  };
+}
+
+export function assertReleaseBenchmarkSmokeGate(evidence) {
+  if (evidence.releaseClaims.npmUpdateClaimable === true) {
+    return;
+  }
+
+  const contextBlocker = evidence.context.actualInjectedContextReduction.blocker;
+  throw new Error(
+    [
+      "release benchmark gate failed: npm update wording is not claimable",
+      contextBlocker ? `actual injected context blocker: ${contextBlocker}` : null,
+      evidence.reuse.reuseCorrectnessClaimable === true ? null : "reuse correctness is not claimable",
+    ]
+      .filter(Boolean)
+      .join("; "),
+  );
+}
+
 export function renderReleaseBenchmarkEvidenceMarkdown(evidence) {
   const fixtureRows = evidence.context.fixtures
     .map(

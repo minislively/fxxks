@@ -5,6 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertPublicSurfaceClaimBoundaries } from "./release-claim-guards.mjs";
+import {
+  assertReleaseBenchmarkSmokeGate,
+  buildReleaseBenchmarkEvidence,
+  buildReleaseBenchmarkSmokeSummary,
+} from "./release-benchmark-evidence.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -128,6 +133,34 @@ function assertPackedFiles(packEntry) {
     assert(!forbiddenPrefixes.some((prefix) => filePath.startsWith(prefix)), `packed tarball includes non-public path ${filePath}`);
   }
 }
+
+function copyReleaseBenchmarkInputs(targetRoot) {
+  for (const relativePath of ["dist", "fixtures", path.join("test", "fixtures")]) {
+    fs.cpSync(path.join(repoRoot, relativePath), path.join(targetRoot, relativePath), { recursive: true });
+  }
+  fs.copyFileSync(path.join(repoRoot, "package.json"), path.join(targetRoot, "package.json"));
+  const nodeModules = path.join(repoRoot, "node_modules");
+  if (fs.existsSync(nodeModules)) {
+    fs.symlinkSync(nodeModules, path.join(targetRoot, "node_modules"), "dir");
+  }
+}
+
+async function buildReleaseBenchmarkPreflightSummary() {
+  const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-release-benchmark-preflight-"));
+  try {
+    copyReleaseBenchmarkInputs(isolatedRoot);
+    const evidence = await buildReleaseBenchmarkEvidence({
+      repoRoot: isolatedRoot,
+      runId: `release-smoke-${new Date().toISOString().replace(/[:.]/g, "-")}`,
+    });
+    assertReleaseBenchmarkSmokeGate(evidence);
+    return buildReleaseBenchmarkSmokeSummary(evidence);
+  } finally {
+    fs.rmSync(isolatedRoot, { recursive: true, force: true });
+  }
+}
+
+const releaseBenchmarkSmokeSummary = await buildReleaseBenchmarkPreflightSummary();
 
 const dryRun = parsePackJson(run("npm", ["pack", "--dry-run", "--json"]));
 assertPackedFiles(dryRun);
@@ -455,6 +488,7 @@ console.log(JSON.stringify({
   installedBinary: fooksBin,
   setupSummary: setup.summary,
   hookSmokeEvidence: {
+    releaseBenchmark: releaseBenchmarkSmokeSummary,
     codex: {
       sessionStart: "recorded",
       firstPrompt: "record-only",
