@@ -4176,6 +4176,10 @@ test("release smoke runs release benchmark gate before package npm smoke work", 
   assert.ok(firstNpmRunIndex >= 0, "release smoke should still run npm package smoke checks");
   assert.ok(gateIndex < firstNpmRunIndex, "release benchmark gate should run before package npm smoke work");
   assert.match(releaseSmoke, /fooks-release-benchmark-preflight-/);
+  assert.match(releaseSmoke, /fooks-clean-install-project-/);
+  assert.match(releaseSmoke, /node_modules.*\.bin.*fooks/s);
+  assert.match(releaseSmoke, /clean temp install missing dist\/cli\/index\.js/);
+  assert.match(releaseSmoke, /clean temp installed fooks status should run from package dist/);
   assert.match(releaseSmoke, /symlinkSync\(nodeModules/);
   assert.ok(
     releaseSmoke.indexOf("buildReleaseBenchmarkPreflightSummary") < firstNpmRunIndex,
