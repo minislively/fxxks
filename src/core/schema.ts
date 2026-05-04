@@ -182,6 +182,24 @@ export type ReactWebContextComponentApiHint = {
   evidence: string[];
 };
 
+export type ReactWebContextLayoutRegionHint = {
+  kind:
+    | "semantic-region"
+    | "list-region"
+    | "table-region"
+    | "form-region"
+    | "form-row"
+    | "repeated-region"
+    | "conditional-region"
+    | "state-region"
+    | "container-region";
+  label: string;
+  tagName?: string;
+  state?: "loading" | "error" | "empty" | "disabled" | "unknown";
+  loc?: SourceRange;
+  evidence: string[];
+};
+
 export type ReactWebContextIntentTarget = {
   intent: "style" | "form" | "handler" | "state" | "branch" | "props" | "component";
   label: string;
@@ -254,6 +272,7 @@ export type ReactWebContextMetadataV0 = {
   importRoleHints?: ReactWebContextImportRoleHint[];
   stylingVariantHints?: ReactWebContextStylingVariantHint[];
   componentApiHints?: ReactWebContextComponentApiHint[];
+  layoutRegionHints?: ReactWebContextLayoutRegionHint[];
   intentTargets?: ReactWebContextIntentTarget[];
   editTargetRouting?: ReactWebContextEditTargetRoute[];
   formStateFlow?: ReactWebContextFormStateFlowEntry[];
