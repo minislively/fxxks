@@ -1,10 +1,10 @@
 import type { DomainDetectionResult } from "../domain-detector";
 import {
   assessReactNativePrimitiveInputSignalGate,
-  RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
-  RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES,
+  RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
   RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
+  RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY,
 } from "../payload-policy/react-native";
 import type { ExtractionResult, FormControlSignal, StyleSystem } from "../schema";
 
@@ -221,11 +221,8 @@ function buildReactNativePrimitiveInputReuseContract(): ReactNativePrimitiveInpu
       "frontendPayloadPolicy no longer allows RN narrow policy",
     ],
     requiredSignals: [...RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS],
-    deniedBySignals: [
-      ...RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
-      ...RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES.map((prefix) => `${prefix}*`),
-    ],
-    supportBoundary: "measured-evidence-only; no broad RN/WebView/TUI support",
+    deniedBySignals: [...RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS],
+    supportBoundary: RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY,
   };
 }
 
@@ -275,7 +272,7 @@ export function buildReactWebDomainPayload(
 export function buildReactNativePrimitiveInputDomainPayload(
   result: ExtractionResult,
   domainDetection: DomainDetectionResult | undefined = result.domainDetection,
-  policy = RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+  policy: string = RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
 ): ReactNativePrimitiveInputDomainPayload | undefined {
   const plan = planReactNativePrimitiveInputPayload(result, domainDetection, policy);
   if (!plan) return undefined;

@@ -16,12 +16,53 @@ const {
   profileForClassification,
   resolveDomainClassification,
 } = require(path.join(repoRoot, "dist", "core", "domain-profiles", "registry.js"));
+const { REACT_NATIVE_SIGNAL_TAXONOMY } = require(path.join(
+  repoRoot,
+  "dist",
+  "core",
+  "domain-profiles",
+  "react-native.js",
+));
 
 const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled/i;
 
 function evidence(domain, signal = "import", detail = domain) {
   return [{ domain, signal, detail }];
 }
+
+test("React Native profile owns the primitive/input signal taxonomy contract", () => {
+  assert.deepEqual(REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput, {
+    policy: "rn-primitive-input-narrow-payload",
+    plannerDecision: "narrow-primitive-input-payload",
+    requiredSignals: [
+      "react-native:primitive:View",
+      "react-native:primitive:Text",
+      "react-native:primitive:TextInput",
+      "react-native:primitive:Pressable",
+      "react-native:jsx-prop:onChangeText",
+      "react-native:jsx-prop:onPress",
+    ],
+    forbiddenExactSignals: [
+      "react-native:primitive:FlatList",
+      "react-native:primitive:Image",
+      "react-native:primitive:ScrollView",
+      "react-native:primitive:TouchableOpacity",
+      "react-native:style-factory:StyleSheet.create",
+      "react-native:platform-select:Platform.select",
+      "react-native:style-prop:resizeMode",
+      "react-native:jsx-prop:activeOpacity",
+      "react-native:jsx-prop:pagingEnabled",
+    ],
+    forbiddenPrefixes: [
+      "webview:",
+      "tui-ink:",
+      "react-native:navigation-",
+      "react-native:api-call:Dimensions.",
+      "react-native:api-call:PanResponder.",
+    ],
+    supportBoundary: "measured-evidence-only; no broad RN/WebView/TUI support",
+  });
+});
 
 test("domain profile registry exposes behavior-neutral lane ownership metadata", () => {
   assert.deepEqual(
