@@ -391,6 +391,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
   const stateConditions: NonNullable<FormSurface["stateConditions"]> = [];
   const a11yAnchors: A11yAnchorSignal[] = [];
+  const a11ySourceIds: NonNullable<NonNullable<ExtractionResult["behavior"]>["a11ySourceIds"]> = [];
   const conditionalRenders = new Set<string>();
   const repeatedBlocks = new Set<string>();
   const snippetCandidates: NonNullable<ExtractionResult["snippets"]> = [];
@@ -419,10 +420,30 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     items.push({ value: compacted, loc: sourceRangeOf(sourceFile, node) });
   };
 
-  const addA11yAnchor = (kind: A11yAnchorSignal["kind"], label: string, node: ts.Node): void => {
+  const addA11yAnchor = (
+    kind: A11yAnchorSignal["kind"],
+    label: string,
+    node: ts.Node,
+    metadata: Pick<A11yAnchorSignal, "sourceId" | "references"> = {},
+  ): void => {
     const compacted = compactText(label);
     if (!compacted) return;
-    a11yAnchors.push({ kind, label: compacted, loc: sourceRangeOf(sourceFile, node) });
+    a11yAnchors.push({
+      kind,
+      label: compacted,
+      loc: sourceRangeOf(sourceFile, node),
+      ...(metadata.sourceId ? { sourceId: metadata.sourceId } : {}),
+      ...(metadata.references && metadata.references.length > 0 ? { references: metadata.references } : {}),
+    });
+  };
+
+  const idRefTokens = (value: string | undefined): string[] => {
+    if (!value || value === "true") return [];
+    return value
+      .split(/\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 8);
   };
 
   const jsxAttributeValue = (attribute: ts.JsxAttribute): string | undefined => {
@@ -436,6 +457,16 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
 
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
     const tag = node.tagName.getText(sourceFile);
+    const attributeValues = new Map<string, string>();
+    for (const property of node.attributes.properties) {
+      if (!ts.isJsxAttribute(property)) continue;
+      const value = jsxAttributeValue(property);
+      if (value) attributeValues.set(property.name.getText(sourceFile), value);
+    }
+    const elementId = attributeValues.get("id");
+    if (elementId) {
+      a11ySourceIds.push({ value: elementId, loc: sourceRangeOf(sourceFile, node) });
+    }
     if (tag === "Controller") {
       addLocatedAnchor(validationAnchors, "Controller", node);
     }
@@ -466,16 +497,28 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         if (value) propValues[attrName] = value;
       }
       if (tag === "label") {
-        addA11yAnchor("label", jsxAttributeValue(property) ?? tag, property);
+        addA11yAnchor("label", jsxAttributeValue(property) ?? tag, property, {
+          ...(elementId ? { sourceId: elementId } : {}),
+        });
       }
       if (attrName === "htmlFor") {
-        addA11yAnchor("htmlFor", jsxAttributeValue(property) ?? attrName, property);
+        const value = jsxAttributeValue(property) ?? attrName;
+        addA11yAnchor("htmlFor", value, property, {
+          references: idRefTokens(value),
+          ...(elementId ? { sourceId: elementId } : {}),
+        });
       }
       if (attrName === "role") {
-        addA11yAnchor("role", jsxAttributeValue(property) ?? attrName, property);
+        addA11yAnchor("role", jsxAttributeValue(property) ?? attrName, property, {
+          ...(elementId ? { sourceId: elementId } : {}),
+        });
       }
       if (attrName.startsWith("aria-")) {
-        addA11yAnchor("aria", `${attrName}=${jsxAttributeValue(property) ?? "true"}`, property);
+        const value = jsxAttributeValue(property) ?? "true";
+        addA11yAnchor("aria", `${attrName}=${value}`, property, {
+          ...(attrName === "aria-describedby" || attrName === "aria-labelledby" ? { references: idRefTokens(value) } : {}),
+          ...(elementId ? { sourceId: elementId } : {}),
+        });
       }
       if (attrName === "required") {
         addA11yAnchor("required", controlName ? `${tag}[name=${controlName}]` : tag, property);
@@ -612,6 +655,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const eventHandlerList = [...eventHandlers];
   const eventHandlerSignalList = dedupeBy(eventHandlerSignals, (item) => `${item.name}:${item.trigger ?? ""}:${item.loc?.startLine ?? ""}`).slice(0, MAX_EVENT_HANDLER_SIGNALS);
   const a11yAnchorList = dedupeBy(a11yAnchors, (item) => `${item.kind}:${item.label}:${item.loc?.startLine ?? ""}`).slice(0, 16);
+  const a11ySourceIdList = dedupeBy(a11ySourceIds, (item) => `${item.value}:${item.loc?.startLine ?? ""}`).slice(0, 16);
   return {
     behavior: {
       hooks: [...hooks],
@@ -632,6 +676,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
           }
         : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
+      ...(a11ySourceIdList.length ? { a11ySourceIds: a11ySourceIdList } : {}),
       hasSideEffects,
     },
     structure: {

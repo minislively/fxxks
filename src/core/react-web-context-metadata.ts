@@ -110,14 +110,60 @@ function buildRenderStates(result: ExtractionResult): ReactWebContextRenderState
   return dedupeBy(states, (item) => `${item.kind}:${item.label}:${item.condition ?? ""}`);
 }
 
+function ariaReferenceIds(label: string): string[] {
+  const [, value = ""] = label.split("=");
+  return value
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
 function buildA11yAnchors(result: ExtractionResult): ReactWebContextA11yAnchor[] {
   const anchors: ReactWebContextA11yAnchor[] = [];
+  const controlIds = new Set<string>();
+  const sourceIds = new Set<string>();
+
+  for (const control of result.behavior?.formSurface?.controls ?? []) {
+    const id = control.propValues?.id;
+    if (id) {
+      controlIds.add(id);
+      sourceIds.add(id);
+    }
+  }
+
+  for (const sourceId of result.behavior?.a11ySourceIds ?? []) {
+    sourceIds.add(sourceId.value);
+  }
 
   for (const anchor of result.behavior?.a11yAnchors ?? []) {
+    if (anchor.sourceId) sourceIds.add(anchor.sourceId);
+  }
+
+  for (const anchor of result.behavior?.a11yAnchors ?? []) {
+    const references = anchor.references ?? (anchor.kind === "aria" ? ariaReferenceIds(anchor.label) : []);
+    const resolvedIds = references.filter((id) => sourceIds.has(id));
+    const relation = (() => {
+      if (anchor.kind === "htmlFor" && references[0] && controlIds.has(references[0])) {
+        return { kind: "label-control" as const, targetId: references[0] };
+      }
+      if (anchor.kind === "aria" && /^aria-(describedby|labelledby)=/.test(anchor.label) && resolvedIds.length > 0) {
+        return { kind: "aria-idrefs" as const, targetIds: references, resolvedIds };
+      }
+      if (anchor.kind === "aria" && /^aria-invalid=/.test(anchor.label)) {
+        return { kind: "invalid-state" as const, ...(anchor.sourceId ? { sourceId: anchor.sourceId } : {}) };
+      }
+      if (anchor.kind === "role" && /^alert$/i.test(anchor.label)) {
+        return { kind: "alert-region" as const, ...(anchor.sourceId ? { sourceId: anchor.sourceId } : {}) };
+      }
+      return undefined;
+    })();
+
     anchors.push({
       kind: anchor.kind,
       label: anchor.label,
       ...(anchor.loc ? { loc: anchor.loc } : {}),
+      ...(relation ? { relation } : {}),
       evidence: ["behavior.a11yAnchors"],
     });
   }
