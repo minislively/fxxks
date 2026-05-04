@@ -17,6 +17,12 @@ export const OPERATOR_ACTIVITY_TMUX_COMMAND = "tmux list-panes -a -F #{session_n
 export const OPERATOR_ACTIVITY_REMOTE_SOURCE = "GitHub CLI gh issue/pr list; explicit opt-in only";
 export const DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS = 1000;
 export const DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS = 1500;
+export const OPERATOR_ACTIVITY_MAX_WORKTREE_PATH_ROWS = 8;
+export const OPERATOR_ACTIVITY_MAX_TMUX_SESSIONS = 6;
+export const OPERATOR_ACTIVITY_MAX_TMUX_PANES_PER_SESSION = 4;
+export const OPERATOR_ACTIVITY_MAX_SESSION_NAME_CHARS = 80;
+export const OPERATOR_ACTIVITY_MAX_PATH_CHARS = 160;
+export const OPERATOR_ACTIVITY_MAX_COMMAND_CHARS = 80;
 
 export type OperatorActivityCommandRunner = (command: string, args: string[], cwd: string, timeoutMs: number) => string;
 export type OperatorActivityPathExists = (targetPath: string) => boolean;
@@ -44,6 +50,8 @@ export type OperatorActivityWorktree = {
     conflictedPathCount: number;
     changedPaths: string[];
     conflictedPaths: string[];
+    changedPathsOmitted: number;
+    conflictedPathsOmitted: number;
   };
   blockers: string[];
 };
@@ -60,12 +68,14 @@ export type OperatorActivityTmuxSession = {
   paneCount: number;
   current: boolean;
   panes: OperatorActivityTmuxPane[];
+  panesOmitted: number;
 };
 
 export type OperatorActivityTmux = {
   available: boolean;
   command: typeof OPERATOR_ACTIVITY_TMUX_COMMAND;
   sessions: OperatorActivityTmuxSession[];
+  sessionsOmitted: number;
   blockers: string[];
 };
 
@@ -142,6 +152,27 @@ function panePathWithoutDeletedMarker(panePath: string): string {
   return panePath.replace(/ \(deleted\)$/u, "").trim();
 }
 
+function compactString(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  const marker = "…";
+  const headChars = Math.max(1, Math.ceil((maxChars - marker.length) / 2));
+  const tailChars = Math.max(1, maxChars - marker.length - headChars);
+  return `${value.slice(0, headChars)}${marker}${value.slice(value.length - tailChars)}`;
+}
+
+function currentFirstThenLexical<T>(values: T[], isCurrent: (value: T) => boolean, label: (value: T) => string): T[] {
+  return [...values].sort((left, right) => {
+    const currentDelta = Number(isCurrent(right)) - Number(isCurrent(left));
+    if (currentDelta !== 0) return currentDelta;
+    return label(left).localeCompare(label(right));
+  });
+}
+
+function boundedCurrentFirst<T>(values: T[], limit: number, isCurrent: (value: T) => boolean, label: (value: T) => string): { rows: T[]; omitted: number } {
+  const sorted = currentFirstThenLexical(values, isCurrent, label);
+  return { rows: sorted.slice(0, limit), omitted: Math.max(0, sorted.length - limit) };
+}
+
 export function defaultOperatorActivityCommandRunner(command: string, args: string[], cwd: string, timeoutMs: number): string {
   return execFileSync(command, args, {
     cwd,
@@ -174,6 +205,8 @@ export function parseOperatorActivityTmuxPanes(output: string): ParsedTmuxPane[]
 function buildWorktreeSnapshot(status: WorktreeCurrentStatus): OperatorActivityWorktree {
   const snapshot = status.snapshot;
   const divergence = status.branchDivergence;
+  const changedPathRows = (snapshot?.changedPaths ?? []).slice(0, OPERATOR_ACTIVITY_MAX_WORKTREE_PATH_ROWS);
+  const conflictedPathRows = (snapshot?.conflictedPaths ?? []).slice(0, OPERATOR_ACTIVITY_MAX_WORKTREE_PATH_ROWS);
   const branchFields = divergence?.kind === "available"
     ? {
         branch: divergence.branch,
@@ -198,8 +231,10 @@ function buildWorktreeSnapshot(status: WorktreeCurrentStatus): OperatorActivityW
       trackedPathCount: snapshot?.trackedPaths.length ?? 0,
       untrackedPathCount: snapshot?.untrackedPaths.length ?? 0,
       conflictedPathCount: snapshot?.conflictedPaths.length ?? 0,
-      changedPaths: snapshot?.changedPaths ?? [],
-      conflictedPaths: snapshot?.conflictedPaths ?? [],
+      changedPaths: changedPathRows,
+      conflictedPaths: conflictedPathRows,
+      changedPathsOmitted: Math.max(0, (snapshot?.changedPaths.length ?? 0) - changedPathRows.length),
+      conflictedPathsOmitted: Math.max(0, (snapshot?.conflictedPaths.length ?? 0) - conflictedPathRows.length),
     },
     blockers: status.blockers,
   };
@@ -219,6 +254,7 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
       available: false,
       command: OPERATOR_ACTIVITY_TMUX_COMMAND,
       sessions: [],
+      sessionsOmitted: 0,
       blockers: uniqueSorted(blockers),
     };
   }
@@ -232,21 +268,35 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
     const current = exists && (pathContainsCwd(cleanPanePath, currentCwd) || pathContainsCwd(currentCwd, cleanPanePath));
     if (!includesFooksSignal(pane.session, cwd) && !includesFooksSignal(cleanPanePath, cwd) && !current) continue;
     const panes = panesBySession.get(pane.session) ?? [];
-    panes.push({ path: pane.path, exists, current, command: pane.command });
+    panes.push({
+      path: compactString(pane.path, OPERATOR_ACTIVITY_MAX_PATH_CHARS),
+      exists,
+      current,
+      command: pane.command ? compactString(pane.command, OPERATOR_ACTIVITY_MAX_COMMAND_CHARS) : undefined,
+    });
     panesBySession.set(pane.session, panes);
   }
+
+  const sessions = [...panesBySession.entries()].map(([session, panes]) => ({
+    session: compactString(session, OPERATOR_ACTIVITY_MAX_SESSION_NAME_CHARS),
+    paneCount: panes.length,
+    current: panes.some((pane) => pane.current),
+    panes,
+  }));
+  const boundedSessions = boundedCurrentFirst(sessions, OPERATOR_ACTIVITY_MAX_TMUX_SESSIONS, (session) => session.current, (session) => session.session);
 
   return {
     available: true,
     command: OPERATOR_ACTIVITY_TMUX_COMMAND,
-    sessions: [...panesBySession.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([session, panes]) => ({
-        session,
-        paneCount: panes.length,
-        current: panes.some((pane) => pane.current),
-        panes,
-      })),
+    sessions: boundedSessions.rows.map((session) => {
+      const boundedPanes = boundedCurrentFirst(session.panes, OPERATOR_ACTIVITY_MAX_TMUX_PANES_PER_SESSION, (pane) => pane.current, (pane) => pane.path);
+      return {
+        ...session,
+        panes: boundedPanes.rows,
+        panesOmitted: boundedPanes.omitted,
+      };
+    }),
+    sessionsOmitted: boundedSessions.omitted,
     blockers: uniqueSorted(blockers),
   };
 }

@@ -16,6 +16,11 @@ const require = createRequire(import.meta.url);
 const {
   OPERATOR_ACTIVITY_CLAIM_BOUNDARY,
   OPERATOR_ACTIVITY_COMMAND,
+  OPERATOR_ACTIVITY_MAX_COMMAND_CHARS,
+  OPERATOR_ACTIVITY_MAX_PATH_CHARS,
+  OPERATOR_ACTIVITY_MAX_TMUX_PANES_PER_SESSION,
+  OPERATOR_ACTIVITY_MAX_TMUX_SESSIONS,
+  OPERATOR_ACTIVITY_MAX_WORKTREE_PATH_ROWS,
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
   OPERATOR_ACTIVITY_REMOTE_SOURCE,
   OPERATOR_ACTIVITY_TMUX_COMMAND,
@@ -83,6 +88,59 @@ test("operator activity snapshot is local-first and does not call remote counts 
   assert.equal(snapshot.optionalCounts.enabled, false);
   assert.match(snapshot.optionalCounts.source, /--include-remote-counts/);
   assert.equal(calls.some((call) => call.startsWith("gh ")), false);
+});
+
+
+test("operator activity snapshot bounds noisy worktree and tmux rows while preserving current fooks evidence", () => {
+  const tempDir = makeTempProject();
+  const statusRows = Array.from({ length: 12 }, (_, index) => ` M src/noisy-${String(index).padStart(2, "0")}.tsx\0`).join("");
+  const activePanePath = path.join(tempDir, "src", "deep", "active-worktree-evidence-" + "x".repeat(220));
+  const longCommand = `node ${"--very-long-arg ".repeat(20)}`;
+  const noisySessions = Array.from({ length: OPERATOR_ACTIVITY_MAX_TMUX_SESSIONS + 3 }, (_, index) => {
+    const session = `fooks-noisy-${String(index).padStart(2, "0")}`;
+    return `${session}\t/tmp/fooks-noisy-${index}\tzsh`;
+  });
+  const activeSession = `zz-fooks-active-${"s".repeat(100)}`;
+  const activePanes = [
+    `${activeSession}\t${activePanePath}\t${longCommand}`,
+    ...Array.from({ length: OPERATOR_ACTIVITY_MAX_TMUX_PANES_PER_SESSION + 2 }, (_, index) => `${activeSession}\t/tmp/fooks-active-extra-${index}\tbash`),
+  ];
+  const calls = [];
+
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    now: () => "2026-05-04T02:09:00.000Z",
+    runner: () => statusRows,
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "dogfood/issue-429\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command) => {
+      calls.push(command);
+      if (command === "gh") throw new Error("gh must not be called by bounded local snapshot");
+      return [...noisySessions, ...activePanes].join("\n") + "\n";
+    },
+    pathExists: (targetPath) => targetPath === activePanePath || targetPath === tempDir || targetPath.startsWith("/tmp/fooks"),
+  });
+
+  assert.equal(snapshot.worktree.delta.changedPathCount, 12);
+  assert.equal(snapshot.worktree.delta.changedPaths.length, OPERATOR_ACTIVITY_MAX_WORKTREE_PATH_ROWS);
+  assert.equal(snapshot.worktree.delta.changedPathsOmitted, 12 - OPERATOR_ACTIVITY_MAX_WORKTREE_PATH_ROWS);
+  assert.equal(snapshot.worktree.branch, "dogfood/issue-429");
+  assert.equal(snapshot.tmux.sessions.length, OPERATOR_ACTIVITY_MAX_TMUX_SESSIONS);
+  assert.equal(snapshot.tmux.sessionsOmitted, 4);
+  assert.equal(snapshot.tmux.sessions[0].current, true);
+  assert.match(snapshot.tmux.sessions[0].session, /^zz-fooks-active-/);
+  assert.ok(snapshot.tmux.sessions[0].session.length <= 80);
+  assert.equal(snapshot.tmux.sessions[0].paneCount, OPERATOR_ACTIVITY_MAX_TMUX_PANES_PER_SESSION + 3);
+  assert.equal(snapshot.tmux.sessions[0].panes.length, OPERATOR_ACTIVITY_MAX_TMUX_PANES_PER_SESSION);
+  assert.equal(snapshot.tmux.sessions[0].panesOmitted, 3);
+  assert.equal(snapshot.tmux.sessions[0].panes[0].current, true);
+  assert.ok(snapshot.tmux.sessions[0].panes[0].path.length <= OPERATOR_ACTIVITY_MAX_PATH_CHARS);
+  assert.ok(snapshot.tmux.sessions[0].panes[0].command.length <= OPERATOR_ACTIVITY_MAX_COMMAND_CHARS);
+  assert.equal(snapshot.optionalCounts.enabled, false);
+  assert.equal(calls.includes("gh"), false);
 });
 
 test("operator activity treats tmux and opt-in GitHub count failures as non-fatal blockers", () => {
