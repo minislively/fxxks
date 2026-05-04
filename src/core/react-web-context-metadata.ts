@@ -9,6 +9,7 @@ import {
   type ReactWebContextFormStateFlowEntry,
   type ReactWebContextImportRoleHint,
   type ReactWebContextIntentTarget,
+  type ReactWebContextLayoutRegionHint,
   type ReactWebContextLocalDependency,
   type ReactWebContextMetadataV0,
   type ReactWebContextRenderState,
@@ -25,6 +26,7 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   importRoleHints: 12,
   stylingVariantHints: 12,
   componentApiHints: 12,
+  layoutRegionHints: 16,
   intentTargets: 16,
   editTargetRouting: 8,
   formStateFlow: 10,
@@ -382,6 +384,99 @@ function buildComponentApiHints(result: ExtractionResult): ReactWebContextCompon
   return dedupeBy(hints, (item) => `${item.kind}:${item.propName ?? item.label}:${item.loc?.startLine ?? ""}:${item.typeText ?? ""}`);
 }
 
+const LAYOUT_REGION_TAGS = new Map<string, ReactWebContextLayoutRegionHint["kind"]>([
+  ["header", "semantic-region"],
+  ["main", "semantic-region"],
+  ["section", "semantic-region"],
+  ["article", "semantic-region"],
+  ["footer", "semantic-region"],
+  ["nav", "semantic-region"],
+  ["aside", "semantic-region"],
+  ["ul", "list-region"],
+  ["ol", "list-region"],
+  ["li", "list-region"],
+  ["table", "table-region"],
+  ["thead", "table-region"],
+  ["tbody", "table-region"],
+  ["tr", "table-region"],
+  ["form", "form-region"],
+  ["fieldset", "form-region"],
+]);
+
+function stateForRegionCondition(condition: string): ReactWebContextLayoutRegionHint["state"] | undefined {
+  const normalized = condition.toLowerCase();
+  if (/\b(?:loading|pending|isloading|isfetching)\b/.test(normalized)) return "loading";
+  if (/\b(?:error|err|failed|invalid)\b/.test(normalized)) return "error";
+  if (/\b(?:empty|isempty|length\s*===\s*0|length\s*<\s*1|no[A-Z_\s-])/.test(condition)) return "empty";
+  if (/\b(?:disabled|isdisabled)\b/.test(normalized)) return "disabled";
+  return undefined;
+}
+
+function hasLayoutClassToken(label: string): boolean {
+  return /\b(?:grid|flex|container|list|table|card|header|footer|sidebar|layout|stack|row|col|columns|gap-)\b/.test(
+    label.toLowerCase(),
+  );
+}
+
+function buildLayoutRegionHints(result: ExtractionResult): ReactWebContextLayoutRegionHint[] {
+  const hints: ReactWebContextLayoutRegionHint[] = [];
+
+  for (const tagName of result.structure?.sections ?? []) {
+    const normalizedTag = tagName.toLowerCase();
+    const kind = LAYOUT_REGION_TAGS.get(normalizedTag);
+    if (!kind) continue;
+    hints.push({
+      kind,
+      label: tagName,
+      tagName,
+      evidence: ["structure.sections"],
+    });
+  }
+
+  for (const repeated of result.structure?.repeatedBlocks ?? []) {
+    hints.push({
+      kind: "repeated-region",
+      label: compact(repeated, 100),
+      evidence: ["structure.repeatedBlocks"],
+    });
+  }
+
+  for (const condition of result.structure?.conditionalRenders ?? []) {
+    const state = stateForRegionCondition(condition);
+    hints.push({
+      kind: state ? "state-region" : "conditional-region",
+      label: compact(condition, 100),
+      ...(state ? { state } : {}),
+      evidence: ["structure.conditionalRenders"],
+    });
+  }
+
+  for (const control of result.behavior?.formSurface?.controls ?? []) {
+    hints.push({
+      kind: "form-row",
+      label: control.name ? `${control.tag}[name=${control.name}]` : control.tag,
+      tagName: control.tag,
+      ...(control.loc ? { loc: control.loc } : {}),
+      evidence: ["behavior.formSurface.controls"],
+    });
+  }
+
+  for (const signal of result.style?.variantSignals ?? []) {
+    if (signal.kind !== "className-branch" || !hasLayoutClassToken(signal.label)) continue;
+    hints.push({
+      kind: "container-region",
+      label: compact(signal.label, 100),
+      ...(signal.loc ? { loc: signal.loc } : {}),
+      evidence: ["style.variantSignals.className-branch"],
+    });
+  }
+
+  return dedupeBy(
+    hints,
+    (item) => `${item.kind}:${item.tagName ?? ""}:${item.label}:${item.state ?? ""}:${item.loc?.startLine ?? ""}`,
+  );
+}
+
 function intentForPatchTarget(kind: EditGuidance["patchTargets"][number]["kind"]): ReactWebContextIntentTarget["intent"] | undefined {
   switch (kind) {
     case "component":
@@ -692,6 +787,7 @@ export function buildReactWebContextMetadata(
   const importRoleHints = pruneArray(buildImportRoleHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.importRoleHints);
   const stylingVariantHints = pruneArray(buildStylingVariantHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.stylingVariantHints);
   const componentApiHints = pruneArray(buildComponentApiHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.componentApiHints);
+  const layoutRegionHints = pruneArray(buildLayoutRegionHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.layoutRegionHints);
   const intentTargets = pruneArray(buildIntentTargets(result, editGuidance), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.intentTargets);
   const editTargetRouting = pruneArray(
     buildEditTargetRouting(result, editGuidance),
@@ -707,6 +803,7 @@ export function buildReactWebContextMetadata(
       importRoleHints ||
       stylingVariantHints ||
       componentApiHints ||
+      layoutRegionHints ||
       intentTargets ||
       editTargetRouting ||
       formStateFlow,
@@ -729,6 +826,7 @@ export function buildReactWebContextMetadata(
     ...(importRoleHints ? { importRoleHints } : {}),
     ...(stylingVariantHints ? { stylingVariantHints } : {}),
     ...(componentApiHints ? { componentApiHints } : {}),
+    ...(layoutRegionHints ? { layoutRegionHints } : {}),
     ...(intentTargets ? { intentTargets } : {}),
     ...(editTargetRouting ? { editTargetRouting } : {}),
     ...(formStateFlow ? { formStateFlow } : {}),
