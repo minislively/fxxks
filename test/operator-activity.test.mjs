@@ -85,6 +85,71 @@ test("operator activity snapshot is local-first and does not call remote counts 
   assert.equal(calls.some((call) => call.startsWith("gh ")), false);
 });
 
+test("idle activity snapshot remains zero and read-only with opt-in remote counts", () => {
+  const tempDir = makeTempProject();
+  const commandCalls = [];
+  const gitCalls = [];
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-04T02:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      gitCalls.push(args.join(" "));
+      if (args[0] === "fetch") throw new Error("status activity must not fetch");
+      if (args[0] === "symbolic-ref") return "dogfood/issue-428-idle-activity-snapshot\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      commandCalls.push([command, ...args].join(" "));
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\nalso-other\t/tmp/elsewhere\tnode\n";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      throw new Error(`unexpected command ${command} ${args.join(" ")}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.schemaVersion, 1);
+  assert.equal(snapshot.command, OPERATOR_ACTIVITY_COMMAND);
+  assert.equal(snapshot.generatedAt, "2026-05-04T02:00:00.000Z");
+  assert.equal(snapshot.cwd, tempDir);
+  assert.equal(snapshot.claimBoundary, OPERATOR_ACTIVITY_CLAIM_BOUNDARY);
+  assert.equal(snapshot.readOnly, true);
+  assert.equal(snapshot.worktree.clean, true);
+  assert.equal(snapshot.worktree.verdict.kind, "clean");
+  assert.equal(snapshot.worktree.branch, "dogfood/issue-428-idle-activity-snapshot");
+  assert.equal(snapshot.worktree.upstream, "origin/main");
+  assert.equal(snapshot.worktree.ahead, 0);
+  assert.equal(snapshot.worktree.behind, 0);
+  assert.equal(snapshot.worktree.divergenceSource, "local tracking refs only; no fetch performed");
+  assert.deepEqual(snapshot.worktree.delta, {
+    source: "current git status only; no session baseline comparison",
+    changedPathCount: 0,
+    trackedPathCount: 0,
+    untrackedPathCount: 0,
+    conflictedPathCount: 0,
+    changedPaths: [],
+    conflictedPaths: [],
+  });
+  assert.deepEqual(snapshot.worktree.blockers, []);
+  assert.equal(snapshot.tmux.available, true);
+  assert.equal(snapshot.tmux.command, OPERATOR_ACTIVITY_TMUX_COMMAND);
+  assert.deepEqual(snapshot.tmux.sessions, []);
+  assert.deepEqual(snapshot.tmux.blockers, []);
+  assert.deepEqual(snapshot.optionalCounts, {
+    enabled: true,
+    source: OPERATOR_ACTIVITY_REMOTE_SOURCE,
+    openIssues: 0,
+    openPullRequests: 0,
+    blockers: [],
+  });
+  assert.deepEqual(snapshot.blockers, []);
+  assert.equal(commandCalls.filter((call) => call.startsWith("gh ")).length, 2);
+  assert.equal(gitCalls.some((call) => call.includes("fetch")), false);
+});
+
 test("operator activity treats tmux and opt-in GitHub count failures as non-fatal blockers", () => {
   const tempDir = makeTempProject();
   const snapshot = readOperatorActivitySnapshot(tempDir, {
