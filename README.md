@@ -13,7 +13,7 @@ npm install -g fxxk-frontend-hooks
 cd your-supported-project
 fooks setup
 fooks doctor
-fooks compare src/components/Button.tsx --json
+fooks compare src/components/Button.tsx
 ```
 
 Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
@@ -37,9 +37,9 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 
 ## Quick start and local proof
 
-The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks compare <supported-file> --json` for local source-vs-payload evidence.
+The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks compare <supported-file>` for a human local source-vs-payload summary.
 
-`fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local source-vs-payload evidence.
+`fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local byte counts, exclusions, and claim boundary text.
 
 If you run `fooks doctor` from a source checkout, new git worktree, or freshly cloned project before `fooks setup`, an `unhealthy` result usually means the project-local adapter/runtime manifests have not been activated yet. That is expected for an unprepared checkout; run `fooks setup`, then rerun `fooks doctor` to verify the dogfood state you will actually use.
 
@@ -48,7 +48,7 @@ If you run `fooks doctor` from a source checkout, new git worktree, or freshly c
 1. Install the package: `npm install -g fxxk-frontend-hooks`.
 2. Confirm the command resolves to the package you expect: `which fooks` and `fooks --help`.
 3. Activate only the repo you are inside: `fooks setup`. The default output should be a short `ready`, `partial`, or `blocked` summary, not a debug JSON wall.
-4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file> --json` for one-file payload proof.
+4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file>` for one-file payload proof; add `--json` only when you need exact local byte counts, exclusions, and claim boundary text.
 5. Use `fooks setup --json` only when you need support/debug paths, runtime manifests, or issue-report evidence.
 
 ## Strongest path / beta path / not today
@@ -72,10 +72,10 @@ If you run `fooks doctor` from a source checkout, new git worktree, or freshly c
 
 | Project shape | Setup expectation | Best verification command | Boundary |
 | --- | --- | --- | --- |
-| React / Next.js with `.tsx` or `.jsx` components | Full Codex setup path; Claude/opencode helpers can also be prepared when their homes/settings are available. | `fooks doctor` then `fooks compare src/components/Button.tsx --json` | Same-file repeated Codex work is the strongest supported workflow. |
-| Ink or other React-based CLI with `.tsx` / `.jsx` components | Treated like TSX/JSX React source for Codex repeated same-file work. | `fooks compare path/to/App.tsx --json` | DOM/form/style signals may be weaker than web UI components; unsupported cases fall back safely. |
+| React / Next.js with `.tsx` or `.jsx` components | Full Codex setup path; Claude/opencode helpers can also be prepared when their homes/settings are available. | `fooks doctor` then `fooks compare src/components/Button.tsx` | Same-file repeated Codex work is the strongest supported workflow. |
+| Ink or other React-based CLI with `.tsx` / `.jsx` components | Treated like TSX/JSX React source for Codex repeated same-file work. | `fooks compare path/to/App.tsx` | DOM/form/style signals may be weaker than web UI components; unsupported cases fall back safely. |
 | React Native or embedded WebView `.tsx` files | Not a current support claim. TSX parsing only proves syntax can be read; it does not prove React Native component semantics, native platform behavior, bridge behavior, or WebView boundary safety. | Use normal source reading unless a future release adds RN/WebView fixtures, benchmarks, and explicit evidence. | Deferred lane; obvious RN/WebView markers fall back to full-source reading rather than compact fooks payload reuse. |
-| Pure TypeScript/JavaScript library | Codex-only setup may qualify if a `.ts` / `.js` file passes the strong beta readiness gate. | `fooks doctor codex` and `fooks compare path/to/module.ts --json` | No Claude/opencode helper parity and no broad semantic/framework claim. |
+| Pure TypeScript/JavaScript library | Codex-only setup may qualify if a `.ts` / `.js` file passes the strong beta readiness gate. | `fooks doctor codex` and `fooks compare path/to/module.ts` | No Claude/opencode helper parity and no broad semantic/framework claim. |
 | Vue/Svelte/SFC or arbitrary backend repo | Not a current support claim. | Use normal source reading unless a strong `.ts` / `.js` beta module qualifies for Codex. | Roadmap only; no universal read interception. |
 
 ## Deferred asks / not supported yet
