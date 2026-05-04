@@ -99,6 +99,36 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.equal(payload?.plannerDecision, "narrow-primitive-input-payload");
   assert.equal(payload?.claimStatus, "measured-evidence-only");
   assert.equal(payload?.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(payload?.sourceAnchorBeta.contract.contractVersion, "rn-source-anchor-beta.v0");
+  assert.equal(payload?.sourceAnchorBeta.contract.scope, "local-proof-only");
+  assert.deepEqual(payload?.sourceAnchorBeta.contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);
+  assert.equal(payload?.sourceAnchorBeta.contract.runtimeReusePromotion, "not-promoted");
+  assert.equal(payload?.sourceAnchorBeta.contract.sourceDerivedOnly, true);
+  assert.deepEqual(payload?.sourceAnchorBeta.contract.anchorKinds, [
+    "component-name",
+    "props-interface",
+    "hooks-effects",
+    "event-handlers",
+    "rn-primitive-outline",
+    "source-fingerprint-ranges",
+  ]);
+  assert.deepEqual(payload?.sourceAnchorBeta.contract.fallbackFirstBoundaries, [
+    "webview",
+    "native-bridge",
+    "platform-specific",
+    "navigation",
+    "gesture-list-image-scrollview",
+    "mixed-react-web-dom",
+    "tui-ink",
+  ]);
+  assert.equal(
+    payload?.sourceAnchorBeta.contract.nextImplementationStep,
+    "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates",
+  );
+  assert.equal(payload?.sourceAnchorBeta.anchors.componentName, "InlineActionRow");
+  assert.deepEqual(payload?.sourceAnchorBeta.anchors.primitives, ["Pressable", "Text", "TextInput", "View"]);
+  assert.deepEqual(payload?.sourceAnchorBeta.anchors.jsxProps, ["onChangeText", "onPress"]);
+  assert.equal(payload?.sourceAnchorBeta.anchors.sourceFingerprintRequired, true);
   assert.equal(payload?.reuseContract.supportBoundary, "measured-evidence-only; no broad RN/WebView/TUI support");
   assert.deepEqual(payload?.reuseContract.requiredSignals, [...RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS]);
 
@@ -273,6 +303,39 @@ test("React Native F1 signal gate is the shared source of truth for policy and p
   });
   const payload = buildReactNativePrimitiveInputDomainPayload(extractionResult, allowedDetection);
   assert.equal(payload?.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.deepEqual(payload?.sourceAnchorBeta.contract, {
+    contractVersion: "rn-source-anchor-beta.v0",
+    scope: "local-proof-only",
+    allowedProofSurfaces: ["extract", "compare", "inspect-domain"],
+    runtimeReusePromotion: "not-promoted",
+    sourceDerivedOnly: true,
+    anchorKinds: [
+      "component-name",
+      "props-interface",
+      "hooks-effects",
+      "event-handlers",
+      "rn-primitive-outline",
+      "source-fingerprint-ranges",
+    ],
+    fallbackFirstBoundaries: [
+      "webview",
+      "native-bridge",
+      "platform-specific",
+      "navigation",
+      "gesture-list-image-scrollview",
+      "mixed-react-web-dom",
+      "tui-ink",
+    ],
+    nextImplementationStep:
+      "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates",
+  });
+  assert.deepEqual(payload?.sourceAnchorBeta.anchors, {
+    componentName: "NativeInput",
+    primitives: ["Pressable", "Text", "TextInput", "View"],
+    jsxProps: ["onChangeText", "onPress"],
+    sourceFingerprintRequired: true,
+  });
+
   assert.deepEqual(payload?.reuseContract, {
     sourceDerivedOnly: true,
     policy: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,

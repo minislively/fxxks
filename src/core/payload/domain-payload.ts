@@ -10,6 +10,26 @@ import type { ExtractionResult, FormControlSignal, StyleSystem } from "../schema
 
 export const DOMAIN_PAYLOAD_SCHEMA_VERSION = "domain-payload.v1";
 export const REACT_WEB_DOMAIN_PAYLOAD_POLICY = "react-web-current-supported-lane";
+export const RN_SOURCE_ANCHOR_BETA_CONTRACT_VERSION = "rn-source-anchor-beta.v0";
+
+const RN_SOURCE_ANCHOR_BETA_ALLOWED_PROOF_SURFACES = ["extract", "compare", "inspect-domain"] as const;
+const RN_SOURCE_ANCHOR_BETA_ANCHOR_KINDS = [
+  "component-name",
+  "props-interface",
+  "hooks-effects",
+  "event-handlers",
+  "rn-primitive-outline",
+  "source-fingerprint-ranges",
+] as const;
+const RN_SOURCE_ANCHOR_BETA_FALLBACK_FIRST_BOUNDARIES = [
+  "webview",
+  "native-bridge",
+  "platform-specific",
+  "navigation",
+  "gesture-list-image-scrollview",
+  "mixed-react-web-dom",
+  "tui-ink",
+] as const;
 
 export type ReactWebDomainPayload = {
   schemaVersion: typeof DOMAIN_PAYLOAD_SCHEMA_VERSION;
@@ -37,6 +57,30 @@ export type ReactWebDomainPayload = {
   warnings: string[];
 };
 
+export type ReactNativeSourceAnchorBetaContract = {
+  contractVersion: typeof RN_SOURCE_ANCHOR_BETA_CONTRACT_VERSION;
+  scope: "local-proof-only";
+  allowedProofSurfaces: readonly (typeof RN_SOURCE_ANCHOR_BETA_ALLOWED_PROOF_SURFACES)[number][];
+  runtimeReusePromotion: "not-promoted";
+  sourceDerivedOnly: true;
+  anchorKinds: readonly (typeof RN_SOURCE_ANCHOR_BETA_ANCHOR_KINDS)[number][];
+  fallbackFirstBoundaries: readonly (typeof RN_SOURCE_ANCHOR_BETA_FALLBACK_FIRST_BOUNDARIES)[number][];
+  nextImplementationStep: "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates";
+};
+
+export type ReactNativeSourceAnchorBetaPayload = {
+  contract: ReactNativeSourceAnchorBetaContract;
+  anchors: {
+    componentName?: string;
+    propsName?: string;
+    hooks?: string[];
+    eventHandlers?: string[];
+    primitives: string[];
+    jsxProps: string[];
+    sourceFingerprintRequired: true;
+  };
+};
+
 export type ReactNativePrimitiveInputReuseContract = {
   sourceDerivedOnly: true;
   policy: typeof RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY;
@@ -60,6 +104,7 @@ export type ReactNativePrimitiveInputDomainPayload = {
   claimStatus: "measured-evidence-only";
   claimBoundary: "rn-primitive-input-narrow-payload-only";
   evidence: string[];
+  sourceAnchorBeta: ReactNativeSourceAnchorBetaPayload;
   reuseContract: ReactNativePrimitiveInputReuseContract;
   facts: {
     primitives: string[];
@@ -209,6 +254,41 @@ function buildReactWebPayloadFacts(
   };
 }
 
+function buildReactNativeSourceAnchorBetaContract(): ReactNativeSourceAnchorBetaContract {
+  return {
+    contractVersion: RN_SOURCE_ANCHOR_BETA_CONTRACT_VERSION,
+    scope: "local-proof-only",
+    allowedProofSurfaces: [...RN_SOURCE_ANCHOR_BETA_ALLOWED_PROOF_SURFACES],
+    runtimeReusePromotion: "not-promoted",
+    sourceDerivedOnly: true,
+    anchorKinds: [...RN_SOURCE_ANCHOR_BETA_ANCHOR_KINDS],
+    fallbackFirstBoundaries: [...RN_SOURCE_ANCHOR_BETA_FALLBACK_FIRST_BOUNDARIES],
+    nextImplementationStep:
+      "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates",
+  };
+}
+
+function buildReactNativeSourceAnchorBetaPayload(
+  result: ExtractionResult,
+  evidenceFacts: ReactNativePayloadEvidenceFacts,
+): ReactNativeSourceAnchorBetaPayload {
+  const eventHandlers = uniqueSorted(result.behavior?.eventHandlers ?? []);
+  const hooks = uniqueSorted(result.behavior?.hooks ?? []);
+
+  return {
+    contract: buildReactNativeSourceAnchorBetaContract(),
+    anchors: {
+      ...(result.componentName ? { componentName: result.componentName } : {}),
+      ...(result.contract?.propsName ? { propsName: result.contract.propsName } : {}),
+      ...(hooks.length > 0 ? { hooks } : {}),
+      ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
+      primitives: evidenceFacts.primitives,
+      jsxProps: evidenceFacts.jsxProps,
+      sourceFingerprintRequired: true,
+    },
+  };
+}
+
 function buildReactNativePrimitiveInputReuseContract(): ReactNativePrimitiveInputReuseContract {
   return {
     sourceDerivedOnly: true,
@@ -285,9 +365,11 @@ export function buildReactNativePrimitiveInputDomainPayload(
     claimStatus: "measured-evidence-only",
     claimBoundary: "rn-primitive-input-narrow-payload-only",
     evidence: plan.evidenceFacts.evidence,
+    sourceAnchorBeta: buildReactNativeSourceAnchorBetaPayload(plan.result, plan.evidenceFacts),
     reuseContract: buildReactNativePrimitiveInputReuseContract(),
     facts: buildReactNativePayloadFacts(plan.result, plan.evidenceFacts),
     warnings: [
+      "React Native source anchors are a local-proof beta contract only, not a runtime reuse promotion.",
       "React Native primitive/input payload reuse is limited to the measured F1-style gate.",
       "Do not reinterpret React Native primitives as DOM controls, web form semantics, navigation behavior, native platform behavior, or WebView bridge behavior.",
       "Planner decision depends on current extractor readiness and domain profile evidence; rerun extraction if the source changes.",

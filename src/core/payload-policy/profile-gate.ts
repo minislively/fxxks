@@ -1,8 +1,10 @@
 import type { DomainDetectionResult } from "../domain-detector";
 import {
   DOMAIN_PAYLOAD_SCHEMA_VERSION,
+  RN_SOURCE_ANCHOR_BETA_CONTRACT_VERSION,
   type ReactNativePrimitiveInputDomainPayload,
   type ReactNativePrimitiveInputReuseContract,
+  type ReactNativeSourceAnchorBetaPayload,
 } from "../payload/domain-payload";
 import {
   RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS,
@@ -20,7 +22,7 @@ export const MISSING_REACT_NATIVE_DOMAIN_PAYLOAD_REASON = "missing-react-native-
 
 export type FrontendProfilePayloadReuseDecision = { allowed: true } | { allowed: false; reason: string };
 
-function arraysEqual(left: string[] | undefined, right: readonly string[]): boolean {
+function arraysEqual(left: readonly string[] | undefined, right: readonly string[]): boolean {
   if (!left || left.length !== right.length) return false;
   return left.every((value, index) => value === right[index]);
 }
@@ -28,6 +30,50 @@ function arraysEqual(left: string[] | undefined, right: readonly string[]): bool
 function sourceFingerprintsEqual(left: SourceFingerprint | undefined, right: SourceFingerprint | undefined): boolean {
   if (!left || !right) return false;
   return left.fileHash === right.fileHash && left.lineCount === right.lineCount;
+}
+
+function arraysContainValues(left: string[] | readonly string[] | undefined, right: readonly string[]): boolean {
+  if (!left) return false;
+  return right.every((value) => left.includes(value));
+}
+
+function isReactNativeSourceAnchorBetaPayload(value: unknown): value is ReactNativeSourceAnchorBetaPayload {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Partial<ReactNativeSourceAnchorBetaPayload>;
+  const contract = payload.contract as Partial<ReactNativeSourceAnchorBetaPayload["contract"]> | undefined;
+  const anchors = payload.anchors as Partial<ReactNativeSourceAnchorBetaPayload["anchors"]> | undefined;
+
+  return (
+    Boolean(contract) &&
+    contract?.contractVersion === RN_SOURCE_ANCHOR_BETA_CONTRACT_VERSION &&
+    contract.scope === "local-proof-only" &&
+    arraysEqual(contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]) &&
+    contract.runtimeReusePromotion === "not-promoted" &&
+    contract.sourceDerivedOnly === true &&
+    arraysEqual(contract.anchorKinds, [
+      "component-name",
+      "props-interface",
+      "hooks-effects",
+      "event-handlers",
+      "rn-primitive-outline",
+      "source-fingerprint-ranges",
+    ]) &&
+    arraysEqual(contract.fallbackFirstBoundaries, [
+      "webview",
+      "native-bridge",
+      "platform-specific",
+      "navigation",
+      "gesture-list-image-scrollview",
+      "mixed-react-web-dom",
+      "tui-ink",
+    ]) &&
+    contract.nextImplementationStep ===
+      "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates" &&
+    Boolean(anchors) &&
+    anchors?.sourceFingerprintRequired === true &&
+    arraysContainValues(anchors?.primitives, ["Pressable", "Text", "TextInput", "View"]) &&
+    arraysContainValues(anchors?.jsxProps, ["onChangeText", "onPress"])
+  );
 }
 
 function isReactNativePrimitiveInputReuseContract(value: unknown): value is ReactNativePrimitiveInputReuseContract {
@@ -63,6 +109,7 @@ function isReactNativePrimitiveInputDomainPayload(
   if (domainPayload.plannerDecision !== "narrow-primitive-input-payload") return false;
   if (domainPayload.claimStatus !== "measured-evidence-only") return false;
   if (domainPayload.claimBoundary !== "rn-primitive-input-narrow-payload-only") return false;
+  if (!isReactNativeSourceAnchorBetaPayload(domainPayload.sourceAnchorBeta)) return false;
   if (!isReactNativePrimitiveInputReuseContract(domainPayload.reuseContract)) return false;
   if (!payload.sourceFingerprint) return false;
   if (payload.editGuidance?.freshness && !sourceFingerprintsEqual(payload.sourceFingerprint, payload.editGuidance.freshness)) return false;
