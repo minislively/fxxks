@@ -111,20 +111,40 @@ function reactWebContextPayloadBudget(rawSizeBytes: number): number {
   );
 }
 
-function trimEditTargetRoutingToBudget(
+type ReactWebContext = NonNullable<NonNullable<PreReadDecision["payload"]>["reactWebContext"]>;
+type ReactWebContextArrayKey = Exclude<{
+  [Key in keyof ReactWebContext]: ReactWebContext[Key] extends unknown[] | undefined ? Key : never;
+}[keyof ReactWebContext], undefined>;
+
+const REACT_WEB_CONTEXT_TRIM_POLICY: ReactWebContextArrayKey[] = [
+  "importRoleHints",
+  "stylingVariantHints",
+  "localDependencies",
+  "renderStates",
+  "stateHints",
+  "componentApiHints",
+  "layoutRegionHints",
+  "intentTargets",
+  "a11yAnchors",
+  "formStateFlow",
+  "editTargetRouting",
+];
+
+function trimReactWebContextArrayFieldToBudget(
   payload: NonNullable<PreReadDecision["payload"]>,
   maxPayloadBytes: number,
+  field: ReactWebContextArrayKey,
 ): { payload: NonNullable<PreReadDecision["payload"]>; estimatedPayloadBytes: number } {
   const reactWebContext = payload.reactWebContext;
-  if (!reactWebContext || !reactWebContext.editTargetRouting || reactWebContext.editTargetRouting.length === 0) {
+  const values = reactWebContext?.[field];
+  if (!reactWebContext || !Array.isArray(values) || values.length === 0) {
     return { payload, estimatedPayloadBytes: estimatePayloadBytes(payload) };
   }
-  const routes = reactWebContext.editTargetRouting;
 
-  for (let routeCount = routes.length - 1; routeCount > 0; routeCount -= 1) {
+  for (let itemCount = values.length - 1; itemCount > 0; itemCount -= 1) {
     const trimmedReactWebContext = {
       ...reactWebContext,
-      editTargetRouting: routes.slice(0, routeCount),
+      [field]: values.slice(0, itemCount),
     };
     const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
     const estimatedPayloadBytes = estimatePayloadBytes(trimmedPayload);
@@ -134,65 +154,26 @@ function trimEditTargetRoutingToBudget(
   }
 
   const trimmedReactWebContext = { ...reactWebContext };
-  delete trimmedReactWebContext.editTargetRouting;
+  delete trimmedReactWebContext[field];
   const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
   return { payload: trimmedPayload, estimatedPayloadBytes: estimatePayloadBytes(trimmedPayload) };
 }
 
-function trimComponentApiHintsToBudget(
+function trimReactWebContextToBudget(
   payload: NonNullable<PreReadDecision["payload"]>,
   maxPayloadBytes: number,
 ): { payload: NonNullable<PreReadDecision["payload"]>; estimatedPayloadBytes: number } {
-  const reactWebContext = payload.reactWebContext;
-  if (!reactWebContext || !reactWebContext.componentApiHints || reactWebContext.componentApiHints.length === 0) {
-    return { payload, estimatedPayloadBytes: estimatePayloadBytes(payload) };
-  }
-  const hints = reactWebContext.componentApiHints;
+  let trimmedPayload = payload;
+  let estimatedPayloadBytes = estimatePayloadBytes(trimmedPayload);
 
-  for (let hintCount = hints.length - 1; hintCount > 0; hintCount -= 1) {
-    const trimmedReactWebContext = {
-      ...reactWebContext,
-      componentApiHints: hints.slice(0, hintCount),
-    };
-    const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
-    const estimatedPayloadBytes = estimatePayloadBytes(trimmedPayload);
-    if (estimatedPayloadBytes <= maxPayloadBytes) {
-      return { payload: trimmedPayload, estimatedPayloadBytes };
-    }
+  for (const field of REACT_WEB_CONTEXT_TRIM_POLICY) {
+    if (estimatedPayloadBytes <= maxPayloadBytes) break;
+    const trimmed = trimReactWebContextArrayFieldToBudget(trimmedPayload, maxPayloadBytes, field);
+    trimmedPayload = trimmed.payload;
+    estimatedPayloadBytes = trimmed.estimatedPayloadBytes;
   }
 
-  const trimmedReactWebContext = { ...reactWebContext };
-  delete trimmedReactWebContext.componentApiHints;
-  const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
-  return { payload: trimmedPayload, estimatedPayloadBytes: estimatePayloadBytes(trimmedPayload) };
-}
-
-function trimLayoutRegionHintsToBudget(
-  payload: NonNullable<PreReadDecision["payload"]>,
-  maxPayloadBytes: number,
-): { payload: NonNullable<PreReadDecision["payload"]>; estimatedPayloadBytes: number } {
-  const reactWebContext = payload.reactWebContext;
-  if (!reactWebContext || !reactWebContext.layoutRegionHints || reactWebContext.layoutRegionHints.length === 0) {
-    return { payload, estimatedPayloadBytes: estimatePayloadBytes(payload) };
-  }
-  const hints = reactWebContext.layoutRegionHints;
-
-  for (let hintCount = hints.length - 1; hintCount > 0; hintCount -= 1) {
-    const trimmedReactWebContext = {
-      ...reactWebContext,
-      layoutRegionHints: hints.slice(0, hintCount),
-    };
-    const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
-    const estimatedPayloadBytes = estimatePayloadBytes(trimmedPayload);
-    if (estimatedPayloadBytes <= maxPayloadBytes) {
-      return { payload: trimmedPayload, estimatedPayloadBytes };
-    }
-  }
-
-  const trimmedReactWebContext = { ...reactWebContext };
-  delete trimmedReactWebContext.layoutRegionHints;
-  const trimmedPayload = { ...payload, reactWebContext: trimmedReactWebContext };
-  return { payload: trimmedPayload, estimatedPayloadBytes: estimatePayloadBytes(trimmedPayload) };
+  return { payload: trimmedPayload, estimatedPayloadBytes };
 }
 
 export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreReadPayloadPlan {
@@ -211,18 +192,8 @@ export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreRead
   if (includeReactWebContextMetadata) {
     let estimatedPayloadBytes = estimatePayloadBytes(payload);
     const maxPayloadBytes = reactWebContextPayloadBudget(result.meta.rawSizeBytes);
-    if (payload.reactWebContext?.layoutRegionHints && estimatedPayloadBytes > maxPayloadBytes) {
-      const trimmed = trimLayoutRegionHintsToBudget(payload, maxPayloadBytes);
-      payload = trimmed.payload;
-      estimatedPayloadBytes = trimmed.estimatedPayloadBytes;
-    }
-    if (payload.reactWebContext?.componentApiHints && estimatedPayloadBytes > maxPayloadBytes) {
-      const trimmed = trimComponentApiHintsToBudget(payload, maxPayloadBytes);
-      payload = trimmed.payload;
-      estimatedPayloadBytes = trimmed.estimatedPayloadBytes;
-    }
-    if (payload.reactWebContext?.editTargetRouting && estimatedPayloadBytes > maxPayloadBytes) {
-      const trimmed = trimEditTargetRoutingToBudget(payload, maxPayloadBytes);
+    if (payload.reactWebContext && estimatedPayloadBytes > maxPayloadBytes) {
+      const trimmed = trimReactWebContextToBudget(payload, maxPayloadBytes);
       payload = trimmed.payload;
       estimatedPayloadBytes = trimmed.estimatedPayloadBytes;
     }
