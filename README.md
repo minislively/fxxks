@@ -304,6 +304,7 @@ Useful public docs:
 - opencode support boundary: [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
 - Roadmap / future evidence lanes: [`docs/roadmap.md`](docs/roadmap.md)
+- Development principles: [`docs/development-principles.md`](docs/development-principles.md)
 - Benchmark evidence and claim boundaries: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
 
 Benchmark harness internals and generated reports live in the source repository, but are intentionally not part of the npm package payload.
