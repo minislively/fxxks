@@ -771,6 +771,84 @@ test("React Web styling variant hints are omitted without source variation ancho
   assert.equal(payload.reactWebContext?.stylingVariantHints, undefined);
 });
 
+test("React Web component API hints summarize same-file source API facts", () => {
+  const source = `
+    import React from "react";
+
+    type ApiPanelProps = {
+      title: string;
+      onSave?: (value: string) => void;
+      children?: React.ReactNode;
+      renderFooter?: (state: { dirty: boolean }) => React.ReactNode;
+      count?: number;
+    };
+
+    function FieldShell({ children }: { children?: React.ReactNode }) {
+      return <div className="field-shell">{children}</div>;
+    }
+
+    export function ApiPanel({ title, onSave, children, renderFooter, count = 0 }: ApiPanelProps) {
+      return (
+        <section aria-label="API panel">
+          <FieldShell>
+            <button onClick={() => onSave?.(title)}>Save</button>
+            {children}
+            {renderFooter?.({ dirty: count > 0 })}
+          </FieldShell>
+          <p>Extra body copy keeps this fixture past the tiny raw threshold for metadata testing.</p>
+          <p>Component API hints must remain source-derived and avoid cross-file usage semantics.</p>
+          <p>The repeated-read payload should expose the props contract and custom JSX usage anchors.</p>
+          <p>Another neutral sentence keeps this fixture in the compressed React Web lane.</p>
+        </section>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "ApiPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+  const hints = payload.reactWebContext.componentApiHints;
+  assert.ok(hints);
+
+  assert.ok(hints.some((item) => item.kind === "prop" && item.propName === "title" && item.evidence.includes("contract.propsSummary")));
+  assert.ok(hints.some((item) => item.kind === "callback-prop" && item.propName === "onSave"));
+  assert.ok(hints.some((item) => item.kind === "children-prop" && item.propName === "children"));
+  assert.ok(hints.some((item) => item.kind === "render-prop" && item.propName === "renderFooter"));
+  assert.ok(hints.some((item) => item.kind === "custom-component-usage" && item.label === "FieldShell" && item.evidence.includes("structure.sections")));
+  assert.ok(hints.filter((item) => item.evidence.includes("contract.propsSummary")).every((item) => item.loc && item.typeText));
+  assert.equal(JSON.stringify(hints).includes("crossFile"), false);
+  assert.equal(JSON.stringify(hints).includes("typeChecker"), false);
+});
+
+test("React Web component API hints omit lowercase DOM tags without props contracts", () => {
+  const source = `
+    export function DomOnlyPanel() {
+      return (
+        <section>
+          <h2>Plain DOM panel</h2>
+          <p>This component intentionally has no props contract or custom component usage.</p>
+          <button type="button">Save</button>
+          <textarea name="notes" />
+          <select name="status"><option>Open</option></select>
+          <p>Additional neutral content keeps this fixture in compressed mode.</p>
+          <p>Lowercase DOM tags must not be promoted to component API hints.</p>
+          <p>Another neutral sentence keeps this assertion independent from tiny raw thresholds.</p>
+        </section>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "DomOnlyPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.equal(payload.reactWebContext?.componentApiHints, undefined);
+});
+
 test("non React Web and raw/useOriginal payloads omit reactWebContext", () => {
   for (const fixture of [
     "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx",

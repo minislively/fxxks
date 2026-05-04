@@ -173,6 +173,15 @@ export type ReactWebContextStylingVariantHint = {
   evidence: string[];
 };
 
+export type ReactWebContextComponentApiHint = {
+  kind: "prop" | "callback-prop" | "children-prop" | "render-prop" | "custom-component-usage";
+  label: string;
+  propName?: string;
+  typeText?: string;
+  loc?: SourceRange;
+  evidence: string[];
+};
+
 export type ReactWebContextIntentTarget = {
   intent: "style" | "form" | "handler" | "state" | "branch" | "props" | "component";
   label: string;
@@ -244,6 +253,7 @@ export type ReactWebContextMetadataV0 = {
   localDependencies?: ReactWebContextLocalDependency[];
   importRoleHints?: ReactWebContextImportRoleHint[];
   stylingVariantHints?: ReactWebContextStylingVariantHint[];
+  componentApiHints?: ReactWebContextComponentApiHint[];
   intentTargets?: ReactWebContextIntentTarget[];
   editTargetRouting?: ReactWebContextEditTargetRoute[];
   formStateFlow?: ReactWebContextFormStateFlowEntry[];
