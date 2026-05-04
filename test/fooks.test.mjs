@@ -513,6 +513,14 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.ok(result.savedEstimatedTokens > 0);
   assert.ok(result.reductionPercent > 0);
   assert.equal(result.payloadLarger, false);
+  assert.equal(result.reactWebContextSummary.present, true);
+  assert.equal(result.reactWebContextSummary.schemaVersion, "react-web-context.v0");
+  assert.equal(result.reactWebContextSummary.scope.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(result.reactWebContextSummary.scope.componentName, "FormSection");
+  assert.ok(result.reactWebContextSummary.fieldCounts.editTargetRouting > 0);
+  assert.ok(result.reactWebContextSummary.fieldCounts.a11yAnchors > 0);
+  assert.ok(result.reactWebContextSummary.totalAnchors > 0);
+  assert.equal(result.reactWebContextSummary.claimBoundary, "source-backed-react-web-context-counts-only");
   assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
   assert.match(result.claimBoundary, /not provider usage\/billing tokens, invoices, dashboards, charged costs/);
   assert.ok(result.excludes.includes("provider-tokenizer-behavior"));
@@ -531,6 +539,7 @@ test("compare keeps tiny raw fallback from reporting false positive savings", ()
   assert.equal(result.reductionPercent, 0);
   assert.equal(result.payloadLarger, true);
   assert.equal(result.nonSavingReason, "original-source-preserved-for-small-raw-file");
+  assert.equal("reactWebContextSummary" in result, false);
   assert.equal(result.userSummary.verdict, "no-estimated-reduction");
   assert.match(result.userSummary.headline, /original source/);
   assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
@@ -542,6 +551,8 @@ test("compare default output is a concise human verdict with json details opt-in
   assert.match(output, /Verdict: estimated-reduction/);
   assert.match(output, /Why: Estimated \d+(?:\.\d+)?% smaller model-facing payload/);
   assert.match(output, /Local proof: source \d+ bytes \/ \d+ est tokens → model-facing \d+ bytes \/ \d+ est tokens; saved \d+ bytes \/ \d+ est tokens\./);
+  assert.match(output, /React Web context: \d+ source-backed anchors across \d+ summary fields \(counts only; see --json\)\./);
+  assert.doesNotMatch(output, /correctness|billing savings|provider token savings|latency/i);
   assert.match(output, /Next action: Use fooks setup/);
   assert.match(output, /Boundary: Local model-facing payload estimate only/);
   assert.match(output, /fooks compare <file> --json/);
@@ -556,6 +567,7 @@ test("compare default output avoids reduction claims for no-savings files", () =
   assert.match(output, /Mode: raw \(original source preserved\)/);
   assert.match(output, /Local proof: source \d+ bytes \/ \d+ est tokens → model-facing \d+ bytes \/ \d+ est tokens; no local estimate savings for this file\./);
   assert.match(output, /Boundary: Local model-facing payload estimate only/);
+  assert.doesNotMatch(output, /React Web context:/);
   assert.doesNotMatch(output, /0(?:\.0+)?% smaller/);
   assert.doesNotMatch(output, /saved 0 bytes \/ 0 est tokens/);
   assert.doesNotMatch(output.trim(), /^\{/);
