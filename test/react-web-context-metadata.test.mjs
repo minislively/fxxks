@@ -458,6 +458,118 @@ test("React Web opt-in emits source-observed role aria and readOnly anchors", ()
   assert.ok(payload.reactWebContext.a11yAnchors.some((item) => item.kind === "readonly" && item.label === "input[name=displayName]"));
 });
 
+
+
+test("React Web a11y anchors expose source-derived semantic relationships", () => {
+  const source = `
+    import React from "react";
+
+    type ContactFormProps = { email: string; invalid: boolean; onEmailChange(value: string): void };
+
+    export function ContactForm({ email, invalid, onEmailChange }: ContactFormProps) {
+      return (
+        <form className="grid gap-3 rounded-lg border p-4">
+          <label htmlFor="email" className="text-sm font-medium">Email</label>
+          <input
+            id="email"
+            name="email"
+            value={email}
+            onChange={(event) => onEmailChange(event.currentTarget.value)}
+            aria-invalid={invalid}
+            aria-describedby="email-error email-help missing-id"
+            aria-labelledby="email-label"
+          />
+          <span id="email-label" className="sr-only">Primary email address</span>
+          <p id="email-error" role="alert" className="text-sm text-red-600">Email is required</p>
+          <p id="email-help" className="text-xs text-slate-500">Use your work email for account recovery.</p>
+          <p className="text-xs text-slate-500">This source is intentionally long enough to stay in compressed mode.</p>
+          <p className="text-xs text-slate-500">A11y relations remain source-derived facts, not runtime DOM validation.</p>
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "ContactForm.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+
+  const anchors = payload.reactWebContext.a11yAnchors;
+  assert.ok(
+    anchors.some(
+      (item) => item.kind === "htmlFor" && item.label === "email" && item.relation?.kind === "label-control" && item.relation.targetId === "email",
+    ),
+  );
+  assert.ok(
+    anchors.some(
+      (item) =>
+        item.kind === "aria" &&
+        item.label.startsWith("aria-describedby=email-error email-help") &&
+        item.relation?.kind === "aria-idrefs" &&
+        item.relation.resolvedIds.includes("email-error") &&
+        !item.relation.resolvedIds.includes("missing-id"),
+    ),
+  );
+  assert.ok(
+    anchors.some(
+      (item) =>
+        item.kind === "aria" &&
+        item.label === "aria-labelledby=email-label" &&
+        item.relation?.kind === "aria-idrefs" &&
+        item.relation.resolvedIds.includes("email-label"),
+    ),
+  );
+  assert.ok(
+    anchors.some((item) => item.kind === "aria" && item.label === "aria-invalid=invalid" && item.relation?.kind === "invalid-state"),
+  );
+  assert.ok(
+    anchors.some((item) => item.kind === "role" && item.label === "alert" && item.relation?.kind === "alert-region" && item.relation.sourceId === "email-error"),
+  );
+});
+
+test("React Web a11y id-ref relations require matching source ids", () => {
+  const source = `
+    import React from "react";
+
+    export function MissingA11yRelation() {
+      return (
+        <form className="grid gap-3 rounded-lg border p-4">
+          <label htmlFor="missing-email" className="text-sm font-medium">Email</label>
+          <input
+            id="email"
+            name="email"
+            aria-describedby="missing-help"
+            className="rounded border px-3 py-2"
+          />
+          <p className="text-xs text-slate-500">This fixture is intentionally long enough for compressed metadata.</p>
+          <p className="text-xs text-slate-500">Missing source ids must not become resolved semantic relations.</p>
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "MissingA11yRelation.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+
+  const anchors = payload.reactWebContext.a11yAnchors;
+  assert.ok(anchors.some((item) => item.kind === "htmlFor" && item.label === "missing-email"));
+  assert.equal(
+    anchors.some((item) => item.kind === "htmlFor" && item.label === "missing-email" && item.relation?.kind === "label-control"),
+    false,
+  );
+  assert.ok(anchors.some((item) => item.kind === "aria" && item.label === "aria-describedby=missing-help"));
+  assert.equal(
+    anchors.some((item) => item.kind === "aria" && item.label === "aria-describedby=missing-help" && item.relation?.kind === "aria-idrefs"),
+    false,
+  );
+});
+
 test("React Web wrapper fixture can expose source-observed htmlFor anchor from domain evidence", () => {
   const payload = payloadFor("test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx", {
     includeReactWebContextMetadata: true,
