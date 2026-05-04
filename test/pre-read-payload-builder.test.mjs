@@ -32,7 +32,7 @@ test("pre-read payload builder preserves React Web payload success envelope", ()
   assert.equal(decision.debug.domainDetection.classification, "react-web");
   assert.equal(decision.debug.frontendPayloadPolicy.allowed, true);
   assert.ok(decision.payload.reactWebContext);
-  assert.equal("editTargetRouting" in decision.payload.reactWebContext, false);
+  assert.equal(decision.payload.reactWebContext.editTargetRouting.length, 2);
   assert.equal(decision.debug.reactWebContextBudget.included, true);
   assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
 });
@@ -68,7 +68,7 @@ test("pre-read payload builder omits React Web context metadata when payload bud
   }
 });
 
-test("pre-read payload builder trims React Web edit-target routing as an ordered prefix before metadata fallback", () => {
+test("pre-read payload builder preserves React Web edit-target routing before lower-priority metadata", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-routing-budget-"));
   try {
     const target = path.join(tempDir, "HookEffectPanel.tsx");
@@ -84,7 +84,14 @@ test("pre-read payload builder trims React Web edit-target routing as an ordered
     assert.equal(decision.debug.reactWebContextBudget.included, true);
     assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
     assert.ok(decision.debug.reactWebContextBudget.estimatedPayloadBytes <= decision.debug.reactWebContextBudget.maxPayloadBytes);
-    assert.equal(decision.payload.reactWebContext.editTargetRouting.length < 8, true);
+    assert.equal("importRoleHints" in decision.payload.reactWebContext, false);
+    assert.equal("stylingVariantHints" in decision.payload.reactWebContext, false);
+    assert.equal("localDependencies" in decision.payload.reactWebContext, false);
+    assert.equal("renderStates" in decision.payload.reactWebContext, false);
+    assert.equal("stateHints" in decision.payload.reactWebContext, false);
+    assert.equal("componentApiHints" in decision.payload.reactWebContext, false);
+    assert.equal("layoutRegionHints" in decision.payload.reactWebContext, false);
+    assert.equal(decision.payload.reactWebContext.editTargetRouting.length, 8);
     assert.deepEqual(
       decision.payload.reactWebContext.editTargetRouting.map((item) => ({
         kind: item.kind,
@@ -115,9 +122,43 @@ test("pre-read payload builder trims React Web edit-target routing as an ordered
           source: "editGuidance.patchTargets",
           evidence: ["editGuidance.patchTargets.effect"],
         },
+        {
+          kind: "callback",
+          label: "useMemo deps:[name]",
+          priority: 4,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.callback"],
+        },
+        {
+          kind: "callback",
+          label: "useCallback deps:[loadUser, userId]",
+          priority: 5,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.callback"],
+        },
+        {
+          kind: "event-handler",
+          label: "handleRefresh",
+          priority: 6,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.event-handler"],
+        },
+        {
+          kind: "event-handler",
+          label: "handleRefresh",
+          priority: 7,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.event-handler"],
+        },
+        {
+          kind: "conditional-region",
+          label: "useEffect",
+          priority: 8,
+          source: "editGuidance.patchTargets",
+          evidence: ["editGuidance.patchTargets.snippet"],
+        },
       ],
     );
-    assert.ok(decision.payload.reactWebContext.stateHints.length > 0);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

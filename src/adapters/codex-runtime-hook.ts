@@ -41,9 +41,9 @@ function payloadContextModeReason(
     : `${phase}-exact-file-narrow-payload`;
 }
 
-function buildRuntimeContextPayload(payload: ModelFacingPayload): { optimized: boolean; payload: unknown } {
+function buildRuntimeContextPayload(payload: ModelFacingPayload, includeReactWebContext = true): { optimized: boolean; payload: unknown } {
   if (payload.domainPayload?.domain === "react-web" && !payload.editGuidance && !payload.useOriginal) {
-    const reactWebContext = payload.reactWebContext
+    const reactWebContext = includeReactWebContext && payload.reactWebContext
       ? {
           schemaVersion: payload.reactWebContext.schemaVersion,
           freshness: payload.reactWebContext.freshness,
@@ -67,12 +67,35 @@ function buildRuntimeContextPayload(payload: ModelFacingPayload): { optimized: b
   return { optimized: false, payload };
 }
 
-function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, contextMode: ContextMode): string {
-  const runtimeContextPayload = buildRuntimeContextPayload(payload);
+function renderAdditionalContext(
+  filePath: string,
+  payloadMode: ModelFacingPayload["mode"],
+  contextMode: ContextMode,
+  runtimeContextPayload: ReturnType<typeof buildRuntimeContextPayload>,
+): string {
   return [
-    `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode}`,
+    `${buildPreReadReuseStatus(payloadMode)} · file: ${filePath} · context-mode: ${contextMode}`,
     JSON.stringify(runtimeContextPayload.payload, null, runtimeContextPayload.optimized ? undefined : 2),
   ].join("\n");
+}
+
+function buildAdditionalContext(
+  filePath: string,
+  payload: ModelFacingPayload,
+  contextMode: ContextMode,
+  maxOptimizedContextBytes?: number,
+): string {
+  const runtimeContextPayload = buildRuntimeContextPayload(payload);
+  const additionalContext = renderAdditionalContext(filePath, payload.mode, contextMode, runtimeContextPayload);
+  if (
+    runtimeContextPayload.optimized &&
+    payload.reactWebContext &&
+    maxOptimizedContextBytes !== undefined &&
+    estimateTextBytes(additionalContext) > maxOptimizedContextBytes
+  ) {
+    return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload, false));
+  }
+  return additionalContext;
 }
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
@@ -350,7 +373,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       });
       if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
         const optInContextMode = payloadContextMode(optInDecision.payload);
-        const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode);
+        const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode, originalEstimatedBytes);
         const estimatedContextBytes = estimateTextBytes(optInAdditionalContext);
         if (estimatedContextBytes <= editGuidanceBudgetLimit(originalEstimatedBytes)) {
           decision = optInDecision;
@@ -363,7 +386,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
-    const additionalContext = buildAdditionalContext(target, decision.payload, contextMode);
+    const additionalContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes);
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
     const runtimeDecision: CodexRuntimeHookDecision = {
