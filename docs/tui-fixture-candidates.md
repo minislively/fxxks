@@ -97,6 +97,17 @@ This matrix is the current review contract for TUI-related fixtures. It is inten
 
 If a future PR changes any row from fallback/no-payload to payload emission, it is no longer a TUI evidence matrix update and must go through a serialized shared-policy plan.
 
+## Payload design readiness handoff
+
+The evidence matrix above is sufficient to discuss a future payload-design PRD, but it is not itself a payload contract. A payload-design handoff must first prove that the current evidence-only lane stays denied:
+
+- positive Ink concern evidence is mapped to fixtures before design assumptions are made;
+- negative, weak, and mixed fixtures keep fallback/no-payload behavior;
+- the TUI payload policy remains `allowed: false` for current fixtures;
+- pre-read emits no model-facing TUI payload;
+- terminal runtime facts, command execution, key handling correctness, token reduction, billing reduction, provider-cost reduction, and performance outcomes are treated as non-claims until measured in a separate plan;
+- any detector, registry, manifest, payload builder, pre-read, runtime, or cross-lane frontend edit is out of scope for a readiness handoff and requires a separate serialized plan.
+
 ## Candidate source notes
 
 If a future PR names public repositories, keep the list conservative and verify license, activity, file paths, and commit SHAs at that time. Good seed sources are likely to be established Ink examples, React-based CLI apps, or prompt/status UI components with inspectable TSX/JSX. Do not use curated lists, stale forks, or runtime-only demos as evidence fixtures unless a pinned source file clearly exercises one category above.
