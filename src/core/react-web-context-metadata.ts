@@ -6,6 +6,7 @@ import {
   type ReactWebContextA11yAnchor,
   type ReactWebContextEditTargetRoute,
   type ReactWebContextFormStateFlowEntry,
+  type ReactWebContextImportRoleHint,
   type ReactWebContextIntentTarget,
   type ReactWebContextLocalDependency,
   type ReactWebContextMetadataV0,
@@ -19,6 +20,7 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   renderStates: 12,
   a11yAnchors: 16,
   localDependencies: 12,
+  importRoleHints: 12,
   intentTargets: 16,
   editTargetRouting: 8,
   formStateFlow: 10,
@@ -230,6 +232,60 @@ function buildLocalDependencies(result: ExtractionResult): ReactWebContextLocalD
   }
 
   return dedupeBy(dependencies, (item) => `${item.kind}:${item.symbol}:${item.loc?.startLine ?? ""}`);
+}
+
+function importRoleFor(moduleSpecifier: string, importedSymbols: string[] = []): ReactWebContextImportRoleHint["role"] | undefined {
+  if (moduleSpecifier === "react-hook-form" || moduleSpecifier.startsWith("@hookform/")) return "form-library";
+  if (["zod", "yup", "valibot", "joi", "superstruct", "arktype"].includes(moduleSpecifier)) return "validation-library";
+  if (
+    moduleSpecifier === "next/link" ||
+    moduleSpecifier === "next/navigation" ||
+    moduleSpecifier === "react-router" ||
+    moduleSpecifier === "react-router-dom" ||
+    moduleSpecifier === "@remix-run/react"
+  ) {
+    return "routing";
+  }
+  if (
+    moduleSpecifier.startsWith("@/components/ui") ||
+    moduleSpecifier.includes("/components/ui/") ||
+    moduleSpecifier.startsWith("@radix-ui/") ||
+    moduleSpecifier.startsWith("@mui/") ||
+    moduleSpecifier.startsWith("@chakra-ui/") ||
+    moduleSpecifier === "antd"
+  ) {
+    return "ui-kit";
+  }
+  if (
+    moduleSpecifier === "lucide-react" ||
+    moduleSpecifier.startsWith("react-icons/") ||
+    moduleSpecifier.startsWith("@heroicons/react")
+  ) {
+    return "icon-library";
+  }
+  if (moduleSpecifier.startsWith(".")) {
+    const hasComponentSymbol = importedSymbols.some((symbol) => /^[A-Z]/.test(symbol) && !/(?:Props|Type|Types|Config|Options)$/.test(symbol));
+    if (hasComponentSymbol) return "local-component";
+  }
+  return undefined;
+}
+
+function buildImportRoleHints(result: ExtractionResult): ReactWebContextImportRoleHint[] {
+  const hints: ReactWebContextImportRoleHint[] = [];
+
+  for (const importSignal of result.structure?.imports ?? []) {
+    const role = importRoleFor(importSignal.moduleSpecifier, importSignal.importedSymbols ?? []);
+    if (!role) continue;
+    hints.push({
+      role,
+      moduleSpecifier: importSignal.moduleSpecifier,
+      ...(importSignal.importedSymbols && importSignal.importedSymbols.length > 0 ? { importedSymbols: importSignal.importedSymbols } : {}),
+      ...(importSignal.loc ? { loc: importSignal.loc } : {}),
+      evidence: ["structure.imports"],
+    });
+  }
+
+  return dedupeBy(hints, (item) => `${item.role}:${item.moduleSpecifier}:${item.importedSymbols?.join(",") ?? ""}`);
 }
 
 function intentForPatchTarget(kind: EditGuidance["patchTargets"][number]["kind"]): ReactWebContextIntentTarget["intent"] | undefined {
@@ -539,6 +595,7 @@ export function buildReactWebContextMetadata(
   const renderStates = pruneArray(buildRenderStates(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.renderStates);
   const a11yAnchors = pruneArray(buildA11yAnchors(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.a11yAnchors);
   const localDependencies = pruneArray(buildLocalDependencies(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.localDependencies);
+  const importRoleHints = pruneArray(buildImportRoleHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.importRoleHints);
   const intentTargets = pruneArray(buildIntentTargets(result, editGuidance), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.intentTargets);
   const editTargetRouting = pruneArray(
     buildEditTargetRouting(result, editGuidance),
@@ -546,7 +603,7 @@ export function buildReactWebContextMetadata(
   );
   const formStateFlow = pruneArray(buildFormStateFlow(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.formStateFlow);
 
-  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || intentTargets || editTargetRouting || formStateFlow);
+  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || importRoleHints || intentTargets || editTargetRouting || formStateFlow);
   if (!hasContext) return undefined;
 
   return {
@@ -562,6 +619,7 @@ export function buildReactWebContextMetadata(
     ...(renderStates ? { renderStates } : {}),
     ...(a11yAnchors ? { a11yAnchors } : {}),
     ...(localDependencies ? { localDependencies } : {}),
+    ...(importRoleHints ? { importRoleHints } : {}),
     ...(intentTargets ? { intentTargets } : {}),
     ...(editTargetRouting ? { editTargetRouting } : {}),
     ...(formStateFlow ? { formStateFlow } : {}),

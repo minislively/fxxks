@@ -4,7 +4,7 @@ import ts from "typescript";
 import { hashText } from "./hash";
 import { decideMode } from "./decide";
 import { detectDomainFromSource } from "./domain-detector";
-import type { A11yAnchorSignal, ExtractionResult, FormSurface, Language, SourceRange, StyleSystem } from "./schema";
+import type { A11yAnchorSignal, ExtractionResult, FormSurface, ImportSignal, Language, SourceRange, StyleSystem } from "./schema";
 
 const HOOK_NAMES = new Set(["useState", "useEffect", "useMemo", "useCallback", "useRef", "useReducer", "useLayoutEffect", "useContext", "useId", "useTransition"]);
 const EFFECT_HOOK_NAMES = new Set(["useEffect", "useLayoutEffect"]);
@@ -176,6 +176,38 @@ function getComponentName(exports: ExtractionResult["exports"]): string | undefi
   const defaultExport = exports.find((item) => item.kind === "default" && isPascal(item.name));
   if (defaultExport) return defaultExport.name;
   return exports.find((item) => isPascal(item.name))?.name;
+}
+
+function collectImports(sourceFile: ts.SourceFile): ImportSignal[] {
+  const imports: ImportSignal[] = [];
+
+  const addImport = (moduleSpecifier: string, importedSymbols: string[], node: ts.Node): void => {
+    const compacted = compactText(moduleSpecifier, 80);
+    if (!compacted) return;
+    imports.push({
+      moduleSpecifier: compacted,
+      ...(importedSymbols.length ? { importedSymbols: [...new Set(importedSymbols)].slice(0, 12) } : {}),
+      loc: sourceRangeOf(sourceFile, node),
+    });
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const symbols: string[] = [];
+    const clause = statement.importClause;
+    if (clause?.name) symbols.push(clause.name.text);
+    if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+      for (const element of clause.namedBindings.elements) {
+        symbols.push(element.name.text);
+      }
+    }
+    if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+      symbols.push(clause.namedBindings.name.text);
+    }
+    addImport(statement.moduleSpecifier.text, symbols, statement);
+  }
+
+  return dedupeBy(imports, (item) => `${item.moduleSpecifier}:${item.importedSymbols?.join(",") ?? ""}:${item.loc?.startLine ?? ""}`).slice(0, 24);
 }
 
 function collectModuleDeclarations(sourceFile: ts.SourceFile): NonNullable<NonNullable<ExtractionResult["structure"]>["moduleDeclarations"]> {
@@ -704,6 +736,7 @@ export function extractSource(filePath: string, sourceText: string): ExtractionR
   const contract = getPropsInfo(sourceFile, componentName);
   const style = detectStyleSystem(sourceFile);
   const behaviorStructure = collectBehaviorAndStructure(sourceFile);
+  const imports = collectImports(sourceFile);
   const importCount = sourceFile.statements.filter(ts.isImportDeclaration).length;
   const moduleDeclarations = language === "ts" || language === "js"
     ? collectModuleDeclarations(sourceFile)
@@ -727,10 +760,11 @@ export function extractSource(filePath: string, sourceText: string): ExtractionR
       generatedAt: new Date().toISOString(),
     },
   };
-  if (moduleDeclarations.length > 0) {
+  if (moduleDeclarations.length > 0 || imports.length > 0) {
     base.structure = {
       ...base.structure,
-      moduleDeclarations,
+      ...(moduleDeclarations.length > 0 ? { moduleDeclarations } : {}),
+      ...(imports.length > 0 ? { imports } : {}),
     };
   }
 
