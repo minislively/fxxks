@@ -16,16 +16,18 @@ This separation is intentional. Domain evidence can tell reviewers what kind of 
 
 ## Fixture roles
 
-| Fixture | Role | Required current result |
-| --- | --- | --- |
-| `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | Compact Ink syntax signal with `Box`, `Text`, and `useInput`. | `tui-ink`, `evidence-only`, denied TUI policy, fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | Behavior-heavy keyboard/list prompt evidence. | `tui-ink`, `evidence-only`, denied TUI policy, `raw-mode` fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-ink-form-prompt.tsx` | Positive form/prompt evidence with input state, validation/error text, submit/apply, and cancel branches. | `tui-ink`, `evidence-only`, denied TUI policy, fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-ink-layout-style.tsx` | Positive layout/style evidence with nested boxes, borders, spacing, color, dim text, and mapped rows. | `tui-ink`, `evidence-only`, denied TUI policy, fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-ink-status-panel.tsx` | Non-interactive status/progress UI syntax evidence. | `tui-ink`, `evidence-only`, denied TUI policy, `raw-mode` fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-non-ink-cli-renderer.tsx` | Negative terminal-looking React renderer without Ink signals. | `unknown`, `deferred`, no TUI policy authorization, fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-ink-web-dom-mixed.tsx` | Mixed-negative Ink plus React Web DOM evidence. | `mixed`, `fallback-boundary`, no TUI or React Web payload authorization, fallback/no-payload. |
-| `test/fixtures/frontend-domain-expectations/tui-ink-rn-narrow-mixed.tsx` | Mixed-negative Ink plus RN primitive/input evidence. | `mixed`, `fallback-boundary`, no TUI or RN narrow payload authorization, fallback/no-payload. |
+These fixture roles are also the current TUI concern taxonomy. Concern labels help reviewers reason about source evidence, but concern evidence is not payload permission.
+
+| Fixture | Concern category | Role | Required current result |
+| --- | --- | --- | --- |
+| `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | Compact Ink syntax baseline; keyboard input | Compact Ink syntax signal with `Box`, `Text`, and `useInput`. | `tui-ink`, `evidence-only`, denied TUI policy, fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | Keyboard input | Behavior-heavy keyboard/list prompt evidence. | `tui-ink`, `evidence-only`, denied TUI policy, `raw-mode` fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-form-prompt.tsx` | Keyboard input; prompt/form flow | Positive form/prompt evidence with input state, validation/error text, submit/apply, and cancel branches. | `tui-ink`, `evidence-only`, denied TUI policy, fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-layout-style.tsx` | Layout/style | Positive layout/style evidence with nested boxes, borders, spacing, color, dim text, and mapped rows. | `tui-ink`, `evidence-only`, denied TUI policy, fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-status-panel.tsx` | Status/progress | Non-interactive status/progress UI syntax evidence. | `tui-ink`, `evidence-only`, denied TUI policy, `raw-mode` fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-non-ink-cli-renderer.tsx` | Non-Ink negative evidence | Negative terminal-looking React renderer without Ink signals. | `unknown`, `deferred`, no TUI policy authorization, fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-web-dom-mixed.tsx` | Mixed-boundary | Mixed-negative Ink plus React Web DOM evidence. | `mixed`, `fallback-boundary`, no TUI or React Web payload authorization, fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-rn-narrow-mixed.tsx` | Mixed-boundary | Mixed-negative Ink plus RN primitive/input evidence. | `mixed`, `fallback-boundary`, no TUI or RN narrow payload authorization, fallback/no-payload. |
 
 ## Allowed next work
 

@@ -98,6 +98,27 @@ const tuiEvidenceMatrix = [
   },
 ];
 
+const tuiConcernTaxonomyTerms = [
+  "Compact Ink syntax baseline",
+  "Keyboard input",
+  "Prompt/form flow",
+  "Layout/style",
+  "Status/progress",
+  "Mixed-boundary",
+  "Non-Ink negative evidence",
+];
+
+const operationalConcernRows = [
+  ["tui-ink-basic.tsx", "Compact Ink syntax baseline; keyboard input"],
+  ["tui-ink-interactive-list.tsx", "Keyboard input"],
+  ["tui-ink-form-prompt.tsx", "Keyboard input; prompt/form flow"],
+  ["tui-ink-layout-style.tsx", "Layout/style"],
+  ["tui-ink-status-panel.tsx", "Status/progress"],
+  ["tui-non-ink-cli-renderer.tsx", "Non-Ink negative evidence"],
+  ["tui-ink-web-dom-mixed.tsx", "Mixed-boundary"],
+  ["tui-ink-rn-narrow-mixed.tsx", "Mixed-boundary"],
+];
+
 function tuiFixturePath(fileName) {
   return path.join("test", "fixtures", "frontend-domain-expectations", fileName);
 }
@@ -395,6 +416,11 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   const survey = fs.readFileSync(path.join(repoRoot, "docs", "tui-fixture-candidates.md"), "utf8");
 
   assert.match(survey, /Current evidence-only reinforcement slice/);
+  assert.match(survey, /TUI concern taxonomy/);
+  assert.match(survey, /concern evidence is not payload permission/);
+  for (const term of tuiConcernTaxonomyTerms) {
+    assert.match(survey, new RegExp(term.replace("/", "\\/")));
+  }
   assert.match(survey, /tui-ink-basic\.tsx/);
   assert.match(survey, /tui-ink-interactive-list\.tsx/);
   assert.match(survey, /tui-ink-form-prompt\.tsx/);
@@ -416,17 +442,19 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
 
   assert.match(guide, /## Current state/);
   assert.match(guide, /## Fixture roles/);
+  assert.match(guide, /current TUI concern taxonomy/);
+  assert.match(guide, /Concern category/);
+  assert.match(guide, /concern evidence is not payload permission/);
   assert.match(guide, /## Allowed next work/);
   assert.match(guide, /## Promotion criteria before payload-design planning/);
   assert.match(guide, /## Stop rules/);
   assert.match(guide, /tui-ink-evidence-only-payload/);
   assert.match(guide, /fallback\/no-payload/);
   assert.match(guide, /serialized shared-policy plan/);
-  assert.match(guide, /tui-ink-form-prompt\.tsx/);
-  assert.match(guide, /tui-ink-layout-style\.tsx/);
-  assert.match(guide, /tui-ink-web-dom-mixed\.tsx/);
+  for (const [fixture, concern] of operationalConcernRows) {
+    assert.ok(guide.includes(`${fixture}\` | ${concern}`), fixture);
+  }
   assert.match(guide, /no TUI or React Web payload authorization/);
-  assert.match(guide, /tui-ink-rn-narrow-mixed\.tsx/);
   assert.match(guide, /no TUI or RN narrow payload authorization/);
   assert.doesNotMatch(guide, forbiddenSupportClaims);
 });

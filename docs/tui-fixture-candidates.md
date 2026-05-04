@@ -38,6 +38,20 @@ Start with a small source-only corpus before any extractor or runtime change:
 
 The current committed TUI / Ink fixtures are useful as domain evidence, not as compact-payload permission:
 
+### TUI concern taxonomy
+
+This taxonomy names the source-level concerns currently represented by TUI fixtures. It is a review vocabulary, not a payload contract: **concern evidence is not payload permission**. A fixture may prove that a concern is visible in source while the TUI lane still denies compact payload emission and keeps normal source fallback.
+
+| Concern | Current meaning | Representative fixtures | Current permission boundary |
+| --- | --- | --- | --- |
+| Compact Ink syntax baseline | Minimal Ink import plus React CLI primitives that prove the file belongs to the Ink evidence lane. | `tui-ink-basic.tsx` | Evidence-only; no compact extraction permission. |
+| Keyboard input | `useInput`, key branching, selection movement, or cancel/submit keys observed in source. | `tui-ink-basic.tsx`, `tui-ink-interactive-list.tsx`, `tui-ink-form-prompt.tsx` | Evidence-only; no terminal key handling correctness claim. |
+| Prompt/form flow | Prompt state, validation/error text, apply/submit, or cancel branches in an Ink component. | `tui-ink-form-prompt.tsx` | Evidence-only; no form runtime or terminal UX correctness claim. |
+| Layout/style | Nested `Box`/`Text`, row/column layout, borders, spacing, color, dim text, or mapped display rows. | `tui-ink-layout-style.tsx` | Evidence-only; no terminal rendering correctness claim. |
+| Status/progress | Non-interactive status rows, command phase labels, progress-like output, elapsed time, or log summaries. | `tui-ink-status-panel.tsx` | Evidence-only; no command execution or progress behavior claim. |
+| Mixed-boundary | Ink evidence combined with React Web DOM or React Native primitive/input evidence in one file. | `tui-ink-web-dom-mixed.tsx`, `tui-ink-rn-narrow-mixed.tsx` | Fallback boundary; no TUI, React Web, or RN payload authorization. |
+| Non-Ink negative evidence | Terminal-looking React or CLI renderer source without Ink import, `Box`, `Text`, or `useInput` signals. | `tui-non-ink-cli-renderer.tsx` | Unknown/deferred fallback; no package or non-Ink terminal UI expansion. |
+
 | Fixture | Evidence it should prove | Required current outcome |
 | --- | --- | --- |
 | `test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx` | Ink import, `Box`, `Text`, and `useInput` signals in a compact React CLI component. | Classify as `tui-ink`, mark the profile `evidence-only`, deny the TUI payload policy, and fall back with `unsupported-frontend-domain-profile`. |
