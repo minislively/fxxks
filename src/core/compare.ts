@@ -6,7 +6,12 @@ import {
   estimateTextBytes,
   estimateTokensFromBytes,
 } from "./session-metrics";
-import type { ModelFacingPayload, OutputMode } from "./schema";
+import type { OutputMode } from "./schema";
+import {
+  formatReactWebContextSummary,
+  reactWebContextSummaryFor,
+  type ReactWebContextSummary,
+} from "./react-web-context-summary";
 
 export const FOOKS_COMPARE_CLAIM_BOUNDARY = `${FOOKS_METRIC_CLAIM_BOUNDARY} Compare values are local model-facing payload estimates, not provider tokenizer output, not runtime hook envelope overhead, and not provider invoice/dashboard/charged-cost proof.`;
 
@@ -16,18 +21,7 @@ export type FooksCompareUserSummary = {
   nextAction: string;
 };
 
-export type FooksCompareReactWebContextSummary = {
-  present: boolean;
-  schemaVersion: string;
-  scope: {
-    kind: "same-file" | "same-component";
-    filePath: string;
-    componentName?: string;
-  };
-  fieldCounts: Record<string, number>;
-  totalAnchors: number;
-  claimBoundary: "source-backed-react-web-context-counts-only";
-};
+export type FooksCompareReactWebContextSummary = ReactWebContextSummary;
 
 export type FooksCompareResult = {
   filePath: string;
@@ -50,45 +44,6 @@ export type FooksCompareResult = {
   claimBoundary: string;
 };
 
-
-const REACT_WEB_CONTEXT_SUMMARY_FIELDS = [
-  "editTargetRouting",
-  "formStateFlow",
-  "a11yAnchors",
-  "intentTargets",
-  "stateHints",
-  "layoutRegionHints",
-  "componentApiHints",
-  "stylingVariantHints",
-  "importRoleHints",
-  "renderStates",
-  "localDependencies",
-] as const;
-
-function reactWebContextSummaryFor(payload: ModelFacingPayload, useOriginal: boolean): FooksCompareReactWebContextSummary | undefined {
-  if (useOriginal || !payload.reactWebContext) return undefined;
-
-  const fieldCounts: Record<string, number> = {};
-  for (const field of REACT_WEB_CONTEXT_SUMMARY_FIELDS) {
-    const values = payload.reactWebContext[field];
-    if (Array.isArray(values) && values.length > 0) {
-      fieldCounts[field] = values.length;
-    }
-  }
-
-  return {
-    present: true,
-    schemaVersion: payload.reactWebContext.schemaVersion,
-    scope: {
-      kind: payload.reactWebContext.scope.kind,
-      filePath: payload.reactWebContext.scope.filePath,
-      componentName: payload.reactWebContext.scope.componentName,
-    },
-    fieldCounts,
-    totalAnchors: Object.values(fieldCounts).reduce((total, count) => total + count, 0),
-    claimBoundary: "source-backed-react-web-context-counts-only",
-  };
-}
 
 function roundPercent(value: number): number {
   return Number(value.toFixed(2));
@@ -135,7 +90,7 @@ export function formatCompare(result: FooksCompareResult): string {
     ? `Local proof: source ${result.sourceBytes} bytes / ${result.estimatedSourceTokens} est tokens → model-facing ${result.modelFacingBytes} bytes / ${result.estimatedModelFacingTokens} est tokens; saved ${result.savedEstimatedBytes} bytes / ${result.savedEstimatedTokens} est tokens.`
     : `Local proof: source ${result.sourceBytes} bytes / ${result.estimatedSourceTokens} est tokens → model-facing ${result.modelFacingBytes} bytes / ${result.estimatedModelFacingTokens} est tokens; no local estimate savings for this file.`;
   const reactWebContextLine = result.reactWebContextSummary
-    ? `React Web context: ${result.reactWebContextSummary.totalAnchors} source-backed anchors across ${Object.keys(result.reactWebContextSummary.fieldCounts).length} summary fields (counts only; see --json).`
+    ? formatReactWebContextSummary(result.reactWebContextSummary)
     : undefined;
   const lines = [
     `fooks compare ${result.filePath}`,
