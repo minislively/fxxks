@@ -62,6 +62,25 @@ test("fallback payload policy returns denied boundary decision for mixed fronten
   assert.deepEqual(assessFallbackPayloadPolicy(domainDetection), expectedMixedPolicy(domainDetection.reason));
 });
 
+test("fallback payload policy keeps RN and WebView mixed evidence fallback-only", () => {
+  const filePath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "negative-rn-webview-boundary.tsx");
+  const domainDetection = detectDomainFromSource(fs.readFileSync(filePath, "utf8"), filePath);
+  const preReadDecision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
+
+  assert.equal(domainDetection.classification, "mixed");
+  assert.equal(domainDetection.reason, preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.ok(domainDetection.signals.some((signal) => signal.startsWith("react-native:")));
+  assert.ok(domainDetection.signals.some((signal) => signal.startsWith("webview:")));
+  assert.deepEqual(assessFallbackPayloadPolicy(domainDetection), expectedMixedPolicy(domainDetection.reason));
+  assert.equal(preReadDecision.decision, "fallback");
+  assert.deepEqual(preReadDecision.reasons, [preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON]);
+  assert.equal(preReadDecision.fallback.reason, preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.equal(preReadDecision.debug.domainDetection.classification, "mixed");
+  assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, false);
+  assert.equal("payload" in preReadDecision, false);
+  assert.equal("readiness" in preReadDecision, false);
+});
+
 test("fallback payload policy returns denied deferred decision for unknown domains", () => {
   const domainDetection = detect(unknownTsxSource(), "PlainUnknown.tsx");
 

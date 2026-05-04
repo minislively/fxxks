@@ -146,6 +146,21 @@ test("frontend profile gate rejects adversarial RN narrow payload contract and f
       stale.domainPayload.reuseContract.requiredSignals = stale.domainPayload.reuseContract.requiredSignals.slice(1);
       return stale;
     }],
+    ["missing denied signal in reuse contract", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.reuseContract.deniedBySignals = stale.domainPayload.reuseContract.deniedBySignals.slice(1);
+      return stale;
+    }],
+    ["wrong reuse contract freshness source", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.reuseContract.freshnessSource = "mtime";
+      return stale;
+    }],
+    ["wrong reuse contract support boundary", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.reuseContract.supportBoundary = "react-native-supported";
+      return stale;
+    }],
     ["missing source fingerprint", () => {
       const stale = clonePayload(payload);
       delete stale.sourceFingerprint;
