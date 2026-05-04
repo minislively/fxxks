@@ -5,10 +5,10 @@ import {
   type ReactNativePrimitiveInputReuseContract,
 } from "../payload/domain-payload";
 import {
-  RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
-  RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES,
+  RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
   RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
+  RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY,
 } from "./react-native";
 import type { ModelFacingPayload, SourceFingerprint } from "../schema";
 import { UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON } from "./fallback";
@@ -30,13 +30,6 @@ function sourceFingerprintsEqual(left: SourceFingerprint | undefined, right: Sou
   return left.fileHash === right.fileHash && left.lineCount === right.lineCount;
 }
 
-function expectedReactNativeDeniedSignals(): string[] {
-  return [
-    ...RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
-    ...RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES.map((prefix) => `${prefix}*`),
-  ];
-}
-
 function isReactNativePrimitiveInputReuseContract(value: unknown): value is ReactNativePrimitiveInputReuseContract {
   if (!value || typeof value !== "object") return false;
   const contract = value as Partial<ReactNativePrimitiveInputReuseContract>;
@@ -52,8 +45,8 @@ function isReactNativePrimitiveInputReuseContract(value: unknown): value is Reac
       "frontendPayloadPolicy no longer allows RN narrow policy",
     ]) &&
     arraysEqual(contract.requiredSignals, RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS) &&
-    arraysEqual(contract.deniedBySignals, expectedReactNativeDeniedSignals()) &&
-    contract.supportBoundary === "measured-evidence-only; no broad RN/WebView/TUI support"
+    arraysEqual(contract.deniedBySignals, RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS) &&
+    contract.supportBoundary === RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY
   );
 }
 
