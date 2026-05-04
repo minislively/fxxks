@@ -684,11 +684,13 @@ function parseExtractArgs(args: string[]): { filePath: string; modelPayload: boo
   return { filePath: requireFilePath(filePath), modelPayload };
 }
 
-function parseCompareArgs(args: string[]): { filePath: string } {
+function parseCompareArgs(args: string[]): { filePath: string; json: boolean } {
   let filePath: string | undefined;
+  let json = false;
 
   for (const arg of args) {
     if (arg === "--json") {
+      json = true;
       continue;
     }
     if (!filePath) {
@@ -698,7 +700,7 @@ function parseCompareArgs(args: string[]): { filePath: string } {
     throw new Error(`Unexpected compare argument: ${arg}`);
   }
 
-  return { filePath: requireFilePath(filePath) };
+  return { filePath: requireFilePath(filePath), json };
 }
 
 type InspectDomainCliResult = {
@@ -1006,9 +1008,14 @@ async function run(): Promise<void> {
     }
 
     case "compare": {
-      const { compareModelFacingPayload } = await import("../core/compare.js");
-      const { filePath: file } = parseCompareArgs(rest);
-      print(compareModelFacingPayload(file, process.cwd()));
+      const { compareModelFacingPayload, formatCompare } = await import("../core/compare.js");
+      const { filePath: file, json } = parseCompareArgs(rest);
+      const result = compareModelFacingPayload(file, process.cwd());
+      if (json) {
+        print(result);
+      } else {
+        process.stdout.write(formatCompare(result));
+      }
       return;
     }
     case "decide": {

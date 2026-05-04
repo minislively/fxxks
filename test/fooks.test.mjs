@@ -504,6 +504,9 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.equal(result.useOriginal, false);
   assert.equal(result.metricTier, "estimated");
   assert.equal(result.measurement, "local-model-facing-payload");
+  assert.equal(result.userSummary.verdict, "estimated-reduction");
+  assert.match(result.userSummary.headline, /smaller model-facing payload/);
+  assert.match(result.userSummary.nextAction, /fooks setup/);
   assert.ok(result.sourceBytes > result.modelFacingBytes);
   assert.ok(result.estimatedSourceTokens > result.estimatedModelFacingTokens);
   assert.ok(result.savedEstimatedBytes > 0);
@@ -528,7 +531,20 @@ test("compare keeps tiny raw fallback from reporting false positive savings", ()
   assert.equal(result.reductionPercent, 0);
   assert.equal(result.payloadLarger, true);
   assert.equal(result.nonSavingReason, "original-source-preserved-for-small-raw-file");
+  assert.equal(result.userSummary.verdict, "no-estimated-reduction");
+  assert.match(result.userSummary.headline, /original source/);
   assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
+});
+
+test("compare default output is a concise human verdict with json details opt-in", () => {
+  const output = runText(["compare", "fixtures/compressed/FormSection.tsx"]);
+  assert.match(output, /^fooks compare fixtures\/compressed\/FormSection\.tsx/m);
+  assert.match(output, /Verdict: estimated-reduction/);
+  assert.match(output, /Why: Estimated \d+(?:\.\d+)?% smaller model-facing payload/);
+  assert.match(output, /Next action: Use fooks setup/);
+  assert.match(output, /Boundary: Local model-facing payload estimate only/);
+  assert.match(output, /fooks compare <file> --json/);
+  assert.doesNotMatch(output.trim(), /^\{/);
 });
 
 test("extract produces compressed output for boilerplate-heavy fixture", () => {

@@ -60,13 +60,13 @@ The default setup output is intentionally short. `fooks setup --json` includes a
 
 ## 3. Check status
 
-A first run should be understandable without reading JSON:
+A first run should be understandable without reading JSON; use `--json` only when you need exact support/debug evidence:
 
 ```bash
 fooks setup          # short ready / partial / blocked summary
 fooks doctor         # read-only readiness diagnosis
 fooks status         # local estimated session telemetry after use
-fooks compare src/components/Button.tsx --json
+fooks compare src/components/Button.tsx   # concise verdict; add --json for exact local evidence
 ```
 
 Use focused diagnostics when needed:

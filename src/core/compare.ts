@@ -10,10 +10,17 @@ import type { OutputMode } from "./schema";
 
 export const FOOKS_COMPARE_CLAIM_BOUNDARY = `${FOOKS_METRIC_CLAIM_BOUNDARY} Compare values are local model-facing payload estimates, not provider tokenizer output, not runtime hook envelope overhead, and not provider invoice/dashboard/charged-cost proof.`;
 
+export type FooksCompareUserSummary = {
+  verdict: "estimated-reduction" | "no-estimated-reduction";
+  headline: string;
+  nextAction: string;
+};
+
 export type FooksCompareResult = {
   filePath: string;
   mode: OutputMode;
   useOriginal: boolean;
+  userSummary: FooksCompareUserSummary;
   sourceBytes: number;
   modelFacingBytes: number;
   estimatedSourceTokens: number;
@@ -39,6 +46,52 @@ function nonSavingReason(useOriginal: boolean, payloadLarger: boolean): FooksCom
   return undefined;
 }
 
+function userSummaryFor(options: {
+  mode: OutputMode;
+  savedEstimatedTokens: number;
+  reductionPercent: number;
+  useOriginal: boolean;
+  payloadLarger: boolean;
+}): FooksCompareUserSummary {
+  if (options.savedEstimatedTokens > 0 && !options.useOriginal && !options.payloadLarger) {
+    return {
+      verdict: "estimated-reduction",
+      headline: `Estimated ${options.reductionPercent}% smaller model-facing payload (${options.savedEstimatedTokens} fewer local estimated tokens).`,
+      nextAction: "Use fooks setup for repeated same-file Codex work, or inspect --json for exact local payload evidence.",
+    };
+  }
+
+  if (options.useOriginal) {
+    return {
+      verdict: "no-estimated-reduction",
+      headline: "No compact payload used: fooks preserved the original source for this small/raw file.",
+      nextAction: "Try compare on a larger supported React .tsx/.jsx component, or use extract --model-payload for manual handoff.",
+    };
+  }
+
+  return {
+    verdict: "no-estimated-reduction",
+    headline: `No estimated reduction for ${options.mode} output: the model-facing payload is not smaller than the source.`,
+    nextAction: "Treat this as a fallback/no-savings case; inspect --json before using it as evidence.",
+  };
+}
+
+export function formatCompare(result: FooksCompareResult): string {
+  const lines = [
+    `fooks compare ${result.filePath}`,
+    "",
+    `Verdict: ${result.userSummary.verdict}`,
+    `Why: ${result.userSummary.headline}`,
+    `Mode: ${result.mode}${result.useOriginal ? " (original source preserved)" : ""}`,
+    `Estimate: ${result.estimatedSourceTokens} source tokens → ${result.estimatedModelFacingTokens} model-facing tokens (${result.reductionPercent}% smaller)`,
+    `Next action: ${result.userSummary.nextAction}`,
+    "",
+    "Boundary: Local model-facing payload estimate only; not provider tokenizer output, billing tokens, invoices, dashboards, or charged costs.",
+    "Details: Run `fooks compare <file> --json` for exact byte counts, exclusions, and claim boundary text.",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
 export function compareModelFacingPayload(filePath: string, cwd = process.cwd()): FooksCompareResult {
   const extracted = extractFile(filePath);
   const payload = toModelFacingPayload(extracted, cwd);
@@ -56,6 +109,7 @@ export function compareModelFacingPayload(filePath: string, cwd = process.cwd())
     filePath: payload.filePath,
     mode: extracted.mode,
     useOriginal,
+    userSummary: userSummaryFor({ mode: extracted.mode, savedEstimatedTokens, reductionPercent, useOriginal, payloadLarger }),
     sourceBytes,
     modelFacingBytes,
     estimatedSourceTokens,
