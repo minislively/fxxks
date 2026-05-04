@@ -13,12 +13,12 @@ function finite(value) {
 }
 
 function claimLine(contextEvidence, reuseEvidence) {
-  const min = contextEvidence.summary.domainPayloadReduction.minPct;
-  const max = contextEvidence.summary.domainPayloadReduction.maxPct;
-  if (!contextEvidence.summary.domainPayloadReduction.claimable || !reuseEvidence.summary.reuseCorrectnessClaimable) {
-    return "React Web evidence is present, but release wording must stay diagnostic until all claimability gates pass.";
+  const min = contextEvidence.summary.actualInjectedContextReduction.minPct;
+  const max = contextEvidence.summary.actualInjectedContextReduction.maxPct;
+  if (!contextEvidence.summary.actualInjectedContextReduction.claimable || !reuseEvidence.summary.reuseCorrectnessClaimable) {
+    return "React Web evidence is present, but npm wording must stay diagnostic until actual injected context and reuse-correctness gates pass.";
   }
-  return `React Web same-file reuse is routed correctly, and current-lane fixtures show ${min}% to ${max}% smaller source-derived domainPayloads in local byte-size evidence.`;
+  return `React Web same-file reuse is routed correctly, and current-lane fixtures show ${min}% to ${max}% smaller actual injected additionalContext by local byte-size evidence.`;
 }
 
 export async function buildReleaseBenchmarkEvidence({
@@ -29,19 +29,26 @@ export async function buildReleaseBenchmarkEvidence({
   const reuseEvidence = await buildReactWebReuseEvidence({ repoRoot, runId: `${runId}-reuse` });
 
   const releaseClaims = {
-    npmUpdateClaimable: contextEvidence.summary.domainPayloadReduction.claimable && reuseEvidence.summary.reuseCorrectnessClaimable,
+    npmUpdateClaimable: contextEvidence.summary.actualInjectedContextReduction.claimable && reuseEvidence.summary.reuseCorrectnessClaimable,
     headline: claimLine(contextEvidence, reuseEvidence),
     allowed: [
       "React Web same-file reuse routes record -> inject for current-lane fixtures.",
       "React Web source changes refresh before attach and do not reuse stale fingerprints.",
-      `React Web current-lane fixtures show ${contextEvidence.summary.domainPayloadReduction.minPct}% to ${contextEvidence.summary.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads by local byte-size measurement.`,
+      ...(contextEvidence.summary.actualInjectedContextReduction.claimable
+        ? [
+            `React Web current-lane fixtures show ${contextEvidence.summary.actualInjectedContextReduction.minPct}% to ${contextEvidence.summary.actualInjectedContextReduction.maxPct}% smaller actual injected additionalContext by local byte-size measurement.`,
+          ]
+        : [
+            "React Web current-lane actual injected additionalContext evidence is diagnostic-only until all fixtures are smaller than source.",
+          ]),
       "RN and WebView boundaries fall back instead of becoming React Web payload support.",
     ],
     forbidden: [
       "Caching performance improved.",
       "Runtime-token savings are proven.",
       "Provider cost or billing is reduced.",
-      "Full runtime payloads are always smaller than source.",
+      "Actual injected runtime context is always smaller than source without fixture evidence.",
+      "Diagnostic domainPayload reduction proves runtime-token savings.",
       "Broad React Web, React Native, or WebView support is available.",
     ],
   };
@@ -58,8 +65,15 @@ export async function buildReleaseBenchmarkEvidence({
       schemaVersion: contextEvidence.schemaVersion,
       fixtureCount: contextEvidence.summary.fixtureCount,
       allReactWebInjects: contextEvidence.summary.allReactWebInjects,
+      actualInjectedContextReduction: {
+        claimable: contextEvidence.summary.actualInjectedContextReduction.claimable,
+        minPct: finite(contextEvidence.summary.actualInjectedContextReduction.minPct),
+        maxPct: finite(contextEvidence.summary.actualInjectedContextReduction.maxPct),
+        blocker: contextEvidence.summary.actualInjectedContextReduction.blocker,
+      },
       domainPayloadReduction: {
         claimable: contextEvidence.summary.domainPayloadReduction.claimable,
+        diagnosticOnly: true,
         minPct: finite(contextEvidence.summary.domainPayloadReduction.minPct),
         maxPct: finite(contextEvidence.summary.domainPayloadReduction.maxPct),
       },
@@ -72,6 +86,8 @@ export async function buildReleaseBenchmarkEvidence({
       fixtures: contextEvidence.fixtures.map((row) => ({
         file: row.file,
         sourceBytes: row.sourceBytes,
+        additionalContextBytes: row.additionalContextBytes,
+        additionalContextReductionPct: row.additionalContextReductionPct,
         domainPayloadBytes: row.domainPayloadBytes,
         domainPayloadReductionPct: row.domainPayloadReductionPct,
         runtimePayloadBytes: row.runtimePayloadBytes,
@@ -106,7 +122,7 @@ export function renderReleaseBenchmarkEvidenceMarkdown(evidence) {
   const fixtureRows = evidence.context.fixtures
     .map(
       (row) =>
-        `| \`${row.file}\` | ${row.sourceBytes} | ${row.domainPayloadBytes} | ${row.domainPayloadReductionPct}% | ${row.runtimePayloadBytes} | ${row.runtimePayloadReductionPct}% |`,
+        `| \`${row.file}\` | ${row.sourceBytes} | ${row.additionalContextBytes} | ${row.additionalContextReductionPct}% | ${row.domainPayloadBytes} | ${row.domainPayloadReductionPct}% | ${row.runtimePayloadBytes} | ${row.runtimePayloadReductionPct}% |`,
     )
     .join("\n");
 
@@ -121,13 +137,14 @@ ${evidence.releaseClaims.headline}
 ## Claimable for this npm update
 
 - npm update wording claimable: ${evidence.releaseClaims.npmUpdateClaimable ? "yes" : "no"}
-- React Web context reduction: ${evidence.context.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.context.domainPayloadReduction.minPct}% to ${evidence.context.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads)
+- React Web actual injected context reduction: ${evidence.context.actualInjectedContextReduction.claimable ? "yes" : "no"} (${evidence.context.actualInjectedContextReduction.minPct}% to ${evidence.context.actualInjectedContextReduction.maxPct}% smaller actual additionalContext)
+- React Web domainPayload reduction diagnostic-only: ${evidence.context.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.context.domainPayloadReduction.minPct}% to ${evidence.context.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads)
 - React Web reuse correctness: ${evidence.reuse.reuseCorrectnessClaimable ? "yes" : "no"}
 
 ## Fixture context-size measurements
 
-| Fixture | Source bytes | domainPayload bytes | domainPayload reduction | full runtime payload bytes | full runtime payload reduction |
-| --- | ---: | ---: | ---: | ---: | ---: |
+| Fixture | Source bytes | actual additionalContext bytes | actual additionalContext reduction | diagnostic domainPayload bytes | diagnostic domainPayload reduction | diagnostic runtime payload bytes | diagnostic runtime payload reduction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${fixtureRows}
 
 ## Reuse-correctness checks
@@ -142,7 +159,8 @@ ${fixtureRows}
 - Cache performance improvement: no
 - Runtime-token savings: no
 - Provider billing/cost savings: no
-- Full runtime payloads always smaller than source: no
+- Actual injected runtime context always smaller than source without fixture evidence: no
+- Diagnostic domainPayload reduction proves runtime-token savings: no
 - Broad React Web/RN/WebView support: no
 `;
 }

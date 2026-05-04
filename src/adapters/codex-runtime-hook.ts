@@ -41,11 +41,37 @@ function payloadContextModeReason(
     : `${phase}-exact-file-narrow-payload`;
 }
 
+function buildRuntimeContextPayload(payload: ModelFacingPayload): { optimized: boolean; payload: unknown } {
+  if (payload.domainPayload?.domain === "react-web" && !payload.editGuidance && !payload.useOriginal) {
+    const reactWebContext = payload.reactWebContext
+      ? {
+          schemaVersion: payload.reactWebContext.schemaVersion,
+          freshness: payload.reactWebContext.freshness,
+          scope: {
+            kind: payload.reactWebContext.scope.kind,
+            filePath: payload.reactWebContext.scope.filePath,
+            componentName: payload.reactWebContext.scope.componentName,
+          },
+        }
+      : undefined;
+    return {
+      optimized: true,
+      payload: {
+        filePath: payload.filePath,
+        sourceFingerprint: payload.sourceFingerprint,
+        domainPayload: payload.domainPayload,
+        ...(reactWebContext ? { reactWebContext } : {}),
+      },
+    };
+  }
+  return { optimized: false, payload };
+}
+
 function buildAdditionalContext(filePath: string, payload: ModelFacingPayload, contextMode: ContextMode): string {
+  const runtimeContextPayload = buildRuntimeContextPayload(payload);
   return [
     `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode}`,
-    "",
-    JSON.stringify(payload, null, 2),
+    JSON.stringify(runtimeContextPayload.payload, null, runtimeContextPayload.optimized ? undefined : 2),
   ].join("\n");
 }
 
