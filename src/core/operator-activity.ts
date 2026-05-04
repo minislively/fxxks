@@ -51,15 +51,22 @@ export type OperatorActivityWorktree = {
 export type OperatorActivityTmuxPane = {
   path: string;
   exists: boolean;
+  deleted: boolean;
   current: boolean;
   command?: string;
 };
+
+export type OperatorActivityTmuxSessionStatus = "current" | "activeOrUnknown" | "staleRuntimeCandidate";
 
 export type OperatorActivityTmuxSession = {
   session: string;
   paneCount: number;
   current: boolean;
+  status: OperatorActivityTmuxSessionStatus;
+  reasons: string[];
   panes: OperatorActivityTmuxPane[];
+  manualCleanupCommands: string[];
+  cleanupOrder: string[];
 };
 
 export type OperatorActivityTmux = {
@@ -140,6 +147,10 @@ function panePathDeleted(panePath: string): boolean {
 
 function panePathWithoutDeletedMarker(panePath: string): string {
   return panePath.replace(/ \(deleted\)$/u, "").trim();
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 export function defaultOperatorActivityCommandRunner(command: string, args: string[], cwd: string, timeoutMs: number): string {
@@ -232,7 +243,7 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
     const current = exists && (pathContainsCwd(cleanPanePath, currentCwd) || pathContainsCwd(currentCwd, cleanPanePath));
     if (!includesFooksSignal(pane.session, cwd) && !includesFooksSignal(cleanPanePath, cwd) && !current) continue;
     const panes = panesBySession.get(pane.session) ?? [];
-    panes.push({ path: pane.path, exists, current, command: pane.command });
+    panes.push({ path: pane.path, exists, deleted, current, command: pane.command });
     panesBySession.set(pane.session, panes);
   }
 
@@ -241,12 +252,34 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
     command: OPERATOR_ACTIVITY_TMUX_COMMAND,
     sessions: [...panesBySession.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([session, panes]) => ({
-        session,
-        paneCount: panes.length,
-        current: panes.some((pane) => pane.current),
-        panes,
-      })),
+      .map(([session, panes]) => {
+        const current = panes.some((pane) => pane.current);
+        const allPanesMissing = panes.length > 0 && panes.every((pane) => pane.deleted || !pane.exists);
+        const status: OperatorActivityTmuxSessionStatus = current ? "current" : allPanesMissing ? "staleRuntimeCandidate" : "activeOrUnknown";
+        const reasons = status === "current"
+          ? ["session has a pane at the current working directory"]
+          : status === "staleRuntimeCandidate"
+            ? ["all panes point at missing or deleted paths"]
+            : ["session has live panes away from the current working directory; activity is unknown"];
+        const manualCleanupCommands = status === "staleRuntimeCandidate" ? [`tmux kill-session -t ${shellQuote(session)}`] : [];
+        const cleanupOrder = status === "staleRuntimeCandidate"
+          ? [
+              "Verify the PR/worktree is no longer active",
+              "Stop the stale tmux/OMX/Codex session manually",
+              "Run any git worktree prune/remove follow-up only after the runtime is stopped",
+            ]
+          : [];
+        return {
+          session,
+          paneCount: panes.length,
+          current,
+          status,
+          reasons,
+          panes,
+          manualCleanupCommands,
+          cleanupOrder,
+        };
+      }),
     blockers: uniqueSorted(blockers),
   };
 }

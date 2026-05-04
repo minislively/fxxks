@@ -150,6 +150,46 @@ test("idle activity snapshot remains zero and read-only with opt-in remote count
   assert.equal(gitCalls.some((call) => call.includes("fetch")), false);
 });
 
+test("operator activity classifies stale deleted tmux worktree panes with manual cleanup guidance", () => {
+  const tempDir = makeTempProject();
+  const staleWorktree = path.join(tempDir, ".omx-worktrees", "fooks-issue-467-stale-worktree-cleanup");
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command) => {
+      if (command === "tmux") return `fooks-issue-467\t${staleWorktree} (deleted)\tzsh\n`;
+      throw new Error(`unexpected command ${command}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.tmux.sessions.length, 1);
+  assert.equal(snapshot.tmux.sessions[0].session, "fooks-issue-467");
+  assert.equal(snapshot.tmux.sessions[0].current, false);
+  assert.equal(snapshot.tmux.sessions[0].status, "staleRuntimeCandidate");
+  assert.deepEqual(snapshot.tmux.sessions[0].reasons, ["all panes point at missing or deleted paths"]);
+  assert.deepEqual(snapshot.tmux.sessions[0].panes, [
+    {
+      path: `${staleWorktree} (deleted)`,
+      exists: false,
+      deleted: true,
+      current: false,
+      command: "zsh",
+    },
+  ]);
+  assert.deepEqual(snapshot.tmux.sessions[0].manualCleanupCommands, ["tmux kill-session -t 'fooks-issue-467'"]);
+  assert.deepEqual(snapshot.tmux.sessions[0].cleanupOrder, [
+    "Verify the PR/worktree is no longer active",
+    "Stop the stale tmux/OMX/Codex session manually",
+    "Run any git worktree prune/remove follow-up only after the runtime is stopped",
+  ]);
+});
+
 test("operator activity treats tmux and opt-in GitHub count failures as non-fatal blockers", () => {
   const tempDir = makeTempProject();
   const snapshot = readOperatorActivitySnapshot(tempDir, {
