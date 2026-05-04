@@ -77,13 +77,16 @@ function userSummaryFor(options: {
 }
 
 export function formatCompare(result: FooksCompareResult): string {
+  const proofLine = result.userSummary.verdict === "estimated-reduction"
+    ? `Local proof: source ${result.sourceBytes} bytes / ${result.estimatedSourceTokens} est tokens → model-facing ${result.modelFacingBytes} bytes / ${result.estimatedModelFacingTokens} est tokens; saved ${result.savedEstimatedBytes} bytes / ${result.savedEstimatedTokens} est tokens.`
+    : `Local proof: source ${result.sourceBytes} bytes / ${result.estimatedSourceTokens} est tokens → model-facing ${result.modelFacingBytes} bytes / ${result.estimatedModelFacingTokens} est tokens; no local estimate savings for this file.`;
   const lines = [
     `fooks compare ${result.filePath}`,
     "",
     `Verdict: ${result.userSummary.verdict}`,
     `Why: ${result.userSummary.headline}`,
     `Mode: ${result.mode}${result.useOriginal ? " (original source preserved)" : ""}`,
-    `Estimate: ${result.estimatedSourceTokens} source tokens → ${result.estimatedModelFacingTokens} model-facing tokens (${result.reductionPercent}% smaller)`,
+    proofLine,
     `Next action: ${result.userSummary.nextAction}`,
     "",
     "Boundary: Local model-facing payload estimate only; not provider tokenizer output, billing tokens, invoices, dashboards, or charged costs.",
