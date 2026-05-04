@@ -2766,6 +2766,8 @@ test("setup default output is human-readable and points to --json for details", 
   assert.match(output, /Codex: ready \(automatic-ready\)/);
   assert.match(output, /Claude: ready \(context-hook-ready\)/);
   assert.match(output, /opencode: ready \(tool-ready\)/);
+  assert.match(output, /Next action/);
+  assert.match(output, /fooks doctor/);
   assert.match(output, /fooks setup --json/);
   assert.doesNotMatch(output.trim(), /^\{/);
   assert.doesNotMatch(output, /"runtimeProof"/);
@@ -3053,6 +3055,10 @@ test("doctor codex reports missing runtime blockers without mutating local state
   assert.ok(result.summary.fail >= 1);
   assert.ok(result.checks.some((item) => item.name === "Codex runtime home" && item.status === "fail"));
   assert.ok(result.checks.some((item) => item.name === "Codex hooks" && item.status === "fail"));
+  assert.equal(result.readiness.state, "unhealthy");
+  assert.match(result.readiness.headline, /Codex readiness is not ready/);
+  assert.match(result.readiness.firstBlocker, /Codex runtime home/);
+  assert.match(result.readiness.nextAction, /FOOKS_CODEX_HOME/);
   assert.ok(result.nextSteps.some((item) => item.includes("FOOKS_CODEX_HOME")));
   assert.deepEqual(fileSnapshot(tempDir), beforeProject);
   assert.deepEqual(fileSnapshot(codexHome), beforeCodex);
@@ -3096,6 +3102,9 @@ test("doctor codex passes after isolated setup and reports readiness evidence", 
   const result = run(["doctor", "codex", "--json"], tempDir, env);
   assert.equal(result.healthy, true);
   assert.equal(result.summary.fail, 0);
+  assert.equal(result.readiness.state, "ready");
+  assert.match(result.readiness.headline, /Codex readiness is ready/);
+  assert.match(result.readiness.nextAction, /Open Codex in this repo/);
   const hooks = result.checks.find((item) => item.name === "Codex hooks");
   assert.equal(hooks.status, "pass");
   assert.deepEqual(hooks.evidence.installedEvents, ["SessionStart", "UserPromptSubmit", "Stop"]);
@@ -3182,6 +3191,11 @@ test("doctor human output is readable and includes fixes plus boundaries", () =>
     FOOKS_CLAUDE_HOME: path.join(tempDir, ".missing-claude-home"),
   });
   assert.match(output, /^fooks doctor codex/m);
+  assert.match(output, /Status: unhealthy/);
+  assert.match(output, /Why: Codex readiness is not ready/);
+  assert.match(output, /First blocker: Codex runtime home/);
+  assert.match(output, /Next action: Create the Codex runtime home or set FOOKS_CODEX_HOME/);
+  assert.match(output, /Checks/);
   assert.match(output, /❌ Codex runtime home/);
   assert.match(output, /Fix: Create the Codex runtime home or set FOOKS_CODEX_HOME/);
   assert.match(output, /Summary: \d+ passed, \d+ warnings, \d+ failures/);

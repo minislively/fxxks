@@ -338,10 +338,15 @@ function formatSetupResult(result: Record<string, unknown>): string {
   }
 
   if (nextSteps.length > 0) {
-    lines.push("", "Next", ...nextSteps.map((step) => `  - ${step}`));
+    lines.push("", "Next action", ...nextSteps.map((step) => `  - ${step}`));
   }
 
-  lines.push("", "Details", "  - Run `fooks setup --json` for full paths, manifests, and hook evidence.");
+  lines.push(
+    "",
+    "Details",
+    "  - Run `fooks doctor` for a read-only health check with first-blocker guidance.",
+    "  - Run `fooks setup --json` for full paths, manifests, and hook evidence.",
+  );
 
   return `${lines.join("\n")}\n`;
 }
