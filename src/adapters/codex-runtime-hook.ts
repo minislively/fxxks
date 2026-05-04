@@ -24,6 +24,34 @@ const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|mo
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const EDIT_GUIDANCE_CONTEXT_MAX_BYTES = 8_192;
 
+type RuntimeReactWebContext = NonNullable<ModelFacingPayload["reactWebContext"]>;
+type RuntimeReactWebContextArrayKey = Exclude<{
+  [Key in keyof RuntimeReactWebContext]: RuntimeReactWebContext[Key] extends unknown[] | undefined ? Key : never;
+}[keyof RuntimeReactWebContext], undefined>;
+type PackedRuntimeReactWebContext = {
+  schemaVersion: RuntimeReactWebContext["schemaVersion"];
+  freshness: RuntimeReactWebContext["freshness"];
+  scope: {
+    kind: RuntimeReactWebContext["scope"]["kind"];
+    filePath: RuntimeReactWebContext["scope"]["filePath"];
+    componentName?: RuntimeReactWebContext["scope"]["componentName"];
+  };
+} & Partial<Pick<RuntimeReactWebContext, RuntimeReactWebContextArrayKey>>;
+
+const RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY: RuntimeReactWebContextArrayKey[] = [
+  "editTargetRouting",
+  "formStateFlow",
+  "a11yAnchors",
+  "intentTargets",
+  "stateHints",
+  "layoutRegionHints",
+  "componentApiHints",
+  "stylingVariantHints",
+  "importRoleHints",
+  "renderStates",
+  "localDependencies",
+];
+
 function payloadContextMode(payload: ModelFacingPayload): ContextMode {
   return payload.useOriginal ? "light-minimal" : "light";
 }
@@ -41,27 +69,32 @@ function payloadContextModeReason(
     : `${phase}-exact-file-narrow-payload`;
 }
 
-function buildRuntimeContextPayload(payload: ModelFacingPayload, includeReactWebContext = true): { optimized: boolean; payload: unknown } {
+function minimalRuntimeReactWebContext(reactWebContext: RuntimeReactWebContext): PackedRuntimeReactWebContext {
+  return {
+    schemaVersion: reactWebContext.schemaVersion,
+    freshness: reactWebContext.freshness,
+    scope: {
+      kind: reactWebContext.scope.kind,
+      filePath: reactWebContext.scope.filePath,
+      componentName: reactWebContext.scope.componentName,
+    },
+  };
+}
+
+function optimizedReactWebRuntimePayload(payload: ModelFacingPayload, reactWebContext?: PackedRuntimeReactWebContext): unknown {
+  return {
+    filePath: payload.filePath,
+    sourceFingerprint: payload.sourceFingerprint,
+    domainPayload: payload.domainPayload,
+    ...(reactWebContext ? { reactWebContext } : {}),
+  };
+}
+
+function buildRuntimeContextPayload(payload: ModelFacingPayload, reactWebContext?: PackedRuntimeReactWebContext): { optimized: boolean; payload: unknown } {
   if (payload.domainPayload?.domain === "react-web" && !payload.editGuidance && !payload.useOriginal) {
-    const reactWebContext = includeReactWebContext && payload.reactWebContext
-      ? {
-          schemaVersion: payload.reactWebContext.schemaVersion,
-          freshness: payload.reactWebContext.freshness,
-          scope: {
-            kind: payload.reactWebContext.scope.kind,
-            filePath: payload.reactWebContext.scope.filePath,
-            componentName: payload.reactWebContext.scope.componentName,
-          },
-        }
-      : undefined;
     return {
       optimized: true,
-      payload: {
-        filePath: payload.filePath,
-        sourceFingerprint: payload.sourceFingerprint,
-        domainPayload: payload.domainPayload,
-        ...(reactWebContext ? { reactWebContext } : {}),
-      },
+      payload: optimizedReactWebRuntimePayload(payload, reactWebContext),
     };
   }
   return { optimized: false, payload };
@@ -79,23 +112,70 @@ function renderAdditionalContext(
   ].join("\n");
 }
 
+function renderOptimizedReactWebAdditionalContext(
+  filePath: string,
+  payload: ModelFacingPayload,
+  contextMode: ContextMode,
+  reactWebContext?: PackedRuntimeReactWebContext,
+): string {
+  return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload, reactWebContext));
+}
+
+function compactRuntimeReactWebContext(
+  filePath: string,
+  payload: ModelFacingPayload,
+  contextMode: ContextMode,
+  maxOptimizedContextBytes?: number,
+): PackedRuntimeReactWebContext | undefined {
+  if (!payload.reactWebContext) return undefined;
+
+  const fits = (reactWebContext?: PackedRuntimeReactWebContext): boolean => {
+    if (maxOptimizedContextBytes === undefined) return true;
+    const additionalContext = renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext);
+    return estimateTextBytes(additionalContext) <= maxOptimizedContextBytes;
+  };
+
+  const compactContext = minimalRuntimeReactWebContext(payload.reactWebContext);
+  if (!fits(compactContext)) return undefined;
+
+  for (const field of RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY) {
+    const values = payload.reactWebContext[field];
+    if (!Array.isArray(values) || values.length === 0) continue;
+
+    const fullCandidate = { ...compactContext, [field]: values };
+    if (fits(fullCandidate)) {
+      Object.assign(compactContext, { [field]: values });
+      continue;
+    }
+
+    for (let itemCount = values.length - 1; itemCount > 0; itemCount -= 1) {
+      const partialCandidate = { ...compactContext, [field]: values.slice(0, itemCount) };
+      if (fits(partialCandidate)) {
+        Object.assign(compactContext, { [field]: values.slice(0, itemCount) });
+        break;
+      }
+    }
+  }
+
+  return compactContext;
+}
+
 function buildAdditionalContext(
   filePath: string,
   payload: ModelFacingPayload,
   contextMode: ContextMode,
   maxOptimizedContextBytes?: number,
 ): string {
-  const runtimeContextPayload = buildRuntimeContextPayload(payload);
-  const additionalContext = renderAdditionalContext(filePath, payload.mode, contextMode, runtimeContextPayload);
-  if (
-    runtimeContextPayload.optimized &&
-    payload.reactWebContext &&
-    maxOptimizedContextBytes !== undefined &&
-    estimateTextBytes(additionalContext) > maxOptimizedContextBytes
-  ) {
-    return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload, false));
+  if (payload.domainPayload?.domain === "react-web" && !payload.editGuidance && !payload.useOriginal) {
+    return renderOptimizedReactWebAdditionalContext(
+      filePath,
+      payload,
+      contextMode,
+      compactRuntimeReactWebContext(filePath, payload, contextMode, maxOptimizedContextBytes),
+    );
   }
-  return additionalContext;
+
+  return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload));
 }
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {

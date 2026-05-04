@@ -105,6 +105,76 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondContext.additionalContext.includes("\"reactWebContext\""), true);
   assert.equal(secondContext.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
   assert.equal(secondContext.debug.decision.debug.reactWebContextBudget.included, true);
+  const optimizedContextPayload = JSON.parse(secondContext.additionalContext.split("\n").slice(1).join("\n"));
+  assert.equal(optimizedContextPayload.reactWebContext.schemaVersion, "react-web-context.v0");
+  assert.equal("editTargetRouting" in optimizedContextPayload.reactWebContext, false);
+  assert.ok(
+    Buffer.byteLength(secondContext.additionalContext, "utf8") <= fs.statSync(path.join(repoRoot, "fixtures/compressed/FormSection.tsx")).size,
+  );
+
+  const pressureSession = `bridge-contract-react-web-context-pressure-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: pressureSession }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: pressureSession,
+      prompt: "Inspect fixtures/compressed/HookEffectPanel.tsx",
+    },
+    repoRoot,
+  );
+  const pressureContext = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId: pressureSession,
+      prompt: "Inspect fixtures/compressed/HookEffectPanel.tsx again",
+    },
+    repoRoot,
+  );
+  const pressurePayload = JSON.parse(pressureContext.additionalContext.split("\n").slice(1).join("\n"));
+  assert.equal(pressureContext.contextModeReason, "repeated-exact-file-react-web-payload");
+  assert.equal("reactWebContext" in pressurePayload, false);
+  assert.ok(
+    Buffer.byteLength(pressureContext.additionalContext, "utf8") <= fs.statSync(path.join(repoRoot, "fixtures/compressed/HookEffectPanel.tsx")).size,
+  );
+
+  const runtimePackingTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-context-routing-"));
+  try {
+    fs.mkdirSync(path.join(runtimePackingTempDir, "src"), { recursive: true });
+    const largeReactSource = `${fs.readFileSync(path.join(repoRoot, "fixtures/compressed/FormSection.tsx"), "utf8")}
+{/* ${"routing budget filler ".repeat(200)} */}
+`;
+    fs.writeFileSync(path.join(runtimePackingTempDir, "src", "LargeFormSection.tsx"), largeReactSource);
+
+    const packedSession = `bridge-contract-react-web-context-packed-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: packedSession }, runtimePackingTempDir);
+    handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId: packedSession,
+        prompt: "Inspect src/LargeFormSection.tsx",
+      },
+      runtimePackingTempDir,
+    );
+    const packedContext = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId: packedSession,
+        prompt: "Inspect src/LargeFormSection.tsx again",
+      },
+      runtimePackingTempDir,
+    );
+    const packedPayload = JSON.parse(packedContext.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(packedContext.action, "inject");
+    assert.equal(packedContext.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.ok(Array.isArray(packedPayload.reactWebContext.editTargetRouting));
+    assert.ok(packedPayload.reactWebContext.editTargetRouting.length > 0);
+    assert.ok(Array.isArray(packedPayload.reactWebContext.a11yAnchors));
+    assert.ok(Buffer.byteLength(packedContext.additionalContext, "utf8") <= Buffer.byteLength(largeReactSource, "utf8"));
+    assert.equal("sourceRanges" in packedPayload.reactWebContext, false);
+  } finally {
+    fs.rmSync(runtimePackingTempDir, { recursive: true, force: true });
+  }
 
   const wrapperSession = `bridge-contract-wrapper-debug-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: wrapperSession }, repoRoot);
