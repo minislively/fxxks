@@ -78,6 +78,12 @@ export type ModuleDeclarationSignal = LocatedString & {
   exported?: boolean;
 };
 
+export type ImportSignal = {
+  moduleSpecifier: string;
+  importedSymbols?: string[];
+  loc?: SourceRange;
+};
+
 export type PatchTargetKind =
   | "component"
   | "props"
@@ -140,6 +146,14 @@ export type ReactWebContextLocalDependency = {
   kind: "local-declaration";
   loc?: SourceRange;
   usedBy?: string[];
+};
+
+export type ReactWebContextImportRoleHint = {
+  role: "form-library" | "validation-library" | "routing" | "ui-kit" | "icon-library" | "local-component";
+  moduleSpecifier: string;
+  importedSymbols?: string[];
+  loc?: SourceRange;
+  evidence: string[];
 };
 
 export type ReactWebContextIntentTarget = {
@@ -211,6 +225,7 @@ export type ReactWebContextMetadataV0 = {
   renderStates?: ReactWebContextRenderState[];
   a11yAnchors?: ReactWebContextA11yAnchor[];
   localDependencies?: ReactWebContextLocalDependency[];
+  importRoleHints?: ReactWebContextImportRoleHint[];
   intentTargets?: ReactWebContextIntentTarget[];
   editTargetRouting?: ReactWebContextEditTargetRoute[];
   formStateFlow?: ReactWebContextFormStateFlowEntry[];
@@ -255,6 +270,7 @@ export type ExtractionResult = {
     repeatedBlocks?: string[];
     jsxDepth?: number;
     moduleDeclarations?: ModuleDeclarationSignal[];
+    imports?: ImportSignal[];
   };
   style?: {
     system?: StyleSystem;
@@ -307,6 +323,7 @@ export type ModelFacingPayload = {
     repeatedBlocks?: string[];
     jsxDepth?: number;
     moduleDeclarations?: ModuleDeclarationSignal[];
+    imports?: ImportSignal[];
   };
   style?: {
     system?: StyleSystem;

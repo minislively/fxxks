@@ -421,6 +421,121 @@ test("React Web formStateFlow does not link hooks from uncontrolled name or id t
   );
 });
 
+
+test("React Web import role hints summarize source-only dependency roles", () => {
+  const source = `
+    import React from "react";
+    import { useForm } from "react-hook-form";
+    import { z } from "zod";
+    import Link from "next/link";
+    import { Button } from "@/components/ui/button";
+    import { Mail } from "lucide-react";
+    import FieldShell from "./FieldShell";
+    import { format } from "date-fns";
+
+    type ImportRolePanelProps = { email: string };
+
+    export function ImportRolePanel({ email }: ImportRolePanelProps) {
+      const form = useForm();
+      const schema = z.object({ email: z.string() });
+      return (
+        <FieldShell className="grid gap-3 rounded-lg border p-4">
+          <Button type="button" className="inline-flex items-center gap-2">
+            <Mail aria-hidden="true" />
+            {email}
+          </Button>
+          <Link href="/settings" className="text-sm underline">Settings</Link>
+          <p className="text-xs text-slate-500">{format(new Date(), "yyyy-MM-dd")}</p>
+          <p className="text-xs text-slate-500">Import role hints are source facts only, not runtime library behavior.</p>
+          <p className="text-xs text-slate-500">This fixture is intentionally long enough for compressed metadata.</p>
+        </FieldShell>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "ImportRolePanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+  assert.deepEqual(
+    payload.reactWebContext.importRoleHints.map((item) => ({
+      role: item.role,
+      moduleSpecifier: item.moduleSpecifier,
+      importedSymbols: item.importedSymbols,
+      evidence: item.evidence,
+    })),
+    [
+      {
+        role: "form-library",
+        moduleSpecifier: "react-hook-form",
+        importedSymbols: ["useForm"],
+        evidence: ["structure.imports"],
+      },
+      {
+        role: "validation-library",
+        moduleSpecifier: "zod",
+        importedSymbols: ["z"],
+        evidence: ["structure.imports"],
+      },
+      {
+        role: "routing",
+        moduleSpecifier: "next/link",
+        importedSymbols: ["Link"],
+        evidence: ["structure.imports"],
+      },
+      {
+        role: "ui-kit",
+        moduleSpecifier: "@/components/ui/button",
+        importedSymbols: ["Button"],
+        evidence: ["structure.imports"],
+      },
+      {
+        role: "icon-library",
+        moduleSpecifier: "lucide-react",
+        importedSymbols: ["Mail"],
+        evidence: ["structure.imports"],
+      },
+      {
+        role: "local-component",
+        moduleSpecifier: "./FieldShell",
+        importedSymbols: ["FieldShell"],
+        evidence: ["structure.imports"],
+      },
+    ],
+  );
+  assert.equal(
+    payload.reactWebContext.importRoleHints.some((item) => item.moduleSpecifier === "date-fns"),
+    false,
+  );
+});
+
+test("React Web import role hints are omitted without recognized source evidence", () => {
+  const source = `
+    import React from "react";
+    import { format } from "date-fns";
+
+    export function UnknownImportPanel() {
+      return (
+        <section className="grid gap-3 rounded-lg border p-4">
+          <p className="text-xs text-slate-500">{format(new Date(), "yyyy-MM-dd")}</p>
+          <p className="text-xs text-slate-500">Unknown imports should not become guessed dependency role hints.</p>
+          <p className="text-xs text-slate-500">This fixture is intentionally long enough for compressed metadata.</p>
+        </section>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "UnknownImportPanel.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.useOriginal, undefined);
+  assert.ok(payload.reactWebContext);
+  assert.equal("importRoleHints" in payload.reactWebContext, false);
+});
+
 test("React Web opt-in emits source-observed role aria and readOnly anchors", () => {
   const source = `
     import React from "react";
