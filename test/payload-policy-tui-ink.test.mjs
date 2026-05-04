@@ -15,6 +15,9 @@ const {
   TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY,
   TUI_INK_EVIDENCE_ONLY_REASON,
 } = require(path.join(repoRoot, "dist", "core", "payload-policy", "tui-ink.js"));
+const { assessReactNativePayloadPolicy } = require(
+  path.join(repoRoot, "dist", "core", "payload-policy", "react-native.js"),
+);
 const preRead = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
 
 const forbiddenSupportClaims = /TUI support is available|TUI is supported today|TUI\/Ink is supported today|terminal correctness is guaranteed|terminal UX safety is guaranteed|runtime-token savings are available|provider-token savings are available|billing savings are available|TUI performance improvement is available|default TUI compact extraction is enabled/i;
@@ -67,6 +70,13 @@ const tuiEvidenceMatrix = [
   },
   {
     fileName: "tui-ink-web-dom-mixed.tsx",
+    classification: "mixed",
+    claimStatus: "fallback-boundary",
+    expectedPolicy: () => undefined,
+    fallbackReason: () => preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
+  },
+  {
+    fileName: "tui-ink-rn-narrow-mixed.tsx",
     classification: "mixed",
     claimStatus: "fallback-boundary",
     expectedPolicy: () => undefined,
@@ -247,6 +257,39 @@ test("TUI/Ink mixed web DOM fixture stays outside TUI and React Web payload lane
   assert.deepEqual(decision.reasons, [preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON]);
 });
 
+test("TUI/Ink mixed RN narrow fixture stays outside TUI and React Native payload lanes", () => {
+  const relativeFixturePath = path.join(
+    "test",
+    "fixtures",
+    "frontend-domain-expectations",
+    "tui-ink-rn-narrow-mixed.tsx",
+  );
+  const fixturePath = path.join(repoRoot, relativeFixturePath);
+  const domainDetection = detect(readFixture(relativeFixturePath), "tui-ink-rn-narrow-mixed.tsx");
+
+  assert.equal(domainDetection.classification, "mixed");
+  assert.equal(domainDetection.profile.claimStatus, "fallback-boundary");
+  assert.ok(domainDetection.signals.includes("tui-ink:import:ink"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Box"));
+  assert.ok(domainDetection.signals.includes("react-native:primitive:View"));
+  assert.ok(domainDetection.signals.includes("react-native:primitive:Text"));
+  assert.ok(domainDetection.signals.includes("react-native:primitive:TextInput"));
+  assert.ok(domainDetection.signals.includes("react-native:primitive:Pressable"));
+  assert.ok(domainDetection.signals.includes("react-native:jsx-prop:onChangeText"));
+  assert.ok(domainDetection.signals.includes("react-native:jsx-prop:onPress"));
+  assert.equal(assessTuiInkPayloadPolicy(domainDetection), undefined);
+  assert.equal(assessReactNativePayloadPolicy(domainDetection), undefined);
+
+  const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
+
+  assertFallbackWithoutPayload(decision);
+  assert.equal(decision.debug.domainDetection.classification, "mixed");
+  assert.equal(decision.debug.frontendPayloadPolicy.name, preRead.MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY);
+  assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+  assert.equal(decision.debug.frontendPayloadPolicy.reason, preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.deepEqual(decision.reasons, [preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON]);
+});
+
 test("TUI evidence matrix rows stay aligned with policy and pre-read boundaries", () => {
   for (const row of tuiEvidenceMatrix) {
     const relativeFixturePath = tuiFixturePath(row.fileName);
@@ -285,6 +328,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /unsupported-frontend-domain-profile/);
   assert.match(survey, /tui-non-ink-cli-renderer\.tsx/);
   assert.match(survey, /tui-ink-web-dom-mixed\.tsx/);
+  assert.match(survey, /tui-ink-rn-narrow-mixed\.tsx/);
   assert.match(survey, /Negative\/fallback reinforcement/);
   assert.match(survey, /Current TUI evidence matrix/);
   assert.match(survey, /tui-ink-evidence-only-payload/);
@@ -305,5 +349,7 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /serialized shared-policy plan/);
   assert.match(guide, /tui-ink-web-dom-mixed\.tsx/);
   assert.match(guide, /no TUI or React Web payload authorization/);
+  assert.match(guide, /tui-ink-rn-narrow-mixed\.tsx/);
+  assert.match(guide, /no TUI or RN narrow payload authorization/);
   assert.doesNotMatch(guide, forbiddenSupportClaims);
 });
