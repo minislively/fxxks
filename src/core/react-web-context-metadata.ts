@@ -12,6 +12,7 @@ import {
   type ReactWebContextMetadataV0,
   type ReactWebContextRenderState,
   type ReactWebContextStateHint,
+  type ReactWebContextStylingVariantHint,
   type SourceFingerprint,
 } from "./schema";
 
@@ -21,6 +22,7 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   a11yAnchors: 16,
   localDependencies: 12,
   importRoleHints: 12,
+  stylingVariantHints: 12,
   intentTargets: 16,
   editTargetRouting: 8,
   formStateFlow: 10,
@@ -286,6 +288,42 @@ function buildImportRoleHints(result: ExtractionResult): ReactWebContextImportRo
   }
 
   return dedupeBy(hints, (item) => `${item.role}:${item.moduleSpecifier}:${item.importedSymbols?.join(",") ?? ""}`);
+}
+
+const STYLE_VARIANT_CONTRACT_NAMES = new Set(["variant", "size", "tone", "intent", "disabled", "selected", "loading", "compact"]);
+
+function propName(summary: string): string | undefined {
+  const match = summary.match(/^([A-Za-z_$][\w$]*)\??:/);
+  return match?.[1];
+}
+
+function buildStylingVariantHints(result: ExtractionResult): ReactWebContextStylingVariantHint[] {
+  const hints: ReactWebContextStylingVariantHint[] = [];
+
+  for (const signal of result.style?.variantSignals ?? []) {
+    hints.push({
+      kind: signal.kind,
+      label: compact(signal.label),
+      ...(signal.propName ? { propName: signal.propName } : {}),
+      ...(signal.value ? { value: compact(signal.value, 80) } : {}),
+      ...(signal.loc ? { loc: signal.loc } : {}),
+      evidence: [`style.variantSignals.${signal.kind}`],
+    });
+  }
+
+  for (const summary of result.contract?.propsSummary ?? []) {
+    const name = propName(summary);
+    if (!name || !STYLE_VARIANT_CONTRACT_NAMES.has(name)) continue;
+    hints.push({
+      kind: "props-contract",
+      label: compact(summary, 80),
+      propName: name,
+      ...(result.contract?.propsLoc ? { loc: result.contract.propsLoc } : {}),
+      evidence: ["contract.propsSummary"],
+    });
+  }
+
+  return dedupeBy(hints, (item) => `${item.kind}:${item.propName ?? ""}:${item.label}:${item.loc?.startLine ?? ""}`);
 }
 
 function intentForPatchTarget(kind: EditGuidance["patchTargets"][number]["kind"]): ReactWebContextIntentTarget["intent"] | undefined {
@@ -596,6 +634,7 @@ export function buildReactWebContextMetadata(
   const a11yAnchors = pruneArray(buildA11yAnchors(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.a11yAnchors);
   const localDependencies = pruneArray(buildLocalDependencies(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.localDependencies);
   const importRoleHints = pruneArray(buildImportRoleHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.importRoleHints);
+  const stylingVariantHints = pruneArray(buildStylingVariantHints(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.stylingVariantHints);
   const intentTargets = pruneArray(buildIntentTargets(result, editGuidance), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.intentTargets);
   const editTargetRouting = pruneArray(
     buildEditTargetRouting(result, editGuidance),
@@ -603,7 +642,7 @@ export function buildReactWebContextMetadata(
   );
   const formStateFlow = pruneArray(buildFormStateFlow(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.formStateFlow);
 
-  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || importRoleHints || intentTargets || editTargetRouting || formStateFlow);
+  const hasContext = Boolean(stateHints || renderStates || a11yAnchors || localDependencies || importRoleHints || stylingVariantHints || intentTargets || editTargetRouting || formStateFlow);
   if (!hasContext) return undefined;
 
   return {
@@ -620,6 +659,7 @@ export function buildReactWebContextMetadata(
     ...(a11yAnchors ? { a11yAnchors } : {}),
     ...(localDependencies ? { localDependencies } : {}),
     ...(importRoleHints ? { importRoleHints } : {}),
+    ...(stylingVariantHints ? { stylingVariantHints } : {}),
     ...(intentTargets ? { intentTargets } : {}),
     ...(editTargetRouting ? { editTargetRouting } : {}),
     ...(formStateFlow ? { formStateFlow } : {}),

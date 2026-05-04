@@ -4,7 +4,7 @@ import ts from "typescript";
 import { hashText } from "./hash";
 import { decideMode } from "./decide";
 import { detectDomainFromSource } from "./domain-detector";
-import type { A11yAnchorSignal, ExtractionResult, FormSurface, ImportSignal, Language, SourceRange, StyleSystem } from "./schema";
+import type { A11yAnchorSignal, ExtractionResult, FormSurface, ImportSignal, Language, SourceRange, StyleSystem, StyleVariantSignal } from "./schema";
 
 const HOOK_NAMES = new Set(["useState", "useEffect", "useMemo", "useCallback", "useRef", "useReducer", "useLayoutEffect", "useContext", "useId", "useTransition"]);
 const EFFECT_HOOK_NAMES = new Set(["useEffect", "useLayoutEffect"]);
@@ -19,6 +19,8 @@ const MAX_FORM_ANCHORS = 8;
 const MAX_DEPENDENCIES = 8;
 const MAX_CONTROL_PROPS = 8;
 const MAX_TEXT_LENGTH = 48;
+const STYLE_VARIANT_PROP_NAMES = new Set(["variant", "size", "tone", "intent", "disabled", "selected", "loading", "compact"]);
+const MAX_STYLE_VARIANT_SIGNALS = 16;
 
 function getLanguage(filePath: string): Language {
   const ext = path.extname(filePath);
@@ -366,6 +368,7 @@ function detectStyleSystem(sourceFile: ts.SourceFile): ExtractionResult["style"]
   let system: StyleSystem = "unknown";
   const summary: string[] = [];
   const sourceText = sourceFile.text;
+  const variantSignals: StyleVariantSignal[] = [];
 
   if (imports.some((spec) => spec.includes(".module.css") || spec.includes(".module.scss"))) {
     system = "css-modules";
@@ -387,7 +390,77 @@ function detectStyleSystem(sourceFile: ts.SourceFile): ExtractionResult["style"]
     summary.push("inline-style-prop");
   }
   const hasStyleBranching = /className\s*=\s*\{/.test(sourceText) || /style\s*=\s*\{/.test(sourceText);
-  return { system, summary, hasStyleBranching };
+
+  const jsxAttributeValue = (attribute: ts.JsxAttribute): string | undefined => {
+    if (!attribute.initializer) return "true";
+    if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text;
+    if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression) {
+      return compactText(attribute.initializer.expression.getText(sourceFile), 80);
+    }
+    return compactText(attribute.initializer.getText(sourceFile), 80);
+  };
+
+  const addStyleSignal = (signal: StyleVariantSignal): void => {
+    if (!signal.label) return;
+    variantSignals.push(signal);
+  };
+
+  function visit(node: ts.Node): void {
+    if (ts.isJsxAttribute(node)) {
+      const propName = node.name.getText(sourceFile);
+      const value = jsxAttributeValue(node);
+      if (propName === "className" && node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression) {
+        addStyleSignal({
+          kind: "className-branch",
+          label: compactText(node.initializer.expression.getText(sourceFile), 80),
+          propName,
+          ...(value ? { value } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+        });
+      }
+      if (propName === "style") {
+        addStyleSignal({
+          kind: "inline-style",
+          label: value ? compactText(value, 80) : "style",
+          propName,
+          ...(value ? { value } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+        });
+      }
+      if (propName === "data-state") {
+        addStyleSignal({
+          kind: "data-state",
+          label: value ? `data-state=${compactText(value, 60)}` : "data-state",
+          propName,
+          ...(value ? { value } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+        });
+      }
+      if (STYLE_VARIANT_PROP_NAMES.has(propName)) {
+        addStyleSignal({
+          kind: "variant-prop",
+          label: value ? `${propName}=${compactText(value, 60)}` : propName,
+          propName,
+          ...(value ? { value } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  const dedupedSignals = dedupeBy(
+    variantSignals,
+    (item) => `${item.kind}:${item.propName ?? ""}:${item.label}:${item.loc?.startLine ?? ""}`,
+  ).slice(0, MAX_STYLE_VARIANT_SIGNALS);
+
+  return {
+    system,
+    summary,
+    hasStyleBranching,
+    ...(dedupedSignals.length ? { variantSignals: dedupedSignals } : {}),
+  };
 }
 
 function collectSectionsFromJsx(sourceFile: ts.SourceFile): { sections: string[]; jsxDepth: number } {
