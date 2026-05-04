@@ -62,6 +62,13 @@ const tuiEvidenceMatrix = [
     fallbackReason: () => preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
   },
   {
+    fileName: "tui-ink-layout-style.tsx",
+    classification: "tui-ink",
+    claimStatus: "evidence-only",
+    expectedPolicy: expectedTuiEvidenceOnlyPolicy,
+    fallbackReason: () => preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+  },
+  {
     fileName: "tui-ink-status-panel.tsx",
     classification: "tui-ink",
     claimStatus: "evidence-only",
@@ -206,6 +213,37 @@ test("TUI/Ink form prompt fixture broadens positive evidence without payload per
   assert.match(fixtureSource, /Target is required/);
   assert.match(fixtureSource, /key\.return/);
   assert.match(fixtureSource, /key\.escape/);
+  assert.deepEqual(assessTuiInkPayloadPolicy(domainDetection), expectedTuiEvidenceOnlyPolicy());
+
+  const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
+
+  assertTuiFallbackWithoutPayload(decision, preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
+});
+
+test("TUI/Ink layout style fixture broadens positive evidence without payload permission", () => {
+  const relativeFixturePath = path.join(
+    "test",
+    "fixtures",
+    "frontend-domain-expectations",
+    "tui-ink-layout-style.tsx",
+  );
+  const fixturePath = path.join(repoRoot, relativeFixturePath);
+  const fixtureSource = readFixture(relativeFixturePath);
+  const domainDetection = detect(fixtureSource, "tui-ink-layout-style.tsx");
+
+  assert.equal(domainDetection.classification, "tui-ink");
+  assert.equal(domainDetection.profile.claimStatus, "evidence-only");
+  assert.ok(domainDetection.signals.includes("tui-ink:import:ink"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Box"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Text"));
+  assert.equal(domainDetection.signals.includes("tui-ink:hook:useInput"), false);
+  assert.match(fixtureSource, /flexDirection="column"/);
+  assert.match(fixtureSource, /gap=\{1\}/);
+  assert.match(fixtureSource, /paddingX=\{1\}/);
+  assert.match(fixtureSource, /borderStyle="round"/);
+  assert.match(fixtureSource, /borderColor="cyan"/);
+  assert.match(fixtureSource, /color="cyan"/);
+  assert.match(fixtureSource, /dimColor/);
   assert.deepEqual(assessTuiInkPayloadPolicy(domainDetection), expectedTuiEvidenceOnlyPolicy());
 
   const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
@@ -360,6 +398,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /tui-ink-basic\.tsx/);
   assert.match(survey, /tui-ink-interactive-list\.tsx/);
   assert.match(survey, /tui-ink-form-prompt\.tsx/);
+  assert.match(survey, /tui-ink-layout-style\.tsx/);
   assert.match(survey, /tui-ink-status-panel\.tsx/);
   assert.match(survey, /unsupported-frontend-domain-profile/);
   assert.match(survey, /tui-non-ink-cli-renderer\.tsx/);
@@ -384,6 +423,7 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /fallback\/no-payload/);
   assert.match(guide, /serialized shared-policy plan/);
   assert.match(guide, /tui-ink-form-prompt\.tsx/);
+  assert.match(guide, /tui-ink-layout-style\.tsx/);
   assert.match(guide, /tui-ink-web-dom-mixed\.tsx/);
   assert.match(guide, /no TUI or React Web payload authorization/);
   assert.match(guide, /tui-ink-rn-narrow-mixed\.tsx/);
