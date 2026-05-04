@@ -1,34 +1,16 @@
 import type { DomainDetectionResult } from "../domain-detector";
+import { REACT_NATIVE_SIGNAL_TAXONOMY } from "../domain-profiles/react-native";
 import type { FrontendPayloadPolicyDecision } from "./types";
 
-export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = "rn-primitive-input-narrow-payload";
-
-export const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = [
-  "react-native:primitive:View",
-  "react-native:primitive:Text",
-  "react-native:primitive:TextInput",
-  "react-native:primitive:Pressable",
-  "react-native:jsx-prop:onChangeText",
-  "react-native:jsx-prop:onPress",
+export const RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY = REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.policy;
+export const RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS = REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.requiredSignals;
+export const RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES = REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenPrefixes;
+export const RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS = REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenExactSignals;
+export const RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS = [
+  ...RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
+  ...RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES.map((prefix) => `${prefix}*`),
 ] as const;
-export const RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES = [
-  "webview:",
-  "tui-ink:",
-  "react-native:navigation-",
-  "react-native:api-call:Dimensions.",
-  "react-native:api-call:PanResponder.",
-] as const;
-export const RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS = [
-  "react-native:primitive:FlatList",
-  "react-native:primitive:Image",
-  "react-native:primitive:ScrollView",
-  "react-native:primitive:TouchableOpacity",
-  "react-native:style-factory:StyleSheet.create",
-  "react-native:platform-select:Platform.select",
-  "react-native:style-prop:resizeMode",
-  "react-native:jsx-prop:activeOpacity",
-  "react-native:jsx-prop:pagingEnabled",
-] as const;
+export const RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY = REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.supportBoundary;
 
 type ReactNativePrimitiveInputSignalGate =
   | { allowed: true }

@@ -13,11 +13,20 @@ const { detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "
 const {
   assessReactNativePrimitiveInputSignalGate,
   assessReactNativePayloadPolicy,
+  RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS,
   RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS,
   RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES,
   RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
   RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
+  RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY,
 } = require(path.join(repoRoot, "dist", "core", "payload-policy", "react-native.js"));
+const { REACT_NATIVE_SIGNAL_TAXONOMY } = require(path.join(
+  repoRoot,
+  "dist",
+  "core",
+  "domain-profiles",
+  "react-native.js",
+));
 const { buildReactNativePrimitiveInputDomainPayload } = require(
   path.join(repoRoot, "dist", "core", "payload", "domain-payload.js"),
 );
@@ -223,15 +232,25 @@ test("React Native F1 signal gate is the shared source of truth for policy and p
     "react-native:jsx-prop:pagingEnabled",
   ];
 
-  assert.deepEqual(RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS, requiredSignals);
-  assert.deepEqual(RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS, forbiddenExactSignals);
-  assert.deepEqual(RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES, [
+  assert.deepEqual(REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.requiredSignals, requiredSignals);
+  assert.deepEqual(REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenExactSignals, forbiddenExactSignals);
+  assert.deepEqual(REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenPrefixes, [
     "webview:",
     "tui-ink:",
     "react-native:navigation-",
     "react-native:api-call:Dimensions.",
     "react-native:api-call:PanResponder.",
   ]);
+  assert.equal(REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.supportBoundary, "measured-evidence-only; no broad RN/WebView/TUI support");
+
+  assert.deepEqual(RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS, REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.requiredSignals);
+  assert.deepEqual(RN_PRIMITIVE_INPUT_FORBIDDEN_EXACT_SIGNALS, REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenExactSignals);
+  assert.deepEqual(RN_PRIMITIVE_INPUT_FORBIDDEN_PREFIXES, REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenPrefixes);
+  assert.deepEqual(RN_PRIMITIVE_INPUT_DENIED_BY_SIGNALS, [
+    ...REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenExactSignals,
+    ...REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.forbiddenPrefixes.map((prefix) => `${prefix}*`),
+  ]);
+  assert.equal(RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY, REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput.supportBoundary);
 
   const extractionResult = {
     componentName: "NativeInput",
