@@ -65,6 +65,13 @@ const tuiEvidenceMatrix = [
     expectedPolicy: () => undefined,
     fallbackReason: () => undefined,
   },
+  {
+    fileName: "tui-ink-web-dom-mixed.tsx",
+    classification: "mixed",
+    claimStatus: "fallback-boundary",
+    expectedPolicy: () => undefined,
+    fallbackReason: () => preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
+  },
 ];
 
 function tuiFixturePath(fileName) {
@@ -208,6 +215,38 @@ test("non-Ink CLI renderer fixture stays outside TUI/Ink payload policy", () => 
   assert.equal(decision.debug.frontendPayloadPolicy.reason, preRead.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
 });
 
+test("TUI/Ink mixed web DOM fixture stays outside TUI and React Web payload lanes", () => {
+  const relativeFixturePath = path.join(
+    "test",
+    "fixtures",
+    "frontend-domain-expectations",
+    "tui-ink-web-dom-mixed.tsx",
+  );
+  const fixturePath = path.join(repoRoot, relativeFixturePath);
+  const domainDetection = detect(readFixture(relativeFixturePath), "tui-ink-web-dom-mixed.tsx");
+
+  assert.equal(domainDetection.classification, "mixed");
+  assert.equal(domainDetection.profile.claimStatus, "fallback-boundary");
+  assert.ok(domainDetection.signals.includes("tui-ink:import:ink"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Box"));
+  assert.ok(domainDetection.signals.includes("tui-ink:primitive:Text"));
+  assert.ok(domainDetection.signals.includes("react-web:dom-tag:form"));
+  assert.ok(domainDetection.signals.includes("react-web:dom-tag:input"));
+  assert.ok(domainDetection.signals.includes("react-web:dom-tag:button"));
+  assert.ok(domainDetection.signals.includes("react-web:jsx-attribute:className"));
+  assert.ok(domainDetection.signals.includes("react-web:jsx-attribute:htmlFor"));
+  assert.equal(assessTuiInkPayloadPolicy(domainDetection), undefined);
+
+  const decision = preRead.decidePreRead(fixturePath, repoRoot, "codex");
+
+  assertFallbackWithoutPayload(decision);
+  assert.equal(decision.debug.domainDetection.classification, "mixed");
+  assert.equal(decision.debug.frontendPayloadPolicy.name, preRead.MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY);
+  assert.equal(decision.debug.frontendPayloadPolicy.allowed, false);
+  assert.equal(decision.debug.frontendPayloadPolicy.reason, preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON);
+  assert.deepEqual(decision.reasons, [preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON]);
+});
+
 test("TUI evidence matrix rows stay aligned with policy and pre-read boundaries", () => {
   for (const row of tuiEvidenceMatrix) {
     const relativeFixturePath = tuiFixturePath(row.fileName);
@@ -245,9 +284,11 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /tui-ink-status-panel\.tsx/);
   assert.match(survey, /unsupported-frontend-domain-profile/);
   assert.match(survey, /tui-non-ink-cli-renderer\.tsx/);
+  assert.match(survey, /tui-ink-web-dom-mixed\.tsx/);
   assert.match(survey, /Negative\/fallback reinforcement/);
   assert.match(survey, /Current TUI evidence matrix/);
   assert.match(survey, /tui-ink-evidence-only-payload/);
+  assert.match(survey, /mixed frontend boundary/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
 });
 
@@ -262,5 +303,7 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /tui-ink-evidence-only-payload/);
   assert.match(guide, /fallback\/no-payload/);
   assert.match(guide, /serialized shared-policy plan/);
+  assert.match(guide, /tui-ink-web-dom-mixed\.tsx/);
+  assert.match(guide, /no TUI or React Web payload authorization/);
   assert.doesNotMatch(guide, forbiddenSupportClaims);
 });

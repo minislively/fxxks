@@ -22,6 +22,7 @@ This separation is intentional. Domain evidence can tell reviewers what kind of 
 | `test/fixtures/frontend-domain-expectations/tui-ink-interactive-list.tsx` | Behavior-heavy keyboard/list prompt evidence. | `tui-ink`, `evidence-only`, denied TUI policy, `raw-mode` fallback/no-payload. |
 | `test/fixtures/frontend-domain-expectations/tui-ink-status-panel.tsx` | Non-interactive status/progress UI syntax evidence. | `tui-ink`, `evidence-only`, denied TUI policy, `raw-mode` fallback/no-payload. |
 | `test/fixtures/frontend-domain-expectations/tui-non-ink-cli-renderer.tsx` | Negative terminal-looking React renderer without Ink signals. | `unknown`, `deferred`, no TUI policy authorization, fallback/no-payload. |
+| `test/fixtures/frontend-domain-expectations/tui-ink-web-dom-mixed.tsx` | Mixed-negative Ink plus React Web DOM evidence. | `mixed`, `fallback-boundary`, no TUI or React Web payload authorization, fallback/no-payload. |
 
 ## Allowed next work
 
