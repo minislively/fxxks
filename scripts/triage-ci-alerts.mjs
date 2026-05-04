@@ -399,11 +399,40 @@ function alertSummaryFields(allEvidence, focusBranch) {
   };
 }
 
+function historicalReplayBatchGuard(allEvidence, focusBranch, summaryFields) {
+  if (allEvidence.length === 0) {
+    return {
+      batchVerdict: "no-pasted-ci-run-urls",
+      batchDisposition: "none",
+      batchReason: "no GitHub Actions run URLs were present in the pasted alert buffer",
+    };
+  }
+
+  const inspectable = allEvidence.filter((alert) => alert.disposition === "inspect" || alert.disposition === "review");
+  const nonReplayNoise = allEvidence.filter((alert) => !alert.replay && !alert.echo && !alert.supersededMainCancellationEcho);
+  if (inspectable.length === 0 && summaryFields.staleReplayCount > 0 && nonReplayNoise.length === 0) {
+    return {
+      batchVerdict: "historical-ci-replay-batch",
+      batchDisposition: "suppress-historical-replay-before-current-main-echo",
+      batchReason: `current GitHub Actions state for ${focusBranch} remains authoritative; all non-current pasted run URLs are stale replay noise before ${summaryFields.currentHeadCount} current-head echo${summaryFields.currentHeadCount === 1 ? "" : "es"}`,
+    };
+  }
+
+  return {
+    batchVerdict: "mixed-ci-alert-buffer",
+    batchDisposition: inspectable.length > 0 ? "inspect-before-suppressing" : "review-before-suppressing",
+    batchReason: inspectable.length > 0
+      ? `${inspectable.length} pasted CI alert row${inspectable.length === 1 ? "" : "s"} still need inspection before suppressing historical replay noise`
+      : "pasted CI alert rows are not a pure historical replay batch",
+  };
+}
+
 function buildAlertEvidence(alertRefs, rows, options = {}) {
   const focusBranch = options.branch || "main";
   const allEvidence = buildRawAlertEvidence(alertRefs, rows, { branch: focusBranch });
   const limit = options.alertEvidenceLimit || DEFAULT_ALERT_EVIDENCE_LIMIT;
   const summaryFields = alertSummaryFields(allEvidence, focusBranch);
+  const batchGuard = historicalReplayBatchGuard(allEvidence, focusBranch, summaryFields);
 
   if (allEvidence.length <= limit) {
     return {
@@ -415,6 +444,7 @@ function buildAlertEvidence(alertRefs, rows, options = {}) {
         omitted: 0,
         focusBranch,
         ...summaryFields,
+        ...batchGuard,
       },
     };
   }
@@ -460,6 +490,7 @@ function buildAlertEvidence(alertRefs, rows, options = {}) {
       focusBranch,
       staleSampleLimit: STALE_ALERT_SAMPLE_LIMIT,
       ...summaryFields,
+      ...batchGuard,
       ...summarizeOmittedAlerts(omitted),
     },
   };
@@ -555,6 +586,9 @@ function formatCountMap(map) {
 
 function alertEvidenceTable(alerts, summary) {
   if (!alerts || alerts.length === 0) return "";
+  const batchGuard = summary?.batchVerdict
+    ? ` Batch guard: \`${escapeMarkdown(summary.batchVerdict)}\` / \`${escapeMarkdown(summary.batchDisposition)}\` — ${escapeMarkdown(summary.batchReason)}.`
+    : "";
   const currentHeadVerdict = summary?.currentHeadRunIds?.length
     ? ` Current-head verdict${summary.currentHeadRunIds.length === 1 ? "" : "s"}: ${summary.currentHeadRunIds.map((id) => `\`${escapeMarkdown(id)}\``).join(", ")}. Current-main echo count: ${summary.currentMainEchoCount ?? 0}. Stale historical replay count: ${summary.staleReplayCount ?? 0}.`
     : "";
@@ -562,8 +596,8 @@ function alertEvidenceTable(alerts, summary) {
     ? ` Bounded omitted run evidence: ${summary.omittedRunEvidence.map((evidence) => `\`${escapeMarkdown(evidence.runId)}:${escapeMarkdown(evidence.conclusion)}:${escapeMarkdown(evidence.disposition)}\``).join(", ")}${summary.omitted > summary.omittedRunEvidence.length ? ` (+${summary.omitted - summary.omittedRunEvidence.length} more)` : ""}.`
     : "";
   const compactNote = summary?.mode === "compact"
-    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).${currentHeadVerdict}${omittedEvidence}`
-    : `Full mode: showing all ${summary?.shown ?? alerts.length} pasted alert URLs.${currentHeadVerdict}`;
+    ? `Compact mode: showing ${summary.shown}/${summary.total} pasted alert URLs for focus branch \`${escapeMarkdown(summary.focusBranch)}\`; omitted ${summary.omitted} low-signal historical replay rows (${escapeMarkdown(formatCountMap(summary.byConclusion))}).${batchGuard}${currentHeadVerdict}${omittedEvidence}`
+    : `Full mode: showing all ${summary?.shown ?? alerts.length} pasted alert URLs.${batchGuard}${currentHeadVerdict}`;
   const lines = [
     "## Pasted alert URL evidence",
     "",

@@ -772,6 +772,9 @@ test("CI alert triage collapses success-heavy clawhip bursts to current head plu
     assert.equal(result.alertSummary.omitted, 20);
     assert.equal(result.alertSummary.currentHeadCount, 1);
     assert.deepEqual(result.alertSummary.currentHeadRunIds, ["700"]);
+    assert.equal(result.alertSummary.batchVerdict, "historical-ci-replay-batch");
+    assert.equal(result.alertSummary.batchDisposition, "suppress-historical-replay-before-current-main-echo");
+    assert.match(result.alertSummary.batchReason, /current GitHub Actions state for main remains authoritative/);
     assert.equal(result.alertSummary.actionableAlertCount, 0);
     assert.equal(result.alertSummary.verificationOnlyCount, 1);
     assert.equal(result.alertSummary.staleReplayCount, 20);
