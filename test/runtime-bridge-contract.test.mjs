@@ -77,8 +77,15 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.debug.decision.payload.domainPayload.domain, "react-web");
   assert.equal(secondInject.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(secondInject.additionalContext.includes("\"reactWebContext\""), true);
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
   assert.deepEqual(secondInject.debug.decision.payload.editGuidance.freshness, secondInject.debug.decision.payload.sourceFingerprint);
+  assert.equal(secondInject.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
+  assert.equal(secondInject.debug.decision.debug.reactWebContextBudget.included, true);
+  const optimizedEditPayload = JSON.parse(secondInject.additionalContext.split("\n").slice(1).join("\n"));
+  assert.equal(optimizedEditPayload.editGuidance.freshness.fileHash, optimizedEditPayload.sourceFingerprint.fileHash);
+  assert.ok(Array.isArray(optimizedEditPayload.reactWebContext.editTargetRouting));
+  assert.ok(optimizedEditPayload.reactWebContext.editTargetRouting.length > 0);
 
   const contextSession = `bridge-contract-react-web-context-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: contextSession }, repoRoot);
@@ -199,7 +206,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondWrapper.action, "inject");
   assert.equal(secondWrapper.debug.decision.debug.domainDetection.classification, "react-web");
   assert.deepEqual(secondWrapper.debug.decision.debug.frontendPayloadPolicy.evidenceGates, [CUSTOM_WRAPPER_DOM_SIGNAL_GAP]);
-  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-react-web-payload");
+  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.equal(secondWrapper.additionalContext.includes("\"editGuidance\""), true);
 
   const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);

@@ -86,12 +86,13 @@ function optimizedReactWebRuntimePayload(payload: ModelFacingPayload, reactWebCo
     filePath: payload.filePath,
     sourceFingerprint: payload.sourceFingerprint,
     domainPayload: payload.domainPayload,
+    ...(payload.editGuidance ? { editGuidance: payload.editGuidance } : {}),
     ...(reactWebContext ? { reactWebContext } : {}),
   };
 }
 
 function buildRuntimeContextPayload(payload: ModelFacingPayload, reactWebContext?: PackedRuntimeReactWebContext): { optimized: boolean; payload: unknown } {
-  if (payload.domainPayload?.domain === "react-web" && !payload.editGuidance && !payload.useOriginal) {
+  if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
     return {
       optimized: true,
       payload: optimizedReactWebRuntimePayload(payload, reactWebContext),
@@ -166,12 +167,15 @@ function buildAdditionalContext(
   contextMode: ContextMode,
   maxOptimizedContextBytes?: number,
 ): string {
-  if (payload.domainPayload?.domain === "react-web" && !payload.editGuidance && !payload.useOriginal) {
+  if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
+    const runtimeReactWebContextBudget = payload.editGuidance
+      ? editGuidanceBudgetLimit(maxOptimizedContextBytes)
+      : maxOptimizedContextBytes;
     return renderOptimizedReactWebAdditionalContext(
       filePath,
       payload,
       contextMode,
-      compactRuntimeReactWebContext(filePath, payload, contextMode, maxOptimizedContextBytes),
+      compactRuntimeReactWebContext(filePath, payload, contextMode, runtimeReactWebContextBudget),
     );
   }
 
@@ -449,7 +453,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     try {
       const optInDecision = decidePreRead(path.join(cwd, target), cwd, "codex", {
         includeEditGuidance: true,
-        includeReactWebContextMetadata: false,
+        includeReactWebContextMetadata: true,
       });
       if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
         const optInContextMode = payloadContextMode(optInDecision.payload);

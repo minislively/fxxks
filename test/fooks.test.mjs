@@ -1821,10 +1821,16 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(second.additionalContext.includes("#fooks-full-read"), false);
   assert.equal(second.additionalContext.includes("#fooks-disable-pre-read"), false);
   assert.equal(second.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(second.additionalContext.includes("\"reactWebContext\""), true);
   assert.ok(second.reasons.includes("edit-guidance-opt-in"));
   assert.equal(second.debug.repeatedFile, true);
   assert.deepEqual(second.debug.decision.payload.editGuidance.freshness, second.debug.decision.payload.sourceFingerprint);
   assert.ok(second.debug.decision.payload.editGuidance.patchTargets.length <= 12);
+  assert.equal(second.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
+  assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+  const runtimePayload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+  assert.ok(Array.isArray(runtimePayload.reactWebContext.editTargetRouting));
+  assert.ok(runtimePayload.reactWebContext.editTargetRouting.length > 0);
 
   fs.writeFileSync(second.statePath, "{not-json");
   const afterCorruptState = handleCodexRuntimeHook(
@@ -1884,6 +1890,7 @@ test("runtime hook treats implement and rename prompts as safe edit-intent guida
   assert.equal(implementSecond.action, "inject");
   assert.equal(implementSecond.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(implementSecond.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(implementSecond.additionalContext.includes("\"reactWebContext\""), true);
   assert.equal(implementSecond.reasons.includes("edit-guidance-opt-in"), true);
 
   const renameSession = `hook-rename-edit-guidance-${Date.now()}`;
@@ -1907,6 +1914,7 @@ test("runtime hook treats implement and rename prompts as safe edit-intent guida
   assert.equal(renameSecond.action, "inject");
   assert.equal(renameSecond.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(renameSecond.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(renameSecond.additionalContext.includes("\"reactWebContext\""), true);
   assert.equal(renameSecond.reasons.includes("edit-guidance-opt-in"), true);
 });
 
