@@ -84,6 +84,14 @@ export type ImportSignal = {
   loc?: SourceRange;
 };
 
+export type StyleVariantSignal = {
+  kind: "className-branch" | "inline-style" | "variant-prop" | "data-state";
+  label: string;
+  propName?: string;
+  value?: string;
+  loc?: SourceRange;
+};
+
 export type PatchTargetKind =
   | "component"
   | "props"
@@ -152,6 +160,15 @@ export type ReactWebContextImportRoleHint = {
   role: "form-library" | "validation-library" | "routing" | "ui-kit" | "icon-library" | "local-component";
   moduleSpecifier: string;
   importedSymbols?: string[];
+  loc?: SourceRange;
+  evidence: string[];
+};
+
+export type ReactWebContextStylingVariantHint = {
+  kind: "className-branch" | "inline-style" | "variant-prop" | "data-state" | "props-contract";
+  label: string;
+  propName?: string;
+  value?: string;
   loc?: SourceRange;
   evidence: string[];
 };
@@ -226,6 +243,7 @@ export type ReactWebContextMetadataV0 = {
   a11yAnchors?: ReactWebContextA11yAnchor[];
   localDependencies?: ReactWebContextLocalDependency[];
   importRoleHints?: ReactWebContextImportRoleHint[];
+  stylingVariantHints?: ReactWebContextStylingVariantHint[];
   intentTargets?: ReactWebContextIntentTarget[];
   editTargetRouting?: ReactWebContextEditTargetRoute[];
   formStateFlow?: ReactWebContextFormStateFlowEntry[];
@@ -276,6 +294,7 @@ export type ExtractionResult = {
     system?: StyleSystem;
     summary?: string[];
     hasStyleBranching?: boolean;
+    variantSignals?: StyleVariantSignal[];
   };
   snippets?: Array<{
     label: string;
@@ -329,6 +348,7 @@ export type ModelFacingPayload = {
     system?: StyleSystem;
     summary?: string[];
     hasStyleBranching?: boolean;
+    variantSignals?: StyleVariantSignal[];
   };
   snippets?: ExtractionResult["snippets"];
   editGuidance?: EditGuidance;
