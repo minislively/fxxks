@@ -541,9 +541,23 @@ test("compare default output is a concise human verdict with json details opt-in
   assert.match(output, /^fooks compare fixtures\/compressed\/FormSection\.tsx/m);
   assert.match(output, /Verdict: estimated-reduction/);
   assert.match(output, /Why: Estimated \d+(?:\.\d+)?% smaller model-facing payload/);
+  assert.match(output, /Local proof: source \d+ bytes \/ \d+ est tokens → model-facing \d+ bytes \/ \d+ est tokens; saved \d+ bytes \/ \d+ est tokens\./);
   assert.match(output, /Next action: Use fooks setup/);
   assert.match(output, /Boundary: Local model-facing payload estimate only/);
   assert.match(output, /fooks compare <file> --json/);
+  assert.doesNotMatch(output.trim(), /^\{/);
+});
+
+test("compare default output avoids reduction claims for no-savings files", () => {
+  const output = runText(["compare", "fixtures/raw/SimpleButton.tsx"]);
+  assert.match(output, /^fooks compare fixtures\/raw\/SimpleButton\.tsx/m);
+  assert.match(output, /Verdict: no-estimated-reduction/);
+  assert.match(output, /Why: No compact payload used: fooks preserved the original source for this small\/raw file\./);
+  assert.match(output, /Mode: raw \(original source preserved\)/);
+  assert.match(output, /Local proof: source \d+ bytes \/ \d+ est tokens → model-facing \d+ bytes \/ \d+ est tokens; no local estimate savings for this file\./);
+  assert.match(output, /Boundary: Local model-facing payload estimate only/);
+  assert.doesNotMatch(output, /0(?:\.0+)?% smaller/);
+  assert.doesNotMatch(output, /saved 0 bytes \/ 0 est tokens/);
   assert.doesNotMatch(output.trim(), /^\{/);
 });
 
@@ -4146,6 +4160,9 @@ ${release}`;
 
   assert.match(readme, /Smaller model-facing context for repeated same-file work in Codex\./);
   assert.match(readme, /Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization\./);
+  assert.match(readme, /First-minute path:[\s\S]*fooks compare src\/components\/Button\.tsx[\s\S]*Then open Codex/);
+  assert.doesNotMatch(readme, /First-minute path:[\s\S]*fooks compare src\/components\/Button\.tsx --json[\s\S]*Then open Codex/);
+  assert.match(readme, /add `--json` for exact local byte counts, exclusions, and claim boundary text/);
   assert.match(combined, /fooks compare src\/components\/Button\.tsx/);
   assert.match(combined, /local model-facing payload estimate|local file-level estimate/);
   assert.match(combined, /TypeScript AST-derived/);
