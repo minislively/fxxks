@@ -37,6 +37,6 @@ jobs:
       - name: Validate merge policy
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          MERGE_GATE_ALLOWED_MAINTAINERS: minislively
+          MERGE_GATE_ALLOWED_MAINTAINERS: ${{ vars.MERGE_GATE_ALLOWED_MAINTAINERS || 'minislively,bellman,yeachan,minseol' }}
           MERGE_GATE_REQUIRE_LINKED_ISSUE: "true"
         run: node scripts/validate-pr-merge-gate.mjs
