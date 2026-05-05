@@ -27,3 +27,27 @@ export function InlineRetentionForm({ onSubmit }: Props) {
 /* ${"form flow budget filler ".repeat(140)} */
 `;
 }
+
+export function reactWebLayoutRegionSource() {
+  return `type LayoutItem = { id: string; label: string };
+type LayoutPanelProps = { items: LayoutItem[]; loading?: boolean; error?: string };
+
+export function InlineLayoutPanel({ items, loading, error }: LayoutPanelProps) {
+  return (
+    <main className={loading ? "grid gap-4" : "flex flex-col gap-4"}>
+      <header><h1>Accounts</h1></header>
+      <section>
+        {loading && <p>Loading accounts</p>}
+        {error ? <p role="alert">{error}</p> : null}
+        {items.length === 0 && <p>No accounts yet</p>}
+        <ul>{items.map((item) => <li key={item.id}>{item.label}</li>)}</ul>
+      </section>
+      <form><label htmlFor="filter">Filter</label><input id="filter" name="filter" /></form>
+      <footer><button type="button">Refresh</button></footer>
+    </main>
+  );
+}
+
+/* ${"layout budget filler ".repeat(360)} */
+`;
+}
