@@ -11,6 +11,7 @@ export type ReactWebContextSummary = {
     componentName?: string;
   };
   fieldCounts: Record<string, number>;
+  fieldOrder: string[];
   totalAnchors: number;
   claimBoundary: typeof REACT_WEB_CONTEXT_SUMMARY_CLAIM_BOUNDARY;
 };
@@ -40,6 +41,10 @@ export function reactWebContextSummaryFor(payload: ModelFacingPayload, useOrigin
     }
   }
 
+  const fieldOrder = REACT_WEB_CONTEXT_SUMMARY_FIELDS.filter((field) => fieldCounts[field] > 0).sort(
+    (left, right) => fieldCounts[right] - fieldCounts[left],
+  );
+
   return {
     present: true,
     schemaVersion: payload.reactWebContext.schemaVersion,
@@ -49,11 +54,17 @@ export function reactWebContextSummaryFor(payload: ModelFacingPayload, useOrigin
       componentName: payload.reactWebContext.scope.componentName,
     },
     fieldCounts,
+    fieldOrder,
     totalAnchors: Object.values(fieldCounts).reduce((total, count) => total + count, 0),
     claimBoundary: REACT_WEB_CONTEXT_SUMMARY_CLAIM_BOUNDARY,
   };
 }
 
 export function formatReactWebContextSummary(summary: ReactWebContextSummary): string {
-  return `React Web context: ${summary.totalAnchors} source-backed anchors across ${Object.keys(summary.fieldCounts).length} summary fields (counts only; see --json).`;
+  const topFields = summary.fieldOrder
+    .slice(0, 4)
+    .map((field) => `${field}=${summary.fieldCounts[field]}`)
+    .join(", ");
+  const fieldDetails = topFields ? `; top fields: ${topFields}` : "";
+  return `React Web context: ${summary.totalAnchors} source-backed anchors across ${summary.fieldOrder.length} summary fields${fieldDetails} (source-only counts; see --json).`;
 }
