@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import {
+  reactWebA11yAnchorSource,
   reactWebComponentApiSource,
   reactWebFormStateFlowSource,
   reactWebLayoutRegionSource,
@@ -70,6 +71,79 @@ test("pre-read payload builder omits React Web context metadata when payload bud
     assert.equal(budgeted.debug.reactWebContextBudget.reason, "budget-exceeded");
   } finally {
     JSON.stringify = originalStringify;
+  }
+});
+
+function hasA11yAnchor(anchors, predicate) {
+  return anchors.some(predicate);
+}
+
+test("pre-read payload builder preserves React Web a11y anchors when context budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-a11y-anchor-budget-"));
+  try {
+    const target = path.join(tempDir, "InlineA11yContactForm.tsx");
+    fs.writeFileSync(target, reactWebA11yAnchorSource());
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: false,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(
+      decision.debug.reactWebContextBudget.estimatedPayloadBytes <=
+        decision.debug.reactWebContextBudget.maxPayloadBytes,
+    );
+    assert.ok(Array.isArray(decision.payload.reactWebContext.a11yAnchors));
+
+    const anchors = decision.payload.reactWebContext.a11yAnchors;
+    assert.ok(
+      hasA11yAnchor(
+        anchors,
+        (item) => item.kind === "htmlFor" && item.label === "email" && item.relation?.kind === "label-control",
+      ),
+    );
+    assert.ok(
+      hasA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "aria" &&
+          item.label.startsWith("aria-describedby=email-error email-help") &&
+          item.relation?.kind === "aria-idrefs" &&
+          item.relation.resolvedIds.includes("email-error") &&
+          !item.relation.resolvedIds.includes("missing-id"),
+      ),
+    );
+    assert.ok(
+      hasA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "aria" &&
+          item.label === "aria-labelledby=email-label" &&
+          item.relation?.kind === "aria-idrefs" &&
+          item.relation.resolvedIds.includes("email-label"),
+      ),
+    );
+    assert.ok(
+      hasA11yAnchor(
+        anchors,
+        (item) => item.kind === "aria" && item.label === "aria-invalid=invalid" && item.relation?.kind === "invalid-state",
+      ),
+    );
+    assert.ok(
+      hasA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "role" &&
+          item.label === "alert" &&
+          item.relation?.kind === "alert-region" &&
+          item.relation.sourceId === "email-error",
+      ),
+    );
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
