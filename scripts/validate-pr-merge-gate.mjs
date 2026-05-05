@@ -131,4 +131,11 @@ async function main() {
   console.log(`Merge gate passed. Approving maintainer(s): ${result.approvingMaintainers.join(", ")}`);
 }
 
-await main();
+function isDirectCliInvocation() {
+  const invoked = process.argv[1] ? new URL(`file://${process.argv[1]}`).href : undefined;
+  return invoked === import.meta.url;
+}
+
+if (isDirectCliInvocation()) {
+  await main();
+}
