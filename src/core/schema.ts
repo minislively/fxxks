@@ -65,6 +65,28 @@ export type FormSurface = {
   stateConditions?: LocatedString[];
 };
 
+export type ReactNativePrimitiveInputBindingSignal = {
+  primitive: "TextInput";
+  loc?: SourceRange;
+  valueExpr?: string;
+  onChangeTextExpr?: string;
+  placeholder?: string;
+  evidence: string[];
+};
+
+export type ReactNativePrimitiveActionBindingSignal = {
+  primitive: "Pressable";
+  loc?: SourceRange;
+  onPressExpr: string;
+  label?: string;
+  evidence: string[];
+};
+
+export type ReactNativePrimitiveInteractionSignal = {
+  inputBindings?: ReactNativePrimitiveInputBindingSignal[];
+  actionBindings?: ReactNativePrimitiveActionBindingSignal[];
+};
+
 export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
@@ -307,6 +329,7 @@ export type ExtractionResult = {
     eventHandlers?: string[];
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
+    rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -363,6 +386,7 @@ export type ModelFacingPayload = {
     eventHandlers?: string[];
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
+    rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     hasSideEffects?: boolean;
   };
   structure?: {

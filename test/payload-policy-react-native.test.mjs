@@ -10,6 +10,7 @@ import { createRequire } from "node:module";
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
 const {
   assessReactNativePrimitiveInputSignalGate,
   assessReactNativePayloadPolicy,
@@ -83,16 +84,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
     allowed: true,
   });
 
-  const payload = buildReactNativePrimitiveInputDomainPayload(
-    {
-      componentName: "InlineActionRow",
-      exports: [],
-      behavior: {},
-      structure: {},
-      domainDetection,
-    },
-    domainDetection,
-  );
+  const payload = buildReactNativePrimitiveInputDomainPayload(extractFile(filePath), domainDetection);
 
   assert.equal(payload?.domain, "react-native");
   assert.equal(payload?.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
@@ -129,6 +121,28 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.sourceAnchorBeta.anchors.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload?.sourceAnchorBeta.anchors.jsxProps, ["onChangeText", "onPress"]);
   assert.equal(payload?.sourceAnchorBeta.anchors.sourceFingerprintRequired, true);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
+    {
+      primitive: "TextInput",
+      loc: { startLine: 15, endLine: 15 },
+      valueExpr: "value",
+      onChangeTextExpr: "onChangeText",
+      placeholder: "Type filter",
+      evidence: ["jsx.TextInput.value", "jsx.TextInput.onChangeText", "jsx.TextInput.placeholder"],
+    },
+  ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
+    {
+      primitive: "Pressable",
+      loc: { startLine: 16, endLine: 16 },
+      onPressExpr: "submitCurrentValue",
+      label: "Submit",
+      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label"],
+    },
+  ]);
+  assert.equal("formControls" in payload.facts, false);
+  assert.equal("domTags" in payload.facts, false);
+  assert.equal("reactNativeContext" in payload, false);
   assert.equal(payload?.reuseContract.supportBoundary, "measured-evidence-only; no broad RN/WebView/TUI support");
   assert.deepEqual(payload?.reuseContract.requiredSignals, [...RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS]);
 
@@ -137,8 +151,41 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.equal(preReadDecision.payload.domainPayload.domain, "react-native");
   assert.equal(preReadDecision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(preReadDecision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].onPressExpr, "submitCurrentValue");
+  assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].label, "Submit");
   assert.equal(preReadDecision.debug.domainDetection.classification, "react-native");
   assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
+});
+
+
+test("React Native primitive basic fixture emits TextInput and Pressable interaction facts", () => {
+  const filePath = fixturePath("rn-primitive-basic.tsx");
+  const domainDetection = detect(fixtureSource("rn-primitive-basic.tsx"), filePath);
+  const payload = buildReactNativePrimitiveInputDomainPayload(extractFile(filePath), domainDetection);
+
+  assert.equal(payload?.domain, "react-native");
+  assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
+    {
+      primitive: "TextInput",
+      loc: { startLine: 13, endLine: 13 },
+      valueExpr: "value",
+      onChangeTextExpr: "onChangeText",
+      placeholder: "Filter",
+      evidence: ["jsx.TextInput.value", "jsx.TextInput.onChangeText", "jsx.TextInput.placeholder"],
+    },
+  ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
+    {
+      primitive: "Pressable",
+      loc: { startLine: 14, endLine: 14 },
+      onPressExpr: "onApply",
+      label: "Apply",
+      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label"],
+    },
+  ]);
+  assert.equal("formControls" in payload.facts, false);
+  assert.equal("domTags" in payload.facts, false);
+  assert.equal("reactNativeContext" in payload, false);
 });
 
 test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {
@@ -385,8 +432,13 @@ test("React Native F1 signal gate is the shared source of truth for policy and p
   }
 });
 
-test("React Native policy seam source avoids broad React Native support claims", () => {
-  for (const relativePath of [path.join("src", "core", "payload-policy", "react-native.ts")]) {
-    assert.doesNotMatch(fs.readFileSync(path.join(repoRoot, relativePath), "utf8"), forbiddenSupportClaims, relativePath);
+test("React Native policy and payload seams avoid broad support and web terminology", () => {
+  for (const relativePath of [
+    path.join("src", "core", "payload-policy", "react-native.ts"),
+    path.join("src", "core", "payload", "domain-payload.ts"),
+  ]) {
+    const source = fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
+    assert.doesNotMatch(source, forbiddenSupportClaims, relativePath);
+    assert.doesNotMatch(source, /reactNativeContext|editTargetRouting/i, relativePath);
   }
 });
