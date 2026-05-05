@@ -80,6 +80,17 @@ function runText(args, cwd = repoRoot, envOverrides = {}) {
   return execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } });
 }
 
+function assertReactWebContextFieldOrder(summary, expectedFields) {
+  for (const field of expectedFields) {
+    assert.ok(summary.fieldOrder.includes(field));
+  }
+  assert.ok(
+    summary.fieldOrder.every((field, index, fields) =>
+      index === 0 || summary.fieldCounts[fields[index - 1]] >= summary.fieldCounts[field],
+    ),
+  );
+}
+
 function runTextWithInput(args, input, cwd = repoRoot, envOverrides = {}) {
   return execFileSync(process.execPath, [cli, ...args], {
     cwd,
@@ -380,6 +391,7 @@ test("extract can return model-facing payload without engine metadata", () => {
   assert.ok(result.reactWebContextSummary.fieldCounts.editTargetRouting > 0);
   assert.ok(result.reactWebContextSummary.fieldCounts.componentApiHints > 0);
   assert.ok(result.reactWebContextSummary.fieldCounts.a11yAnchors > 0);
+  assertReactWebContextFieldOrder(result.reactWebContextSummary, ["editTargetRouting", "componentApiHints"]);
   assert.ok(result.reactWebContextSummary.totalAnchors > 0);
   assert.equal(result.reactWebContextSummary.claimBoundary, "source-backed-react-web-context-counts-only");
   assert.doesNotMatch(JSON.stringify(result.reactWebContextSummary), /cross-file|typechecker|lsp|visual proof|billing|latency/i);
@@ -532,6 +544,7 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.equal(result.reactWebContextSummary.scope.componentName, "FormSection");
   assert.ok(result.reactWebContextSummary.fieldCounts.editTargetRouting > 0);
   assert.ok(result.reactWebContextSummary.fieldCounts.a11yAnchors > 0);
+  assertReactWebContextFieldOrder(result.reactWebContextSummary, ["editTargetRouting", "a11yAnchors"]);
   assert.ok(result.reactWebContextSummary.totalAnchors > 0);
   assert.equal(result.reactWebContextSummary.claimBoundary, "source-backed-react-web-context-counts-only");
   assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
@@ -564,8 +577,9 @@ test("compare default output is a concise human verdict with json details opt-in
   assert.match(output, /Verdict: estimated-reduction/);
   assert.match(output, /Why: Estimated \d+(?:\.\d+)?% smaller model-facing payload/);
   assert.match(output, /Local proof: source \d+ bytes \/ \d+ est tokens → model-facing \d+ bytes \/ \d+ est tokens; saved \d+ bytes \/ \d+ est tokens\./);
-  assert.match(output, /React Web context: \d+ source-backed anchors across \d+ summary fields \(counts only; see --json\)\./);
-  assert.doesNotMatch(output, /correctness|billing savings|provider token savings|latency/i);
+  assert.match(output, /React Web context: \d+ source-backed anchors across \d+ summary fields; top fields: [A-Za-z]+\w*=\d+/);
+  assert.match(output, /source-only counts; see --json/);
+  assert.doesNotMatch(output, /correctness|billing savings|provider token savings|latency|cross-file|typechecker/i);
   assert.match(output, /Next action: Use fooks setup/);
   assert.match(output, /Boundary: Local model-facing payload estimate only/);
   assert.match(output, /fooks compare <file> --json/);
@@ -599,6 +613,7 @@ test("extract produces compressed output for boilerplate-heavy fixture", () => {
   assert.equal(result.reactWebContextSummary.scope.componentName, "FormSection");
   assert.ok(result.reactWebContextSummary.fieldCounts.editTargetRouting > 0);
   assert.ok(result.reactWebContextSummary.fieldCounts.layoutRegionHints > 0);
+  assertReactWebContextFieldOrder(result.reactWebContextSummary, ["editTargetRouting", "layoutRegionHints"]);
   assert.ok(result.reactWebContextSummary.totalAnchors > 0);
   assert.equal(result.reactWebContextSummary.claimBoundary, "source-backed-react-web-context-counts-only");
   assert.doesNotMatch(JSON.stringify(result.reactWebContextSummary), /cross-file|typechecker|lsp|visual proof|billing|latency/i);
