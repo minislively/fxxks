@@ -7,7 +7,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { reactWebFormStateFlowSource, reactWebLayoutRegionSource } from "./react-web-inline-sources.mjs";
+import {
+  reactWebComponentApiSource,
+  reactWebFormStateFlowSource,
+  reactWebLayoutRegionSource,
+} from "./react-web-inline-sources.mjs";
 
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
@@ -90,6 +94,33 @@ test("pre-read payload builder preserves React Web form state-flow when context 
         (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
       ),
     );
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("pre-read payload builder preserves React Web component API hints when context budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-component-api-budget-"));
+  try {
+    const target = path.join(tempDir, "InlineComponentApiPanel.tsx");
+    fs.writeFileSync(target, reactWebComponentApiSource());
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: false,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(decision.debug.reactWebContextBudget.estimatedPayloadBytes <= decision.debug.reactWebContextBudget.maxPayloadBytes);
+    assert.ok(Array.isArray(decision.payload.reactWebContext.componentApiHints));
+
+    const apiKinds = new Set(decision.payload.reactWebContext.componentApiHints.map((item) => item.kind));
+    assert.equal(apiKinds.has("prop"), true);
+    assert.equal(apiKinds.has("custom-component-usage"), true);
+    assert.ok(decision.payload.reactWebContext.componentApiHints.some((item) => item.propName === "title"));
+    assert.ok(decision.payload.reactWebContext.componentApiHints.some((item) => item.label === "StatusBadge"));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
