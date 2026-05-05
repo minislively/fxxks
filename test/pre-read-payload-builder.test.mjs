@@ -12,6 +12,8 @@ import {
   reactWebComponentApiSource,
   reactWebFormStateFlowSource,
   reactWebLayoutRegionSource,
+  reactWebStylingVariantSource,
+  reactWebImportRoleSource,
 } from "./react-web-inline-sources.mjs";
 
 const repoRoot = process.cwd();
@@ -142,6 +144,65 @@ test("pre-read payload builder preserves React Web a11y anchors when context bud
           item.relation.sourceId === "email-error",
       ),
     );
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("pre-read payload builder preserves React Web styling variant hints when context budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-styling-variant-budget-"));
+  try {
+    const target = path.join(tempDir, "InlineVariantPanel.tsx");
+    fs.writeFileSync(target, reactWebStylingVariantSource());
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: false,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(decision.payload.reactWebContext.stylingVariantHints));
+
+    const hints = decision.payload.reactWebContext.stylingVariantHints;
+    assert.ok(hints.some((item) => item.kind === "props-contract" && item.propName === "variant"));
+    assert.ok(hints.some((item) => item.kind === "props-contract" && item.propName === "size"));
+    assert.ok(hints.some((item) => item.kind === "data-state" && item.propName === "data-state"));
+    assert.ok(hints.some((item) => item.kind === "className-branch" && item.propName === "className" && item.loc));
+    assert.ok(hints.some((item) => item.kind === "inline-style" && item.propName === "style" && item.loc));
+    assert.ok(hints.some((item) => item.kind === "variant-prop" && item.propName === "disabled"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("pre-read payload builder preserves React Web import role hints when context budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-import-role-budget-"));
+  try {
+    const target = path.join(tempDir, "InlineImportRolePanel.tsx");
+    fs.writeFileSync(target, reactWebImportRoleSource());
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: false,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(decision.payload.reactWebContext.importRoleHints));
+
+    const rolesByModule = new Map(
+      decision.payload.reactWebContext.importRoleHints.map((item) => [item.moduleSpecifier, item.role]),
+    );
+    assert.equal(rolesByModule.get("react-hook-form"), "form-library");
+    assert.equal(rolesByModule.get("zod"), "validation-library");
+    assert.equal(rolesByModule.get("next/link"), "routing");
+    assert.equal(rolesByModule.get("@/components/ui/button"), "ui-kit");
+    assert.equal(rolesByModule.get("lucide-react"), "icon-library");
+    assert.equal(rolesByModule.get("./FieldShell"), "local-component");
+    assert.equal(rolesByModule.has("date-fns"), false);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
