@@ -78,3 +78,33 @@ export function InlineComponentApiPanel({ title, items, count = 0, loading, erro
 /* ${"component api budget filler ".repeat(220)} */
 `;
 }
+
+export function reactWebA11yAnchorSource() {
+  return `type ContactA11yFormProps = { email: string; invalid?: boolean; loading?: boolean; error?: string };
+
+export function InlineA11yContactForm({ email, invalid, loading, error }: ContactA11yFormProps) {
+  return (
+    <form className="grid gap-3" aria-busy={loading}>
+      <label htmlFor="email">Email</label>
+      <input
+        id="email"
+        name="email"
+        value={email}
+        readOnly
+        required
+        aria-invalid={invalid}
+        aria-describedby="email-error email-help missing-id"
+        aria-labelledby="email-label"
+      />
+      <span id="email-label">Primary email</span>
+      {loading ? <p>Loading contact details</p> : null}
+      {error ? <p id="email-error" role="alert">{error}</p> : null}
+      <p id="email-help">Use your work email for recovery.</p>
+      <button type="button" disabled={loading}>Refresh</button>
+    </form>
+  );
+}
+
+/* ${"a11y anchor budget filler ".repeat(220)} */
+`;
+}

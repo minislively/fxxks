@@ -6,6 +6,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { cleanupMetricSessions } from "./metric-cleanup.mjs";
 import {
+  reactWebA11yAnchorSource,
   reactWebComponentApiSource,
   reactWebFormStateFlowSource,
   reactWebLayoutRegionSource,
@@ -288,6 +289,94 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
   assert.equal(legacyOverride.action, "fallback");
   assert.equal(legacyOverride.fallback.reason, "escape-hatch-full-read");
+});
+
+function hasRuntimeA11yAnchor(anchors, predicate) {
+  return anchors.some(predicate);
+}
+
+test("runtime bridge preserves React Web a11y anchors in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-a11y-anchor-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebA11yAnchorSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineA11yContactForm.tsx"), source);
+
+    const sessionId = `bridge-contract-a11y-anchor-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineA11yContactForm.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineA11yContactForm.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.a11yAnchors));
+
+    const anchors = payload.reactWebContext.a11yAnchors;
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) => item.kind === "htmlFor" && item.label === "email" && item.relation?.kind === "label-control",
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "aria" &&
+          item.label.startsWith("aria-describedby=email-error email-help") &&
+          item.relation?.kind === "aria-idrefs" &&
+          item.relation.resolvedIds.includes("email-error") &&
+          !item.relation.resolvedIds.includes("missing-id"),
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "aria" &&
+          item.label === "aria-labelledby=email-label" &&
+          item.relation?.kind === "aria-idrefs" &&
+          item.relation.resolvedIds.includes("email-label"),
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) => item.kind === "aria" && item.label === "aria-invalid=invalid" && item.relation?.kind === "invalid-state",
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "role" &&
+          item.label === "alert" &&
+          item.relation?.kind === "alert-region" &&
+          item.relation.sourceId === "email-error",
+      ),
+    );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("runtime bridge preserves React Web form state-flow in repeated-read context when budget permits", () => {
