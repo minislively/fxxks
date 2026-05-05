@@ -3,6 +3,7 @@
 /// <reference types="node" />
 
 import fs from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const CLOSING_ISSUE_PATTERN = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?:(?:[\w.-]+\/[\w.-]+)?#\d+|https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+)/i;
 
@@ -131,4 +132,11 @@ async function main() {
   console.log(`Merge gate passed. Approving maintainer(s): ${result.approvingMaintainers.join(", ")}`);
 }
 
-await main();
+function isMainModule() {
+  const entrypoint = process.argv[1];
+  return Boolean(entrypoint) && import.meta.url === pathToFileURL(entrypoint).href;
+}
+
+if (isMainModule()) {
+  await main();
+}
