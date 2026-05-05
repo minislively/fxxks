@@ -86,6 +86,19 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(optimizedEditPayload.editGuidance.freshness.fileHash, optimizedEditPayload.sourceFingerprint.fileHash);
   assert.ok(Array.isArray(optimizedEditPayload.reactWebContext.editTargetRouting));
   assert.ok(optimizedEditPayload.reactWebContext.editTargetRouting.length > 0);
+  assert.equal(secondInject.debug.reactWebContextPacking.included, true);
+  assert.equal(secondInject.debug.reactWebContextPacking.reason, "packed");
+  assert.equal(secondInject.debug.reactWebContextPacking.priority[0], "editTargetRouting");
+  assert.equal(secondInject.debug.reactWebContextPacking.fields[0].name, "editTargetRouting");
+  assert.equal(
+    secondInject.debug.reactWebContextPacking.fields.find((field) => field.name === "editTargetRouting")?.count,
+    optimizedEditPayload.reactWebContext.editTargetRouting.length,
+  );
+  assert.equal(
+    secondInject.debug.reactWebContextPacking.totalAnchors,
+    secondInject.debug.reactWebContextPacking.fields.reduce((total, field) => total + field.count, 0),
+  );
+  assert.doesNotMatch(JSON.stringify(secondInject.debug.reactWebContextPacking), /provider|billing|latency|edit-quality|typechecker|cross-file/i);
 
   const contextSession = `bridge-contract-react-web-context-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: contextSession }, repoRoot);
@@ -115,6 +128,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   const optimizedContextPayload = JSON.parse(secondContext.additionalContext.split("\n").slice(1).join("\n"));
   assert.equal(optimizedContextPayload.reactWebContext.schemaVersion, "react-web-context.v0");
   assert.equal("editTargetRouting" in optimizedContextPayload.reactWebContext, false);
+  assert.equal(secondContext.debug.reactWebContextPacking.included, true);
+  assert.deepEqual(secondContext.debug.reactWebContextPacking.fields, []);
   assert.ok(
     Buffer.byteLength(secondContext.additionalContext, "utf8") <= fs.statSync(path.join(repoRoot, "fixtures/compressed/FormSection.tsx")).size,
   );
@@ -176,6 +191,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
     assert.equal(packedContext.contextModeReason, "repeated-exact-file-react-web-payload");
     assert.ok(Array.isArray(packedPayload.reactWebContext.editTargetRouting));
     assert.ok(packedPayload.reactWebContext.editTargetRouting.length > 0);
+    assert.equal(packedContext.debug.reactWebContextPacking.fields[0].name, "editTargetRouting");
     assert.ok(Array.isArray(packedPayload.reactWebContext.a11yAnchors));
     assert.ok(Buffer.byteLength(packedContext.additionalContext, "utf8") <= Buffer.byteLength(largeReactSource, "utf8"));
     assert.equal("sourceRanges" in packedPayload.reactWebContext, false);
@@ -257,6 +273,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondSmallRaw.action, "inject");
   assert.match(secondSmallRaw.additionalContext, /^fooks: reused pre-read \(raw\)/);
   assert.match(secondSmallRaw.additionalContext, /"useOriginal": true/);
+  assert.equal("reactWebContextPacking" in secondSmallRaw.debug, false);
 
   const overrideSession = `bridge-contract-override-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: overrideSession }, repoRoot);
