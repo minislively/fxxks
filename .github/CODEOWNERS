@@ -1,0 +1,3 @@
+# Keep repository-wide ownership explicit. GitHub branch protection must enable
+# "Require review from Code Owners" for this to be an enforcement point.
+* @minislively
