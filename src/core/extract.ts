@@ -506,6 +506,9 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const rnInputBindings: ReactNativePrimitiveInputBindingSignal[] = [];
   const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
+  const functionIdentifierReads = new Map<string, Set<string>>();
+  const ambiguousFunctionReadNames = new Set<string>();
+  const rnActionIdentifierReads = new Map<string, Set<string>>();
   const submitHandlers: NonNullable<FormSurface["submitHandlers"]> = [];
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
   const stateConditions: NonNullable<FormSurface["stateConditions"]> = [];
@@ -591,10 +594,87 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     return label || undefined;
   };
 
+  const collectBindingNames = (name: ts.BindingName | undefined, out: Set<string>): void => {
+    if (!name) return;
+    if (ts.isIdentifier(name)) {
+      out.add(name.text);
+      return;
+    }
+    for (const element of name.elements) {
+      if (!ts.isOmittedExpression(element)) collectBindingNames(element.name, out);
+    }
+  };
+
+  const identifierReads = (node: ts.Node | undefined, initialLocalBindings: Iterable<string> = []): Set<string> => {
+    const reads = new Set<string>();
+    if (!node) return reads;
+    const localBindings = new Set(initialLocalBindings);
+    if (ts.isFunctionExpression(node) && node.name) localBindings.add(node.name.text);
+    const visitRead = (child: ts.Node): void => {
+      if (ts.isParameter(child)) collectBindingNames(child.name, localBindings);
+      if (ts.isVariableDeclaration(child)) collectBindingNames(child.name, localBindings);
+      if (child !== node && (ts.isFunctionDeclaration(child) || ts.isFunctionExpression(child) || ts.isArrowFunction(child))) {
+        if (ts.isFunctionDeclaration(child) && child.name) localBindings.add(child.name.text);
+        return;
+      }
+      if (ts.isIdentifier(child)) {
+        const parent = child.parent;
+        const isPropertyName =
+          (ts.isPropertyAccessExpression(parent) && parent.name === child) ||
+          (ts.isPropertyAssignment(parent) && parent.name === child) ||
+          (ts.isBindingElement(parent) && parent.propertyName === child);
+        if (!isPropertyName && !localBindings.has(child.text)) reads.add(child.text);
+      }
+      ts.forEachChild(child, visitRead);
+    };
+    visitRead(node);
+    return reads;
+  };
+
+  const parameterBindingNames = (parameters: ts.NodeArray<ts.ParameterDeclaration>): string[] => {
+    const bindings = new Set<string>();
+    for (const parameter of parameters) collectBindingNames(parameter.name, bindings);
+    return [...bindings];
+  };
+
+  const rememberFunctionReads = (name: string | undefined, body: ts.Node | undefined, localBindings: string[] = []): void => {
+    if (!name || !body) return;
+    if (functionIdentifierReads.has(name)) ambiguousFunctionReadNames.add(name);
+    functionIdentifierReads.set(name, identifierReads(body, localBindings));
+  };
+
+  const actionBindingKey = (onPressExpr: string, loc: SourceRange | undefined): string =>
+    `${onPressExpr}:${loc?.startLine ?? ""}:${loc?.endLine ?? ""}`;
+
+  const handlerReadsValue = (handlerExpr: string, valueExpr: string, actionLoc: SourceRange | undefined): { basis: string[] } | undefined => {
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(valueExpr)) return undefined;
+    if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(handlerExpr)) {
+      if (ambiguousFunctionReadNames.has(handlerExpr)) return undefined;
+      const reads = functionIdentifierReads.get(handlerExpr);
+      if (reads?.has(valueExpr)) return { basis: [`handler.${handlerExpr}.reads.${valueExpr}`] };
+      return undefined;
+    }
+    const reads = rnActionIdentifierReads.get(actionBindingKey(handlerExpr, actionLoc));
+    if ((handlerExpr.includes("=>") || handlerExpr.startsWith("function")) && reads?.has(valueExpr)) {
+      return { basis: [`jsx.Pressable.onPress.reads.${valueExpr}`] };
+    }
+    return undefined;
+  };
+
+  const sourceRangeSpan = (ranges: Array<SourceRange | undefined>): SourceRange | undefined => {
+    const present = ranges.filter((range): range is SourceRange => Boolean(range));
+    if (present.length === 0) return undefined;
+    return {
+      startLine: Math.min(...present.map((range) => range.startLine)),
+      endLine: Math.max(...present.map((range) => range.endLine)),
+    };
+  };
+
   const collectRnPrimitiveInteraction = (
     node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
     tag: string,
     attributeValues: Map<string, string>,
+    attributeExpressions: Map<string, ts.Expression>,
   ): void => {
     if (tag === "TextInput") {
       const valueExpr = attributeValues.get("value");
@@ -656,9 +736,12 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     const testID = attributeValues.get("testID");
 
     const label = ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? jsxElementTextLabel(node.parent) : undefined;
+    const loc = sourceRangeOf(sourceFile, node);
+    const actionReads = identifierReads(attributeExpressions.get("onPress"));
+    if (actionReads.size > 0) rnActionIdentifierReads.set(actionBindingKey(onPressExpr, loc), actionReads);
     rnActionBindings.push({
       primitive: "Pressable",
-      loc: sourceRangeOf(sourceFile, node),
+      loc,
       onPressExpr,
       ...(label ? { label } : {}),
       ...(disabled ? { disabled } : {}),
@@ -679,10 +762,14 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
     const tag = node.tagName.getText(sourceFile);
     const attributeValues = new Map<string, string>();
+    const attributeExpressions = new Map<string, ts.Expression>();
     for (const property of node.attributes.properties) {
       if (!ts.isJsxAttribute(property)) continue;
       const value = jsxAttributeValue(property);
       if (value) attributeValues.set(property.name.getText(sourceFile), value);
+      if (property.initializer && ts.isJsxExpression(property.initializer) && property.initializer.expression) {
+        attributeExpressions.set(property.name.getText(sourceFile), property.initializer.expression);
+      }
     }
     const elementId = attributeValues.get("id");
     if (elementId) {
@@ -691,7 +778,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     if (tag === "Controller") {
       addLocatedAnchor(validationAnchors, "Controller", node);
     }
-    collectRnPrimitiveInteraction(node, tag, attributeValues);
+    collectRnPrimitiveInteraction(node, tag, attributeValues, attributeExpressions);
 
     const propNames: string[] = [];
     const propValues: Record<string, string> = {};
@@ -829,13 +916,24 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       }
     }
 
-    if (ts.isFunctionDeclaration(node) && node.name && /^handle[A-Z]/.test(node.name.text)) {
-      addEventHandlerSignal(node.name.text, node);
-      addSnippet(node.name.text, textOf(sourceFile, node), "event-handler", node);
+    if (ts.isFunctionDeclaration(node) && node.name) {
+      rememberFunctionReads(node.name.text, node.body, parameterBindingNames(node.parameters));
+      if (/^handle[A-Z]/.test(node.name.text)) {
+        addEventHandlerSignal(node.name.text, node);
+        addSnippet(node.name.text, textOf(sourceFile, node), "event-handler", node);
+      }
     }
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && /^handle[A-Z]/.test(node.name.text)) {
-      addEventHandlerSignal(node.name.text, node.parent?.parent ?? node);
-      addSnippet(node.name.text, textOf(sourceFile, node.parent?.parent ?? node), "event-handler", node.parent?.parent ?? node);
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      if (
+        node.initializer &&
+        (ts.isFunctionExpression(node.initializer) || ts.isArrowFunction(node.initializer))
+      ) {
+        rememberFunctionReads(node.name.text, node.initializer);
+      }
+      if (/^handle[A-Z]/.test(node.name.text)) {
+        addEventHandlerSignal(node.name.text, node.parent?.parent ?? node);
+        addSnippet(node.name.text, textOf(sourceFile, node.parent?.parent ?? node), "event-handler", node.parent?.parent ?? node);
+      }
     }
     if (ts.isJsxAttribute(node)) {
       const attrName = node.name.getText(sourceFile);
@@ -886,7 +984,36 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     rnActionBindings,
     (item) => `${item.primitive}:${item.onPressExpr}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
-  const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0;
+  const rnStateActionRelations = rnActionBindingList.flatMap((actionBinding) => {
+    const directInputMatches = rnInputBindingList.flatMap((inputBinding) => {
+      if (!inputBinding.valueExpr) return [];
+      const read = handlerReadsValue(actionBinding.onPressExpr, inputBinding.valueExpr, actionBinding.loc);
+      if (!read) return [];
+      return [{ inputBinding, read }];
+    });
+    if (directInputMatches.length !== 1) return [];
+    const { inputBinding, read } = directInputMatches[0];
+    return [
+      {
+        relationKind: "actionReadsInputValue" as const,
+        inputPrimitive: "TextInput" as const,
+        actionPrimitive: "Pressable" as const,
+        valueExpr: inputBinding.valueExpr!,
+        ...(inputBinding.onChangeTextExpr ? { onChangeTextExpr: inputBinding.onChangeTextExpr } : {}),
+        onPressExpr: actionBinding.onPressExpr,
+        ...(actionBinding.label ? { label: actionBinding.label } : {}),
+        relationBasis: read.basis,
+        loc: sourceRangeSpan([inputBinding.loc, actionBinding.loc]),
+        evidence: [
+          "rn.stateActionRelation.actionReadsInputValue",
+          ...inputBinding.evidence,
+          ...actionBinding.evidence,
+          ...read.basis,
+        ],
+      },
+    ];
+  }).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0 || rnStateActionRelations.length > 0;
   return {
     behavior: {
       hooks: [...hooks],
@@ -911,6 +1038,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
             rnPrimitiveInteractions: {
               ...(rnInputBindingList.length ? { inputBindings: rnInputBindingList } : {}),
               ...(rnActionBindingList.length ? { actionBindings: rnActionBindingList } : {}),
+              ...(rnStateActionRelations.length ? { stateActionRelations: rnStateActionRelations } : {}),
             },
           }
         : {}),

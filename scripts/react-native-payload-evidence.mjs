@@ -69,13 +69,20 @@ function interactionSummary(domainPayload) {
   const interactions = domainPayload?.facts?.primitiveInteractions ?? {};
   const inputBindings = interactions.inputBindings ?? [];
   const actionBindings = interactions.actionBindings ?? [];
+  const stateActionRelations = interactions.stateActionRelations ?? [];
   const textInputMetadataFields = presentFields(inputBindings, RN_TEXT_INPUT_METADATA_FIELDS);
   const pressableMetadataFields = presentFields(actionBindings, RN_PRESSABLE_METADATA_FIELDS);
   return {
     inputBindings,
     actionBindings,
+    stateActionRelations,
     hasTextInputBinding: Boolean(inputBindings.some((item) => item.primitive === "TextInput" && item.onChangeTextExpr)),
     hasPressableAction: Boolean(actionBindings.some((item) => item.primitive === "Pressable" && item.onPressExpr)),
+    hasDirectStateActionRelation: Boolean(
+      stateActionRelations.some(
+        (item) => item.relationKind === "actionReadsInputValue" && item.valueExpr && item.onPressExpr && item.relationBasis?.length > 0,
+      ),
+    ),
     metadataCoverage: {
       textInputFields: textInputMetadataFields,
       pressableFields: pressableMetadataFields,
@@ -169,9 +176,16 @@ export async function buildReactNativePayloadEvidence({
     (field) => !preReadPressableFields.includes(field) || !modelPressableFields.includes(field),
   );
   const metadataAnchorsVisible = missingTextInputFields.length === 0 && missingPressableFields.length === 0;
+  const directRelationRows = rnFixtures.filter(
+    (row) => row.preRead.primitiveInteractions.hasDirectStateActionRelation && row.modelFacing.primitiveInteractions.hasDirectStateActionRelation,
+  );
+  const relationOmittedRows = rnFixtures.filter(
+    (row) => !row.preRead.primitiveInteractions.hasDirectStateActionRelation && !row.modelFacing.primitiveInteractions.hasDirectStateActionRelation,
+  );
+  const stateActionRelationsVisible = directRelationRows.length > 0;
 
   return {
-    schemaVersion: "react-native-payload-evidence.v2",
+    schemaVersion: "react-native-payload-evidence.v3",
     generatedAt: new Date().toISOString(),
     runId,
     measurement: "local-fixture-pre-read-and-model-facing-domain-payload-evidence",
@@ -208,6 +222,15 @@ export async function buildReactNativePayloadEvidence({
           ? null
           : `missing metadata fields: TextInput=${missingTextInputFields.join(",") || "none"}; Pressable=${missingPressableFields.join(",") || "none"}`,
       },
+      stateActionRelationsVisible: {
+        claimable: stateActionRelationsVisible,
+        relationKind: "actionReadsInputValue",
+        directRelationFixtures: directRelationRows.map((row) => row.file),
+        omittedRelationFixtures: relationOmittedRows.map((row) => row.file),
+        blocker: stateActionRelationsVisible
+          ? null
+          : "no measured RN fixture exposed a direct actionReadsInputValue relation in both pre-read and model-facing payloads",
+      },
       broadReactNativeSupport: {
         claimable: false,
         blocker: "evidence is limited to the existing rn-primitive-input-narrow-payload measured lane",
@@ -237,7 +260,10 @@ export function renderReactNativePayloadEvidenceMarkdown(evidence) {
       const action = row.preRead.primitiveInteractions.actionBindings
         .map((item) => `${item.primitive}:onPress=${item.onPressExpr}${item.label ? `,label=${item.label}` : ""}`)
         .join("; ");
-      return `| \`${row.file}\` | ${row.preReadDecision} | ${row.sourceFingerprintPresent ? "yes" : "no"} | ${row.preRead.strictContractsPresent ? "yes" : "no"} | ${input} | ${action} | ${row.claimable ? "yes" : "no"} |`;
+      const relation = row.preRead.primitiveInteractions.stateActionRelations
+        .map((item) => `${item.relationKind}:${item.onPressExpr}->${item.valueExpr}`)
+        .join("; ") || "omitted";
+      return `| \`${row.file}\` | ${row.preReadDecision} | ${row.sourceFingerprintPresent ? "yes" : "no"} | ${row.preRead.strictContractsPresent ? "yes" : "no"} | ${input} | ${action} | ${relation} | ${row.claimable ? "yes" : "no"} |`;
     })
     .join("\n");
   const boundaryRows = evidence.boundaryFixtures
@@ -264,6 +290,7 @@ ${evidence.claimBoundary}
 - RN primitive interaction facts visible: ${evidence.summary.rnPayloadFactsVisible.claimable ? "yes" : "no"}
 - Richer RN/WebView/TUI boundaries preserved: ${evidence.summary.boundaryFallbacksPreserved.claimable ? "yes" : "no"}
 - RN metadata anchors visible: ${evidence.summary.metadataAnchorsVisible.claimable ? "yes" : "no"}
+- RN direct state/action relation visible: ${evidence.summary.stateActionRelationsVisible.claimable ? "yes" : "no"}
 - Broad React Native support claimable: no
 - Runtime reuse promotion claimable: no
 - RN edit routing claimable: no
@@ -271,8 +298,8 @@ ${evidence.claimBoundary}
 
 ## Measured RN narrow fixtures
 
-| Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | claimable |
-| --- | --- | --- | --- | --- | --- | --- |
+| Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | direct relation | claimable |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 ${fixtureRows}
 
 ## Metadata anchor coverage

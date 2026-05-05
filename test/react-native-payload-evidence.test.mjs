@@ -10,7 +10,7 @@ import {
 test("React Native payload evidence exposes primitiveInteractions without widening RN scope", async () => {
   const evidence = await buildReactNativePayloadEvidence({ runId: `test-${Date.now()}-${Math.random()}` });
 
-  assert.equal(evidence.schemaVersion, "react-native-payload-evidence.v2");
+  assert.equal(evidence.schemaVersion, "react-native-payload-evidence.v3");
   assert.equal(evidence.measurement, "local-fixture-pre-read-and-model-facing-domain-payload-evidence");
   assert.match(evidence.claimBoundary, /Local fixture payload evidence only/);
   assert.match(evidence.claimBoundary, /not broad React Native support/);
@@ -25,6 +25,14 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.boundaryFallbacksPreserved.blocker, null);
   assert.equal(evidence.summary.metadataAnchorsVisible.claimable, true);
   assert.equal(evidence.summary.metadataAnchorsVisible.blocker, null);
+  assert.equal(evidence.summary.stateActionRelationsVisible.claimable, true);
+  assert.equal(evidence.summary.stateActionRelationsVisible.relationKind, "actionReadsInputValue");
+  assert.ok(
+    evidence.summary.stateActionRelationsVisible.directRelationFixtures.some((file) => file.endsWith("rn-primitive-inline-action.tsx")),
+  );
+  assert.ok(
+    evidence.summary.stateActionRelationsVisible.omittedRelationFixtures.some((file) => file.endsWith("rn-primitive-basic.tsx")),
+  );
   assert.deepEqual(
     evidence.summary.metadataAnchorsVisible.textInputFields.map((row) => row.field),
     RN_TEXT_INPUT_METADATA_FIELDS,
@@ -84,6 +92,8 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Apply filter");
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].accessibilityRole, "button");
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].testID, "apply-button");
+  assert.deepEqual(basic.preRead.primitiveInteractions.stateActionRelations, []);
+  assert.deepEqual(basic.modelFacing.primitiveInteractions.stateActionRelations, []);
 
   const inline = evidence.fixtures.find((row) => row.file.endsWith("rn-primitive-inline-action.tsx"));
   assert.equal(inline.preRead.primitiveInteractions.inputBindings[0].placeholder, "Type filter");
@@ -95,6 +105,35 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].label, "Submit");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Submit filter");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].testID, "submit-filter-button");
+  assert.deepEqual(inline.preRead.primitiveInteractions.stateActionRelations, [
+    {
+      relationKind: "actionReadsInputValue",
+      inputPrimitive: "TextInput",
+      actionPrimitive: "Pressable",
+      valueExpr: "value",
+      onChangeTextExpr: "onChangeText",
+      onPressExpr: "submitCurrentValue",
+      label: "Submit",
+      relationBasis: ["handler.submitCurrentValue.reads.value"],
+      loc: { startLine: 15, endLine: 24 },
+      evidence: [
+        "rn.stateActionRelation.actionReadsInputValue",
+        "jsx.TextInput.value",
+        "jsx.TextInput.onChangeText",
+        "jsx.TextInput.placeholder",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.accessibilityLabel",
+        "jsx.TextInput.testID",
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.testID",
+        "handler.submitCurrentValue.reads.value",
+      ],
+    },
+  ]);
+  assert.deepEqual(inline.modelFacing.primitiveInteractions.stateActionRelations, inline.preRead.primitiveInteractions.stateActionRelations);
 });
 
 test("React Native payload evidence keeps richer RN WebView and TUI boundaries fallback-only", async () => {
@@ -120,6 +159,8 @@ test("React Native payload evidence Markdown keeps claim boundaries explicit", a
   assert.match(markdown, /RN primitive interaction facts visible: yes/);
   assert.match(markdown, /Richer RN\/WebView\/TUI boundaries preserved: yes/);
   assert.match(markdown, /RN metadata anchors visible: yes/);
+  assert.match(markdown, /RN direct state\/action relation visible: yes/);
+  assert.match(markdown, /actionReadsInputValue:submitCurrentValue->value/);
   assert.match(markdown, /\| TextInput \| keyboardType \| yes \| yes \| yes \|/);
   assert.match(markdown, /\| TextInput \| secureTextEntry \| yes \| yes \| yes \|/);
   assert.match(markdown, /\| TextInput \| maxLength \| yes \| yes \| yes \|/);

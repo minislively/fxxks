@@ -92,9 +92,23 @@ export type ReactNativePrimitiveActionBindingSignal = {
   evidence: string[];
 };
 
+export type ReactNativePrimitiveStateActionRelationSignal = {
+  relationKind: "actionReadsInputValue";
+  inputPrimitive: "TextInput";
+  actionPrimitive: "Pressable";
+  valueExpr: string;
+  onChangeTextExpr?: string;
+  onPressExpr: string;
+  label?: string;
+  relationBasis: string[];
+  loc?: SourceRange;
+  evidence: string[];
+};
+
 export type ReactNativePrimitiveInteractionSignal = {
   inputBindings?: ReactNativePrimitiveInputBindingSignal[];
   actionBindings?: ReactNativePrimitiveActionBindingSignal[];
+  stateActionRelations?: ReactNativePrimitiveStateActionRelationSignal[];
 };
 
 export type A11yAnchorSignal = {

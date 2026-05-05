@@ -10,7 +10,7 @@ import { createRequire } from "node:module";
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
-const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
+const { extractFile, extractSource } = require(path.join(repoRoot, "dist", "core", "extract.js"));
 const {
   assessReactNativePrimitiveInputSignalGate,
   assessReactNativePayloadPolicy,
@@ -45,6 +45,11 @@ function fixturePath(fileName) {
 
 function fixtureSource(fileName) {
   return fs.readFileSync(fixturePath(fileName), "utf8");
+}
+
+function rnPayloadFromSource(source, filePath = "NativeRelation.tsx") {
+  const extracted = extractSource(filePath, source);
+  return buildReactNativePrimitiveInputDomainPayload(extracted, extracted.domainDetection);
 }
 
 function rnPrimitiveInputSource(extraJsx = "") {
@@ -154,6 +159,35 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
       evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label", "jsx.Pressable.accessibilityLabel", "jsx.Pressable.testID"],
     },
   ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.stateActionRelations, [
+    {
+      relationKind: "actionReadsInputValue",
+      inputPrimitive: "TextInput",
+      actionPrimitive: "Pressable",
+      valueExpr: "value",
+      onChangeTextExpr: "onChangeText",
+      onPressExpr: "submitCurrentValue",
+      label: "Submit",
+      relationBasis: ["handler.submitCurrentValue.reads.value"],
+      loc: { startLine: 15, endLine: 24 },
+      evidence: [
+        "rn.stateActionRelation.actionReadsInputValue",
+        "jsx.TextInput.value",
+        "jsx.TextInput.onChangeText",
+        "jsx.TextInput.placeholder",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.accessibilityLabel",
+        "jsx.TextInput.testID",
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.testID",
+        "handler.submitCurrentValue.reads.value",
+      ],
+    },
+  ]);
+  assert.equal("stateActionRelations" in payload.sourceAnchorBeta, false);
   assert.equal("formControls" in payload.facts, false);
   assert.equal("domTags" in payload.facts, false);
   assert.equal("reactNativeContext" in payload, false);
@@ -224,9 +258,95 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
       ],
     },
   ]);
+  assert.equal("stateActionRelations" in payload.facts.primitiveInteractions, false);
+  assert.equal("stateActionRelations" in payload.sourceAnchorBeta, false);
   assert.equal("formControls" in payload.facts, false);
   assert.equal("domTags" in payload.facts, false);
   assert.equal("reactNativeContext" in payload, false);
+});
+
+test("React Native direct state/action relation omits co-located and ambiguous narrow pairs", () => {
+  const unrelatedPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function UnrelatedNativeInput({ value, onChangeText, onApply }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={onApply}><Text>Apply</Text></Pressable></View>;
+    }`);
+  assert.equal(unrelatedPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in unrelatedPayload.facts.primitiveInteractions, false);
+
+  const ambiguousPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function AmbiguousNativeInput({ value, query, onChangeText, onChangeQuery, onSubmit }) {
+      const submitCurrentValue = () => onSubmit(value, query);
+      return <View><TextInput value={value} onChangeText={onChangeText} /><TextInput value={query} onChangeText={onChangeQuery} /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(ambiguousPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in ambiguousPayload.facts.primitiveInteractions, false);
+
+  const propertyNameOnlyPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function PropertyNameOnly({ value, onChangeText, onSubmit }) {
+      const submitCurrentValue = () => onSubmit({ value: "static" });
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(propertyNameOnlyPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in propertyNameOnlyPayload.facts.primitiveInteractions, false);
+
+  const shadowedHandlerPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function ShadowedHandler({ value, onChangeText, onSubmit }) {
+      const submitCurrentValue = (value) => onSubmit(value);
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(shadowedHandlerPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in shadowedHandlerPayload.facts.primitiveInteractions, false);
+
+  const shadowedFunctionPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function ShadowedFunction({ value, onChangeText, onSubmit }) {
+      function submitCurrentValue(value) {
+        onSubmit(value);
+      }
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(shadowedFunctionPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in shadowedFunctionPayload.facts.primitiveInteractions, false);
+
+  const namedFunctionExpressionPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function NamedFunctionExpression({ value, onChangeText, onSubmit }) {
+      const submitCurrentValue = function value() {
+        onSubmit("static");
+      };
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(namedFunctionExpressionPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in namedFunctionExpressionPayload.facts.primitiveInteractions, false);
+
+  const duplicateHandlerNamePayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function DuplicateHandlerA({ value, onChangeText, onSubmit }) {
+      const submitCurrentValue = () => onSubmit("static");
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }
+    export function DuplicateHandlerB({ value, onSubmit }) {
+      const submitCurrentValue = () => onSubmit(value);
+      return <View><Text>{value}</Text></View>;
+    }`);
+  assert.equal(duplicateHandlerNamePayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in duplicateHandlerNamePayload.facts.primitiveInteractions, false);
+
+  const inlineShadowedPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function InlineShadowed({ value, onChangeText, onSubmit }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={(value) => onSubmit(value)}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(inlineShadowedPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in inlineShadowedPayload.facts.primitiveInteractions, false);
+
+  const inputOnlyPayload = rnPayloadFromSource(`import { View, TextInput } from "react-native";
+    export function InputOnly({ value, onChangeText }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} /></View>;
+    }`);
+  assert.equal(inputOnlyPayload, undefined);
+
+  const actionOnlyPayload = rnPayloadFromSource(`import { View, Text, Pressable } from "react-native";
+    export function ActionOnly({ onApply }) {
+      return <View><Pressable onPress={onApply}><Text>Apply</Text></Pressable></View>;
+    }`);
+  assert.equal(actionOnlyPayload, undefined);
 });
 
 test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {
