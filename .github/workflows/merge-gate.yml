@@ -1,0 +1,42 @@
+name: Merge Gate
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  merge-gate:
+    name: Require maintainer approval and linked issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted base branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Validate merge policy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MERGE_GATE_ALLOWED_MAINTAINERS: minislively
+          MERGE_GATE_REQUIRE_LINKED_ISSUE: "true"
+        run: node scripts/validate-pr-merge-gate.mjs
