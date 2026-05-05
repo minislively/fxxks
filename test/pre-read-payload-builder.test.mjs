@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { reactWebFormStateFlowSource } from "./react-web-inline-sources.mjs";
 
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
@@ -65,6 +66,32 @@ test("pre-read payload builder omits React Web context metadata when payload bud
     assert.equal(budgeted.debug.reactWebContextBudget.reason, "budget-exceeded");
   } finally {
     JSON.stringify = originalStringify;
+  }
+});
+
+test("pre-read payload builder preserves React Web form state-flow when context budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-form-flow-budget-"));
+  try {
+    const target = path.join(tempDir, "InlineRetentionForm.tsx");
+    fs.writeFileSync(target, reactWebFormStateFlowSource());
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: false,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(decision.debug.reactWebContextBudget.estimatedPayloadBytes <= decision.debug.reactWebContextBudget.maxPayloadBytes);
+    assert.ok(Array.isArray(decision.payload.reactWebContext.formStateFlow));
+    assert.ok(
+      decision.payload.reactWebContext.formStateFlow.some(
+        (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
+      ),
+    );
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
