@@ -600,7 +600,25 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       const valueExpr = attributeValues.get("value");
       const onChangeTextExpr = attributeValues.get("onChangeText");
       const placeholder = attributeValues.get("placeholder");
-      if (!valueExpr && !onChangeTextExpr && !placeholder) return;
+      const keyboardType = attributeValues.get("keyboardType");
+      const secureTextEntry = attributeValues.get("secureTextEntry");
+      const maxLength = attributeValues.get("maxLength");
+      const autoCapitalize = attributeValues.get("autoCapitalize");
+      const accessibilityLabel = attributeValues.get("accessibilityLabel");
+      const testID = attributeValues.get("testID");
+      if (
+        !valueExpr &&
+        !onChangeTextExpr &&
+        !placeholder &&
+        !keyboardType &&
+        !secureTextEntry &&
+        !maxLength &&
+        !autoCapitalize &&
+        !accessibilityLabel &&
+        !testID
+      ) {
+        return;
+      }
 
       rnInputBindings.push({
         primitive: "TextInput",
@@ -608,10 +626,22 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         ...(valueExpr ? { valueExpr } : {}),
         ...(onChangeTextExpr ? { onChangeTextExpr } : {}),
         ...(placeholder ? { placeholder } : {}),
+        ...(keyboardType ? { keyboardType } : {}),
+        ...(secureTextEntry ? { secureTextEntry } : {}),
+        ...(maxLength ? { maxLength } : {}),
+        ...(autoCapitalize ? { autoCapitalize } : {}),
+        ...(accessibilityLabel ? { accessibilityLabel } : {}),
+        ...(testID ? { testID } : {}),
         evidence: [
           ...(valueExpr ? ["jsx.TextInput.value"] : []),
           ...(onChangeTextExpr ? ["jsx.TextInput.onChangeText"] : []),
           ...(placeholder ? ["jsx.TextInput.placeholder"] : []),
+          ...(keyboardType ? ["jsx.TextInput.keyboardType"] : []),
+          ...(secureTextEntry ? ["jsx.TextInput.secureTextEntry"] : []),
+          ...(maxLength ? ["jsx.TextInput.maxLength"] : []),
+          ...(autoCapitalize ? ["jsx.TextInput.autoCapitalize"] : []),
+          ...(accessibilityLabel ? ["jsx.TextInput.accessibilityLabel"] : []),
+          ...(testID ? ["jsx.TextInput.testID"] : []),
         ],
       });
       return;
@@ -620,6 +650,10 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     if (tag !== "Pressable") return;
     const onPressExpr = attributeValues.get("onPress");
     if (!onPressExpr) return;
+    const disabled = attributeValues.get("disabled");
+    const accessibilityLabel = attributeValues.get("accessibilityLabel");
+    const accessibilityRole = attributeValues.get("accessibilityRole");
+    const testID = attributeValues.get("testID");
 
     const label = ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? jsxElementTextLabel(node.parent) : undefined;
     rnActionBindings.push({
@@ -627,7 +661,18 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       loc: sourceRangeOf(sourceFile, node),
       onPressExpr,
       ...(label ? { label } : {}),
-      evidence: ["jsx.Pressable.onPress", ...(label ? ["jsx.Pressable.Text.label"] : [])],
+      ...(disabled ? { disabled } : {}),
+      ...(accessibilityLabel ? { accessibilityLabel } : {}),
+      ...(accessibilityRole ? { accessibilityRole } : {}),
+      ...(testID ? { testID } : {}),
+      evidence: [
+        "jsx.Pressable.onPress",
+        ...(label ? ["jsx.Pressable.Text.label"] : []),
+        ...(disabled ? ["jsx.Pressable.disabled"] : []),
+        ...(accessibilityLabel ? ["jsx.Pressable.accessibilityLabel"] : []),
+        ...(accessibilityRole ? ["jsx.Pressable.accessibilityRole"] : []),
+        ...(testID ? ["jsx.Pressable.testID"] : []),
+      ],
     });
   };
 
