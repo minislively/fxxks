@@ -10,6 +10,8 @@ import {
   reactWebComponentApiSource,
   reactWebFormStateFlowSource,
   reactWebLayoutRegionSource,
+  reactWebStylingVariantSource,
+  reactWebImportRoleSource,
 } from "./react-web-inline-sources.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -373,6 +375,102 @@ test("runtime bridge preserves React Web a11y anchors in repeated-read context w
           item.relation.sourceId === "email-error",
       ),
     );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web styling variant hints in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-styling-variant-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebStylingVariantSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineVariantPanel.tsx"), source);
+
+    const sessionId = `bridge-contract-styling-variant-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineVariantPanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineVariantPanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.stylingVariantHints));
+
+    const hints = payload.reactWebContext.stylingVariantHints;
+    assert.ok(hints.some((item) => item.kind === "props-contract" && item.propName === "variant"));
+    assert.ok(hints.some((item) => item.kind === "data-state" && item.propName === "data-state"));
+    assert.ok(hints.some((item) => item.kind === "className-branch" && item.propName === "className" && item.loc));
+    assert.ok(hints.some((item) => item.kind === "inline-style" && item.propName === "style" && item.loc));
+    assert.ok(hints.some((item) => item.kind === "variant-prop" && item.propName === "disabled"));
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web import role hints in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-import-role-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebImportRoleSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineImportRolePanel.tsx"), source);
+
+    const sessionId = `bridge-contract-import-role-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineImportRolePanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineImportRolePanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.importRoleHints));
+
+    const rolesByModule = new Map(
+      payload.reactWebContext.importRoleHints.map((item) => [item.moduleSpecifier, item.role]),
+    );
+    assert.equal(rolesByModule.get("react-hook-form"), "form-library");
+    assert.equal(rolesByModule.get("zod"), "validation-library");
+    assert.equal(rolesByModule.get("next/link"), "routing");
+    assert.equal(rolesByModule.get("@/components/ui/button"), "ui-kit");
+    assert.equal(rolesByModule.get("lucide-react"), "icon-library");
+    assert.equal(rolesByModule.get("./FieldShell"), "local-component");
+    assert.equal(rolesByModule.has("date-fns"), false);
     assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
