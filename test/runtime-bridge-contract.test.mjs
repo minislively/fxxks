@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { cleanupMetricSessions } from "./metric-cleanup.mjs";
+import { reactWebFormStateFlowSource } from "./react-web-inline-sources.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -283,6 +284,50 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
   assert.equal(legacyOverride.action, "fallback");
   assert.equal(legacyOverride.fallback.reason, "escape-hatch-full-read");
+});
+
+test("runtime bridge preserves React Web form state-flow in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-form-flow-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebFormStateFlowSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineRetentionForm.tsx"), source);
+
+    const sessionId = `bridge-contract-form-flow-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineRetentionForm.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineRetentionForm.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.formStateFlow));
+    assert.ok(
+      payload.reactWebContext.formStateFlow.some(
+        (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
+      ),
+    );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("runtime bridge preserves React Web custom-wrapper domainPayload parity for F11/F12", () => {
