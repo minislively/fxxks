@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { cleanupMetricSessions } from "./metric-cleanup.mjs";
-import { reactWebFormStateFlowSource } from "./react-web-inline-sources.mjs";
+import { reactWebFormStateFlowSource, reactWebLayoutRegionSource } from "./react-web-inline-sources.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -324,6 +324,51 @@ test("runtime bridge preserves React Web form state-flow in repeated-read contex
         (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
       ),
     );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web layout regions in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-layout-region-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebLayoutRegionSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineLayoutPanel.tsx"), source);
+
+    const sessionId = `bridge-contract-layout-region-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineLayoutPanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineLayoutPanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.layoutRegionHints));
+
+    const layoutKinds = new Set(payload.reactWebContext.layoutRegionHints.map((item) => item.kind));
+    assert.equal(layoutKinds.has("semantic-region"), true);
+    assert.equal(layoutKinds.has("list-region"), true);
+    assert.equal(layoutKinds.has("form-region"), true);
+    assert.equal(layoutKinds.has("repeated-region"), true);
     assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
