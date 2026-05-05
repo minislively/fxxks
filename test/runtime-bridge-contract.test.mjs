@@ -5,7 +5,11 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { cleanupMetricSessions } from "./metric-cleanup.mjs";
-import { reactWebFormStateFlowSource, reactWebLayoutRegionSource } from "./react-web-inline-sources.mjs";
+import {
+  reactWebComponentApiSource,
+  reactWebFormStateFlowSource,
+  reactWebLayoutRegionSource,
+} from "./react-web-inline-sources.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -324,6 +328,51 @@ test("runtime bridge preserves React Web form state-flow in repeated-read contex
         (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
       ),
     );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web component API hints in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-component-api-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebComponentApiSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineComponentApiPanel.tsx"), source);
+
+    const sessionId = `bridge-contract-component-api-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineComponentApiPanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineComponentApiPanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.componentApiHints));
+
+    const apiKinds = new Set(payload.reactWebContext.componentApiHints.map((item) => item.kind));
+    assert.equal(apiKinds.has("prop"), true);
+    assert.equal(apiKinds.has("custom-component-usage"), true);
+    assert.ok(payload.reactWebContext.componentApiHints.some((item) => item.propName === "title"));
+    assert.ok(payload.reactWebContext.componentApiHints.some((item) => item.label === "StatusBadge"));
     assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

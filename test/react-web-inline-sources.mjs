@@ -51,3 +51,30 @@ export function InlineLayoutPanel({ items, loading, error }: LayoutPanelProps) {
 /* ${"layout budget filler ".repeat(360)} */
 `;
 }
+
+export function reactWebComponentApiSource() {
+  return `type StatusBadgeProps = { label: string };
+type ComponentApiItem = { id: string; label: string };
+type ComponentApiPanelProps = { title: string; items: ComponentApiItem[]; count?: number; loading?: boolean; error?: string };
+
+function StatusBadge({ label }: StatusBadgeProps) {
+  return <span className="badge">{label}</span>;
+}
+
+export function InlineComponentApiPanel({ title, items, count = 0, loading, error }: ComponentApiPanelProps) {
+  return (
+    <section aria-label={title}>
+      <h2>{title}</h2>
+      <StatusBadge label={count > 0 ? "active" : "empty"} />
+      {loading ? <p>Loading accounts</p> : null}
+      {error ? <p role="alert">{error}</p> : null}
+      <ul>{items.map((item) => <li key={item.id}>{item.label}</li>)}</ul>
+      <p>{count} linked accounts</p>
+      <button type="button">Refresh</button>
+    </section>
+  );
+}
+
+/* ${"component api budget filler ".repeat(220)} */
+`;
+}
