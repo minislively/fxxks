@@ -14,6 +14,20 @@ The TUI lane is currently a source-evidence lane:
 
 This separation is intentional. Domain evidence can tell reviewers what kind of file they are looking at, but it is not permission to replace source reading with compact context.
 
+## TUI-safe metadata projection contract
+
+This contract names the source-derived metadata that may inform a later TUI payload-design plan. It is **not** a payload schema, **not** compact extraction permission, and **not** model-facing output. Current TUI behavior remains evidence-only, denied by policy, and fallback/no-payload.
+
+| Category | May record | Current boundary |
+| --- | --- | --- |
+| Safe shared metadata | Imports, component/export names, JSX tags, prop names, hook names, handler identifiers, state variable names, source ranges, domain classification, policy decision, and fallback reason. | These facts may help reviewers describe the source shape, but they do not authorize source replacement or compact payload emission. |
+| TUI-specific source evidence | Ink import, `Box`, `Text`, `useInput`, source-observed key branch names, and prompt/list/status concern tags. | These facts identify Ink evidence and fixture concerns only; they do not prove terminal behavior. |
+| Caution metadata | Layout/style props, color/dim/border props, mapped rows, and command/status labels. | Useful as source facts, but terminal layout, styling, wrapping, command progress, and display correctness remain unproven. |
+| Fallback-required metadata | Command execution behavior, TTY/stdin behavior, terminal width/wrapping, key handling correctness, progress/runtime state, and shell side effects. | Keep full-source reading or a later measured plan; do not compress these into trusted TUI context from AST facts alone. |
+| Forbidden projection | DOM roles, ARIA relationships, `htmlFor`/id form relations, browser form semantics, CSS/className meaning, React Web layout region semantics, and browser accessibility assumptions. | React Web-only semantics must not be projected into TUI/Ink context or used to promote TUI payload permission. |
+
+The safe and caution categories are review vocabulary for future planning. A later PR that serializes any of this into model-facing payload must write a separate PRD/test-spec pair, name the schema, preserve fallback regressions, and re-check the public claim boundary before implementation.
+
 ## Fixture roles
 
 These fixture roles are also the current TUI concern taxonomy. Concern labels help reviewers reason about source evidence, but concern evidence is not payload permission.
@@ -47,6 +61,7 @@ Before a TUI payload-design plan is useful, the repo should already have:
 - at least one positive Ink fixture for each evidence category that the design wants to rely on;
 - at least one negative or mixed-domain fixture for every rule that could otherwise over-match;
 - stable policy language describing what source facts are safe to summarize and what facts require full source;
+- a TUI-safe metadata projection contract that separates shared syntax facts, TUI source evidence, caution facts, fallback-required facts, and forbidden React Web-only projections;
 - an explicit list of terminal/runtime facts that remain outside AST-derived evidence;
 - a verification matrix that proves fallback/no-payload still wins for weak, mixed, non-Ink, and behavior-heavy cases;
 - a claim-boundary audit that rejects compact-context, terminal behavior, token, billing, and performance wording until measured evidence exists.

@@ -129,6 +129,52 @@ const payloadReadinessGateTerms = [
   "separate serialized plan",
 ];
 
+const metadataProjectionCategories = [
+  "TUI-safe metadata projection contract",
+  "Safe shared metadata",
+  "TUI-specific source evidence",
+  "Caution metadata",
+  "Fallback-required metadata",
+  "Forbidden projection",
+];
+
+const metadataProjectionTerms = [
+  "Imports",
+  "component/export names",
+  "JSX tags",
+  "prop names",
+  "hook names",
+  "handler identifiers",
+  "state variable names",
+  "source ranges",
+  "domain classification",
+  "policy decision",
+  "fallback reason",
+  "Ink import",
+  "`Box`",
+  "`Text`",
+  "`useInput`",
+  "source-observed key branch names",
+  "prompt/list/status concern tags",
+  "Layout/style props",
+  "color/dim/border props",
+  "mapped rows",
+  "command/status labels",
+  "Command execution behavior",
+  "TTY/stdin behavior",
+  "terminal width/wrapping",
+  "key handling correctness",
+  "progress/runtime state",
+  "shell side effects",
+  "DOM roles",
+  "ARIA relationships",
+  "`htmlFor`/id form relations",
+  "browser form semantics",
+  "CSS/className meaning",
+  "React Web layout region semantics",
+  "browser accessibility assumptions",
+];
+
 function tuiFixturePath(fileName) {
   return path.join("test", "fixtures", "frontend-domain-expectations", fileName);
 }
@@ -445,6 +491,8 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /Current TUI evidence matrix/);
   assert.match(survey, /Payload design readiness handoff/);
   assert.match(survey, /not itself a payload contract/);
+  assert.match(survey, /TUI-safe metadata projection contract/);
+  assert.match(survey, /forbidden React Web-only projections/);
   assert.match(survey, /pre-read emits no model-facing TUI payload/);
   assert.match(survey, /separate serialized plan/);
   assert.match(survey, /tui-ink-evidence-only-payload/);
@@ -466,7 +514,16 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /## Stop rules/);
   assert.match(guide, /tui-ink-evidence-only-payload/);
   assert.match(guide, /fallback\/no-payload/);
+  assert.match(guide, /\*\*not\*\* a payload schema/);
+  assert.match(guide, /\*\*not\*\* compact extraction permission/);
+  assert.match(guide, /\*\*not\*\* model-facing output/);
   assert.match(guide, /serialized shared-policy plan/);
+  for (const category of metadataProjectionCategories) {
+    assert.ok(guide.includes(category), category);
+  }
+  for (const term of metadataProjectionTerms) {
+    assert.ok(guide.includes(term), term);
+  }
   for (const term of payloadReadinessGateTerms) {
     assert.ok(guide.includes(term), term);
   }
