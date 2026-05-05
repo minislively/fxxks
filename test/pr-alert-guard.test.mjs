@@ -139,3 +139,50 @@ test("PR alert guard treats new-to-merged alerts for already merged PRs as verif
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+
+test("PR alert guard treats already merged pruned dogfood runtime cleanup as no-action echo", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-dogfood-runtime-"));
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  const eventsPath = path.join(tempDir, "events.json");
+
+  fs.writeFileSync(alertsPath, "relay: PR fooks#220 merged cleanup echo for already-pruned stale dogfood zombie runtime cleanup");
+  fs.writeFileSync(eventsPath, JSON.stringify({
+    number: 220,
+    title: "Document stale runtime cleanup in artifact audit",
+    state: "closed",
+    html_url: "https://github.com/minislively/fooks/pull/220",
+    pull_request: {
+      url: "https://api.github.com/repos/minislively/fooks/pulls/220",
+      html_url: "https://github.com/minislively/fooks/pull/220",
+      merged_at: "2026-04-27T14:30:00Z",
+    },
+  }));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      guardScript,
+      "--repo",
+      "minislively/fooks",
+      "--alerts",
+      alertsPath,
+      "--events",
+      eventsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.totalRefs, 1);
+    assert.equal(result.counts.pull_request, 1);
+    assert.equal(result.counts.echo, 1);
+    assert.equal(result.rows[0].kind, "pull_request");
+    assert.equal(result.rows[0].prHandling, "echo");
+    assert.equal(result.rows[0].reason, "Alert reports merged dogfood stale runtime cleanup and GitHub state is already merged; no-action echo");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

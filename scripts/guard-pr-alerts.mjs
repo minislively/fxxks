@@ -104,14 +104,26 @@ function fetchIssue(ref) {
   return JSON.parse(stdout);
 }
 
-function alertLooksLikeNewToMergedEcho(alertText, ref) {
-  if (!/<new>\s*->\s*merged/i.test(alertText)) return false;
+function alertMentionsRef(alertText, ref) {
   const refPatterns = [
     new RegExp(`\\b${escapeRegExp(ref.repo)}#${ref.number}\\b`, "i"),
     new RegExp(`\\b${escapeRegExp(ref.owner)}/${escapeRegExp(ref.repo)}#${ref.number}\\b`, "i"),
     new RegExp(`github\\.com/${escapeRegExp(ref.owner)}/${escapeRegExp(ref.repo)}/(?:issues|pull)/${ref.number}\\b`, "i"),
   ];
   return refPatterns.some((pattern) => pattern.test(alertText));
+}
+
+function alertLooksLikeNewToMergedEcho(alertText, ref) {
+  return /<new>\s*->\s*merged/i.test(alertText) && alertMentionsRef(alertText, ref);
+}
+
+function alertLooksLikePrunedDogfoodRuntimeCleanupEcho(alertText, ref) {
+  return (
+    alertMentionsRef(alertText, ref) &&
+    /\bmerged\b/i.test(alertText) &&
+    /\bdogfood\b/i.test(alertText) &&
+    /\b(?:stale|runtime|zombie|pruned|prune|cleanup)\b/i.test(alertText)
+  );
 }
 
 function githubStateIsMerged(issue) {
@@ -125,7 +137,9 @@ function githubStateIsMerged(issue) {
 
 function classifyIssue(ref, issue, alertText) {
   const isPullRequest = Boolean(issue?.pull_request);
-  const isNewToMergedEcho = isPullRequest && githubStateIsMerged(issue) && alertLooksLikeNewToMergedEcho(alertText, ref);
+  const isMerged = isPullRequest && githubStateIsMerged(issue);
+  const isNewToMergedEcho = isMerged && alertLooksLikeNewToMergedEcho(alertText, ref);
+  const isPrunedDogfoodRuntimeCleanupEcho = isMerged && alertLooksLikePrunedDogfoodRuntimeCleanupEcho(alertText, ref);
   return {
     repo: `${ref.owner}/${ref.repo}`,
     number: ref.number,
@@ -134,10 +148,12 @@ function classifyIssue(ref, issue, alertText) {
     state: issue?.state ?? "unknown",
     htmlUrl: issue?.html_url ?? `https://github.com/${ref.owner}/${ref.repo}/issues/${ref.number}`,
     kind: isPullRequest ? "pull_request" : "issue",
-    prHandling: isNewToMergedEcho ? "echo" : isPullRequest ? "allow" : "skip",
+    prHandling: isNewToMergedEcho || isPrunedDogfoodRuntimeCleanupEcho ? "echo" : isPullRequest ? "allow" : "skip",
     reason: isNewToMergedEcho
       ? "Alert reports <new> -> merged and GitHub state is already merged; verification-only echo"
-      : isPullRequest ? "GitHub issue API response includes pull_request" : "GitHub issue API response has no pull_request field",
+      : isPrunedDogfoodRuntimeCleanupEcho
+        ? "Alert reports merged dogfood stale runtime cleanup and GitHub state is already merged; no-action echo"
+        : isPullRequest ? "GitHub issue API response includes pull_request" : "GitHub issue API response has no pull_request field",
   };
 }
 
