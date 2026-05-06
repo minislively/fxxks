@@ -148,6 +148,19 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
       ],
     },
   ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.inputConstraints, [
+    {
+      primitive: "TextInput",
+      loc: { startLine: 15, endLine: 23 },
+      valueExpr: "value",
+      constraintKind: "textInputMetadataConstraints",
+      keyboardType: "web-search",
+      autoCapitalize: "sentences",
+      descriptiveHint: "Type filter",
+      constraintBasis: ["jsx.TextInput.keyboardType", "jsx.TextInput.autoCapitalize"],
+      evidence: ["jsx.TextInput.keyboardType", "jsx.TextInput.autoCapitalize", "jsx.TextInput.placeholder"],
+    },
+  ]);
   assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
     {
       primitive: "Pressable",
@@ -188,6 +201,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
     },
   ]);
   assert.equal("stateActionRelations" in payload.sourceAnchorBeta, false);
+  assert.equal("inputConstraints" in payload.sourceAnchorBeta, false);
   assert.equal("formControls" in payload.facts, false);
   assert.equal("domTags" in payload.facts, false);
   assert.equal("reactNativeContext" in payload, false);
@@ -201,6 +215,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.equal(preReadDecision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].onPressExpr, "submitCurrentValue");
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].label, "Submit");
+  assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.inputConstraints[0].constraintKind, "textInputMetadataConstraints");
   assert.equal(preReadDecision.debug.domainDetection.classification, "react-native");
   assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
 });
@@ -238,6 +253,32 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
       ],
     },
   ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.inputConstraints, [
+    {
+      primitive: "TextInput",
+      loc: { startLine: 14, endLine: 24 },
+      valueExpr: "value",
+      constraintKind: "textInputMetadataConstraints",
+      maxLength: "80",
+      secureTextEntry: "false",
+      keyboardType: "default",
+      autoCapitalize: "none",
+      descriptiveHint: "Filter",
+      constraintBasis: [
+        "jsx.TextInput.maxLength",
+        "jsx.TextInput.secureTextEntry",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+      ],
+      evidence: [
+        "jsx.TextInput.maxLength",
+        "jsx.TextInput.secureTextEntry",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.placeholder",
+      ],
+    },
+  ]);
   assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
     {
       primitive: "Pressable",
@@ -260,9 +301,44 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
   ]);
   assert.equal("stateActionRelations" in payload.facts.primitiveInteractions, false);
   assert.equal("stateActionRelations" in payload.sourceAnchorBeta, false);
+  assert.equal("inputConstraints" in payload.sourceAnchorBeta, false);
   assert.equal("formControls" in payload.facts, false);
   assert.equal("domTags" in payload.facts, false);
   assert.equal("reactNativeContext" in payload, false);
+});
+
+test("React Native input constraints are source-observed and omit placeholder-only hints", () => {
+  const placeholderOnlyPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function PlaceholderOnly({ value, onChangeText, onPress }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} placeholder="Search" /><Pressable onPress={onPress}><Text>Go</Text></Pressable></View>;
+    }`);
+  assert.equal(placeholderOnlyPayload?.domain, "react-native");
+  assert.equal("inputConstraints" in placeholderOnlyPayload.facts.primitiveInteractions, false);
+
+  const valueOnlyPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function ValueOnly({ value, onChangeText, onPress }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={onPress}><Text>Go</Text></Pressable></View>;
+    }`);
+  assert.equal(valueOnlyPayload?.domain, "react-native");
+  assert.equal("inputConstraints" in valueOnlyPayload.facts.primitiveInteractions, false);
+
+  const noSecureTextEntryPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function KeyboardOnly({ value, onChangeText, onPress }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} keyboardType="email-address" /><Pressable onPress={onPress}><Text>Go</Text></Pressable></View>;
+    }`);
+  assert.equal(noSecureTextEntryPayload?.domain, "react-native");
+  assert.deepEqual(noSecureTextEntryPayload.facts.primitiveInteractions.inputConstraints, [
+    {
+      primitive: "TextInput",
+      loc: { startLine: 3, endLine: 3 },
+      valueExpr: "value",
+      constraintKind: "textInputMetadataConstraints",
+      keyboardType: "email-address",
+      constraintBasis: ["jsx.TextInput.keyboardType"],
+      evidence: ["jsx.TextInput.keyboardType"],
+    },
+  ]);
+  assert.equal("secureTextEntry" in noSecureTextEntryPayload.facts.primitiveInteractions.inputConstraints[0], false);
 });
 
 test("React Native direct state/action relation omits co-located and ambiguous narrow pairs", () => {

@@ -29,6 +29,8 @@ export const RN_TEXT_INPUT_METADATA_FIELDS = [
   "testID",
 ];
 
+export const RN_TEXT_INPUT_CONSTRAINT_FIELDS = ["maxLength", "secureTextEntry", "keyboardType", "autoCapitalize"];
+
 export const RN_PRESSABLE_METADATA_FIELDS = ["disabled", "accessibilityLabel", "accessibilityRole", "testID"];
 
 function loadDist(repoRoot) {
@@ -69,15 +71,27 @@ function interactionSummary(domainPayload) {
   const interactions = domainPayload?.facts?.primitiveInteractions ?? {};
   const inputBindings = interactions.inputBindings ?? [];
   const actionBindings = interactions.actionBindings ?? [];
+  const inputConstraints = interactions.inputConstraints ?? [];
   const stateActionRelations = interactions.stateActionRelations ?? [];
   const textInputMetadataFields = presentFields(inputBindings, RN_TEXT_INPUT_METADATA_FIELDS);
   const pressableMetadataFields = presentFields(actionBindings, RN_PRESSABLE_METADATA_FIELDS);
+  const constraintFields = presentFields(inputConstraints, RN_TEXT_INPUT_CONSTRAINT_FIELDS);
   return {
     inputBindings,
     actionBindings,
+    inputConstraints,
     stateActionRelations,
     hasTextInputBinding: Boolean(inputBindings.some((item) => item.primitive === "TextInput" && item.onChangeTextExpr)),
     hasPressableAction: Boolean(actionBindings.some((item) => item.primitive === "Pressable" && item.onPressExpr)),
+    hasInputConstraintSemantics: Boolean(
+      inputConstraints.some(
+        (item) =>
+          item.primitive === "TextInput" &&
+          item.constraintKind === "textInputMetadataConstraints" &&
+          item.constraintBasis?.length > 0 &&
+          item.evidence?.length > 0,
+      ),
+    ),
     hasDirectStateActionRelation: Boolean(
       stateActionRelations.some(
         (item) => item.relationKind === "actionReadsInputValue" && item.valueExpr && item.onPressExpr && item.relationBasis?.length > 0,
@@ -88,6 +102,9 @@ function interactionSummary(domainPayload) {
       pressableFields: pressableMetadataFields,
       allTextInputMetadataPresent: RN_TEXT_INPUT_METADATA_FIELDS.every((field) => textInputMetadataFields.includes(field)),
       allPressableMetadataPresent: RN_PRESSABLE_METADATA_FIELDS.every((field) => pressableMetadataFields.includes(field)),
+    },
+    constraintCoverage: {
+      fields: constraintFields,
     },
   };
 }
@@ -169,13 +186,25 @@ export async function buildReactNativePayloadEvidence({
   const preReadPressableFields = uniqueSorted(rnFixtures.flatMap((row) => row.preRead.primitiveInteractions.metadataCoverage.pressableFields));
   const modelTextInputFields = uniqueSorted(rnFixtures.flatMap((row) => row.modelFacing.primitiveInteractions.metadataCoverage.textInputFields));
   const modelPressableFields = uniqueSorted(rnFixtures.flatMap((row) => row.modelFacing.primitiveInteractions.metadataCoverage.pressableFields));
+  const preReadConstraintFields = uniqueSorted(rnFixtures.flatMap((row) => row.preRead.primitiveInteractions.constraintCoverage.fields));
+  const modelConstraintFields = uniqueSorted(rnFixtures.flatMap((row) => row.modelFacing.primitiveInteractions.constraintCoverage.fields));
   const missingTextInputFields = RN_TEXT_INPUT_METADATA_FIELDS.filter(
     (field) => !preReadTextInputFields.includes(field) || !modelTextInputFields.includes(field),
   );
   const missingPressableFields = RN_PRESSABLE_METADATA_FIELDS.filter(
     (field) => !preReadPressableFields.includes(field) || !modelPressableFields.includes(field),
   );
+  const missingConstraintFields = RN_TEXT_INPUT_CONSTRAINT_FIELDS.filter(
+    (field) => !preReadConstraintFields.includes(field) || !modelConstraintFields.includes(field),
+  );
   const metadataAnchorsVisible = missingTextInputFields.length === 0 && missingPressableFields.length === 0;
+  const constraintRows = rnFixtures.filter(
+    (row) => row.preRead.primitiveInteractions.hasInputConstraintSemantics && row.modelFacing.primitiveInteractions.hasInputConstraintSemantics,
+  );
+  const constraintOmittedRows = rnFixtures.filter(
+    (row) => !row.preRead.primitiveInteractions.hasInputConstraintSemantics && !row.modelFacing.primitiveInteractions.hasInputConstraintSemantics,
+  );
+  const inputConstraintsVisible = missingConstraintFields.length === 0 && constraintRows.length > 0;
   const directRelationRows = rnFixtures.filter(
     (row) => row.preRead.primitiveInteractions.hasDirectStateActionRelation && row.modelFacing.primitiveInteractions.hasDirectStateActionRelation,
   );
@@ -185,7 +214,7 @@ export async function buildReactNativePayloadEvidence({
   const stateActionRelationsVisible = directRelationRows.length > 0;
 
   return {
-    schemaVersion: "react-native-payload-evidence.v3",
+    schemaVersion: "react-native-payload-evidence.v4",
     generatedAt: new Date().toISOString(),
     runId,
     measurement: "local-fixture-pre-read-and-model-facing-domain-payload-evidence",
@@ -221,6 +250,22 @@ export async function buildReactNativePayloadEvidence({
         blocker: metadataAnchorsVisible
           ? null
           : `missing metadata fields: TextInput=${missingTextInputFields.join(",") || "none"}; Pressable=${missingPressableFields.join(",") || "none"}`,
+      },
+      inputConstraintsVisible: {
+        claimable: inputConstraintsVisible,
+        scope: "rn-primitive-input-narrow-payload-only",
+        fields: RN_TEXT_INPUT_CONSTRAINT_FIELDS.map((field) => ({
+          field,
+          preRead: preReadConstraintFields.includes(field),
+          modelFacing: modelConstraintFields.includes(field),
+          claimable: preReadConstraintFields.includes(field) && modelConstraintFields.includes(field),
+        })),
+        constraintKind: "textInputMetadataConstraints",
+        directConstraintFixtures: constraintRows.map((row) => row.file),
+        omittedConstraintFixtures: constraintOmittedRows.map((row) => row.file),
+        blocker: inputConstraintsVisible
+          ? null
+          : `missing input constraint fields in rn-primitive-input-narrow-payload-only scope: ${missingConstraintFields.join(",") || "none"}`,
       },
       stateActionRelationsVisible: {
         claimable: stateActionRelationsVisible,
@@ -260,10 +305,19 @@ export function renderReactNativePayloadEvidenceMarkdown(evidence) {
       const action = row.preRead.primitiveInteractions.actionBindings
         .map((item) => `${item.primitive}:onPress=${item.onPressExpr}${item.label ? `,label=${item.label}` : ""}`)
         .join("; ");
+      const constraints =
+        row.preRead.primitiveInteractions.inputConstraints
+          .map((item) => {
+            const fields = RN_TEXT_INPUT_CONSTRAINT_FIELDS.filter((field) => item[field] !== undefined)
+              .map((field) => `${field}=${item[field]}`)
+              .join(",");
+            return `${item.constraintKind}:${fields || "n/a"}`;
+          })
+          .join("; ") || "omitted";
       const relation = row.preRead.primitiveInteractions.stateActionRelations
         .map((item) => `${item.relationKind}:${item.onPressExpr}->${item.valueExpr}`)
         .join("; ") || "omitted";
-      return `| \`${row.file}\` | ${row.preReadDecision} | ${row.sourceFingerprintPresent ? "yes" : "no"} | ${row.preRead.strictContractsPresent ? "yes" : "no"} | ${input} | ${action} | ${relation} | ${row.claimable ? "yes" : "no"} |`;
+      return `| \`${row.file}\` | ${row.preReadDecision} | ${row.sourceFingerprintPresent ? "yes" : "no"} | ${row.preRead.strictContractsPresent ? "yes" : "no"} | ${input} | ${action} | ${constraints} | ${relation} | ${row.claimable ? "yes" : "no"} |`;
     })
     .join("\n");
   const boundaryRows = evidence.boundaryFixtures
@@ -280,6 +334,9 @@ export function renderReactNativePayloadEvidenceMarkdown(evidence) {
       (row) => `| Pressable | ${row.field} | ${row.preRead ? "yes" : "no"} | ${row.modelFacing ? "yes" : "no"} | ${row.claimable ? "yes" : "no"} |`,
     ),
   ].join("\n");
+  const constraintRows = evidence.summary.inputConstraintsVisible.fields
+    .map((row) => `| TextInput | ${row.field} | ${row.preRead ? "yes" : "no"} | ${row.modelFacing ? "yes" : "no"} | ${row.claimable ? "yes" : "no"} |`)
+    .join("\n");
 
   return `# React Native payload evidence
 
@@ -290,6 +347,7 @@ ${evidence.claimBoundary}
 - RN primitive interaction facts visible: ${evidence.summary.rnPayloadFactsVisible.claimable ? "yes" : "no"}
 - Richer RN/WebView/TUI boundaries preserved: ${evidence.summary.boundaryFallbacksPreserved.claimable ? "yes" : "no"}
 - RN metadata anchors visible: ${evidence.summary.metadataAnchorsVisible.claimable ? "yes" : "no"}
+- Measured RN narrow input constraints visible: ${evidence.summary.inputConstraintsVisible.claimable ? "yes" : "no"}
 - RN direct state/action relation visible: ${evidence.summary.stateActionRelationsVisible.claimable ? "yes" : "no"}
 - Broad React Native support claimable: no
 - Runtime reuse promotion claimable: no
@@ -298,8 +356,8 @@ ${evidence.claimBoundary}
 
 ## Measured RN narrow fixtures
 
-| Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | direct relation | claimable |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | input constraints | direct relation | claimable |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ${fixtureRows}
 
 ## Metadata anchor coverage
@@ -308,6 +366,12 @@ ${fixtureRows}
 | --- | --- | --- | --- | --- |
 ${metadataRows}
 
+## Input constraint coverage
+
+| Primitive | field | pre-read | model-facing | claimable |
+| --- | --- | --- | --- | --- |
+${constraintRows}
+
 ## Boundary fixtures
 
 | Fixture | classification | decision | fallback reason | payload exposed | boundary preserved |
@@ -315,6 +379,8 @@ ${metadataRows}
 ${boundaryRows}
 
 ## Claim boundary
+
+The input constraint claim is scoped to \`${evidence.summary.inputConstraintsVisible.scope}\` and measured only through local fixture pre-read/model-facing visibility.
 
 This artifact supports bounded local statements only for the existing \`rn-primitive-input-narrow-payload\` lane. It does not support broad React Native support, WebView/TUI promotion, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
 `;

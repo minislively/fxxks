@@ -92,6 +92,20 @@ export type ReactNativePrimitiveActionBindingSignal = {
   evidence: string[];
 };
 
+export type ReactNativePrimitiveInputConstraintSignal = {
+  primitive: "TextInput";
+  loc?: SourceRange;
+  valueExpr?: string;
+  constraintKind: "textInputMetadataConstraints";
+  maxLength?: string;
+  secureTextEntry?: string;
+  keyboardType?: string;
+  autoCapitalize?: string;
+  descriptiveHint?: string;
+  constraintBasis: string[];
+  evidence: string[];
+};
+
 export type ReactNativePrimitiveStateActionRelationSignal = {
   relationKind: "actionReadsInputValue";
   inputPrimitive: "TextInput";
@@ -108,6 +122,7 @@ export type ReactNativePrimitiveStateActionRelationSignal = {
 export type ReactNativePrimitiveInteractionSignal = {
   inputBindings?: ReactNativePrimitiveInputBindingSignal[];
   actionBindings?: ReactNativePrimitiveActionBindingSignal[];
+  inputConstraints?: ReactNativePrimitiveInputConstraintSignal[];
   stateActionRelations?: ReactNativePrimitiveStateActionRelationSignal[];
 };
 

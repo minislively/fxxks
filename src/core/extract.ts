@@ -12,6 +12,7 @@ import type {
   Language,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveInputBindingSignal,
+  ReactNativePrimitiveInputConstraintSignal,
   SourceRange,
   StyleSystem,
   StyleVariantSignal,
@@ -984,6 +985,33 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     rnActionBindings,
     (item) => `${item.primitive}:${item.onPressExpr}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnInputConstraints: ReactNativePrimitiveInputConstraintSignal[] = rnInputBindingList
+    .flatMap((inputBinding) => {
+      const constraintBasis = [
+        ...(inputBinding.maxLength !== undefined ? ["jsx.TextInput.maxLength"] : []),
+        ...(inputBinding.secureTextEntry !== undefined ? ["jsx.TextInput.secureTextEntry"] : []),
+        ...(inputBinding.keyboardType !== undefined ? ["jsx.TextInput.keyboardType"] : []),
+        ...(inputBinding.autoCapitalize !== undefined ? ["jsx.TextInput.autoCapitalize"] : []),
+      ];
+      if (constraintBasis.length === 0) return [];
+      const evidence = [...constraintBasis, ...(inputBinding.placeholder !== undefined ? ["jsx.TextInput.placeholder"] : [])];
+      return [
+        {
+          primitive: "TextInput" as const,
+          loc: inputBinding.loc,
+          ...(inputBinding.valueExpr ? { valueExpr: inputBinding.valueExpr } : {}),
+          constraintKind: "textInputMetadataConstraints" as const,
+          ...(inputBinding.maxLength !== undefined ? { maxLength: inputBinding.maxLength } : {}),
+          ...(inputBinding.secureTextEntry !== undefined ? { secureTextEntry: inputBinding.secureTextEntry } : {}),
+          ...(inputBinding.keyboardType !== undefined ? { keyboardType: inputBinding.keyboardType } : {}),
+          ...(inputBinding.autoCapitalize !== undefined ? { autoCapitalize: inputBinding.autoCapitalize } : {}),
+          ...(inputBinding.placeholder !== undefined ? { descriptiveHint: inputBinding.placeholder } : {}),
+          constraintBasis,
+          evidence,
+        },
+      ];
+    })
+    .slice(0, MAX_RN_PRIMITIVE_BINDINGS);
   const rnStateActionRelations = rnActionBindingList.flatMap((actionBinding) => {
     const directInputMatches = rnInputBindingList.flatMap((inputBinding) => {
       if (!inputBinding.valueExpr) return [];
@@ -1013,7 +1041,8 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       },
     ];
   }).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
-  const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0 || rnStateActionRelations.length > 0;
+  const hasRnPrimitiveInteractions =
+    rnInputBindingList.length > 0 || rnActionBindingList.length > 0 || rnInputConstraints.length > 0 || rnStateActionRelations.length > 0;
   return {
     behavior: {
       hooks: [...hooks],
@@ -1038,6 +1067,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
             rnPrimitiveInteractions: {
               ...(rnInputBindingList.length ? { inputBindings: rnInputBindingList } : {}),
               ...(rnActionBindingList.length ? { actionBindings: rnActionBindingList } : {}),
+              ...(rnInputConstraints.length ? { inputConstraints: rnInputConstraints } : {}),
               ...(rnStateActionRelations.length ? { stateActionRelations: rnStateActionRelations } : {}),
             },
           }
