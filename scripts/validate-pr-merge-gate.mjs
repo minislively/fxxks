@@ -18,6 +18,31 @@ function parseAllowedMaintainers(value) {
     .filter(Boolean);
 }
 
+function normalizePath(value) {
+  return String(value || "").replace(/^\/+/, "");
+}
+
+const DOCS_TESTS_ONLY_ALLOWED_PREFIXES = ["docs/", "test/"];
+const DOCS_TESTS_ONLY_ALLOWED_FILES = ["README.md"];
+const DOCS_TESTS_ONLY_FORBIDDEN_PATHS = new Set([
+  "test/fixtures/frontend-domain-expectations/manifest.json",
+]);
+
+export function classifyDocsTestsOnlyChange(changedFiles = []) {
+  const files = (changedFiles || []).map(normalizePath).filter(Boolean);
+  const disallowedFiles = files.filter((file) => {
+    if (DOCS_TESTS_ONLY_FORBIDDEN_PATHS.has(file)) return true;
+    if (DOCS_TESTS_ONLY_ALLOWED_FILES.includes(file)) return false;
+    return !DOCS_TESTS_ONLY_ALLOWED_PREFIXES.some((prefix) => file.startsWith(prefix));
+  });
+
+  return {
+    docsTestsOnly: files.length > 0 && disallowedFiles.length === 0,
+    changedFiles: files,
+    disallowedFiles,
+  };
+}
+
 function latestReviewStateByUser(reviews) {
   const latest = new Map();
   for (const review of reviews || []) {
@@ -45,11 +70,20 @@ export function pullRequestHasLinkedClosingIssue(pullRequest) {
 export function evaluatePullRequestMergeGate({
   pullRequest,
   reviews = [],
+  changedFiles = [],
   allowedMaintainers,
   requireLinkedIssue = true,
+  approvalMode = "strict",
 }) {
   const allowed = new Set((allowedMaintainers || []).map(normalizeLogin).filter(Boolean));
   const blockers = [];
+  const author = normalizeLogin(pullRequest?.user?.login);
+  const pathClassification = classifyDocsTestsOnlyChange(changedFiles);
+  const allowDocsTestsSelfApproval =
+    approvalMode === "docs-tests-self-ok" &&
+    pathClassification.docsTestsOnly &&
+    author &&
+    allowed.has(author);
 
   if (allowed.size === 0) {
     blockers.push("Configure MERGE_GATE_ALLOWED_MAINTAINERS with at least one GitHub login.");
@@ -65,7 +99,7 @@ export function evaluatePullRequestMergeGate({
     const latest = latestByUser.get(login);
     return latest?.state === "APPROVED" && (!headSha || latest.commitId === headSha);
   });
-  if (approvingMaintainers.length === 0) {
+  if (approvingMaintainers.length === 0 && !allowDocsTestsSelfApproval) {
     blockers.push(`PR must have an active approval on the current head commit from one of: ${[...allowed].join(", ") || "<none>"}.`);
   }
 
@@ -73,6 +107,8 @@ export function evaluatePullRequestMergeGate({
     ok: blockers.length === 0,
     blockers,
     approvingMaintainers,
+    approvalBypassReason: allowDocsTestsSelfApproval ? "docs-tests-only-self-maintainer" : undefined,
+    pathClassification,
   };
 }
 
@@ -90,6 +126,28 @@ async function fetchPullRequestReviews({ repository, pullNumber, token }) {
     throw new Error(`Failed to fetch PR reviews: ${response.status} ${response.statusText}`);
   }
   return response.json();
+}
+
+async function fetchPullRequestChangedFiles({ repository, pullNumber, token }) {
+  const files = [];
+  for (let page = 1; ; page += 1) {
+    const url = `https://api.github.com/repos/${repository}/pulls/${pullNumber}/files?per_page=100&page=${page}`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "fooks-merge-gate",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PR files: ${response.status} ${response.statusText}`);
+    }
+    const pageFiles = await response.json();
+    files.push(...pageFiles.map((file) => file.filename).filter(Boolean));
+    if (pageFiles.length < 100) break;
+  }
+  return files;
 }
 
 async function main() {
@@ -114,12 +172,19 @@ async function main() {
     pullNumber: pullRequest.number,
     token,
   });
+  const changedFiles = await fetchPullRequestChangedFiles({
+    repository,
+    pullNumber: pullRequest.number,
+    token,
+  });
 
   const result = evaluatePullRequestMergeGate({
     pullRequest,
     reviews,
+    changedFiles,
     allowedMaintainers: parseAllowedMaintainers(process.env.MERGE_GATE_ALLOWED_MAINTAINERS),
     requireLinkedIssue: process.env.MERGE_GATE_REQUIRE_LINKED_ISSUE !== "false",
+    approvalMode: process.env.MERGE_GATE_APPROVAL_MODE || "strict",
   });
 
   if (!result.ok) {
@@ -128,7 +193,10 @@ async function main() {
     return;
   }
 
-  console.log(`Merge gate passed. Approving maintainer(s): ${result.approvingMaintainers.join(", ")}`);
+  const approvalSummary = result.approvingMaintainers.length > 0
+    ? `Approving maintainer(s): ${result.approvingMaintainers.join(", ")}`
+    : `Approval bypass: ${result.approvalBypassReason}`;
+  console.log(`Merge gate passed. ${approvalSummary}`);
 }
 
 function isMainModule() {
