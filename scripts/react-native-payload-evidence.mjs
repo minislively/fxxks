@@ -73,6 +73,7 @@ function interactionSummary(domainPayload) {
   const actionBindings = interactions.actionBindings ?? [];
   const inputConstraints = interactions.inputConstraints ?? [];
   const stateActionRelations = interactions.stateActionRelations ?? [];
+  const constraintActionReadiness = interactions.constraintActionReadiness ?? [];
   const textInputMetadataFields = presentFields(inputBindings, RN_TEXT_INPUT_METADATA_FIELDS);
   const pressableMetadataFields = presentFields(actionBindings, RN_PRESSABLE_METADATA_FIELDS);
   const constraintFields = presentFields(inputConstraints, RN_TEXT_INPUT_CONSTRAINT_FIELDS);
@@ -81,6 +82,7 @@ function interactionSummary(domainPayload) {
     actionBindings,
     inputConstraints,
     stateActionRelations,
+    constraintActionReadiness,
     hasTextInputBinding: Boolean(inputBindings.some((item) => item.primitive === "TextInput" && item.onChangeTextExpr)),
     hasPressableAction: Boolean(actionBindings.some((item) => item.primitive === "Pressable" && item.onPressExpr)),
     hasInputConstraintSemantics: Boolean(
@@ -95,6 +97,18 @@ function interactionSummary(domainPayload) {
     hasDirectStateActionRelation: Boolean(
       stateActionRelations.some(
         (item) => item.relationKind === "actionReadsInputValue" && item.valueExpr && item.onPressExpr && item.relationBasis?.length > 0,
+      ),
+    ),
+    hasConstraintActionReadiness: Boolean(
+      constraintActionReadiness.some(
+        (item) =>
+          item.relationKind === "constraintActionReadiness" &&
+          item.valueExpr &&
+          item.onPressExpr &&
+          item.disabledExpr &&
+          item.constraintBasis?.length > 0 &&
+          item.readinessBasis?.length > 0 &&
+          item.relationBasis?.length > 0,
       ),
     ),
     metadataCoverage: {
@@ -212,9 +226,16 @@ export async function buildReactNativePayloadEvidence({
     (row) => !row.preRead.primitiveInteractions.hasDirectStateActionRelation && !row.modelFacing.primitiveInteractions.hasDirectStateActionRelation,
   );
   const stateActionRelationsVisible = directRelationRows.length > 0;
+  const readinessRows = rnFixtures.filter(
+    (row) => row.preRead.primitiveInteractions.hasConstraintActionReadiness && row.modelFacing.primitiveInteractions.hasConstraintActionReadiness,
+  );
+  const readinessOmittedRows = rnFixtures.filter(
+    (row) => !row.preRead.primitiveInteractions.hasConstraintActionReadiness && !row.modelFacing.primitiveInteractions.hasConstraintActionReadiness,
+  );
+  const constraintActionReadinessVisible = readinessRows.length > 0;
 
   return {
-    schemaVersion: "react-native-payload-evidence.v4",
+    schemaVersion: "react-native-payload-evidence.v5",
     generatedAt: new Date().toISOString(),
     runId,
     measurement: "local-fixture-pre-read-and-model-facing-domain-payload-evidence",
@@ -276,6 +297,16 @@ export async function buildReactNativePayloadEvidence({
           ? null
           : "no measured RN fixture exposed a direct actionReadsInputValue relation in both pre-read and model-facing payloads",
       },
+      constraintActionReadinessVisible: {
+        claimable: constraintActionReadinessVisible,
+        scope: "rn-primitive-input-narrow-payload-only",
+        relationKind: "constraintActionReadiness",
+        directReadinessFixtures: readinessRows.map((row) => row.file),
+        omittedReadinessFixtures: readinessOmittedRows.map((row) => row.file),
+        blocker: constraintActionReadinessVisible
+          ? null
+          : "no measured RN fixture exposed constraintActionReadiness in both pre-read and model-facing payloads",
+      },
       broadReactNativeSupport: {
         claimable: false,
         blocker: "evidence is limited to the existing rn-primitive-input-narrow-payload measured lane",
@@ -317,7 +348,10 @@ export function renderReactNativePayloadEvidenceMarkdown(evidence) {
       const relation = row.preRead.primitiveInteractions.stateActionRelations
         .map((item) => `${item.relationKind}:${item.onPressExpr}->${item.valueExpr}`)
         .join("; ") || "omitted";
-      return `| \`${row.file}\` | ${row.preReadDecision} | ${row.sourceFingerprintPresent ? "yes" : "no"} | ${row.preRead.strictContractsPresent ? "yes" : "no"} | ${input} | ${action} | ${constraints} | ${relation} | ${row.claimable ? "yes" : "no"} |`;
+      const readiness = row.preRead.primitiveInteractions.constraintActionReadiness
+        .map((item) => `${item.relationKind}:${item.onPressExpr}->${item.valueExpr},disabled=${item.disabledExpr}`)
+        .join("; ") || "omitted";
+      return `| \`${row.file}\` | ${row.preReadDecision} | ${row.sourceFingerprintPresent ? "yes" : "no"} | ${row.preRead.strictContractsPresent ? "yes" : "no"} | ${input} | ${action} | ${constraints} | ${relation} | ${readiness} | ${row.claimable ? "yes" : "no"} |`;
     })
     .join("\n");
   const boundaryRows = evidence.boundaryFixtures
@@ -349,6 +383,7 @@ ${evidence.claimBoundary}
 - RN metadata anchors visible: ${evidence.summary.metadataAnchorsVisible.claimable ? "yes" : "no"}
 - Measured RN narrow input constraints visible: ${evidence.summary.inputConstraintsVisible.claimable ? "yes" : "no"}
 - RN direct state/action relation visible: ${evidence.summary.stateActionRelationsVisible.claimable ? "yes" : "no"}
+- Measured RN narrow constraint/action readiness visible: ${evidence.summary.constraintActionReadinessVisible.claimable ? "yes" : "no"}
 - Broad React Native support claimable: no
 - Runtime reuse promotion claimable: no
 - RN edit routing claimable: no
@@ -356,8 +391,8 @@ ${evidence.claimBoundary}
 
 ## Measured RN narrow fixtures
 
-| Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | input constraints | direct relation | claimable |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | input constraints | direct relation | constraint/action readiness | claimable |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ${fixtureRows}
 
 ## Metadata anchor coverage
@@ -380,7 +415,7 @@ ${boundaryRows}
 
 ## Claim boundary
 
-The input constraint claim is scoped to \`${evidence.summary.inputConstraintsVisible.scope}\` and measured only through local fixture pre-read/model-facing visibility.
+The input constraint claim is scoped to \`${evidence.summary.inputConstraintsVisible.scope}\` and measured only through local fixture pre-read/model-facing visibility. The constraint/action readiness claim is scoped to \`${evidence.summary.constraintActionReadinessVisible.scope}\` and requires source-observed TextInput constraints, a direct actionReadsInputValue relation, and a source-observed Pressable disabled expression.
 
 This artifact supports bounded local statements only for the existing \`rn-primitive-input-narrow-payload\` lane. It does not support broad React Native support, WebView/TUI promotion, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
 `;

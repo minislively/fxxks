@@ -8,6 +8,7 @@ type InlineActionRowProps = {
 
 export function InlineActionRow({ value, onChangeText, onSubmit }: InlineActionRowProps) {
   const submitCurrentValue = () => onSubmit(value.trim());
+  const isSubmitDisabled = value.trim().length === 0;
 
   return (
     <View accessibilityLabel="inline action row">
@@ -21,7 +22,7 @@ export function InlineActionRow({ value, onChangeText, onSubmit }: InlineActionR
         accessibilityLabel="Inline filter"
         testID="inline-filter-input"
       />
-      <Pressable onPress={submitCurrentValue} accessibilityLabel="Submit filter" testID="submit-filter-button">
+      <Pressable onPress={submitCurrentValue} disabled={isSubmitDisabled} accessibilityLabel="Submit filter" testID="submit-filter-button">
         <Text>Submit</Text>
       </Pressable>
     </View>

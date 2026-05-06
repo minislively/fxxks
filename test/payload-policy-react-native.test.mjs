@@ -129,7 +129,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
     {
       primitive: "TextInput",
-      loc: { startLine: 15, endLine: 23 },
+      loc: { startLine: 16, endLine: 24 },
       valueExpr: "value",
       onChangeTextExpr: "onChangeText",
       placeholder: "Type filter",
@@ -151,7 +151,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.facts.primitiveInteractions?.inputConstraints, [
     {
       primitive: "TextInput",
-      loc: { startLine: 15, endLine: 23 },
+      loc: { startLine: 16, endLine: 24 },
       valueExpr: "value",
       constraintKind: "textInputMetadataConstraints",
       keyboardType: "web-search",
@@ -164,12 +164,19 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
     {
       primitive: "Pressable",
-      loc: { startLine: 24, endLine: 24 },
+      loc: { startLine: 25, endLine: 25 },
       onPressExpr: "submitCurrentValue",
       label: "Submit",
+      disabled: "isSubmitDisabled",
       accessibilityLabel: "Submit filter",
       testID: "submit-filter-button",
-      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label", "jsx.Pressable.accessibilityLabel", "jsx.Pressable.testID"],
+      evidence: [
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.testID",
+      ],
     },
   ]);
   assert.deepEqual(payload?.facts.primitiveInteractions?.stateActionRelations, [
@@ -182,7 +189,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
       onPressExpr: "submitCurrentValue",
       label: "Submit",
       relationBasis: ["handler.submitCurrentValue.reads.value"],
-      loc: { startLine: 15, endLine: 24 },
+      loc: { startLine: 16, endLine: 25 },
       evidence: [
         "rn.stateActionRelation.actionReadsInputValue",
         "jsx.TextInput.value",
@@ -194,6 +201,35 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
         "jsx.TextInput.testID",
         "jsx.Pressable.onPress",
         "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.testID",
+        "handler.submitCurrentValue.reads.value",
+      ],
+    },
+  ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.constraintActionReadiness, [
+    {
+      relationKind: "constraintActionReadiness",
+      inputPrimitive: "TextInput",
+      actionPrimitive: "Pressable",
+      valueExpr: "value",
+      onPressExpr: "submitCurrentValue",
+      constraintKind: "textInputMetadataConstraints",
+      readinessKind: "pressableDisabledReadiness",
+      disabledExpr: "isSubmitDisabled",
+      constraintBasis: ["jsx.TextInput.keyboardType", "jsx.TextInput.autoCapitalize"],
+      readinessBasis: ["jsx.Pressable.disabled"],
+      relationBasis: ["handler.submitCurrentValue.reads.value"],
+      loc: { startLine: 16, endLine: 25 },
+      evidence: [
+        "rn.constraintActionReadiness.pressableDisabledReadsConstrainedInput",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.placeholder",
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
         "jsx.Pressable.accessibilityLabel",
         "jsx.Pressable.testID",
         "handler.submitCurrentValue.reads.value",
@@ -202,6 +238,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   ]);
   assert.equal("stateActionRelations" in payload.sourceAnchorBeta, false);
   assert.equal("inputConstraints" in payload.sourceAnchorBeta, false);
+  assert.equal("constraintActionReadiness" in payload.sourceAnchorBeta, false);
   assert.equal("formControls" in payload.facts, false);
   assert.equal("domTags" in payload.facts, false);
   assert.equal("reactNativeContext" in payload, false);
@@ -300,6 +337,7 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
     },
   ]);
   assert.equal("stateActionRelations" in payload.facts.primitiveInteractions, false);
+  assert.equal("constraintActionReadiness" in payload.facts.primitiveInteractions, false);
   assert.equal("stateActionRelations" in payload.sourceAnchorBeta, false);
   assert.equal("inputConstraints" in payload.sourceAnchorBeta, false);
   assert.equal("formControls" in payload.facts, false);
@@ -339,6 +377,74 @@ test("React Native input constraints are source-observed and omit placeholder-on
     },
   ]);
   assert.equal("secureTextEntry" in noSecureTextEntryPayload.facts.primitiveInteractions.inputConstraints[0], false);
+});
+
+
+test("React Native constraint/action readiness requires disabled, constraints, and a direct relation per action", () => {
+  const noDisabledPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function NoDisabled({ value, onChangeText, onSubmit }) {
+      const submitCurrentValue = () => onSubmit(value);
+      return <View><TextInput value={value} onChangeText={onChangeText} keyboardType="email-address" /><Pressable onPress={submitCurrentValue}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(noDisabledPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in noDisabledPayload.facts.primitiveInteractions, true);
+  assert.equal("constraintActionReadiness" in noDisabledPayload.facts.primitiveInteractions, false);
+
+  const noRelationPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function NoRelation({ value, onChangeText, onSubmit, disabled }) {
+      return <View><TextInput value={value} onChangeText={onChangeText} keyboardType="email-address" /><Pressable onPress={onSubmit} disabled={disabled}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(noRelationPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in noRelationPayload.facts.primitiveInteractions, false);
+  assert.equal("constraintActionReadiness" in noRelationPayload.facts.primitiveInteractions, false);
+
+  const noConstraintsPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function NoConstraints({ value, onChangeText, onSubmit, disabled }) {
+      const submitCurrentValue = () => onSubmit(value);
+      return <View><TextInput value={value} onChangeText={onChangeText} /><Pressable onPress={submitCurrentValue} disabled={disabled}><Text>Submit</Text></Pressable></View>;
+    }`);
+  assert.equal(noConstraintsPayload?.domain, "react-native");
+  assert.equal("stateActionRelations" in noConstraintsPayload.facts.primitiveInteractions, true);
+  assert.equal("inputConstraints" in noConstraintsPayload.facts.primitiveInteractions, false);
+  assert.equal("constraintActionReadiness" in noConstraintsPayload.facts.primitiveInteractions, false);
+
+  const unrelatedIndependentRelationPayload = rnPayloadFromSource(`import { View, Text, TextInput, Pressable } from "react-native";
+    export function MultipleRelations({ value, query, onChangeText, onChangeQuery, onSubmit, onSearch, disabled }) {
+      const submitCurrentValue = () => onSubmit(value);
+      const searchQuery = () => onSearch(query);
+      return <View>
+        <TextInput value={value} onChangeText={onChangeText} keyboardType="email-address" />
+        <Pressable onPress={submitCurrentValue} disabled={disabled}><Text>Submit</Text></Pressable>
+        <TextInput value={query} onChangeText={onChangeQuery} />
+        <Pressable onPress={searchQuery}><Text>Search</Text></Pressable>
+      </View>;
+    }`);
+  assert.equal(unrelatedIndependentRelationPayload?.domain, "react-native");
+  assert.equal(unrelatedIndependentRelationPayload.facts.primitiveInteractions.stateActionRelations.length, 2);
+  assert.deepEqual(unrelatedIndependentRelationPayload.facts.primitiveInteractions.constraintActionReadiness, [
+    {
+      relationKind: "constraintActionReadiness",
+      inputPrimitive: "TextInput",
+      actionPrimitive: "Pressable",
+      valueExpr: "value",
+      onPressExpr: "submitCurrentValue",
+      constraintKind: "textInputMetadataConstraints",
+      readinessKind: "pressableDisabledReadiness",
+      disabledExpr: "disabled",
+      constraintBasis: ["jsx.TextInput.keyboardType"],
+      readinessBasis: ["jsx.Pressable.disabled"],
+      relationBasis: ["handler.submitCurrentValue.reads.value"],
+      loc: { startLine: 6, endLine: 7 },
+      evidence: [
+        "rn.constraintActionReadiness.pressableDisabledReadsConstrainedInput",
+        "jsx.TextInput.keyboardType",
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
+        "handler.submitCurrentValue.reads.value",
+      ],
+    },
+  ]);
 });
 
 test("React Native direct state/action relation omits co-located and ambiguous narrow pairs", () => {

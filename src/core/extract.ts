@@ -11,6 +11,7 @@ import type {
   ImportSignal,
   Language,
   ReactNativePrimitiveActionBindingSignal,
+  ReactNativePrimitiveConstraintActionReadinessSignal,
   ReactNativePrimitiveInputBindingSignal,
   ReactNativePrimitiveInputConstraintSignal,
   SourceRange,
@@ -1041,8 +1042,45 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       },
     ];
   }).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnConstraintActionReadiness: ReactNativePrimitiveConstraintActionReadinessSignal[] = rnActionBindingList
+    .flatMap((actionBinding) => {
+      if (!actionBinding.disabled) return [];
+      const relationMatches = rnStateActionRelations.filter((relation) => relation.onPressExpr === actionBinding.onPressExpr);
+      if (relationMatches.length !== 1) return [];
+      const relation = relationMatches[0];
+      const inputConstraintMatches = rnInputConstraints.filter((constraint) => constraint.valueExpr === relation.valueExpr);
+      if (inputConstraintMatches.length !== 1) return [];
+      const inputConstraint = inputConstraintMatches[0];
+      return [
+        {
+          relationKind: "constraintActionReadiness" as const,
+          inputPrimitive: "TextInput" as const,
+          actionPrimitive: "Pressable" as const,
+          valueExpr: relation.valueExpr,
+          onPressExpr: actionBinding.onPressExpr,
+          constraintKind: "textInputMetadataConstraints" as const,
+          readinessKind: "pressableDisabledReadiness" as const,
+          disabledExpr: actionBinding.disabled,
+          constraintBasis: inputConstraint.constraintBasis,
+          readinessBasis: ["jsx.Pressable.disabled"],
+          relationBasis: relation.relationBasis,
+          loc: sourceRangeSpan([inputConstraint.loc, actionBinding.loc]),
+          evidence: [
+            "rn.constraintActionReadiness.pressableDisabledReadsConstrainedInput",
+            ...inputConstraint.evidence,
+            ...actionBinding.evidence,
+            ...relation.relationBasis,
+          ],
+        },
+      ];
+    })
+    .slice(0, MAX_RN_PRIMITIVE_BINDINGS);
   const hasRnPrimitiveInteractions =
-    rnInputBindingList.length > 0 || rnActionBindingList.length > 0 || rnInputConstraints.length > 0 || rnStateActionRelations.length > 0;
+    rnInputBindingList.length > 0 ||
+    rnActionBindingList.length > 0 ||
+    rnInputConstraints.length > 0 ||
+    rnStateActionRelations.length > 0 ||
+    rnConstraintActionReadiness.length > 0;
   return {
     behavior: {
       hooks: [...hooks],
@@ -1069,6 +1107,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
               ...(rnActionBindingList.length ? { actionBindings: rnActionBindingList } : {}),
               ...(rnInputConstraints.length ? { inputConstraints: rnInputConstraints } : {}),
               ...(rnStateActionRelations.length ? { stateActionRelations: rnStateActionRelations } : {}),
+              ...(rnConstraintActionReadiness.length ? { constraintActionReadiness: rnConstraintActionReadiness } : {}),
             },
           }
         : {}),
