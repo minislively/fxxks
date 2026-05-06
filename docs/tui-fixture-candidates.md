@@ -101,6 +101,7 @@ If a future PR changes any row from fallback/no-payload to payload emission, it 
 
 The evidence matrix above is sufficient to discuss a future payload-design PRD, but it is not itself a payload contract. A payload-design handoff must first prove that the current evidence-only lane stays denied:
 
+- the TUI-safe metadata projection contract in `docs/tui-operational-readiness.md` classifies safe shared metadata, TUI-specific source evidence, caution metadata, fallback-required metadata, and forbidden React Web-only projections before any schema or builder exists;
 - positive Ink concern evidence is mapped to fixtures before design assumptions are made;
 - negative, weak, and mixed fixtures keep fallback/no-payload behavior;
 - the TUI payload policy remains `allowed: false` for current fixtures;
