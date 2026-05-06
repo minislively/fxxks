@@ -84,6 +84,33 @@ A future payload-design PRD may start only when all of these checks are true:
 
 The disqualifier list is intentionally strict. Stop the current lane and write a separate serialized plan if a change needs `allowed: true`, a TUI payload builder, runtime/pre-read injection, detector or registry edits, manifest changes, fixture classification changes, cross-lane RN/React Web/WebView edits, or any measured-value claim.
 
+## Minimal payload candidate schema contract
+
+This contract names the first metadata vocabulary a future **source-only dry-run** may prototype. It is a schema target, not permission to emit a payload. Every field below must stay source-derived, fixture-backed, and denied by the current TUI payload policy until a later plan explicitly promotes it.
+
+| Candidate metadata field | What current fixtures can prove | Full-source / non-claim boundary |
+| --- | --- | --- |
+| `terminalLayoutEvidence` | Ink `Box`/`Text` hierarchy, nested rows or columns, spacing props, and repeated display rows. | Does not prove rendered terminal dimensions, wrapping, or layout correctness. |
+| `terminalTextStatusEvidence` | Static text, status labels, progress-like rows, elapsed text, and log-summary rendering visible in TSX. | Does not prove command execution, progress accuracy, shell state, or runtime side effects. |
+| `terminalInputFlowEvidence` | `useInput`, key branches, prompt state, validation/error text, submit/apply, cancel, and selection movement in source. | Does not prove terminal key handling correctness, stdin/TTY behavior, accessibility, or runtime UX safety. |
+| `terminalStyleEvidence` | Ink color, dim text, border, padding, gap, and style-like props visible in JSX. | Does not prove terminal theme support, color rendering, or visual fidelity. |
+| `terminalMixedBoundaryEvidence` | Ink evidence combined with React Web DOM or React Native primitive/input evidence. | Must remain fallback/no-payload and cannot authorize any TUI, React Web, or RN compact path. |
+| `terminalNegativeBoundaryEvidence` | Terminal-looking React or CLI renderer source without Ink import, primitives, or hooks. | Must remain unknown/deferred fallback and cannot broaden package support. |
+
+The schema vocabulary above is intentionally smaller than terminal behavior. It may guide a future metadata projection, but it must not be described as compact context support, token reduction, runtime correctness, provider-cost improvement, or default TUI extraction.
+
+## Source-only dry-run handoff
+
+The next implementation PR may build only a **source-only dry-run** that reports the candidate metadata fields above in debug or test-owned evidence. That PR must continue to keep:
+
+- `tui-ink-evidence-only-payload` denied with `allowed: false`;
+- pre-read fallback/no-payload behavior for every current TUI fixture;
+- mixed and non-Ink cases outside TUI payload authorization;
+- model-facing payload emission out of scope;
+- runtime hooks, detector registries, fixture manifest entries, and cross-lane RN/React Web/WebView files unchanged unless a new serialized plan names owners and fallback regressions first.
+
+If the dry-run needs a payload builder, `allowed: true`, runtime injection, token/performance claims, or shared-seam edits, stop and create a new PRD/test-spec pair before implementation.
+
 ## Stop rules
 
 Stop the current PR and switch to serialized shared-policy planning if the change would:

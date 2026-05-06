@@ -175,6 +175,24 @@ const metadataProjectionTerms = [
   "browser accessibility assumptions",
 ];
 
+const tuiMinimalPayloadCandidateFields = [
+  "terminalLayoutEvidence",
+  "terminalTextStatusEvidence",
+  "terminalInputFlowEvidence",
+  "terminalStyleEvidence",
+  "terminalMixedBoundaryEvidence",
+  "terminalNegativeBoundaryEvidence",
+];
+
+const tuiMinimalPayloadFixtureMap = [
+  ["terminalLayoutEvidence", "tui-ink-layout-style.tsx"],
+  ["terminalTextStatusEvidence", "tui-ink-status-panel.tsx"],
+  ["terminalInputFlowEvidence", "tui-ink-form-prompt.tsx"],
+  ["terminalStyleEvidence", "tui-ink-layout-style.tsx"],
+  ["terminalMixedBoundaryEvidence", "tui-ink-rn-narrow-mixed.tsx"],
+  ["terminalNegativeBoundaryEvidence", "tui-non-ink-cli-renderer.tsx"],
+];
+
 function tuiFixturePath(fileName) {
   return path.join("test", "fixtures", "frontend-domain-expectations", fileName);
 }
@@ -493,10 +511,22 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /not itself a payload contract/);
   assert.match(survey, /TUI-safe metadata projection contract/);
   assert.match(survey, /forbidden React Web-only projections/);
+  assert.match(survey, /Minimal payload candidate vocabulary/);
+  assert.match(survey, /Source-only dry-run implementation handoff/);
   assert.match(survey, /pre-read emits no model-facing TUI payload/);
   assert.match(survey, /separate serialized plan/);
   assert.match(survey, /tui-ink-evidence-only-payload/);
   assert.match(survey, /mixed frontend boundary/);
+  for (const field of tuiMinimalPayloadCandidateFields) {
+    assert.ok(survey.includes(field), field);
+  }
+  for (const [field, fixture] of tuiMinimalPayloadFixtureMap) {
+    assert.ok(survey.includes(field), field);
+    assert.ok(survey.includes(fixture), fixture);
+  }
+  assert.match(survey, /not model-facing payload fields yet/);
+  assert.match(survey, /non-emitting metadata projection/);
+  assert.match(survey, /keep `assessTuiInkPayloadPolicy` denied with `allowed: false`/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
 });
 
@@ -511,6 +541,8 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /## Allowed next work/);
   assert.match(guide, /## Promotion criteria before payload-design planning/);
   assert.match(guide, /## Payload design readiness gate/);
+  assert.match(guide, /## Minimal payload candidate schema contract/);
+  assert.match(guide, /## Source-only dry-run handoff/);
   assert.match(guide, /## Stop rules/);
   assert.match(guide, /tui-ink-evidence-only-payload/);
   assert.match(guide, /fallback\/no-payload/);
@@ -532,5 +564,11 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   }
   assert.match(guide, /no TUI or React Web payload authorization/);
   assert.match(guide, /no TUI or RN narrow payload authorization/);
+  for (const field of tuiMinimalPayloadCandidateFields) {
+    assert.ok(guide.includes(field), field);
+  }
+  assert.match(guide, /source-derived, fixture-backed, and denied/);
+  assert.match(guide, /It may guide a future metadata projection/);
+  assert.match(guide, /model-facing payload emission out of scope/);
   assert.doesNotMatch(guide, forbiddenSupportClaims);
 });
