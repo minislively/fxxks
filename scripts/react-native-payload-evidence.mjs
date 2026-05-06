@@ -20,6 +20,17 @@ export const DEFAULT_RN_BOUNDARY_FIXTURES = [
   "test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx",
 ];
 
+export const RN_TEXT_INPUT_METADATA_FIELDS = [
+  "keyboardType",
+  "secureTextEntry",
+  "maxLength",
+  "autoCapitalize",
+  "accessibilityLabel",
+  "testID",
+];
+
+export const RN_PRESSABLE_METADATA_FIELDS = ["disabled", "accessibilityLabel", "accessibilityRole", "testID"];
+
 function loadDist(repoRoot) {
   const require = createRequire(import.meta.url);
   return {
@@ -46,13 +57,31 @@ function hasStrictRnContracts(domainPayload) {
   );
 }
 
+function uniqueSorted(values) {
+  return [...new Set(values)].sort();
+}
+
+function presentFields(bindings, fields) {
+  return uniqueSorted(bindings.flatMap((item) => fields.filter((field) => item[field] !== undefined)));
+}
+
 function interactionSummary(domainPayload) {
   const interactions = domainPayload?.facts?.primitiveInteractions ?? {};
+  const inputBindings = interactions.inputBindings ?? [];
+  const actionBindings = interactions.actionBindings ?? [];
+  const textInputMetadataFields = presentFields(inputBindings, RN_TEXT_INPUT_METADATA_FIELDS);
+  const pressableMetadataFields = presentFields(actionBindings, RN_PRESSABLE_METADATA_FIELDS);
   return {
-    inputBindings: interactions.inputBindings ?? [],
-    actionBindings: interactions.actionBindings ?? [],
-    hasTextInputBinding: Boolean(interactions.inputBindings?.some((item) => item.primitive === "TextInput" && item.onChangeTextExpr)),
-    hasPressableAction: Boolean(interactions.actionBindings?.some((item) => item.primitive === "Pressable" && item.onPressExpr)),
+    inputBindings,
+    actionBindings,
+    hasTextInputBinding: Boolean(inputBindings.some((item) => item.primitive === "TextInput" && item.onChangeTextExpr)),
+    hasPressableAction: Boolean(actionBindings.some((item) => item.primitive === "Pressable" && item.onPressExpr)),
+    metadataCoverage: {
+      textInputFields: textInputMetadataFields,
+      pressableFields: pressableMetadataFields,
+      allTextInputMetadataPresent: RN_TEXT_INPUT_METADATA_FIELDS.every((field) => textInputMetadataFields.includes(field)),
+      allPressableMetadataPresent: RN_PRESSABLE_METADATA_FIELDS.every((field) => pressableMetadataFields.includes(field)),
+    },
   };
 }
 
@@ -129,9 +158,20 @@ export async function buildReactNativePayloadEvidence({
   const boundaries = boundaryFixtures.map((relativeFile) => measureBoundaryFixture({ repoRoot, relativeFile, dist }));
   const rnPayloadFactsVisible = rnFixtures.every((row) => row.claimable);
   const boundaryFallbacksPreserved = boundaries.every((row) => row.boundaryPreserved && !row.rnPrimitiveInteractionsExposed);
+  const preReadTextInputFields = uniqueSorted(rnFixtures.flatMap((row) => row.preRead.primitiveInteractions.metadataCoverage.textInputFields));
+  const preReadPressableFields = uniqueSorted(rnFixtures.flatMap((row) => row.preRead.primitiveInteractions.metadataCoverage.pressableFields));
+  const modelTextInputFields = uniqueSorted(rnFixtures.flatMap((row) => row.modelFacing.primitiveInteractions.metadataCoverage.textInputFields));
+  const modelPressableFields = uniqueSorted(rnFixtures.flatMap((row) => row.modelFacing.primitiveInteractions.metadataCoverage.pressableFields));
+  const missingTextInputFields = RN_TEXT_INPUT_METADATA_FIELDS.filter(
+    (field) => !preReadTextInputFields.includes(field) || !modelTextInputFields.includes(field),
+  );
+  const missingPressableFields = RN_PRESSABLE_METADATA_FIELDS.filter(
+    (field) => !preReadPressableFields.includes(field) || !modelPressableFields.includes(field),
+  );
+  const metadataAnchorsVisible = missingTextInputFields.length === 0 && missingPressableFields.length === 0;
 
   return {
-    schemaVersion: "react-native-payload-evidence.v1",
+    schemaVersion: "react-native-payload-evidence.v2",
     generatedAt: new Date().toISOString(),
     runId,
     measurement: "local-fixture-pre-read-and-model-facing-domain-payload-evidence",
@@ -149,6 +189,24 @@ export async function buildReactNativePayloadEvidence({
       boundaryFallbacksPreserved: {
         claimable: boundaryFallbacksPreserved,
         blocker: boundaryFallbacksPreserved ? null : "one or more richer RN/WebView/TUI fixtures exposed payload facts or failed to fallback",
+      },
+      metadataAnchorsVisible: {
+        claimable: metadataAnchorsVisible,
+        textInputFields: RN_TEXT_INPUT_METADATA_FIELDS.map((field) => ({
+          field,
+          preRead: preReadTextInputFields.includes(field),
+          modelFacing: modelTextInputFields.includes(field),
+          claimable: preReadTextInputFields.includes(field) && modelTextInputFields.includes(field),
+        })),
+        pressableFields: RN_PRESSABLE_METADATA_FIELDS.map((field) => ({
+          field,
+          preRead: preReadPressableFields.includes(field),
+          modelFacing: modelPressableFields.includes(field),
+          claimable: preReadPressableFields.includes(field) && modelPressableFields.includes(field),
+        })),
+        blocker: metadataAnchorsVisible
+          ? null
+          : `missing metadata fields: TextInput=${missingTextInputFields.join(",") || "none"}; Pressable=${missingPressableFields.join(",") || "none"}`,
       },
       broadReactNativeSupport: {
         claimable: false,
@@ -188,6 +246,14 @@ export function renderReactNativePayloadEvidenceMarkdown(evidence) {
         `| \`${row.file}\` | ${row.classification} | ${row.decision} | ${row.fallbackReason ?? "n/a"} | ${row.payloadExposed ? "yes" : "no"} | ${row.boundaryPreserved ? "yes" : "no"} |`,
     )
     .join("\n");
+  const metadataRows = [
+    ...evidence.summary.metadataAnchorsVisible.textInputFields.map(
+      (row) => `| TextInput | ${row.field} | ${row.preRead ? "yes" : "no"} | ${row.modelFacing ? "yes" : "no"} | ${row.claimable ? "yes" : "no"} |`,
+    ),
+    ...evidence.summary.metadataAnchorsVisible.pressableFields.map(
+      (row) => `| Pressable | ${row.field} | ${row.preRead ? "yes" : "no"} | ${row.modelFacing ? "yes" : "no"} | ${row.claimable ? "yes" : "no"} |`,
+    ),
+  ].join("\n");
 
   return `# React Native payload evidence
 
@@ -197,6 +263,7 @@ ${evidence.claimBoundary}
 
 - RN primitive interaction facts visible: ${evidence.summary.rnPayloadFactsVisible.claimable ? "yes" : "no"}
 - Richer RN/WebView/TUI boundaries preserved: ${evidence.summary.boundaryFallbacksPreserved.claimable ? "yes" : "no"}
+- RN metadata anchors visible: ${evidence.summary.metadataAnchorsVisible.claimable ? "yes" : "no"}
 - Broad React Native support claimable: no
 - Runtime reuse promotion claimable: no
 - RN edit routing claimable: no
@@ -207,6 +274,12 @@ ${evidence.claimBoundary}
 | Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | claimable |
 | --- | --- | --- | --- | --- | --- | --- |
 ${fixtureRows}
+
+## Metadata anchor coverage
+
+| Primitive | field | pre-read | model-facing | claimable |
+| --- | --- | --- | --- | --- |
+${metadataRows}
 
 ## Boundary fixtures
 

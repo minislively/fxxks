@@ -124,20 +124,34 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
     {
       primitive: "TextInput",
-      loc: { startLine: 15, endLine: 15 },
+      loc: { startLine: 15, endLine: 23 },
       valueExpr: "value",
       onChangeTextExpr: "onChangeText",
       placeholder: "Type filter",
-      evidence: ["jsx.TextInput.value", "jsx.TextInput.onChangeText", "jsx.TextInput.placeholder"],
+      keyboardType: "web-search",
+      autoCapitalize: "sentences",
+      accessibilityLabel: "Inline filter",
+      testID: "inline-filter-input",
+      evidence: [
+        "jsx.TextInput.value",
+        "jsx.TextInput.onChangeText",
+        "jsx.TextInput.placeholder",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.accessibilityLabel",
+        "jsx.TextInput.testID",
+      ],
     },
   ]);
   assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
     {
       primitive: "Pressable",
-      loc: { startLine: 16, endLine: 16 },
+      loc: { startLine: 24, endLine: 24 },
       onPressExpr: "submitCurrentValue",
       label: "Submit",
-      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label"],
+      accessibilityLabel: "Submit filter",
+      testID: "submit-filter-button",
+      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label", "jsx.Pressable.accessibilityLabel", "jsx.Pressable.testID"],
     },
   ]);
   assert.equal("formControls" in payload.facts, false);
@@ -167,20 +181,47 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
   assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
     {
       primitive: "TextInput",
-      loc: { startLine: 13, endLine: 13 },
+      loc: { startLine: 14, endLine: 24 },
       valueExpr: "value",
       onChangeTextExpr: "onChangeText",
       placeholder: "Filter",
-      evidence: ["jsx.TextInput.value", "jsx.TextInput.onChangeText", "jsx.TextInput.placeholder"],
+      keyboardType: "default",
+      secureTextEntry: "false",
+      maxLength: "80",
+      autoCapitalize: "none",
+      accessibilityLabel: "Search filter",
+      testID: "search-input",
+      evidence: [
+        "jsx.TextInput.value",
+        "jsx.TextInput.onChangeText",
+        "jsx.TextInput.placeholder",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.secureTextEntry",
+        "jsx.TextInput.maxLength",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.accessibilityLabel",
+        "jsx.TextInput.testID",
+      ],
     },
   ]);
   assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
     {
       primitive: "Pressable",
-      loc: { startLine: 14, endLine: 14 },
+      loc: { startLine: 25, endLine: 31 },
       onPressExpr: "onApply",
       label: "Apply",
-      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label"],
+      disabled: "isApplyDisabled",
+      accessibilityLabel: "Apply filter",
+      accessibilityRole: "button",
+      testID: "apply-button",
+      evidence: [
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.accessibilityRole",
+        "jsx.Pressable.testID",
+      ],
     },
   ]);
   assert.equal("formControls" in payload.facts, false);
@@ -439,6 +480,6 @@ test("React Native policy and payload seams avoid broad support and web terminol
   ]) {
     const source = fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
     assert.doesNotMatch(source, forbiddenSupportClaims, relativePath);
-    assert.doesNotMatch(source, /reactNativeContext|editTargetRouting/i, relativePath);
+    assert.doesNotMatch(source, /reactNativeContext|rnContext|editTargetRouting/i, relativePath);
   }
 });

@@ -71,6 +71,12 @@ export type ReactNativePrimitiveInputBindingSignal = {
   valueExpr?: string;
   onChangeTextExpr?: string;
   placeholder?: string;
+  keyboardType?: string;
+  secureTextEntry?: string;
+  maxLength?: string;
+  autoCapitalize?: string;
+  accessibilityLabel?: string;
+  testID?: string;
   evidence: string[];
 };
 
@@ -79,6 +85,10 @@ export type ReactNativePrimitiveActionBindingSignal = {
   loc?: SourceRange;
   onPressExpr: string;
   label?: string;
+  disabled?: string;
+  accessibilityLabel?: string;
+  accessibilityRole?: string;
+  testID?: string;
   evidence: string[];
 };
 
