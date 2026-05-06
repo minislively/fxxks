@@ -5,6 +5,14 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { cleanupMetricSessions } from "./metric-cleanup.mjs";
+import {
+  reactWebA11yAnchorSource,
+  reactWebComponentApiSource,
+  reactWebFormStateFlowSource,
+  reactWebLayoutRegionSource,
+  reactWebStylingVariantSource,
+  reactWebImportRoleSource,
+} from "./react-web-inline-sources.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -300,6 +308,324 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
   assert.equal(legacyOverride.action, "fallback");
   assert.equal(legacyOverride.fallback.reason, "escape-hatch-full-read");
+});
+
+function hasRuntimeA11yAnchor(anchors, predicate) {
+  return anchors.some(predicate);
+}
+
+test("runtime bridge preserves React Web a11y anchors in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-a11y-anchor-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebA11yAnchorSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineA11yContactForm.tsx"), source);
+
+    const sessionId = `bridge-contract-a11y-anchor-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineA11yContactForm.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineA11yContactForm.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.a11yAnchors));
+
+    const anchors = payload.reactWebContext.a11yAnchors;
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) => item.kind === "htmlFor" && item.label === "email" && item.relation?.kind === "label-control",
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "aria" &&
+          item.label.startsWith("aria-describedby=email-error email-help") &&
+          item.relation?.kind === "aria-idrefs" &&
+          item.relation.resolvedIds.includes("email-error") &&
+          !item.relation.resolvedIds.includes("missing-id"),
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "aria" &&
+          item.label === "aria-labelledby=email-label" &&
+          item.relation?.kind === "aria-idrefs" &&
+          item.relation.resolvedIds.includes("email-label"),
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) => item.kind === "aria" && item.label === "aria-invalid=invalid" && item.relation?.kind === "invalid-state",
+      ),
+    );
+    assert.ok(
+      hasRuntimeA11yAnchor(
+        anchors,
+        (item) =>
+          item.kind === "role" &&
+          item.label === "alert" &&
+          item.relation?.kind === "alert-region" &&
+          item.relation.sourceId === "email-error",
+      ),
+    );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web styling variant hints in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-styling-variant-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebStylingVariantSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineVariantPanel.tsx"), source);
+
+    const sessionId = `bridge-contract-styling-variant-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineVariantPanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineVariantPanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.stylingVariantHints));
+
+    const hints = payload.reactWebContext.stylingVariantHints;
+    assert.ok(hints.some((item) => item.kind === "props-contract" && item.propName === "variant"));
+    assert.ok(hints.some((item) => item.kind === "data-state" && item.propName === "data-state"));
+    assert.ok(hints.some((item) => item.kind === "className-branch" && item.propName === "className" && item.loc));
+    assert.ok(hints.some((item) => item.kind === "inline-style" && item.propName === "style" && item.loc));
+    assert.ok(hints.some((item) => item.kind === "variant-prop" && item.propName === "disabled"));
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web import role hints in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-import-role-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebImportRoleSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineImportRolePanel.tsx"), source);
+
+    const sessionId = `bridge-contract-import-role-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineImportRolePanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineImportRolePanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.importRoleHints));
+
+    const rolesByModule = new Map(
+      payload.reactWebContext.importRoleHints.map((item) => [item.moduleSpecifier, item.role]),
+    );
+    assert.equal(rolesByModule.get("react-hook-form"), "form-library");
+    assert.equal(rolesByModule.get("zod"), "validation-library");
+    assert.equal(rolesByModule.get("next/link"), "routing");
+    assert.equal(rolesByModule.get("@/components/ui/button"), "ui-kit");
+    assert.equal(rolesByModule.get("lucide-react"), "icon-library");
+    assert.equal(rolesByModule.get("./FieldShell"), "local-component");
+    assert.equal(rolesByModule.has("date-fns"), false);
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web form state-flow in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-form-flow-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebFormStateFlowSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineRetentionForm.tsx"), source);
+
+    const sessionId = `bridge-contract-form-flow-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineRetentionForm.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineRetentionForm.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.formStateFlow));
+    assert.ok(
+      payload.reactWebContext.formStateFlow.some(
+        (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
+      ),
+    );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web component API hints in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-component-api-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebComponentApiSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineComponentApiPanel.tsx"), source);
+
+    const sessionId = `bridge-contract-component-api-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineComponentApiPanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineComponentApiPanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.componentApiHints));
+
+    const apiKinds = new Set(payload.reactWebContext.componentApiHints.map((item) => item.kind));
+    assert.equal(apiKinds.has("prop"), true);
+    assert.equal(apiKinds.has("custom-component-usage"), true);
+    assert.ok(payload.reactWebContext.componentApiHints.some((item) => item.propName === "title"));
+    assert.ok(payload.reactWebContext.componentApiHints.some((item) => item.label === "StatusBadge"));
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web layout regions in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-layout-region-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebLayoutRegionSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineLayoutPanel.tsx"), source);
+
+    const sessionId = `bridge-contract-layout-region-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineLayoutPanel.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineLayoutPanel.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.layoutRegionHints));
+
+    const layoutKinds = new Set(payload.reactWebContext.layoutRegionHints.map((item) => item.kind));
+    assert.equal(layoutKinds.has("semantic-region"), true);
+    assert.equal(layoutKinds.has("list-region"), true);
+    assert.equal(layoutKinds.has("form-region"), true);
+    assert.equal(layoutKinds.has("repeated-region"), true);
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("runtime bridge preserves React Web custom-wrapper domainPayload parity for F11/F12", () => {

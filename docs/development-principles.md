@@ -37,7 +37,7 @@ Docs/test-first work is appropriate when it is the safest way to establish or pr
 
 Domain strategy should be positive capability design first and negative boundary management second.
 
-- **React Web:** prioritize payload quality, semantic edit anchors, compare output, and context routing for supported same-file work.
+- **React Web:** prioritize payload quality, semantic edit anchors, compare output, and context routing for supported same-file work. Keep the seven-axis repeated-read context retention contract in [`docs/react-web-context-retention.md`](./react-web-context-retention.md) source-only and same-file unless a separate plan explicitly widens the boundary.
 - **TUI/Ink:** define the smallest safe payload value for Ink component structure, layout, prompt, and input facts before broad terminal claims.
 - **React Native:** keep broad support claims out of scope unless explicitly promoted; focus on measured narrow gates and whether they produce useful payload value.
 - **WebView:** preserve fallback-first and bridge-boundary safety; prefer boundary-aware guidance over compact reuse unless a later security/boundary plan approves a measured scope.
