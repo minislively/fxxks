@@ -101,12 +101,40 @@ If a future PR changes any row from fallback/no-payload to payload emission, it 
 
 The evidence matrix above is sufficient to discuss a future payload-design PRD, but it is not itself a payload contract. A payload-design handoff must first prove that the current evidence-only lane stays denied:
 
+- the TUI-safe metadata projection contract in `docs/tui-operational-readiness.md` classifies safe shared metadata, TUI-specific source evidence, caution metadata, fallback-required metadata, and forbidden React Web-only projections before any schema or builder exists;
 - positive Ink concern evidence is mapped to fixtures before design assumptions are made;
 - negative, weak, and mixed fixtures keep fallback/no-payload behavior;
 - the TUI payload policy remains `allowed: false` for current fixtures;
 - pre-read emits no model-facing TUI payload;
 - terminal runtime facts, command execution, key handling correctness, token reduction, billing reduction, provider-cost reduction, and performance outcomes are treated as non-claims until measured in a separate plan;
 - any detector, registry, manifest, payload builder, pre-read, runtime, or cross-lane frontend edit is out of scope for a readiness handoff and requires a separate serialized plan.
+
+### Minimal payload candidate vocabulary
+
+The first safe TUI payload design target is a source-only metadata vocabulary. These names are allowed to appear in docs and future dry-run tests, but they are not model-facing payload fields yet:
+
+| Candidate metadata field | Representative fixture evidence | Required boundary |
+| --- | --- | --- |
+| `terminalLayoutEvidence` | `tui-ink-basic.tsx`, `tui-ink-layout-style.tsx`, `tui-ink-status-panel.tsx` | Layout hierarchy evidence only; no terminal rendering correctness claim. |
+| `terminalTextStatusEvidence` | `tui-ink-basic.tsx`, `tui-ink-status-panel.tsx` | Text/status syntax evidence only; no command progress or runtime side-effect claim. |
+| `terminalInputFlowEvidence` | `tui-ink-basic.tsx`, `tui-ink-interactive-list.tsx`, `tui-ink-form-prompt.tsx` | Input-flow source evidence only; no key handling, stdin, TTY, or UX correctness claim. |
+| `terminalStyleEvidence` | `tui-ink-layout-style.tsx` | Style prop evidence only; no color/theme/visual fidelity claim. |
+| `terminalMixedBoundaryEvidence` | `tui-ink-web-dom-mixed.tsx`, `tui-ink-rn-narrow-mixed.tsx` | Mixed-domain fallback evidence only; no TUI, React Web, or RN payload authorization. |
+| `terminalNegativeBoundaryEvidence` | `tui-non-ink-cli-renderer.tsx` | Non-Ink fallback evidence only; no package-surface expansion. |
+
+The vocabulary is deliberately fixture-backed. A later field should not be added until a fixture proves the source shape and a negative or mixed case keeps fallback/no-payload behavior safe.
+
+### Source-only dry-run implementation handoff
+
+A future dry-run PR may implement a non-emitting metadata projection for the vocabulary above, but only if it keeps the current denied lane intact:
+
+1. read source and produce debug/test evidence for candidate metadata fields;
+2. keep `assessTuiInkPayloadPolicy` denied with `allowed: false`;
+3. keep every current TUI fixture fallback/no-payload;
+4. keep mixed and non-Ink cases outside TUI payload authorization;
+5. avoid model-facing payload builders, runtime/pre-read injection, manifest changes, detector/registry promotion, and token/performance/support claims.
+
+If any of those constraints is too narrow, the next artifact should be a new PRD/test-spec pair rather than an opportunistic source edit.
 
 ## Candidate source notes
 
