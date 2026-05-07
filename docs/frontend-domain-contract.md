@@ -67,6 +67,7 @@ For the current RN PR A docs/tests lane, safe wording is limited to source-only 
 - This source has same-file named-handler or inline-callback evidence observed in the same source file.
 - This source contains RN accessibility/test anchor evidence.
 - This source contains RN list/rendering pattern evidence.
+- This source contains RN media/layout concern evidence.
 - This source contains RN navigation concern evidence.
 - This source contains RN state/action concern evidence.
 - This fixture, payload, or policy record is limited to `rn-primitive-input-narrow-payload` measured evidence with no RN support promotion.
@@ -84,6 +85,9 @@ The current forbidden claim shapes are:
 - Do not claim that list performance is good.
 - Do not claim that virtualization works correctly.
 - Do not claim that rendered order is correct.
+- Do not claim that an image loads correctly.
+- Do not claim that layout is correct.
+- Do not claim that paging works correctly.
 - Do not claim that a route exists or that navigation succeeds.
 - Do not claim that stack, back, or focus behavior is verified.
 - Do not claim that cross-file navigation, route, or global-state behavior is understood.
