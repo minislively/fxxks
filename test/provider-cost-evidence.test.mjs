@@ -1480,6 +1480,58 @@ test("provider cost repeated CLI live mode without credentials writes controlled
   }
 });
 
+test("provider cost repeated CLI live codex transport blocks before requests when codex command is unavailable", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-provider-repeated-nocodex-"));
+  try {
+    const taskManifestPath = path.join(tempRoot, "live-campaign-tasks.json");
+    const authJsonPath = path.join(tempRoot, "auth.json");
+    fs.writeFileSync(authJsonPath, JSON.stringify({
+      auth_mode: "chatgpt",
+      tokens: { access_token: "oauth-token", account_id: "account-1" },
+    }));
+    fs.writeFileSync(taskManifestPath, JSON.stringify({
+      tasks: [{
+        id: "component",
+        targetPairCount: 1,
+        baselinePrompt: "Summarize the baseline payload.",
+        fooksPrompt: "Summarize the fooks payload.",
+        qualityGate: {
+          id: "provider-cost-imported-artifact-gate",
+          version: "v1",
+          command: "npm run bench:layer2:provider-cost:repeated -- --import-manifest=benchmarks/layer2-frontend-task/fixtures/provider-cost-import-kit/import-manifest.json --run-id=provider-cost-import-kit-smoke",
+        },
+      }],
+    }));
+    const stdout = execFileSync(process.execPath, [
+      path.join(repoRoot, "benchmarks", "layer2-frontend-task", "run-provider-cost-repeated.js"),
+      "--live-openai",
+      "--auth-mode=codex-oauth",
+      "--transport=codex-exec",
+      `--codex-auth-json=${authJsonPath}`,
+      `--task-manifest=${taskManifestPath}`,
+      "--run-id=no-codex-command",
+    ], { cwd: tempRoot, encoding: "utf8", env: { ...process.env, PATH: "", OPENAI_API_KEY: "" } });
+    const result = JSON.parse(stdout);
+    const summaryPath = path.join(tempRoot, ".fooks", "evidence", "provider-cost", "no-codex-command", "summary.json");
+    const ledgerPath = path.join(tempRoot, ".fooks", "evidence", "provider-cost", "no-codex-command", "campaign-ledger.json");
+    const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+    const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+
+    assert.equal(result.status, "live-openai-command-unavailable");
+    assert.equal(result.requestMade, false);
+    assert.equal(result.auth.ok, true);
+    assert.equal(result.environmentPreflight.command.ok, false);
+    assert.match(result.environmentPreflight.command.reason, /codex command not found/);
+    assert.equal(summary.status, "live-openai-command-unavailable");
+    assert.match(summary.statusReasons.join("\n"), /Codex live transport requires the codex command/);
+    assert.equal(summary.environmentPreflight.command.ok, false);
+    assert.equal(ledger.plannedPairCount, 1);
+    assert.equal(ledger.attemptedPairCount, 0);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("provider cost task manifests use concrete imported-artifact gates instead of manual review commands", () => {
   const manifestPaths = [
     path.join(repoRoot, "benchmarks", "layer2-frontend-task", "provider-cost-live-campaign-tasks.json"),
