@@ -74,6 +74,28 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
   assert.equal(payload.domainPayload.policy, policy.name);
   assert.deepEqual(payload.domainPayload.facts.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload.domainPayload.facts.jsxProps, ["onChangeText", "onPress"]);
+  assert.deepEqual(payload.domainPayload.facts.primitiveInteractions, {
+    inputBindings: [
+      {
+        primitive: "TextInput",
+        loc: { startLine: 1, endLine: 1 },
+        onChangeTextExpr: "() => null",
+        evidence: ["jsx.TextInput.onChangeText"],
+      },
+    ],
+    actionBindings: [
+      {
+        primitive: "Pressable",
+        loc: { startLine: 1, endLine: 1 },
+        onPressExpr: "() => null",
+        label: "Save",
+        evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label"],
+      },
+    ],
+  });
+  assert.equal("formControls" in payload.domainPayload.facts, false);
+  assert.equal("domTags" in payload.domainPayload.facts, false);
+  assert.equal("reactNativeContext" in payload, false);
   assert.equal(payload.domainPayload.sourceAnchorBeta.contract.contractVersion, "rn-source-anchor-beta.v0");
   assert.equal(payload.domainPayload.sourceAnchorBeta.contract.scope, "local-proof-only");
   assert.deepEqual(payload.domainPayload.sourceAnchorBeta.contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);

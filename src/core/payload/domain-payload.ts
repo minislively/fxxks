@@ -6,7 +6,7 @@ import {
   RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
   RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY,
 } from "../payload-policy/react-native";
-import type { ExtractionResult, FormControlSignal, StyleSystem } from "../schema";
+import type { ExtractionResult, FormControlSignal, ReactNativePrimitiveInteractionSignal, StyleSystem } from "../schema";
 
 export const DOMAIN_PAYLOAD_SCHEMA_VERSION = "domain-payload.v1";
 export const REACT_WEB_DOMAIN_PAYLOAD_POLICY = "react-web-current-supported-lane";
@@ -113,6 +113,7 @@ export type ReactNativePrimitiveInputDomainPayload = {
     exports?: Pick<ExtractionResult["exports"][number], "name" | "kind" | "type">[];
     hooks?: string[];
     eventHandlers?: string[];
+    primitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     jsxDepth?: number;
   };
   warnings: string[];
@@ -306,6 +307,20 @@ function buildReactNativePrimitiveInputReuseContract(): ReactNativePrimitiveInpu
   };
 }
 
+function compactReactNativePrimitiveInteractions(
+  interactions: ReactNativePrimitiveInteractionSignal | undefined,
+): ReactNativePrimitiveInputDomainPayload["facts"]["primitiveInteractions"] {
+  if (!interactions) return undefined;
+  const inputBindings = interactions.inputBindings?.slice(0, 8);
+  const actionBindings = interactions.actionBindings?.slice(0, 8);
+
+  if (!inputBindings?.length && !actionBindings?.length) return undefined;
+  return {
+    ...(inputBindings?.length ? { inputBindings } : {}),
+    ...(actionBindings?.length ? { actionBindings } : {}),
+  };
+}
+
 function buildReactNativePayloadFacts(
   result: ExtractionResult,
   evidenceFacts: ReactNativePayloadEvidenceFacts,
@@ -313,6 +328,7 @@ function buildReactNativePayloadFacts(
   const eventHandlers = uniqueSorted(result.behavior?.eventHandlers ?? []);
   const hooks = uniqueSorted(result.behavior?.hooks ?? []);
   const exportFacts = compactExports(result.exports);
+  const primitiveInteractions = compactReactNativePrimitiveInteractions(result.behavior?.rnPrimitiveInteractions);
 
   return {
     primitives: evidenceFacts.primitives,
@@ -321,6 +337,7 @@ function buildReactNativePayloadFacts(
     ...(exportFacts && exportFacts.length > 0 ? { exports: exportFacts } : {}),
     ...(hooks.length > 0 ? { hooks } : {}),
     ...(eventHandlers.length > 0 ? { eventHandlers } : {}),
+    ...(primitiveInteractions ? { primitiveInteractions } : {}),
     ...(typeof result.structure?.jsxDepth === "number" ? { jsxDepth: result.structure.jsxDepth } : {}),
   };
 }
