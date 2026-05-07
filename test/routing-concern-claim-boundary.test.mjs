@@ -83,7 +83,7 @@ test("routing concern docs explicitly forbid route/runtime/authorization overrea
 
   assert.match(combined, /Next\/React Router imports, `Link`, `useNavigate`, `useRouter`, or same-file route\/search param usage/);
   assert.match(combined, /not\*\* route-existence proof, runtime navigation proof, App Router\/Pages Router verification, or compact-payload authorization by itself/i);
-  assert.match(combined, /Current concern-profile extraction may surface bounded metadata such as form-state, validation\/schema, or routing evidence\./);
+  assert.match(combined, /Current concern-profile extraction may surface bounded metadata such as form-state, validation\/schema, allowlisted client-state, or routing evidence\./);
 });
 
 test("routing concern claim audit rejects broad examples but allows bounded examples", () => {

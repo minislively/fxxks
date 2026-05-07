@@ -1,4 +1,5 @@
 import type { ExtractionResult } from "../schema";
+import { collectClientStateConcernProfile } from "./client-state";
 import { collectFormStateConcernProfile } from "./form-state";
 import { collectReactNativeAccessibilityConcernProfile } from "./react-native-accessibility";
 import { collectReactNativeNavigationConcernProfile } from "./react-native-navigation";
@@ -9,6 +10,7 @@ import { collectValidationSchemaConcernProfile } from "./validation-schema";
 
 export function collectFrontendConcernProfiles(result: ExtractionResult): FrontendConcernProfile[] | undefined {
   const profiles = [
+    collectClientStateConcernProfile(result),
     collectFormStateConcernProfile(result),
     collectReactNativeAccessibilityConcernProfile(result),
     collectReactNativeNavigationConcernProfile(result),

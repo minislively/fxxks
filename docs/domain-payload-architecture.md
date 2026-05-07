@@ -107,7 +107,7 @@ Examples of concern signals include:
 
 - form state such as `react-hook-form` `useForm`, `register`, `Controller`, and `handleSubmit`;
 - validation/schema libraries such as Zod, Yup, or Valibot;
-- client state such as Zustand, Jotai, Redux, or reducer/store modules;
+- client state such as allowlisted Zustand, Jotai, or Redux-library imports; custom reducer/store modules remain future/deferred;
 - server state and data fetching such as TanStack Query or SWR;
 - routing/navigation concerns such as route params, links, redirects, and navigation side effects;
 - styling concerns such as `className`, `cva`, `clsx`, variants, and style-object boundaries.
@@ -123,7 +123,7 @@ Concrete examples:
 - A Zustand store file can be a client-state concern without being a UI-domain payload candidate at all.
 - Next/React Router imports plus `Link`, `useNavigate`, `useRouter`, or same-file route/search param usage can be routing concern evidence, but they are not route-existence proof, runtime navigation proof, App Router/Pages Router verification, or compact-payload authorization.
 
-Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, or routing evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary.
+Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, allowlisted client-state, or routing evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary. Client-state concern evidence is limited to explicit same-file allowlisted imports from `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit`; custom reducer/store modules remain future/deferred unless a later plan widens the allowlist.
 
 ## RN claim boundary at the architecture layer
 
