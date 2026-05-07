@@ -396,6 +396,29 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     return runtimeDecision;
   }
 
+  const resolvedTargetPath = path.join(cwd, target);
+  if (!fs.existsSync(resolvedTargetPath)) {
+    const runtimeDecision: CodexRuntimeHookDecision = {
+      runtime: "codex",
+      hookEventName,
+      action: "noop",
+      filePath: target,
+      reasons: ["eligible-file-target-missing"],
+      contextMode: "no-op",
+      contextModeReason: "eligible-file-target-missing",
+      contextBudget: { ...policy.contextBudget, selectedFiles: 0, totalBytes: 0, skippedFiles: policy.contextBudget.selectedFiles },
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
+      debug: {
+        repeatedFile: false,
+        eligible: false,
+        escapeHatchUsed,
+      },
+    };
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision);
+    return runtimeDecision;
+  }
+
   if (escapeHatchUsed) {
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { discoverRelevantFilesByPolicy } from "./context-policy";
+import { isSafeProjectFilePath } from "./paths";
 
 const IGNORE = new Set([".git", "node_modules", "dist", ".omx", ".fooks"]);
 const COMPONENT_EXTS = new Set([".tsx", ".jsx"]);
@@ -24,16 +25,17 @@ export type DiscoveryResult = {
   stats: DiscoveryStats;
 };
 
-function walk(dir: string, out: string[], stats: DiscoveryStats): void {
+function walk(dir: string, out: string[], stats: DiscoveryStats, root: string): void {
   stats.directoriesVisited += 1;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (IGNORE.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      walk(full, out, stats);
+      walk(full, out, stats, root);
       continue;
     }
     stats.filesVisited += 1;
+    if (!isSafeProjectFilePath(full, root)) continue;
     out.push(full);
   }
 }
@@ -132,7 +134,7 @@ export function discoverProjectFilesWithStats(cwd = process.cwd()): DiscoveryRes
     importProbeCount: 0,
     importResolveCacheHits: 0,
   };
-  walk(cwd, allFiles, stats);
+  walk(cwd, allFiles, stats, cwd);
   const existingFiles = new Set(allFiles);
   const resolutionCache = new Map<string, string | null>();
   const componentFiles = allFiles.filter((file) => COMPONENT_EXTS.has(path.extname(file)));
