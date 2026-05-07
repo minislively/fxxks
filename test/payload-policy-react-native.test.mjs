@@ -486,6 +486,61 @@ test("React Native list/rendering concern evidence stays source-only and blocks 
   ]);
 });
 
+test("React Native media/layout concern evidence stays source-only and blocks narrow authorization", () => {
+  const filePath = fixturePath("rn-image-scrollview.tsx");
+  const result = extractFile(filePath);
+  const domainDetection = detect(fixtureSource("rn-image-scrollview.tsx"), filePath);
+
+  assert.equal(result.domainDetection?.classification, "react-native");
+  assert.deepEqual(result.behavior?.rnMediaLayoutConcerns, [
+    {
+      kind: "dimensions-get",
+      calleeExpr: "Dimensions.get",
+      argExpr: '"window"',
+      loc: { startLine: 4, endLine: 4 },
+      evidence: ["call.Dimensions.get"],
+    },
+    {
+      kind: "pagingEnabled",
+      primitive: "ScrollView",
+      value: "true",
+      loc: { startLine: 7, endLine: 7 },
+      evidence: ["jsx.ScrollView.pagingEnabled"],
+    },
+    {
+      kind: "media-primitive",
+      primitive: "Image",
+      loc: { startLine: 9, endLine: 13 },
+      evidence: ["jsx.Image"],
+    },
+    {
+      kind: "resizeMode",
+      primitive: "Image",
+      value: '"cover"',
+      loc: { startLine: 9, endLine: 13 },
+      evidence: ["jsx.Image.resizeMode"],
+    },
+    {
+      kind: "media-primitive",
+      primitive: "Image",
+      loc: { startLine: 17, endLine: 21 },
+      evidence: ["jsx.Image"],
+    },
+    {
+      kind: "resizeMode",
+      primitive: "Image",
+      value: '"cover"',
+      loc: { startLine: 17, endLine: 21 },
+      evidence: ["jsx.Image.resizeMode"],
+    },
+  ]);
+  assert.deepEqual(assessReactNativePayloadPolicy(domainDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: false,
+    reason: "forbidden-signal:react-native:primitive:Image",
+  });
+});
+
 test("React Native navigation concern evidence stays source-only and blocks narrow authorization", () => {
   const filePath = fixturePath("rn-style-platform-navigation.tsx");
   const result = extractFile(filePath);
