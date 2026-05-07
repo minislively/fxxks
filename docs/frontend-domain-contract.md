@@ -25,6 +25,7 @@ The frontend-domain contract separates **where code runs** from **what task-rele
 - **Concern profile** owns task-relevant library/dataflow evidence only.
 - Concern evidence such as `react-hook-form`, `useForm`, `register`, `control`, `handleSubmit`, default values, error display, or submit handlers is **not** React Web runtime evidence by itself.
 - Concern evidence such as Zod/Yup/Valibot imports, resolver usage, or same-file schema keys is **not** runtime validation proof, backend-contract proof, or compact-payload authorization by itself.
+- Concern evidence such as allowlisted `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit` imports is **not** state-correctness proof, reducer/store-logic proof, global app-state understanding, or compact-payload authorization by itself. Generic `useState` / `useReducer`, local `store` / `dispatch` / `selector` names, and custom reducer/store modules remain fail-closed or future/deferred unless a later plan widens the allowlist.
 - Concern evidence alone must **not** authorize compact payload reuse.
 - The payload-policy architecture target is to evaluate **domain + concern + source fingerprint + lane gate** together. This wording is a boundary/architecture rule, not a claim that the current React Web lane already requires every one of those inputs as an allow condition today.
 
