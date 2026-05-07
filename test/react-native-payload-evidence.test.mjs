@@ -1,11 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   RN_PRESSABLE_METADATA_FIELDS,
   RN_TEXT_INPUT_METADATA_FIELDS,
   buildReactNativePayloadEvidence,
   renderReactNativePayloadEvidenceMarkdown,
 } from "../scripts/react-native-payload-evidence.mjs";
+
+const repoRoot = process.cwd();
 
 test("React Native payload evidence exposes primitiveInteractions without widening RN scope", async () => {
   const evidence = await buildReactNativePayloadEvidence({ runId: `test-${Date.now()}-${Math.random()}` });
@@ -154,4 +160,41 @@ test("React Native payload evidence Markdown keeps claim boundaries explicit", a
   assert.doesNotMatch(markdown, /Runtime reuse promotion claimable: yes/i);
   assert.doesNotMatch(markdown, /RN edit routing claimable: yes/i);
   assert.doesNotMatch(markdown, /reactNativeContext|rnContext|editTargetRouting/i);
+});
+
+test("React Native payload evidence command writes bounded JSON and Markdown reports", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-rn-payload-evidence-"));
+  const outputPath = path.join(tempDir, "rn-payload-evidence.json");
+  const markdownPath = path.join(tempDir, "rn-payload-evidence.md");
+
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(repoRoot, "scripts", "react-native-payload-evidence.mjs"),
+      "--run-id=cli-test",
+      `--output=${outputPath}`,
+      `--markdown-output=${markdownPath}`,
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(fs.existsSync(outputPath), true);
+  assert.equal(fs.existsSync(markdownPath), true);
+
+  const stdoutEvidence = JSON.parse(cli.stdout);
+  const fileEvidence = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+  const markdown = fs.readFileSync(markdownPath, "utf8");
+
+  assert.equal(stdoutEvidence.schemaVersion, "react-native-payload-evidence.v3");
+  assert.equal(stdoutEvidence.runId, "cli-test");
+  assert.deepEqual(fileEvidence, stdoutEvidence);
+  assert.match(markdown, /# React Native payload evidence/);
+  assert.match(markdown, /Local fixture payload evidence only/);
+  assert.match(markdown, /RN primitive interaction facts visible: yes/);
+  assert.match(markdown, /Broad React Native support claimable: no/);
+  assert.match(markdown, /Provider billing savings claimable: no/);
 });
