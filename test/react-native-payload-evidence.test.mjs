@@ -71,6 +71,7 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   const basic = evidence.fixtures.find((row) => row.file.endsWith("rn-primitive-basic.tsx"));
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].valueExpr, "value");
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].onChangeTextExpr, "onChangeText");
+  assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].onChangeTextSource, "component-prop");
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].placeholder, "Filter");
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].keyboardType, "default");
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].secureTextEntry, "false");
@@ -79,6 +80,7 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].accessibilityLabel, "Search filter");
   assert.equal(basic.preRead.primitiveInteractions.inputBindings[0].testID, "search-input");
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].onPressExpr, "onApply");
+  assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].onPressSource, "component-prop");
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].label, "Apply");
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].disabled, "isApplyDisabled");
   assert.equal(basic.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Apply filter");
@@ -92,6 +94,7 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(inline.preRead.primitiveInteractions.inputBindings[0].accessibilityLabel, "Inline filter");
   assert.equal(inline.preRead.primitiveInteractions.inputBindings[0].testID, "inline-filter-input");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].onPressExpr, "submitCurrentValue");
+  assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].onPressSource, "same-file-local");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].label, "Submit");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Submit filter");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].testID, "submit-filter-button");
