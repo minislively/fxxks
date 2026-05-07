@@ -114,55 +114,9 @@ export type ReactNativePrimitiveActionBindingSignal = {
   evidence: string[];
 };
 
-export type ReactNativePrimitiveInputConstraintSignal = {
-  primitive: "TextInput";
-  loc?: SourceRange;
-  valueExpr?: string;
-  constraintKind: "textInputMetadataConstraints";
-  maxLength?: string;
-  secureTextEntry?: string;
-  keyboardType?: string;
-  autoCapitalize?: string;
-  descriptiveHint?: string;
-  constraintBasis: string[];
-  evidence: string[];
-};
-
-export type ReactNativePrimitiveStateActionRelationSignal = {
-  relationKind: "actionReadsInputValue";
-  inputPrimitive: "TextInput";
-  actionPrimitive: "Pressable";
-  valueExpr: string;
-  onChangeTextExpr?: string;
-  onPressExpr: string;
-  label?: string;
-  relationBasis: string[];
-  loc?: SourceRange;
-  evidence: string[];
-};
-
-export type ReactNativePrimitiveConstraintActionReadinessSignal = {
-  relationKind: "constraintActionReadiness";
-  inputPrimitive: "TextInput";
-  actionPrimitive: "Pressable";
-  valueExpr: string;
-  onPressExpr: string;
-  constraintKind: "textInputMetadataConstraints";
-  readinessKind: "pressableDisabledReadiness";
-  disabledExpr: string;
-  constraintBasis: string[];
-  readinessBasis: string[];
-  relationBasis: string[];
-  loc?: SourceRange;
-  evidence: string[];
-};
-
 export type ReactNativePrimitiveInteractionSignal = {
   inputBindings?: ReactNativePrimitiveInputBindingSignal[];
   actionBindings?: ReactNativePrimitiveActionBindingSignal[];
-  inputConstraints?: ReactNativePrimitiveInputConstraintSignal[];
-  stateActionRelations?: ReactNativePrimitiveStateActionRelationSignal[];
-  constraintActionReadiness?: ReactNativePrimitiveConstraintActionReadinessSignal[];
 };
 
 export type ReactNativeAccessibilityTestAnchorSignal = {
