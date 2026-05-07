@@ -11,6 +11,7 @@ import type {
   ImportSignal,
   Language,
   ReactNativeAccessibilityTestAnchorSignal,
+  ReactNativeNavigationConcernSignal,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveConstraintActionReadinessSignal,
   ReactNativePrimitiveInputBindingSignal,
@@ -41,6 +42,8 @@ const STYLE_VARIANT_PROP_NAMES = new Set(["variant", "size", "tone", "intent", "
 const MAX_STYLE_VARIANT_SIGNALS = 16;
 const MAX_RN_PRIMITIVE_BINDINGS = 8;
 const RN_ACTION_PRIMITIVE_TAGS = new Set<ReactNativePrimitiveActionBindingSignal["primitive"]>(["Pressable", "Button", "TouchableOpacity"]);
+const RN_NAVIGATION_MODULE = "@react-navigation/native";
+const RN_NAVIGATION_HOOK_NAMES = new Set<Extract<ReactNativeNavigationConcernSignal, { kind: "navigation-hook" }>["hook"]>(["useNavigation", "useRoute"]);
 
 function getLanguage(filePath: string): Language {
   const ext = path.extname(filePath);
@@ -528,8 +531,10 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const rnActionIdentifierReads = new Map<string, Set<string>>();
   const rnAccessibilityTestAnchors: ReactNativeAccessibilityTestAnchorSignal[] = [];
   const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
+  const rnNavigationConcerns: ReactNativeNavigationConcernSignal[] = [];
   const importedNames = new Set<string>();
   const reactNativeImportedNames = new Set<string>();
+  const reactNavigationImportedNames = new Set<string>();
   const localDeclaredNames = new Set<string>();
   const localFunctionBodies = new Map<string, ts.FunctionLikeDeclaration>();
   const localStateMutators = new Map<string, { hook: "useState" | "useReducer"; stateBinding: string; mutatorKind: "setter" | "dispatch" }>();
@@ -1049,18 +1054,36 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   function visit(node: ts.Node): void {
     if (ts.isImportDeclaration(node) && node.importClause) {
       const moduleName = ts.isStringLiteralLike(node.moduleSpecifier) ? node.moduleSpecifier.text : undefined;
+      const navigationImportedSymbols: string[] = [];
       if (node.importClause.name) importedNames.add(node.importClause.name.text);
       const namedBindings = node.importClause.namedBindings;
       if (namedBindings) {
         if (ts.isNamespaceImport(namedBindings)) {
           importedNames.add(namedBindings.name.text);
           if (moduleName === "react-native") reactNativeImportedNames.add(namedBindings.name.text);
+          if (moduleName === RN_NAVIGATION_MODULE) {
+            reactNavigationImportedNames.add(namedBindings.name.text);
+            navigationImportedSymbols.push(namedBindings.name.text);
+          }
         } else {
           for (const element of namedBindings.elements) {
             importedNames.add(element.name.text);
             if (moduleName === "react-native") reactNativeImportedNames.add(element.name.text);
+            if (moduleName === RN_NAVIGATION_MODULE) {
+              reactNavigationImportedNames.add(element.name.text);
+              navigationImportedSymbols.push(element.name.text);
+            }
           }
         }
+      }
+      if (moduleName === RN_NAVIGATION_MODULE) {
+        rnNavigationConcerns.push({
+          kind: "navigation-import",
+          moduleSpecifier: RN_NAVIGATION_MODULE,
+          ...(navigationImportedSymbols.length ? { importedSymbols: navigationImportedSymbols } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: ["import.@react-navigation/native"],
+        });
       }
     }
     if (ts.isFunctionDeclaration(node) && node.name) {
@@ -1124,6 +1147,42 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       if (shortName === "useForm" || shortName === "register") {
         addLocatedAnchor(validationAnchors, shortName, node);
       }
+      if (RN_NAVIGATION_HOOK_NAMES.has(shortName as Extract<ReactNativeNavigationConcernSignal, { kind: "navigation-hook" }>["hook"]) && reactNavigationImportedNames.has(shortName)) {
+        rnNavigationConcerns.push({
+          kind: "navigation-hook",
+          hook: shortName as Extract<ReactNativeNavigationConcernSignal, { kind: "navigation-hook" }>["hook"],
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: [`hook.${shortName}`],
+        });
+      }
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === "navigate" &&
+        rootIdentifierOf(node.expression.expression) === "navigation"
+      ) {
+        const routeNameArg = node.arguments[0];
+        rnNavigationConcerns.push({
+          kind: "navigation-navigate",
+          calleeExpr: compactText(node.expression.getText(sourceFile)),
+          ...(routeNameArg ? { routeNameExpr: compactText(routeNameArg.getText(sourceFile)) } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: ["call.navigation.navigate"],
+        });
+      }
+    }
+
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "route" &&
+      node.name.text === "params"
+    ) {
+      rnNavigationConcerns.push({
+        kind: "route-params",
+        accessExpr: "route.params",
+        loc: sourceRangeOf(sourceFile, node),
+        evidence: ["member.route.params"],
+      });
     }
 
     if (ts.isFunctionDeclaration(node) && node.name && /^handle[A-Z]/.test(node.name.text)) {
@@ -1285,6 +1344,21 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       ];
     })
     .slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnNavigationConcernList = dedupeBy(
+    rnNavigationConcerns,
+    (item) => {
+      switch (item.kind) {
+        case "navigation-import":
+          return `${item.kind}:${item.moduleSpecifier}:${item.importedSymbols?.join(",") ?? ""}:${item.loc?.startLine ?? ""}`;
+        case "navigation-hook":
+          return `${item.kind}:${item.hook}:${item.loc?.startLine ?? ""}`;
+        case "navigation-navigate":
+          return `${item.kind}:${item.calleeExpr}:${item.routeNameExpr ?? ""}:${item.loc?.startLine ?? ""}`;
+        case "route-params":
+          return `${item.kind}:${item.accessExpr}:${item.loc?.startLine ?? ""}`;
+      }
+    },
+  ).slice(0, 16);
   const hasRnPrimitiveInteractions =
     rnInputBindingList.length > 0 ||
     rnActionBindingList.length > 0 ||
@@ -1324,6 +1398,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         : {}),
       ...(rnAccessibilityAnchorList.length ? { rnAccessibilityTestAnchors: rnAccessibilityAnchorList } : {}),
       ...(hasRnStateActionConcerns ? { rnStateActionConcerns: rnStateActionConcernList } : {}),
+      ...(rnNavigationConcernList.length ? { rnNavigationConcerns: rnNavigationConcernList } : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
       ...(a11ySourceIdList.length ? { a11ySourceIds: a11ySourceIdList } : {}),
       hasSideEffects,

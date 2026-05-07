@@ -57,7 +57,8 @@ test("merge gate requires latest reviewer state to stay approved", () => {
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /active approval/);
+  assert.match(result.blockers.join("\n"), /GitHub PR review approval/);
+  assert.match(result.blockers.join("\n"), /requires re-approval/i);
 });
 
 test("merge gate requires approval on the current head commit", () => {
@@ -68,6 +69,8 @@ test("merge gate requires approval on the current head commit", () => {
 
   assert.equal(result.ok, false);
   assert.match(result.blockers.join("\n"), /current head commit/);
+  assert.match(result.blockers.join("\n"), /comments do not count/i);
+  assert.match(result.blockers.join("\n"), /requires re-approval/i);
 });
 
 test("merge gate ignores PR author self-approval", () => {

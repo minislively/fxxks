@@ -182,6 +182,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
         ...(result.behavior.rnPrimitiveInteractions ? { rnPrimitiveInteractions: result.behavior.rnPrimitiveInteractions } : {}),
         ...(pruneArray(result.behavior.rnAccessibilityTestAnchors) ? { rnAccessibilityTestAnchors: result.behavior.rnAccessibilityTestAnchors } : {}),
         ...(pruneArray(result.behavior.rnStateActionConcerns) ? { rnStateActionConcerns: result.behavior.rnStateActionConcerns } : {}),
+        ...(pruneArray(result.behavior.rnNavigationConcerns) ? { rnNavigationConcerns: result.behavior.rnNavigationConcerns } : {}),
         ...(result.behavior.hasSideEffects ? { hasSideEffects: result.behavior.hasSideEffects } : {}),
       })
     : undefined;

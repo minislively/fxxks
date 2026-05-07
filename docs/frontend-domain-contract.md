@@ -64,6 +64,7 @@ For the current RN PR A docs/tests lane, safe wording is limited to source-only 
 - This source contains source-only RN interaction hints inside the measured `F1`/`F13` narrow gate.
 - This source has same-file named-handler or inline-callback evidence observed in the same source file.
 - This source contains RN accessibility/test anchor evidence.
+- This source contains RN navigation concern evidence.
 - This source contains RN state/action concern evidence.
 - This fixture, payload, or policy record is limited to `rn-primitive-input-narrow-payload` measured evidence with no RN support promotion.
 
@@ -77,6 +78,8 @@ The current forbidden claim shapes are:
 - Do not claim that the screen is accessible.
 - Do not claim that screen reader behavior is verified.
 - Do not claim that the app was run on a device or simulator.
+- Do not claim that a route exists or that navigation succeeds.
+- Do not claim that stack, back, or focus behavior is verified.
 - Do not claim that cross-file navigation, route, or global-state behavior is understood.
 - Do not claim that a state transition, reducer, or setter behavior is correct or verified.
 - Do not claim that RN primitives are equivalent to DOM controls or React Web form semantics.
