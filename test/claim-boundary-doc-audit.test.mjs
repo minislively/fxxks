@@ -64,7 +64,7 @@ const measuredNarrowEvidence = /\b(?:measured\s+`?F1`?|F1`?\s+RN primitive\/inpu
 const forbiddenReactNativeBehaviorClaims = [
   {
     label: "rn-runtime-success",
-    pattern: /\b(?:mobile UI|native component|gesture|press|tap|FlatList|list virtualization)\b[^\n]{0,120}\b(?:works|behaves correctly|is correct|succeeds|successful|verified|validated|proven)\b/i,
+    pattern: /\b(?:mobile UI|native component|gesture|press|tap|FlatList|list virtualization|list performance|rendered order)\b[^\n]{0,120}\b(?:works|behaves correctly|is correct|is good|succeeds|successful|verified|validated|proven)\b/i,
   },
   {
     label: "rn-accessibility-correctness",
@@ -366,6 +366,12 @@ test("claim-boundary doc audit rejects RN runtime/a11y/cross-file/DOM-equivalenc
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("The list virtualization works correctly.", "synthetic.md"), [
     "synthetic.md:1 [rn-runtime-success] The list virtualization works correctly.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("List performance is good.", "synthetic.md"), [
+    "synthetic.md:1 [rn-runtime-success] List performance is good.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("Rendered order is correct.", "synthetic.md"), [
+    "synthetic.md:1 [rn-runtime-success] Rendered order is correct.",
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("Gesture markers remain RN evidence only; no gesture runtime safety claim.", "synthetic.md"), []);
   assert.deepEqual(findReactNativeBehaviorClaims("Same-file local handler/callback evidence may use the existing narrow payload gate, but this remains source-only evidence.", "synthetic.md"), []);
