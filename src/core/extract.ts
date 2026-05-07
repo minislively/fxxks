@@ -13,7 +13,10 @@ import type {
   ReactNativeAccessibilityTestAnchorSignal,
   ReactNativeNavigationConcernSignal,
   ReactNativePrimitiveActionBindingSignal,
+  ReactNativePrimitiveConstraintActionReadinessSignal,
   ReactNativePrimitiveInputBindingSignal,
+  ReactNativePrimitiveInputConstraintSignal,
+  ReactNativePrimitiveStateActionRelationSignal,
   ReactNativeStateActionConcernSignal,
   ReactNativeRelationExpressionKind,
   ReactNativeRelationSource,
@@ -525,6 +528,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const rnInputBindings: ReactNativePrimitiveInputBindingSignal[] = [];
   const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
+  const rnActionIdentifierReads = new Map<string, Set<string>>();
   const rnAccessibilityTestAnchors: ReactNativeAccessibilityTestAnchorSignal[] = [];
   const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
   const rnNavigationConcerns: ReactNativeNavigationConcernSignal[] = [];
@@ -657,6 +661,69 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     if (parameterNames.has(rootIdentifier)) return "component-prop";
     if (localDeclaredNames.has(rootIdentifier)) return "same-file-local";
     return "unknown";
+  };
+
+  const identifierReads = (node: ts.Node | undefined, initialLocalBindings: Iterable<string> = []): Set<string> => {
+    const reads = new Set<string>();
+    if (!node) return reads;
+    const localBindings = new Set(initialLocalBindings);
+    if (ts.isFunctionExpression(node) && node.name) localBindings.add(node.name.text);
+
+    const visitRead = (child: ts.Node): void => {
+      if (ts.isParameter(child)) collectBindingNames(child.name, localBindings);
+      if (ts.isVariableDeclaration(child)) collectBindingNames(child.name, localBindings);
+      if (child !== node && (ts.isFunctionDeclaration(child) || ts.isFunctionExpression(child) || ts.isArrowFunction(child))) {
+        if (ts.isFunctionDeclaration(child) && child.name) localBindings.add(child.name.text);
+        return;
+      }
+      if (ts.isIdentifier(child)) {
+        const parent = child.parent;
+        const isPropertyName =
+          (ts.isPropertyAccessExpression(parent) && parent.name === child) ||
+          (ts.isPropertyAssignment(parent) && parent.name === child) ||
+          (ts.isBindingElement(parent) && parent.propertyName === child);
+        if (!isPropertyName && !localBindings.has(child.text)) reads.add(child.text);
+      }
+      ts.forEachChild(child, visitRead);
+    };
+
+    visitRead(node);
+    return reads;
+  };
+
+  const parameterBindingNames = (parameters: ts.NodeArray<ts.ParameterDeclaration>): string[] => {
+    const bindings = new Set<string>();
+    for (const parameter of parameters) collectBindingNames(parameter.name, bindings);
+    return [...bindings];
+  };
+
+  const actionBindingKey = (onPressExpr: string, loc: SourceRange | undefined): string =>
+    `${onPressExpr}:${loc?.startLine ?? ""}:${loc?.endLine ?? ""}`;
+
+  const handlerReadsValue = (handlerExpr: string, valueExpr: string, actionLoc: SourceRange | undefined): { basis: string[] } | undefined => {
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(valueExpr)) return undefined;
+    if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(handlerExpr)) {
+      const localBody = localFunctionBodies.get(handlerExpr);
+      if (!localBody?.body) return undefined;
+      const bindings = "parameters" in localBody ? parameterBindingNames(localBody.parameters) : [];
+      const reads = identifierReads(localBody.body, bindings);
+      if (reads.has(valueExpr)) return { basis: [`handler.${handlerExpr}.reads.${valueExpr}`] };
+      return undefined;
+    }
+    const reads = rnActionIdentifierReads.get(actionBindingKey(handlerExpr, actionLoc));
+    if ((handlerExpr.includes("=>") || handlerExpr.startsWith("function")) && reads?.has(valueExpr)) {
+      return { basis: [`jsx.Pressable.onPress.reads.${valueExpr}`] };
+    }
+    return undefined;
+  };
+
+  const sourceRangeSpan = (ranges: Array<SourceRange | undefined>): SourceRange | undefined => {
+    const present = ranges.filter((range): range is SourceRange => Boolean(range));
+    if (present.length === 0) return undefined;
+    return {
+      startLine: Math.min(...present.map((range) => range.startLine)),
+      endLine: Math.max(...present.map((range) => range.endLine)),
+    };
   };
 
   const collectMutatorRefs = (expression: ts.Expression | undefined): Array<{ stateBinding: string; mutatorBinding: string; hook: "useState" | "useReducer"; mutatorKind: "setter" | "dispatch" }> => {
@@ -817,9 +884,12 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     const testID = attributeValues.get("testID");
     const title = attributeValues.get("title");
     const label = title ?? (ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? jsxElementTextLabel(node.parent) : undefined);
+    const loc = sourceRangeOf(sourceFile, node);
+    const actionReads = identifierReads(onPressNode);
+    if (actionReads.size > 0) rnActionIdentifierReads.set(actionBindingKey(onPressExpr, loc), actionReads);
     rnActionBindings.push({
       primitive: tag as ReactNativePrimitiveActionBindingSignal["primitive"],
-      loc: sourceRangeOf(sourceFile, node),
+      loc,
       onPressExpr,
       ...(onPressNode ? { onPressKind: expressionKindOf(onPressNode) } : {}),
       ...(onPressNode ? { onPressSource: relationSourceOf(node, onPressNode) } : {}),
@@ -1183,6 +1253,97 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     (item) =>
       `${item.hook}:${item.stateBinding}:${item.mutatorBinding}:${item.primitive}:${item.trigger}:${item.actionExpr}:${item.actionSource ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnInputConstraints: ReactNativePrimitiveInputConstraintSignal[] = rnInputBindingList
+    .flatMap((inputBinding) => {
+      const constraintBasis = [
+        ...(inputBinding.maxLength !== undefined ? ["jsx.TextInput.maxLength"] : []),
+        ...(inputBinding.secureTextEntry !== undefined ? ["jsx.TextInput.secureTextEntry"] : []),
+        ...(inputBinding.keyboardType !== undefined ? ["jsx.TextInput.keyboardType"] : []),
+        ...(inputBinding.autoCapitalize !== undefined ? ["jsx.TextInput.autoCapitalize"] : []),
+      ];
+      if (constraintBasis.length === 0) return [];
+      return [
+        {
+          primitive: "TextInput" as const,
+          loc: inputBinding.loc,
+          ...(inputBinding.valueExpr ? { valueExpr: inputBinding.valueExpr } : {}),
+          constraintKind: "textInputMetadataConstraints" as const,
+          ...(inputBinding.maxLength !== undefined ? { maxLength: inputBinding.maxLength } : {}),
+          ...(inputBinding.secureTextEntry !== undefined ? { secureTextEntry: inputBinding.secureTextEntry } : {}),
+          ...(inputBinding.keyboardType !== undefined ? { keyboardType: inputBinding.keyboardType } : {}),
+          ...(inputBinding.autoCapitalize !== undefined ? { autoCapitalize: inputBinding.autoCapitalize } : {}),
+          ...(inputBinding.placeholder !== undefined ? { descriptiveHint: inputBinding.placeholder } : {}),
+          constraintBasis,
+          evidence: [...constraintBasis, ...(inputBinding.placeholder !== undefined ? ["jsx.TextInput.placeholder"] : [])],
+        },
+      ];
+    })
+    .slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnStateActionRelations: ReactNativePrimitiveStateActionRelationSignal[] = rnActionBindingList
+    .flatMap((actionBinding) => {
+      if (actionBinding.primitive !== "Pressable") return [];
+      const directInputMatches = rnInputBindingList.flatMap((inputBinding) => {
+        if (!inputBinding.valueExpr) return [];
+        const read = handlerReadsValue(actionBinding.onPressExpr, inputBinding.valueExpr, actionBinding.loc);
+        if (!read) return [];
+        return [{ inputBinding, read }];
+      });
+      if (directInputMatches.length !== 1) return [];
+      const { inputBinding, read } = directInputMatches[0];
+      return [
+        {
+          relationKind: "actionReadsInputValue" as const,
+          inputPrimitive: "TextInput" as const,
+          actionPrimitive: "Pressable" as const,
+          valueExpr: inputBinding.valueExpr!,
+          ...(inputBinding.onChangeTextExpr ? { onChangeTextExpr: inputBinding.onChangeTextExpr } : {}),
+          onPressExpr: actionBinding.onPressExpr,
+          ...(actionBinding.label ? { label: actionBinding.label } : {}),
+          relationBasis: read.basis,
+          loc: sourceRangeSpan([inputBinding.loc, actionBinding.loc]),
+          evidence: [
+            "rn.stateActionRelation.actionReadsInputValue",
+            ...inputBinding.evidence,
+            ...actionBinding.evidence,
+            ...read.basis,
+          ],
+        },
+      ];
+    })
+    .slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnConstraintActionReadiness: ReactNativePrimitiveConstraintActionReadinessSignal[] = rnActionBindingList
+    .flatMap((actionBinding) => {
+      if (actionBinding.primitive !== "Pressable" || !actionBinding.disabled) return [];
+      const relationMatches = rnStateActionRelations.filter((relation) => relation.onPressExpr === actionBinding.onPressExpr);
+      if (relationMatches.length !== 1) return [];
+      const relation = relationMatches[0];
+      const inputConstraintMatches = rnInputConstraints.filter((constraint) => constraint.valueExpr === relation.valueExpr);
+      if (inputConstraintMatches.length !== 1) return [];
+      const inputConstraint = inputConstraintMatches[0];
+      return [
+        {
+          relationKind: "constraintActionReadiness" as const,
+          inputPrimitive: "TextInput" as const,
+          actionPrimitive: "Pressable" as const,
+          valueExpr: relation.valueExpr,
+          onPressExpr: actionBinding.onPressExpr,
+          constraintKind: "textInputMetadataConstraints" as const,
+          readinessKind: "pressableDisabledReadiness" as const,
+          disabledExpr: actionBinding.disabled,
+          constraintBasis: inputConstraint.constraintBasis,
+          readinessBasis: ["jsx.Pressable.disabled"],
+          relationBasis: relation.relationBasis,
+          loc: sourceRangeSpan([inputConstraint.loc, actionBinding.loc]),
+          evidence: [
+            "rn.constraintActionReadiness.pressableDisabledReadsConstrainedInput",
+            ...inputConstraint.evidence,
+            ...actionBinding.evidence,
+            ...relation.relationBasis,
+          ],
+        },
+      ];
+    })
+    .slice(0, MAX_RN_PRIMITIVE_BINDINGS);
   const rnNavigationConcernList = dedupeBy(
     rnNavigationConcerns,
     (item) => {
@@ -1198,7 +1359,12 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       }
     },
   ).slice(0, 16);
-  const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0;
+  const hasRnPrimitiveInteractions =
+    rnInputBindingList.length > 0 ||
+    rnActionBindingList.length > 0 ||
+    rnInputConstraints.length > 0 ||
+    rnStateActionRelations.length > 0 ||
+    rnConstraintActionReadiness.length > 0;
   const hasRnStateActionConcerns = rnStateActionConcernList.length > 0;
   return {
     behavior: {
@@ -1224,6 +1390,9 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
             rnPrimitiveInteractions: {
               ...(rnInputBindingList.length ? { inputBindings: rnInputBindingList } : {}),
               ...(rnActionBindingList.length ? { actionBindings: rnActionBindingList } : {}),
+              ...(rnInputConstraints.length ? { inputConstraints: rnInputConstraints } : {}),
+              ...(rnStateActionRelations.length ? { stateActionRelations: rnStateActionRelations } : {}),
+              ...(rnConstraintActionReadiness.length ? { constraintActionReadiness: rnConstraintActionReadiness } : {}),
             },
           }
         : {}),
