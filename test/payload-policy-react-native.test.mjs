@@ -127,6 +127,8 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
       loc: { startLine: 15, endLine: 23 },
       valueExpr: "value",
       onChangeTextExpr: "onChangeText",
+      onChangeTextKind: "identifier",
+      onChangeTextSource: "component-prop",
       placeholder: "Type filter",
       keyboardType: "web-search",
       autoCapitalize: "sentences",
@@ -148,6 +150,8 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
       primitive: "Pressable",
       loc: { startLine: 24, endLine: 24 },
       onPressExpr: "submitCurrentValue",
+      onPressKind: "identifier",
+      onPressSource: "same-file-local",
       label: "Submit",
       accessibilityLabel: "Submit filter",
       testID: "submit-filter-button",
@@ -166,6 +170,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.equal(preReadDecision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(preReadDecision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].onPressExpr, "submitCurrentValue");
+  assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].onPressSource, "same-file-local");
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].label, "Submit");
   assert.equal(preReadDecision.debug.domainDetection.classification, "react-native");
   assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
@@ -184,6 +189,8 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
       loc: { startLine: 14, endLine: 24 },
       valueExpr: "value",
       onChangeTextExpr: "onChangeText",
+      onChangeTextKind: "identifier",
+      onChangeTextSource: "component-prop",
       placeholder: "Filter",
       keyboardType: "default",
       secureTextEntry: "false",
@@ -209,6 +216,8 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
       primitive: "Pressable",
       loc: { startLine: 25, endLine: 31 },
       onPressExpr: "onApply",
+      onPressKind: "identifier",
+      onPressSource: "component-prop",
       label: "Apply",
       disabled: "isApplyDisabled",
       accessibilityLabel: "Apply filter",
@@ -227,6 +236,69 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
   assert.equal("formControls" in payload.facts, false);
   assert.equal("domTags" in payload.facts, false);
   assert.equal("reactNativeContext" in payload, false);
+});
+
+test("React Native inline callbacks and external references stay source-only with explicit locality metadata", () => {
+  const inlineFilePath = fixturePath("rn-primitive-inline-callback.tsx");
+  const inlineResult = extractFile(inlineFilePath);
+  assert.equal(inlineResult.domainDetection?.classification, "react-native");
+  const inlineInput = inlineResult.behavior?.rnPrimitiveInteractions?.inputBindings?.[0];
+  assert.equal(inlineInput?.primitive, "TextInput");
+  assert.equal(inlineInput?.loc?.startLine, 13);
+  assert.equal(inlineInput?.onChangeTextExpr, "(nextValue) => onChangeText(nextValue.trim())");
+  assert.equal(inlineInput?.onChangeTextKind, "inline-callback");
+  assert.equal(inlineInput?.onChangeTextSource, "same-file-inline");
+  assert.equal(inlineInput?.onSubmitEditingExpr, "() => onSubmit(value.trim())");
+  assert.equal(inlineInput?.onSubmitEditingKind, "inline-callback");
+  assert.equal(inlineInput?.onSubmitEditingSource, "same-file-inline");
+  assert.deepEqual(inlineInput?.evidence, [
+    "jsx.TextInput.value",
+    "jsx.TextInput.onChangeText",
+    "jsx.TextInput.onSubmitEditing",
+    "jsx.TextInput.placeholder",
+    "jsx.TextInput.testID",
+  ]);
+
+  const inlineActions = inlineResult.behavior?.rnPrimitiveInteractions?.actionBindings ?? [];
+  assert.equal(inlineActions.length, 2);
+  assert.deepEqual(
+    inlineActions.map((item) => ({
+      primitive: item.primitive,
+      onPressExpr: item.onPressExpr,
+      onPressKind: item.onPressKind,
+      onPressSource: item.onPressSource,
+      label: item.label,
+      testID: item.testID,
+      evidence: item.evidence,
+    })),
+    [
+      {
+        primitive: "TouchableOpacity",
+        onPressExpr: "() => onSubmit(value.trim())",
+        onPressKind: "inline-callback",
+        onPressSource: "same-file-inline",
+        label: "Touchable submit",
+        testID: "inline-touchable",
+        evidence: ["jsx.TouchableOpacity.onPress", "jsx.TouchableOpacity.Text.label", "jsx.TouchableOpacity.testID"],
+      },
+      {
+        primitive: "Button",
+        onPressExpr: "() => onSubmit(value.trim())",
+        onPressKind: "inline-callback",
+        onPressSource: "same-file-inline",
+        label: "Button submit",
+        testID: undefined,
+        evidence: ["jsx.Button.onPress", "jsx.Button.title"],
+      },
+    ],
+  );
+
+  const importedFilePath = fixturePath("rn-primitive-imported-handler.tsx");
+  const importedResult = extractFile(importedFilePath);
+  assert.equal(importedResult.domainDetection?.classification, "react-native");
+  assert.equal(importedResult.behavior?.rnPrimitiveInteractions?.inputBindings?.[0].onChangeTextSource, "imported");
+  assert.equal(importedResult.behavior?.rnPrimitiveInteractions?.inputBindings?.[0].onSubmitEditingSource, "imported");
+  assert.equal(importedResult.behavior?.rnPrimitiveInteractions?.actionBindings?.[0].onPressSource, "imported");
 });
 
 test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {

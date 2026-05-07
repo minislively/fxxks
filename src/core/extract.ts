@@ -12,6 +12,8 @@ import type {
   Language,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveInputBindingSignal,
+  ReactNativeRelationExpressionKind,
+  ReactNativeRelationSource,
   SourceRange,
   StyleSystem,
   StyleVariantSignal,
@@ -33,6 +35,7 @@ const MAX_TEXT_LENGTH = 48;
 const STYLE_VARIANT_PROP_NAMES = new Set(["variant", "size", "tone", "intent", "disabled", "selected", "loading", "compact"]);
 const MAX_STYLE_VARIANT_SIGNALS = 16;
 const MAX_RN_PRIMITIVE_BINDINGS = 8;
+const RN_ACTION_PRIMITIVE_TAGS = new Set<ReactNativePrimitiveActionBindingSignal["primitive"]>(["Pressable", "Button", "TouchableOpacity"]);
 
 function getLanguage(filePath: string): Language {
   const ext = path.extname(filePath);
@@ -124,6 +127,17 @@ function containsAsyncWork(node: ts.Node): boolean {
   };
   visit(node);
   return found;
+}
+
+function collectBindingNames(name: ts.BindingName, names: Set<string>): void {
+  if (ts.isIdentifier(name)) {
+    names.add(name.text);
+    return;
+  }
+  for (const element of name.elements) {
+    if (ts.isOmittedExpression(element)) continue;
+    collectBindingNames(element.name, names);
+  }
 }
 
 function dedupeBy<T>(items: T[], keyOf: (item: T) => string): T[] {
@@ -506,6 +520,8 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const rnInputBindings: ReactNativePrimitiveInputBindingSignal[] = [];
   const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
+  const importedNames = new Set<string>();
+  const localDeclaredNames = new Set<string>();
   const submitHandlers: NonNullable<FormSurface["submitHandlers"]> = [];
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
   const stateConditions: NonNullable<FormSurface["stateConditions"]> = [];
@@ -574,6 +590,63 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     return compactText(attribute.initializer.getText(sourceFile));
   };
 
+  const jsxAttributeExpression = (attribute: ts.JsxAttribute): ts.Expression | undefined => {
+    if (!attribute.initializer || !ts.isJsxExpression(attribute.initializer)) return undefined;
+    return attribute.initializer.expression ?? undefined;
+  };
+
+  const nearestFunctionLike = (node: ts.Node): ts.SignatureDeclaration | undefined => {
+    let current: ts.Node | undefined = node;
+    while (current) {
+      if (ts.isFunctionLike(current)) return current;
+      current = current.parent;
+    }
+    return undefined;
+  };
+
+  const expressionKindOf = (
+    expression: ts.Expression | undefined,
+  ): ReactNativeRelationExpressionKind | undefined => {
+    if (!expression) return undefined;
+    if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) return "inline-callback";
+    if (ts.isIdentifier(expression)) return "identifier";
+    if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) return "member-reference";
+    if (ts.isCallExpression(expression)) return "call-expression";
+    return "other-expression";
+  };
+
+  const rootIdentifierOf = (expression: ts.Expression | undefined): string | undefined => {
+    if (!expression) return undefined;
+    if (ts.isIdentifier(expression)) return expression.text;
+    if (ts.isPropertyAccessExpression(expression)) return rootIdentifierOf(expression.expression);
+    if (ts.isElementAccessExpression(expression)) return rootIdentifierOf(expression.expression);
+    if (ts.isCallExpression(expression)) return rootIdentifierOf(expression.expression);
+    return undefined;
+  };
+
+  const relationSourceOf = (
+    node: ts.Node,
+    expression: ts.Expression | undefined,
+  ): ReactNativeRelationSource | undefined => {
+    if (!expression) return undefined;
+    if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) return "same-file-inline";
+
+    const rootIdentifier = rootIdentifierOf(expression);
+    if (!rootIdentifier) return "unknown";
+    if (importedNames.has(rootIdentifier)) return "imported";
+
+    const parameterNames = new Set<string>();
+    const containingFunction = nearestFunctionLike(node);
+    if (containingFunction) {
+      for (const parameter of containingFunction.parameters) {
+        collectBindingNames(parameter.name, parameterNames);
+      }
+    }
+    if (parameterNames.has(rootIdentifier)) return "component-prop";
+    if (localDeclaredNames.has(rootIdentifier)) return "same-file-local";
+    return "unknown";
+  };
+
   const jsxElementTextLabel = (element: ts.JsxElement): string | undefined => {
     const parts: string[] = [];
     const visitText = (child: ts.Node): void => {
@@ -595,10 +668,14 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
     tag: string,
     attributeValues: Map<string, string>,
+    attributeExpressions: Map<string, ts.Expression>,
   ): void => {
     if (tag === "TextInput") {
       const valueExpr = attributeValues.get("value");
       const onChangeTextExpr = attributeValues.get("onChangeText");
+      const onChangeTextNode = attributeExpressions.get("onChangeText");
+      const onSubmitEditingExpr = attributeValues.get("onSubmitEditing");
+      const onSubmitEditingNode = attributeExpressions.get("onSubmitEditing");
       const placeholder = attributeValues.get("placeholder");
       const keyboardType = attributeValues.get("keyboardType");
       const secureTextEntry = attributeValues.get("secureTextEntry");
@@ -609,6 +686,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       if (
         !valueExpr &&
         !onChangeTextExpr &&
+        !onSubmitEditingExpr &&
         !placeholder &&
         !keyboardType &&
         !secureTextEntry &&
@@ -625,6 +703,11 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         loc: sourceRangeOf(sourceFile, node),
         ...(valueExpr ? { valueExpr } : {}),
         ...(onChangeTextExpr ? { onChangeTextExpr } : {}),
+        ...(onChangeTextNode ? { onChangeTextKind: expressionKindOf(onChangeTextNode) } : {}),
+        ...(onChangeTextNode ? { onChangeTextSource: relationSourceOf(node, onChangeTextNode) } : {}),
+        ...(onSubmitEditingExpr ? { onSubmitEditingExpr } : {}),
+        ...(onSubmitEditingNode ? { onSubmitEditingKind: expressionKindOf(onSubmitEditingNode) } : {}),
+        ...(onSubmitEditingNode ? { onSubmitEditingSource: relationSourceOf(node, onSubmitEditingNode) } : {}),
         ...(placeholder ? { placeholder } : {}),
         ...(keyboardType ? { keyboardType } : {}),
         ...(secureTextEntry ? { secureTextEntry } : {}),
@@ -635,6 +718,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         evidence: [
           ...(valueExpr ? ["jsx.TextInput.value"] : []),
           ...(onChangeTextExpr ? ["jsx.TextInput.onChangeText"] : []),
+          ...(onSubmitEditingExpr ? ["jsx.TextInput.onSubmitEditing"] : []),
           ...(placeholder ? ["jsx.TextInput.placeholder"] : []),
           ...(keyboardType ? ["jsx.TextInput.keyboardType"] : []),
           ...(secureTextEntry ? ["jsx.TextInput.secureTextEntry"] : []),
@@ -647,31 +731,34 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       return;
     }
 
-    if (tag !== "Pressable") return;
+    if (!RN_ACTION_PRIMITIVE_TAGS.has(tag as ReactNativePrimitiveActionBindingSignal["primitive"])) return;
     const onPressExpr = attributeValues.get("onPress");
     if (!onPressExpr) return;
+    const onPressNode = attributeExpressions.get("onPress");
     const disabled = attributeValues.get("disabled");
     const accessibilityLabel = attributeValues.get("accessibilityLabel");
     const accessibilityRole = attributeValues.get("accessibilityRole");
     const testID = attributeValues.get("testID");
-
-    const label = ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? jsxElementTextLabel(node.parent) : undefined;
+    const title = attributeValues.get("title");
+    const label = title ?? (ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? jsxElementTextLabel(node.parent) : undefined);
     rnActionBindings.push({
-      primitive: "Pressable",
+      primitive: tag as ReactNativePrimitiveActionBindingSignal["primitive"],
       loc: sourceRangeOf(sourceFile, node),
       onPressExpr,
+      ...(onPressNode ? { onPressKind: expressionKindOf(onPressNode) } : {}),
+      ...(onPressNode ? { onPressSource: relationSourceOf(node, onPressNode) } : {}),
       ...(label ? { label } : {}),
       ...(disabled ? { disabled } : {}),
       ...(accessibilityLabel ? { accessibilityLabel } : {}),
       ...(accessibilityRole ? { accessibilityRole } : {}),
       ...(testID ? { testID } : {}),
       evidence: [
-        "jsx.Pressable.onPress",
-        ...(label ? ["jsx.Pressable.Text.label"] : []),
-        ...(disabled ? ["jsx.Pressable.disabled"] : []),
-        ...(accessibilityLabel ? ["jsx.Pressable.accessibilityLabel"] : []),
-        ...(accessibilityRole ? ["jsx.Pressable.accessibilityRole"] : []),
-        ...(testID ? ["jsx.Pressable.testID"] : []),
+        `jsx.${tag}.onPress`,
+        ...(label ? [`jsx.${tag}.${title ? "title" : "Text.label"}`] : []),
+        ...(disabled ? [`jsx.${tag}.disabled`] : []),
+        ...(accessibilityLabel ? [`jsx.${tag}.accessibilityLabel`] : []),
+        ...(accessibilityRole ? [`jsx.${tag}.accessibilityRole`] : []),
+        ...(testID ? [`jsx.${tag}.testID`] : []),
       ],
     });
   };
@@ -679,10 +766,13 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
     const tag = node.tagName.getText(sourceFile);
     const attributeValues = new Map<string, string>();
+    const attributeExpressions = new Map<string, ts.Expression>();
     for (const property of node.attributes.properties) {
       if (!ts.isJsxAttribute(property)) continue;
       const value = jsxAttributeValue(property);
       if (value) attributeValues.set(property.name.getText(sourceFile), value);
+      const expression = jsxAttributeExpression(property);
+      if (expression) attributeExpressions.set(property.name.getText(sourceFile), expression);
     }
     const elementId = attributeValues.get("id");
     if (elementId) {
@@ -691,7 +781,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     if (tag === "Controller") {
       addLocatedAnchor(validationAnchors, "Controller", node);
     }
-    collectRnPrimitiveInteraction(node, tag, attributeValues);
+    collectRnPrimitiveInteraction(node, tag, attributeValues, attributeExpressions);
 
     const propNames: string[] = [];
     const propValues: Record<string, string> = {};
@@ -786,6 +876,23 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   };
 
   function visit(node: ts.Node): void {
+    if (ts.isImportDeclaration(node) && node.importClause) {
+      if (node.importClause.name) importedNames.add(node.importClause.name.text);
+      const namedBindings = node.importClause.namedBindings;
+      if (namedBindings) {
+        if (ts.isNamespaceImport(namedBindings)) {
+          importedNames.add(namedBindings.name.text);
+        } else {
+          for (const element of namedBindings.elements) importedNames.add(element.name.text);
+        }
+      }
+    }
+    if (ts.isFunctionDeclaration(node) && node.name) {
+      localDeclaredNames.add(node.name.text);
+    }
+    if (ts.isVariableDeclaration(node)) {
+      collectBindingNames(node.name, localDeclaredNames);
+    }
     if (ts.isCallExpression(node)) {
       const callName = node.expression.getText(sourceFile);
       const shortName = callShortName(node);
@@ -880,11 +987,12 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const a11ySourceIdList = dedupeBy(a11ySourceIds, (item) => `${item.value}:${item.loc?.startLine ?? ""}`).slice(0, 16);
   const rnInputBindingList = dedupeBy(
     rnInputBindings,
-    (item) => `${item.primitive}:${item.valueExpr ?? ""}:${item.onChangeTextExpr ?? ""}:${item.placeholder ?? ""}:${item.loc?.startLine ?? ""}`,
+    (item) =>
+      `${item.primitive}:${item.valueExpr ?? ""}:${item.onChangeTextExpr ?? ""}:${item.onChangeTextSource ?? ""}:${item.onSubmitEditingExpr ?? ""}:${item.onSubmitEditingSource ?? ""}:${item.placeholder ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
   const rnActionBindingList = dedupeBy(
     rnActionBindings,
-    (item) => `${item.primitive}:${item.onPressExpr}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
+    (item) => `${item.primitive}:${item.onPressExpr}:${item.onPressSource ?? ""}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
   const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0;
   return {
