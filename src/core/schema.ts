@@ -66,11 +66,30 @@ export type FormSurface = {
   stateConditions?: LocatedString[];
 };
 
+export type ReactNativeRelationExpressionKind =
+  | "inline-callback"
+  | "identifier"
+  | "member-reference"
+  | "call-expression"
+  | "other-expression";
+
+export type ReactNativeRelationSource =
+  | "same-file-inline"
+  | "same-file-local"
+  | "component-prop"
+  | "imported"
+  | "unknown";
+
 export type ReactNativePrimitiveInputBindingSignal = {
   primitive: "TextInput";
   loc?: SourceRange;
   valueExpr?: string;
   onChangeTextExpr?: string;
+  onChangeTextKind?: ReactNativeRelationExpressionKind;
+  onChangeTextSource?: ReactNativeRelationSource;
+  onSubmitEditingExpr?: string;
+  onSubmitEditingKind?: ReactNativeRelationExpressionKind;
+  onSubmitEditingSource?: ReactNativeRelationSource;
   placeholder?: string;
   keyboardType?: string;
   secureTextEntry?: string;
@@ -82,9 +101,11 @@ export type ReactNativePrimitiveInputBindingSignal = {
 };
 
 export type ReactNativePrimitiveActionBindingSignal = {
-  primitive: "Pressable";
+  primitive: "Pressable" | "Button" | "TouchableOpacity";
   loc?: SourceRange;
   onPressExpr: string;
+  onPressKind?: ReactNativeRelationExpressionKind;
+  onPressSource?: ReactNativeRelationSource;
   label?: string;
   disabled?: string;
   accessibilityLabel?: string;

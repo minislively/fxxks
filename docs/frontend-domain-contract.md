@@ -61,8 +61,10 @@ For the current RN PR A docs/tests lane, safe wording is limited to source-only 
 
 - This source contains React Native primitive/input evidence.
 - This source contains source-only RN interaction hints inside the measured `F1`/`F13` narrow gate.
-- This source has same-file local handler/callback evidence observed in the same source file.
+- This source has same-file named-handler or inline-callback evidence observed in the same source file.
 - This fixture, payload, or policy record is limited to `rn-primitive-input-narrow-payload` measured evidence with no RN support promotion.
+
+Imported or externally supplied callbacks may still be observed as source text, but they must not be promoted to a same-file local handler claim.
 
 The current forbidden claim shapes are:
 
