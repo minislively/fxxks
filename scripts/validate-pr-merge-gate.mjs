@@ -81,7 +81,9 @@ export function evaluatePullRequestMergeGate({
     .sort();
 
   if (requireApproval && approvingReviewers.length === 0) {
-    blockers.push("PR must have an active approval on the current head commit from a reviewer other than the PR author.");
+    blockers.push(
+      "PR must have an active GitHub PR review approval on the current head commit from a reviewer other than the PR author. Issue comments and regular PR comments do not count, and any new push/amend/rebase/force-push after approval requires re-approval.",
+    );
   }
 
   return {
