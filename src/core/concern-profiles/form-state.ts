@@ -70,8 +70,3 @@ export function collectFormStateConcernProfile(result: ExtractionResult): Fronte
     nonAuthorizationBoundary: FRONTEND_CONCERN_PROFILE_NON_AUTHORIZATION,
   };
 }
-
-export function collectFrontendConcernProfiles(result: ExtractionResult): FrontendConcernProfile[] | undefined {
-  const profiles = [collectFormStateConcernProfile(result)].filter((value): value is FrontendConcernProfile => Boolean(value));
-  return profiles.length > 0 ? profiles : undefined;
-}
