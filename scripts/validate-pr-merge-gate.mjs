@@ -138,8 +138,9 @@ async function main() {
   });
 
   if (!result.ok) {
-    console.warn("Merge gate advisories:");
-    for (const blocker of result.blockers) console.warn(`- ${blocker}`);
+    console.error("Merge gate blockers:");
+    for (const blocker of result.blockers) console.error(`- ${blocker}`);
+    process.exitCode = 1;
     return;
   }
 
