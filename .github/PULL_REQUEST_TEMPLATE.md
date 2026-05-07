@@ -12,4 +12,4 @@ Fixes #
 
 ## Review gate
 
-- [ ] Current head has a GitHub PR review approval from a non-author reviewer. Issue comments and regular PR comments do not count.
+- [ ] Current head has a GitHub PR review from `minislively` or `yeachan-heo`. Self-review by those accounts is allowed. Issue comments and regular PR comments do not count.

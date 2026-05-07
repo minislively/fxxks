@@ -11,13 +11,15 @@ import {
 
 const pr = { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "contributor" } };
 
-test("merge gate requires non-author approval by default even when PR links a closing issue", () => {
+test("merge gate requires an allowed reviewer by default even when PR links a closing issue", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: pr,
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /GitHub PR review approval/);
+  assert.match(result.blockers.join("\n"), /GitHub PR review/);
+  assert.match(result.blockers.join("\n"), /minislively/i);
+  assert.match(result.blockers.join("\n"), /yeachan-heo/i);
   assert.deepEqual(result.approvingReviewers, []);
 });
 
@@ -41,43 +43,43 @@ test("merge gate rejects PRs without a closing issue reference", () => {
   assert.match(result.blockers.join("\n"), /closing issue/);
 });
 
-test("merge gate can still enforce latest reviewer state when approval checks are enabled", () => {
+test("merge gate ignores dismissed allowed reviews when review checks are enabled", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: pr,
     reviews: [
-      { user: { login: "reviewer" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" },
-      { user: { login: "reviewer" }, state: "CHANGES_REQUESTED", submitted_at: "2026-05-01T00:02:00Z" },
+      { user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" },
+      { user: { login: "minislively" }, state: "DISMISSED", submitted_at: "2026-05-01T00:02:00Z", commit_id: "head-sha" },
     ],
     requireApproval: true,
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /GitHub PR review approval/);
-  assert.match(result.blockers.join("\n"), /requires re-approval/i);
+  assert.match(result.blockers.join("\n"), /GitHub PR review/);
+  assert.match(result.blockers.join("\n"), /requires re-review/i);
 });
 
 test("merge gate can require approval on the current head commit when enabled", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: pr,
-    reviews: [{ user: { login: "reviewer" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "old-sha" }],
+    reviews: [{ user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "old-sha" }],
     requireApproval: true,
   });
 
   assert.equal(result.ok, false);
   assert.match(result.blockers.join("\n"), /current head commit/);
   assert.match(result.blockers.join("\n"), /comments do not count/i);
-  assert.match(result.blockers.join("\n"), /requires re-approval/i);
+  assert.match(result.blockers.join("\n"), /requires re-review/i);
 });
 
 
-test("merge gate passes by default with linked issue and current-head non-author approval", () => {
+test("merge gate passes by default with linked issue and current-head allowed review", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: pr,
-    reviews: [{ user: { login: "reviewer" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
+    reviews: [{ user: { login: "minislively" }, state: "COMMENTED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.approvingReviewers, ["reviewer"]);
+  assert.deepEqual(result.approvingReviewers, ["minislively"]);
 });
 
 test("issue comments do not satisfy the approval gate", () => {
@@ -90,15 +92,26 @@ test("issue comments do not satisfy the approval gate", () => {
   assert.match(result.blockers.join("\n"), /comments do not count/i);
 });
 
-test("merge gate ignores PR author self-approval", () => {
+test("merge gate allows self-review when the author is an allowed reviewer", () => {
   const result = evaluatePullRequestMergeGate({
-    pullRequest: { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "reviewer" } },
-    reviews: [{ user: { login: "reviewer" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
+    pullRequest: { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "minislively" } },
+    reviews: [{ user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
+    requireApproval: true,
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.approvingReviewers, ["minislively"]);
+});
+
+test("merge gate rejects reviews from users outside the allowed reviewer set", () => {
+  const result = evaluatePullRequestMergeGate({
+    pullRequest: pr,
+    reviews: [{ user: { login: "outside-reviewer" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
     requireApproval: true,
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /reviewer other than the PR author/);
+  assert.match(result.blockers.join("\n"), /allowed reviewer/i);
   assert.deepEqual(result.approvingReviewers, []);
 });
 
