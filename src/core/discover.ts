@@ -6,6 +6,15 @@ import { isSafeProjectFilePath } from "./paths";
 const IGNORE = new Set([".git", "node_modules", "dist", ".omx", ".fooks"]);
 const COMPONENT_EXTS = new Set([".tsx", ".jsx"]);
 
+function isMissingDuringDiscovery(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ENOTDIR"),
+  );
+}
+
 export type FileTarget = {
   filePath: string;
   kind: "component" | "linked-ts";
@@ -25,24 +34,13 @@ export type DiscoveryResult = {
   stats: DiscoveryStats;
 };
 
-function isMissingDuringDiscovery(error: unknown): boolean {
-  return Boolean(
-    error &&
-      typeof error === "object" &&
-      "code" in error &&
-      ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ENOTDIR"),
-  );
-}
-
 function walk(dir: string, out: string[], stats: DiscoveryStats, root: string): void {
   stats.directoriesVisited += 1;
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch (error) {
-    if (isMissingDuringDiscovery(error)) {
-      return;
-    }
+    if (isMissingDuringDiscovery(error)) return;
     throw error;
   }
   for (const entry of entries) {
@@ -62,9 +60,7 @@ function readText(filePath: string): string | null {
   try {
     return fs.readFileSync(filePath, "utf8");
   } catch (error) {
-    if (isMissingDuringDiscovery(error)) {
-      return null;
-    }
+    if (isMissingDuringDiscovery(error)) return null;
     throw error;
   }
 }
