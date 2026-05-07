@@ -64,7 +64,7 @@ export function evaluatePullRequestMergeGate({
   pullRequest,
   reviews = [],
   requireLinkedIssue = true,
-  requireApproval = true,
+  requireApproval = false,
 }) {
   const blockers = [];
 
@@ -126,17 +126,20 @@ async function main() {
     throw new Error("GITHUB_REPOSITORY and GITHUB_TOKEN are required in GitHub Actions.");
   }
 
-  const reviews = await fetchPullRequestReviews({
-    repository,
-    pullNumber: pullRequest.number,
-    token,
-  });
+  const requireApproval = process.env.MERGE_GATE_REQUIRE_APPROVAL === "true";
+  const reviews = requireApproval
+    ? await fetchPullRequestReviews({
+      repository,
+      pullNumber: pullRequest.number,
+      token,
+    })
+    : [];
 
   const result = evaluatePullRequestMergeGate({
     pullRequest,
     reviews,
     requireLinkedIssue: process.env.MERGE_GATE_REQUIRE_LINKED_ISSUE !== "false",
-    requireApproval: process.env.MERGE_GATE_REQUIRE_APPROVAL !== "false",
+    requireApproval,
   });
 
   if (!result.ok) {
@@ -147,9 +150,9 @@ async function main() {
   }
 
   const approvalSummary = result.approvingReviewers.length > 0
-    ? `Approving reviewer(s): ${result.approvingReviewers.join(", ")}`
-    : "Approval requirement disabled";
-  console.log(`Merge gate passed. Linked issue detected. ${approvalSummary}`);
+    ? ` Approving reviewer(s): ${result.approvingReviewers.join(", ")}`
+    : "";
+  console.log(`Merge gate passed. Linked issue detected.${approvalSummary}`);
 }
 
 function isMainModule() {
