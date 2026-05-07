@@ -12,6 +12,7 @@ import type {
   Language,
   ReactNativeAccessibilityTestAnchorSignal,
   ReactNativeListRenderingConcernSignal,
+  ReactNativeMediaLayoutConcernSignal,
   ReactNativeNavigationConcernSignal,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveConstraintActionReadinessSignal,
@@ -81,6 +82,12 @@ function compactText(value: string, maxLength = MAX_TEXT_LENGTH): string {
   return compacted.length > maxLength ? compacted.slice(0, maxLength) : compacted;
 }
 
+function stylePropertyValue(styleExpr: string | undefined, propertyName: string): string | undefined {
+  if (!styleExpr) return undefined;
+  const escaped = propertyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = styleExpr.match(new RegExp(`${escaped}\\s*:\\s*([^,}]+)`));
+  return match?.[1]?.trim();
+}
 function callShortName(node: ts.CallExpression): string {
   const callName = node.expression.getText();
   return callName.split(".").pop() ?? callName;
@@ -532,6 +539,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const rnActionIdentifierReads = new Map<string, Set<string>>();
   const rnAccessibilityTestAnchors: ReactNativeAccessibilityTestAnchorSignal[] = [];
   const rnListRenderingConcerns: ReactNativeListRenderingConcernSignal[] = [];
+  const rnMediaLayoutConcerns: ReactNativeMediaLayoutConcernSignal[] = [];
   const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
   const rnNavigationConcerns: ReactNativeNavigationConcernSignal[] = [];
   const importedNames = new Set<string>();
@@ -940,6 +948,48 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     });
   };
 
+  const collectRnMediaLayoutConcern = (
+    node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    tag: string,
+    attributeValues: Map<string, string>,
+  ): void => {
+    if (!reactNativeImportedNames.has(tag)) return;
+
+    if (tag === "ScrollView") {
+      const pagingEnabled = attributeValues.get("pagingEnabled");
+      if (pagingEnabled) {
+        rnMediaLayoutConcerns.push({
+          kind: "pagingEnabled",
+          primitive: "ScrollView",
+          value: pagingEnabled,
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: ["jsx.ScrollView.pagingEnabled"],
+        });
+      }
+      return;
+    }
+
+    if (tag !== "Image") return;
+
+    rnMediaLayoutConcerns.push({
+      kind: "media-primitive",
+      primitive: "Image",
+      loc: sourceRangeOf(sourceFile, node),
+      evidence: ["jsx.Image"],
+    });
+
+    const resizeMode = attributeValues.get("resizeMode") ?? stylePropertyValue(attributeValues.get("style"), "resizeMode");
+    if (resizeMode) {
+      rnMediaLayoutConcerns.push({
+        kind: "resizeMode",
+        primitive: "Image",
+        value: resizeMode,
+        loc: sourceRangeOf(sourceFile, node),
+        evidence: ["jsx.Image.resizeMode"],
+      });
+    }
+  };
+
   const collectRnListRenderingConcern = (
     node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
     tag: string,
@@ -1017,6 +1067,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     collectRnPrimitiveInteraction(node, tag, attributeValues, attributeExpressions);
     collectRnAccessibilityTestAnchor(node, tag, attributeValues);
     collectRnListRenderingConcern(node, tag, attributeValues, attributeExpressions);
+    collectRnMediaLayoutConcern(node, tag, attributeValues);
 
     const propNames: string[] = [];
     const propValues: Record<string, string> = {};
@@ -1216,6 +1267,22 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       }
       if (
         ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === "Dimensions" &&
+        node.expression.name.text === "get" &&
+        reactNativeImportedNames.has("Dimensions")
+      ) {
+        const arg = node.arguments[0];
+        rnMediaLayoutConcerns.push({
+          kind: "dimensions-get",
+          calleeExpr: "Dimensions.get",
+          ...(arg ? { argExpr: compactText(arg.getText(sourceFile)) } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: ["call.Dimensions.get"],
+        });
+      }
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
         node.expression.name.text === "navigate" &&
         rootIdentifierOf(node.expression.expression) === "navigation"
       ) {
@@ -1321,6 +1388,21 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         case "renderItem":
         case "keyExtractor":
           return `${item.kind}:${item.primitive}:${item.expr}:${item.exprSource ?? ""}:${item.loc?.startLine ?? ""}`;
+      }
+    },
+  ).slice(0, 16);
+  const rnMediaLayoutConcernList = dedupeBy(
+    rnMediaLayoutConcerns,
+    (item) => {
+      switch (item.kind) {
+        case "media-primitive":
+          return `${item.kind}:${item.primitive}:${item.loc?.startLine ?? ""}`;
+        case "resizeMode":
+          return `${item.kind}:${item.primitive}:${item.value}:${item.loc?.startLine ?? ""}`;
+        case "pagingEnabled":
+          return `${item.kind}:${item.primitive}:${item.value}:${item.loc?.startLine ?? ""}`;
+        case "dimensions-get":
+          return `${item.kind}:${item.calleeExpr}:${item.argExpr ?? ""}:${item.loc?.startLine ?? ""}`;
       }
     },
   ).slice(0, 16);
@@ -1469,6 +1551,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         : {}),
       ...(rnAccessibilityAnchorList.length ? { rnAccessibilityTestAnchors: rnAccessibilityAnchorList } : {}),
       ...(rnListRenderingConcernList.length ? { rnListRenderingConcerns: rnListRenderingConcernList } : {}),
+      ...(rnMediaLayoutConcernList.length ? { rnMediaLayoutConcerns: rnMediaLayoutConcernList } : {}),
       ...(hasRnStateActionConcerns ? { rnStateActionConcerns: rnStateActionConcernList } : {}),
       ...(rnNavigationConcernList.length ? { rnNavigationConcerns: rnNavigationConcernList } : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
