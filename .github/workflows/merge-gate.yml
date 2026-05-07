@@ -8,9 +8,15 @@ on:
       - synchronize
       - edited
       - ready_for_review
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
 
 permissions:
   contents: read
+  pull-requests: read
   issues: read
 
 concurrency:
@@ -19,7 +25,7 @@ concurrency:
 
 jobs:
   merge-gate:
-    name: Validate linked issue
+    name: Validate approval review and linked issue
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -31,5 +37,6 @@ jobs:
       - name: Validate merge policy
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          MERGE_GATE_REQUIRE_APPROVAL: "true"
           MERGE_GATE_REQUIRE_LINKED_ISSUE: "true"
         run: node scripts/validate-pr-merge-gate.mjs
