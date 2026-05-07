@@ -143,6 +143,34 @@ export type ReactNativeStateActionConcernSignal = {
   evidence: string[];
 };
 
+export type ReactNativeNavigationConcernSignal =
+  | {
+      kind: "navigation-import";
+      moduleSpecifier: "@react-navigation/native";
+      importedSymbols?: string[];
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "navigation-hook";
+      hook: "useNavigation" | "useRoute";
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "navigation-navigate";
+      calleeExpr: string;
+      routeNameExpr?: string;
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "route-params";
+      accessExpr: "route.params";
+      loc?: SourceRange;
+      evidence: string[];
+    };
+
 export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
@@ -388,6 +416,7 @@ export type ExtractionResult = {
     rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
+    rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -447,6 +476,7 @@ export type ModelFacingPayload = {
     rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
+    rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
     hasSideEffects?: boolean;
   };
   structure?: {
