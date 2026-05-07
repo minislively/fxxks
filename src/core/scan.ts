@@ -2,6 +2,7 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { discoverProjectFilesWithStats } from "./discover";
 import { hashText } from "./hash";
+import { isSafeProjectFilePath } from "./paths";
 import { readCachedExtraction, readScanIndex, writeCachedExtraction, writeScanIndex } from "./cache";
 import type { IndexEntry, ScanObservability, ScanResult } from "./schema";
 import fs from "node:fs";
@@ -49,6 +50,9 @@ export function scanProject(cwd = process.cwd()): ScanResult {
   for (const target of targets) {
     const startedTargetAt = performance.now();
     const relativePath = path.relative(cwd, target.filePath);
+    if (!isSafeProjectFilePath(target.filePath, cwd)) {
+      continue;
+    }
     const statStartedAt = performance.now();
     const stat = fs.statSync(target.filePath);
     statMs += performance.now() - statStartedAt;

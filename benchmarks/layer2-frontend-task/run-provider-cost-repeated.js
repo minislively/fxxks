@@ -372,6 +372,32 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function commandAvailability(command, args = ['--version']) {
+  const env = { ...process.env };
+  delete env.FAKE_CODEX_LOG;
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    env,
+  });
+  if (result.error) {
+    return {
+      ok: false,
+      command,
+      reason: result.error.code === 'ENOENT'
+        ? `${command} command not found on PATH`
+        : `${command} command preflight failed: ${result.error.message}`,
+      errorCode: result.error.code || null,
+    };
+  }
+  return {
+    ok: true,
+    command,
+    exitCode: result.status,
+    signal: result.signal,
+  };
+}
+
 function openAiChatCompletion({ auth, model, prompt, maxOutputTokens }) {
   const payload = JSON.stringify({
     model,
@@ -558,6 +584,20 @@ async function collectLivePairs({ args, runId, pricing, outputDir, taskManifest 
   const transport = args.transport || args['live-transport'] || (auth.credentialKind === 'codex-oauth' ? 'codex-exec' : 'direct-api');
   const codexWorkDirRoot = resolveCodexWorkDirRoot({ args, outputDir });
   const requireNoToolUse = args['require-no-tool-use'] === 'true' || args['require-no-tool-use'] === true;
+  if (transport === 'codex-exec') {
+    const preflight = commandAvailability('codex');
+    if (!preflight.ok) {
+      return {
+        blockerKind: 'command-unavailable',
+        blocker: `Codex live transport requires the codex command; no provider request was made (${preflight.reason})`,
+        auth,
+        commandPreflight: preflight,
+        pairs: [],
+        requestAttempted: false,
+        ledger: createLiveLedger({ pairs: [], attemptedPairs: [], plannedPairCount }),
+      };
+    }
+  }
   let currentBatchEstimatedUsd = 0;
   let currentCampaignEstimatedUsd = 0;
 
@@ -770,11 +810,15 @@ async function main() {
   let liveAuth = null;
   let liveRequestMade = false;
   let liveRequestAttempted = false;
+  let liveBlockerKind = null;
+  let liveCommandPreflight = null;
   if (args['live-openai']) {
     const liveResult = await collectLivePairs({ args, runId, pricing, outputDir, taskManifest });
     pairs = pairs.concat(liveResult.pairs || []);
     capState = liveResult.capState || null;
     liveBlocker = liveResult.blocker || null;
+    liveBlockerKind = liveResult.blockerKind || null;
+    liveCommandPreflight = liveResult.commandPreflight || null;
     liveLedger = liveResult.ledger || null;
     liveAuth = liveResult.auth || null;
     liveRequestAttempted = Boolean(liveResult.requestAttempted);
@@ -815,12 +859,19 @@ async function main() {
   });
   if (liveBlocker) {
     const authMissing = !liveAuth || liveAuth.ok === false;
+    const commandUnavailable = liveBlockerKind === 'command-unavailable';
     summary = {
       ...summary,
-      status: authMissing ? 'live-openai-credentials-missing' : 'live-openai-request-failed',
+      status: authMissing
+        ? 'live-openai-credentials-missing'
+        : commandUnavailable
+          ? 'live-openai-command-unavailable'
+          : 'live-openai-request-failed',
       statusReasons: [liveBlocker, ...summary.statusReasons],
       diagnostics: [
-        authMissing
+        commandUnavailable
+          ? 'Install the codex CLI or select --transport=direct-api with API-key credentials; no live provider request was made.'
+        : authMissing
           ? 'Set OPENAI_API_KEY or use Codex OAuth via ~/.codex/auth.json; no live provider request was made.'
           : 'A live provider request was attempted but failed; inspect attempted-pair ledger before rerunning.',
         ...summary.diagnostics,
@@ -831,6 +882,15 @@ async function main() {
     summary = {
       ...summary,
       liveAuth: publicAuthSummary(liveAuth),
+    };
+  }
+  if (liveCommandPreflight) {
+    summary = {
+      ...summary,
+      environmentPreflight: {
+        ...(summary.environmentPreflight || {}),
+        command: liveCommandPreflight,
+      },
     };
   }
 
@@ -850,6 +910,7 @@ async function main() {
     claimBoundary: summary.claimBoundary,
     requestMade: liveRequestMade,
     auth: liveAuth ? publicAuthSummary(liveAuth) : null,
+    environmentPreflight: liveCommandPreflight ? { command: liveCommandPreflight } : null,
   }, null, 2));
 }
 

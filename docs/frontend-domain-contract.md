@@ -17,6 +17,16 @@ Architecture shorthand:
 
 This shorthand describes the intended separation of responsibilities for future implementation work. It does not add runtime behavior, setup eligibility, compact payload reuse, domain support wording, or team/worktree launch authorization.
 
+## Domain vs concern boundary
+
+The frontend-domain contract separates **where code runs** from **what task-relevant library/dataflow evidence is present**.
+
+- **Domain profile** owns UI/runtime surface evidence only.
+- **Concern profile** owns task-relevant library/dataflow evidence only.
+- Concern evidence such as `react-hook-form`, `useForm`, `register`, `control`, `handleSubmit`, default values, error display, or submit handlers is **not** React Web runtime evidence by itself.
+- Concern evidence alone must **not** authorize compact payload reuse.
+- The payload-policy architecture target is to evaluate **domain + concern + source fingerprint + lane gate** together. This wording is a boundary/architecture rule, not a claim that the current React Web lane already requires every one of those inputs as an allow condition today.
+
 ## Domain taxonomy
 
 | Domain | Classification rule | Current contract outcome | Claim boundary |

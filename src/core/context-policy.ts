@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { FileTarget } from "./discover";
+import { isSafeProjectFilePath } from "./paths";
 
 const REACT_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const CODEX_TS_JS_BETA_EXTENSIONS = new Set([".tsx", ".jsx", ".ts", ".js"]);
@@ -61,10 +62,12 @@ function normalizeCandidate(token: string, cwd: string, capability: ContextCapab
 
   const relativeToCwd = path.relative(cwd, resolved) || path.basename(resolved);
   if (path.isAbsolute(cleaned) && !fs.existsSync(resolved)) return null;
+  const exists = fs.existsSync(resolved);
+  if (exists && !isSafeProjectFilePath(resolved, cwd)) return null;
 
   return {
     filePath: relativeToCwd,
-    exists: fs.existsSync(resolved),
+    exists,
     source: "explicit-path",
   };
 }

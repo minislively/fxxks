@@ -48,6 +48,9 @@ test("release benchmark evidence gates npm wording on actual injected context an
   assert.equal(evidence.nonClaims.cachePerformanceImprovement.claimable, false);
   assert.equal(evidence.nonClaims.runtimeTokenSavings.claimable, false);
   assert.equal(evidence.nonClaims.providerBillingSavings.claimable, false);
+  assert.equal(evidence.releaseProvenance.schemaVersion, "release-provenance.v1");
+  assert.equal(evidence.releaseProvenance.package.expectedVersionTag, `v${evidence.releaseProvenance.package.version}`);
+  assert.match(evidence.releaseProvenance.claimBoundary, /Release provenance only/);
   assert.ok(evidence.releaseClaims.forbidden.includes("Caching performance improved."));
   assert.ok(evidence.releaseClaims.forbidden.includes("Provider cost or billing is reduced."));
   assert.ok(evidence.releaseClaims.forbidden.includes("Diagnostic domainPayload reduction proves runtime-token savings."));
@@ -72,6 +75,8 @@ test("release benchmark smoke summary exposes only release-safe compact evidence
   assert.match(summary.claimBoundary, /not provider tokenizer output/);
   assert.match(summary.claimBoundary, /not runtime-token savings/);
   assert.match(summary.claimBoundary, /not provider cost, billing, invoice, or charged-cost evidence/);
+  assert.equal(summary.releaseProvenance.package.expectedVersionTag, `v${summary.releaseProvenance.package.version}`);
+  assert.match(summary.releaseProvenance.claimBoundary, /Release provenance only/);
 });
 
 test("release benchmark smoke gate fails closed when npm update wording is not claimable", () => {
@@ -107,6 +112,8 @@ test("release benchmark evidence Markdown gives safe public wording and explicit
   assert.match(markdown, /Cache performance improvement: no/);
   assert.match(markdown, /Runtime-token savings: no/);
   assert.match(markdown, /Provider billing\/cost savings: no/);
+  assert.match(markdown, /Release provenance/);
+  assert.match(markdown, /Expected tag:/);
   assert.match(markdown, /Actual injected runtime context always smaller than source without fixture evidence: no/);
   assert.match(markdown, /Diagnostic domainPayload reduction proves runtime-token savings: no/);
   assert.doesNotMatch(markdown, /Cache performance improvement: yes/i);

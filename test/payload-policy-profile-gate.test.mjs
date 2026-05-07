@@ -50,6 +50,27 @@ test("frontend profile gate bypasses non-frontend-profile extensions", () => {
   assert.deepEqual(assessFrontendProfilePayloadReuse(".ts", domainDetection, payload, policy), { allowed: true });
 });
 
+test("frontend profile gate rejects concern-only react-hook-form fixtures without domain evidence", () => {
+  const source = `
+    import { useForm } from "react-hook-form";
+    export function ConcernOnlyFormStateNote() {
+      const { register, control, handleSubmit } = useForm({
+        defaultValues: { email: "", password: "" },
+      });
+      const onSubmit = handleSubmit(() => undefined);
+      return { register, control, onSubmit, errors: { email: "Required" } };
+    }
+  `;
+  const { domainDetection, policy, payload } = payloadForSource(source, "ConcernOnlyFormStateNote.tsx");
+
+  assert.equal(domainDetection.classification, "unknown");
+  assert.equal(policy.allowed, false);
+  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), {
+    allowed: false,
+    reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+  });
+});
+
 test("frontend profile gate requires React Web domain payload for current React Web lane", () => {
   const source = `export function Form() { return <form><input name="email" /></form>; }`;
   const { domainDetection, policy, payload } = payloadForSource(source, "Form.tsx");
@@ -74,6 +95,28 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
   assert.equal(payload.domainPayload.policy, policy.name);
   assert.deepEqual(payload.domainPayload.facts.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload.domainPayload.facts.jsxProps, ["onChangeText", "onPress"]);
+  assert.deepEqual(payload.domainPayload.facts.primitiveInteractions, {
+    inputBindings: [
+      {
+        primitive: "TextInput",
+        loc: { startLine: 1, endLine: 1 },
+        onChangeTextExpr: "() => null",
+        evidence: ["jsx.TextInput.onChangeText"],
+      },
+    ],
+    actionBindings: [
+      {
+        primitive: "Pressable",
+        loc: { startLine: 1, endLine: 1 },
+        onPressExpr: "() => null",
+        label: "Save",
+        evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label"],
+      },
+    ],
+  });
+  assert.equal("formControls" in payload.domainPayload.facts, false);
+  assert.equal("domTags" in payload.domainPayload.facts, false);
+  assert.equal("reactNativeContext" in payload, false);
   assert.equal(payload.domainPayload.sourceAnchorBeta.contract.contractVersion, "rn-source-anchor-beta.v0");
   assert.equal(payload.domainPayload.sourceAnchorBeta.contract.scope, "local-proof-only");
   assert.deepEqual(payload.domainPayload.sourceAnchorBeta.contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);

@@ -161,25 +161,55 @@ function compactRuntimeReactWebContext(
   return compactContext;
 }
 
+type RuntimeReactWebContextPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebContextPacking"]>;
+
+function summarizeRuntimeReactWebContextPacking(
+  reactWebContext: PackedRuntimeReactWebContext | undefined,
+): RuntimeReactWebContextPackingSummary {
+  if (!reactWebContext) {
+    return {
+      included: false,
+      reason: "not-emitted",
+      fields: [],
+      totalAnchors: 0,
+      priority: [...RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY],
+    };
+  }
+
+  const fields = RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY.flatMap((field) => {
+    const values = reactWebContext[field];
+    return Array.isArray(values) && values.length > 0 ? [{ name: field, count: values.length }] : [];
+  });
+
+  return {
+    included: true,
+    reason: "packed",
+    fields,
+    totalAnchors: fields.reduce((total, field) => total + field.count, 0),
+    priority: [...RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY],
+  };
+}
+
 function buildAdditionalContext(
   filePath: string,
   payload: ModelFacingPayload,
   contextMode: ContextMode,
   maxOptimizedContextBytes?: number,
-): string {
+): { additionalContext: string; reactWebContextPacking?: RuntimeReactWebContextPackingSummary } {
   if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
     const runtimeReactWebContextBudget = payload.editGuidance
       ? editGuidanceBudgetLimit(maxOptimizedContextBytes)
       : maxOptimizedContextBytes;
-    return renderOptimizedReactWebAdditionalContext(
-      filePath,
-      payload,
-      contextMode,
-      compactRuntimeReactWebContext(filePath, payload, contextMode, runtimeReactWebContextBudget),
-    );
+    const reactWebContext = compactRuntimeReactWebContext(filePath, payload, contextMode, runtimeReactWebContextBudget);
+    return {
+      additionalContext: renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext),
+      reactWebContextPacking: summarizeRuntimeReactWebContextPacking(reactWebContext),
+    };
   }
 
-  return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload));
+  return {
+    additionalContext: renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload)),
+  };
 }
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
@@ -366,6 +396,29 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     return runtimeDecision;
   }
 
+  const resolvedTargetPath = path.join(cwd, target);
+  if (!fs.existsSync(resolvedTargetPath)) {
+    const runtimeDecision: CodexRuntimeHookDecision = {
+      runtime: "codex",
+      hookEventName,
+      action: "noop",
+      filePath: target,
+      reasons: ["eligible-file-target-missing"],
+      contextMode: "no-op",
+      contextModeReason: "eligible-file-target-missing",
+      contextBudget: { ...policy.contextBudget, selectedFiles: 0, totalBytes: 0, skippedFiles: policy.contextBudget.selectedFiles },
+      promptSpecificity: policy.promptSpecificity,
+      contextPolicyVersion: policy.contextPolicyVersion,
+      debug: {
+        repeatedFile: false,
+        eligible: false,
+        escapeHatchUsed,
+      },
+    };
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision);
+    return runtimeDecision;
+  }
+
   if (escapeHatchUsed) {
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
@@ -458,7 +511,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
         const optInContextMode = payloadContextMode(optInDecision.payload);
         const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode, originalEstimatedBytes);
-        const estimatedContextBytes = estimateTextBytes(optInAdditionalContext);
+        const estimatedContextBytes = estimateTextBytes(optInAdditionalContext.additionalContext);
         if (estimatedContextBytes <= editGuidanceBudgetLimit(originalEstimatedBytes)) {
           decision = optInDecision;
         }
@@ -470,7 +523,8 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
-    const additionalContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes);
+    const runtimeContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes);
+    const { additionalContext, reactWebContextPacking } = runtimeContext;
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
     const runtimeDecision: CodexRuntimeHookDecision = {
@@ -495,6 +549,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         eligible: true,
         escapeHatchUsed: false,
         decision,
+        ...(reactWebContextPacking ? { reactWebContextPacking } : {}),
       },
     };
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {

@@ -1,7 +1,10 @@
 import path from "node:path";
 import fs from "node:fs";
+import { hashText } from "./hash";
 
 export const FOOKS_DIR = ".fooks";
+const DATA_KEY_MAX_LENGTH = 120;
+const DATA_KEY_HASH_LENGTH = 12;
 
 export function projectRoot(cwd = process.cwd()): string {
   return cwd;
@@ -17,7 +20,29 @@ export function ensureProjectDataDirs(cwd = process.cwd()): void {
 }
 
 export function sanitizeDataKey(key: string): string {
-  return key.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase() || "default-session";
+  const sanitized = key.replace(/[^a-z0-9._-]+/gi, "-").toLowerCase() || "default-session";
+  if (sanitized.length <= DATA_KEY_MAX_LENGTH) {
+    return sanitized;
+  }
+  const hash = hashText(key).slice(0, DATA_KEY_HASH_LENGTH);
+  const prefixLength = DATA_KEY_MAX_LENGTH - DATA_KEY_HASH_LENGTH - 1;
+  const prefix = sanitized.slice(0, prefixLength).replace(/[-._]+$/u, "") || "session";
+  return `${prefix}-${hash}`;
+}
+
+export function isPathInside(parentPath: string, childPath: string): boolean {
+  const relative = path.relative(parentPath, childPath);
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+export function isSafeProjectFilePath(filePath: string, cwd = process.cwd()): boolean {
+  try {
+    const realProjectRoot = fs.realpathSync(cwd);
+    const realFilePath = fs.realpathSync(filePath);
+    return isPathInside(realProjectRoot, realFilePath);
+  } catch {
+    return false;
+  }
 }
 
 export function configPath(cwd = process.cwd()): string {

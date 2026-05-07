@@ -1,6 +1,7 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
 import type { DomainDetectionResult } from "./domain-detector";
 import type { DomainPayload } from "./payload/domain-payload";
+import type { FrontendConcernProfile } from "./concern-profiles/types";
 
 export type OutputMode = "raw" | "compressed" | "hybrid";
 export type Language = "tsx" | "jsx" | "ts" | "js";
@@ -63,6 +64,38 @@ export type FormSurface = {
   submitHandlers?: LocatedString[];
   validationAnchors?: LocatedString[];
   stateConditions?: LocatedString[];
+};
+
+export type ReactNativePrimitiveInputBindingSignal = {
+  primitive: "TextInput";
+  loc?: SourceRange;
+  valueExpr?: string;
+  onChangeTextExpr?: string;
+  placeholder?: string;
+  keyboardType?: string;
+  secureTextEntry?: string;
+  maxLength?: string;
+  autoCapitalize?: string;
+  accessibilityLabel?: string;
+  testID?: string;
+  evidence: string[];
+};
+
+export type ReactNativePrimitiveActionBindingSignal = {
+  primitive: "Pressable";
+  loc?: SourceRange;
+  onPressExpr: string;
+  label?: string;
+  disabled?: string;
+  accessibilityLabel?: string;
+  accessibilityRole?: string;
+  testID?: string;
+  evidence: string[];
+};
+
+export type ReactNativePrimitiveInteractionSignal = {
+  inputBindings?: ReactNativePrimitiveInputBindingSignal[];
+  actionBindings?: ReactNativePrimitiveActionBindingSignal[];
 };
 
 export type A11yAnchorSignal = {
@@ -307,6 +340,7 @@ export type ExtractionResult = {
     eventHandlers?: string[];
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
+    rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -363,6 +397,7 @@ export type ModelFacingPayload = {
     eventHandlers?: string[];
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
+    rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     hasSideEffects?: boolean;
   };
   structure?: {
@@ -383,6 +418,7 @@ export type ModelFacingPayload = {
   editGuidance?: EditGuidance;
   designReviewMetadata?: DesignReviewMetadataV0;
   reactWebContext?: ReactWebContextMetadataV0;
+  concernProfiles?: FrontendConcernProfile[];
   domainPayload?: DomainPayload;
 };
 
@@ -477,6 +513,13 @@ export type CodexRuntimeHookDecision = {
     eligible: boolean;
     escapeHatchUsed: boolean;
     decision?: PreReadDecision;
+    reactWebContextPacking?: {
+      included: boolean;
+      reason: "packed" | "not-emitted";
+      fields: Array<{ name: string; count: number }>;
+      totalAnchors: number;
+      priority: string[];
+    };
   };
   fallback?: {
     action: "full-read";
