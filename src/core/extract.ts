@@ -10,6 +10,7 @@ import type {
   FormSurface,
   ImportSignal,
   Language,
+  ReactNativeAccessibilityTestAnchorSignal,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveInputBindingSignal,
   ReactNativeStateActionConcernSignal,
@@ -521,8 +522,10 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const rnInputBindings: ReactNativePrimitiveInputBindingSignal[] = [];
   const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
+  const rnAccessibilityTestAnchors: ReactNativeAccessibilityTestAnchorSignal[] = [];
   const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
   const importedNames = new Set<string>();
+  const reactNativeImportedNames = new Set<string>();
   const localDeclaredNames = new Set<string>();
   const localFunctionBodies = new Map<string, ts.FunctionLikeDeclaration>();
   const localStateMutators = new Map<string, { hook: "useState" | "useReducer"; stateBinding: string; mutatorKind: "setter" | "dispatch" }>();
@@ -832,6 +835,34 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     addRnStateActionConcerns(node, tag as ReactNativeStateActionConcernSignal["primitive"], "onPress", onPressExpr, onPressNode);
   };
 
+  const collectRnAccessibilityTestAnchor = (
+    node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    tag: string,
+    attributeValues: Map<string, string>,
+  ): void => {
+    if (!reactNativeImportedNames.has(tag)) return;
+    const accessibilityLabel = attributeValues.get("accessibilityLabel");
+    const accessibilityRole = attributeValues.get("accessibilityRole");
+    const accessibilityHint = attributeValues.get("accessibilityHint");
+    const testID = attributeValues.get("testID");
+    if (!accessibilityLabel && !accessibilityRole && !accessibilityHint && !testID) return;
+
+    rnAccessibilityTestAnchors.push({
+      primitive: tag,
+      loc: sourceRangeOf(sourceFile, node),
+      ...(accessibilityLabel ? { accessibilityLabel } : {}),
+      ...(accessibilityRole ? { accessibilityRole } : {}),
+      ...(accessibilityHint ? { accessibilityHint } : {}),
+      ...(testID ? { testID } : {}),
+      evidence: [
+        ...(accessibilityLabel ? [`jsx.${tag}.accessibilityLabel`] : []),
+        ...(accessibilityRole ? [`jsx.${tag}.accessibilityRole`] : []),
+        ...(accessibilityHint ? [`jsx.${tag}.accessibilityHint`] : []),
+        ...(testID ? [`jsx.${tag}.testID`] : []),
+      ],
+    });
+  };
+
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
     const tag = node.tagName.getText(sourceFile);
     const attributeValues = new Map<string, string>();
@@ -851,6 +882,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       addLocatedAnchor(validationAnchors, "Controller", node);
     }
     collectRnPrimitiveInteraction(node, tag, attributeValues, attributeExpressions);
+    collectRnAccessibilityTestAnchor(node, tag, attributeValues);
 
     const propNames: string[] = [];
     const propValues: Record<string, string> = {};
@@ -946,13 +978,18 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
 
   function visit(node: ts.Node): void {
     if (ts.isImportDeclaration(node) && node.importClause) {
+      const moduleName = ts.isStringLiteralLike(node.moduleSpecifier) ? node.moduleSpecifier.text : undefined;
       if (node.importClause.name) importedNames.add(node.importClause.name.text);
       const namedBindings = node.importClause.namedBindings;
       if (namedBindings) {
         if (ts.isNamespaceImport(namedBindings)) {
           importedNames.add(namedBindings.name.text);
+          if (moduleName === "react-native") reactNativeImportedNames.add(namedBindings.name.text);
         } else {
-          for (const element of namedBindings.elements) importedNames.add(element.name.text);
+          for (const element of namedBindings.elements) {
+            importedNames.add(element.name.text);
+            if (moduleName === "react-native") reactNativeImportedNames.add(element.name.text);
+          }
         }
       }
     }
@@ -1077,6 +1114,11 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     rnActionBindings,
     (item) => `${item.primitive}:${item.onPressExpr}:${item.onPressSource ?? ""}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnAccessibilityAnchorList = dedupeBy(
+    rnAccessibilityTestAnchors,
+    (item) =>
+      `${item.primitive}:${item.accessibilityLabel ?? ""}:${item.accessibilityRole ?? ""}:${item.accessibilityHint ?? ""}:${item.testID ?? ""}:${item.loc?.startLine ?? ""}`,
+  ).slice(0, 16);
   const rnStateActionConcernList = dedupeBy(
     rnStateActionConcerns,
     (item) =>
@@ -1111,6 +1153,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
             },
           }
         : {}),
+      ...(rnAccessibilityAnchorList.length ? { rnAccessibilityTestAnchors: rnAccessibilityAnchorList } : {}),
       ...(hasRnStateActionConcerns ? { rnStateActionConcerns: rnStateActionConcernList } : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
       ...(a11ySourceIdList.length ? { a11ySourceIds: a11ySourceIdList } : {}),

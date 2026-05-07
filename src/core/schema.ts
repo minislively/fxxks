@@ -119,6 +119,16 @@ export type ReactNativePrimitiveInteractionSignal = {
   actionBindings?: ReactNativePrimitiveActionBindingSignal[];
 };
 
+export type ReactNativeAccessibilityTestAnchorSignal = {
+  primitive: string;
+  loc?: SourceRange;
+  accessibilityLabel?: string;
+  accessibilityRole?: string;
+  accessibilityHint?: string;
+  testID?: string;
+  evidence: string[];
+};
+
 export type ReactNativeStateActionConcernSignal = {
   hook: "useState" | "useReducer";
   stateBinding: string;
@@ -376,6 +386,7 @@ export type ExtractionResult = {
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
     rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
+    rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
@@ -434,6 +445,7 @@ export type ModelFacingPayload = {
     eventHandlerSignals?: EventHandlerSignal[];
     formSurface?: FormSurface;
     rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
+    rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     hasSideEffects?: boolean;
   };
