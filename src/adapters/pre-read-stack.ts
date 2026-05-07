@@ -104,6 +104,20 @@ function estimatePayloadBytes(payload: NonNullable<PreReadDecision["payload"]>):
   return Buffer.byteLength(JSON.stringify(payload), "utf8");
 }
 
+function dropConcernProfilesFromPayload(
+  payload: NonNullable<PreReadDecision["payload"]>,
+): { payload: NonNullable<PreReadDecision["payload"]>; estimatedPayloadBytes: number } {
+  if (!payload.concernProfiles) {
+    return { payload, estimatedPayloadBytes: estimatePayloadBytes(payload) };
+  }
+
+  const { concernProfiles: _ignored, ...trimmedPayload } = payload;
+  return {
+    payload: trimmedPayload,
+    estimatedPayloadBytes: estimatePayloadBytes(trimmedPayload),
+  };
+}
+
 function reactWebContextPayloadBudget(rawSizeBytes: number): number {
   return Math.min(
     REACT_WEB_CONTEXT_METADATA_MAX_BUDGET_BYTES,
@@ -192,6 +206,11 @@ export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreRead
   if (includeReactWebContextMetadata) {
     let estimatedPayloadBytes = estimatePayloadBytes(payload);
     const maxPayloadBytes = reactWebContextPayloadBudget(result.meta.rawSizeBytes);
+    if (payload.concernProfiles && estimatedPayloadBytes > maxPayloadBytes) {
+      const trimmedConcernProfiles = dropConcernProfilesFromPayload(payload);
+      payload = trimmedConcernProfiles.payload;
+      estimatedPayloadBytes = trimmedConcernProfiles.estimatedPayloadBytes;
+    }
     if (payload.reactWebContext && estimatedPayloadBytes > maxPayloadBytes) {
       const trimmed = trimReactWebContextToBudget(payload, maxPayloadBytes);
       payload = trimmed.payload;

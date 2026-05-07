@@ -114,6 +114,8 @@ Examples of concern signals include:
 
 Concern evidence is editor-context guidance. It can help a future packet explain what not to break, but it does not promote a domain and does not authorize compact payload reuse by itself. Payload permission still belongs to the payload planner/policy layer after domain evidence, boundary evidence, source ranges, and current maturity gates have been evaluated.
 
+Contract target: payload policy should eventually evaluate **domain + concern + source fingerprint + lane gate** together. That sentence is a boundary/architecture contract, not a claim that every current lane already uses each input as an allow condition today. In particular, concern evidence alone must never be treated as React Web runtime evidence or as a standalone compact-payload authorization.
+
 Concrete examples:
 
 - `react-hook-form` plus DOM-like `<form>` and `<input>` signals can be React Web domain evidence plus a form-state concern.

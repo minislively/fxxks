@@ -1,4 +1,5 @@
 import path from "node:path";
+import { collectFrontendConcernProfiles } from "../concern-profiles/form-state";
 import { deriveDesignReviewMetadata } from "../design-review-metadata";
 import { buildReactWebContextMetadata } from "../react-web-context-metadata";
 import { buildFrontendDomainPayload, buildReactWebDomainPayload, REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "./domain-payload";
@@ -138,6 +139,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
     ? buildFrontendDomainPayload(result, result.domainDetection, options.domainPayloadPolicy ?? REACT_WEB_DOMAIN_PAYLOAD_POLICY)
     : undefined;
   const domainPayloadGate = domainPayload ?? reactWebDomainPayload;
+  const concernProfiles = collectFrontendConcernProfiles(result);
 
   if (result.useOriginal && result.mode === "raw" && result.rawText) {
     return {
@@ -145,6 +147,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
       filePath: relativeFilePath,
       useOriginal: true,
       rawText: result.rawText,
+      ...(concernProfiles ? { concernProfiles } : {}),
       ...(domainPayload ? { domainPayload } : {}),
     };
   }
@@ -218,6 +221,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
     ...(editGuidance ? { editGuidance } : {}),
     ...(designReviewMetadata ? { designReviewMetadata } : {}),
     ...(reactWebContext ? { reactWebContext } : {}),
+    ...(concernProfiles ? { concernProfiles } : {}),
     ...(domainPayload ? { domainPayload } : {}),
     ...(result.exports.length > 0 ? { exports: result.exports } : {}),
     ...(contract ? { contract } : {}),

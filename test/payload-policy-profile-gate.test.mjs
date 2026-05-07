@@ -50,6 +50,27 @@ test("frontend profile gate bypasses non-frontend-profile extensions", () => {
   assert.deepEqual(assessFrontendProfilePayloadReuse(".ts", domainDetection, payload, policy), { allowed: true });
 });
 
+test("frontend profile gate rejects concern-only react-hook-form fixtures without domain evidence", () => {
+  const source = `
+    import { useForm } from "react-hook-form";
+    export function ConcernOnlyFormStateNote() {
+      const { register, control, handleSubmit } = useForm({
+        defaultValues: { email: "", password: "" },
+      });
+      const onSubmit = handleSubmit(() => undefined);
+      return { register, control, onSubmit, errors: { email: "Required" } };
+    }
+  `;
+  const { domainDetection, policy, payload } = payloadForSource(source, "ConcernOnlyFormStateNote.tsx");
+
+  assert.equal(domainDetection.classification, "unknown");
+  assert.equal(policy.allowed, false);
+  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), {
+    allowed: false,
+    reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+  });
+});
+
 test("frontend profile gate requires React Web domain payload for current React Web lane", () => {
   const source = `export function Form() { return <form><input name="email" /></form>; }`;
   const { domainDetection, policy, payload } = payloadForSource(source, "Form.tsx");

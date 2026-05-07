@@ -229,6 +229,7 @@ test("pre-read payload builder preserves React Web form state-flow when context 
         (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
       ),
     );
+    assert.equal("concernProfiles" in decision.payload, false);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
