@@ -64,7 +64,7 @@ const measuredNarrowEvidence = /\b(?:measured\s+`?F1`?|F1`?\s+RN primitive\/inpu
 const forbiddenReactNativeBehaviorClaims = [
   {
     label: "rn-runtime-success",
-    pattern: /\b(?:mobile UI|native component|gesture|press|tap|FlatList|list virtualization|list performance|rendered order|image|layout|paging)\b[^\n]{0,120}\b(?:loads correctly|works|behaves correctly|is correct|is good|succeeds|successful|verified|validated|proven)\b/i,
+    pattern: /\b(?:mobile UI|native component|gesture|press|tap|FlatList|list virtualization|list performance|rendered order|image|layout|style|platform select|platform branch|paging)\b[^\n]{0,120}\b(?:loads correctly|works|behaves correctly|is correct|is good|succeeds|successful|verified|validated|proven)\b/i,
   },
   {
     label: "rn-accessibility-correctness",

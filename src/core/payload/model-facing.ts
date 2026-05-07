@@ -186,6 +186,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
         ...(pruneArray(result.behavior.rnNavigationConcerns) ? { rnNavigationConcerns: result.behavior.rnNavigationConcerns } : {}),
         ...(pruneArray(result.behavior.rnListRenderingConcerns) ? { rnListRenderingConcerns: result.behavior.rnListRenderingConcerns } : {}),
         ...(pruneArray(result.behavior.rnMediaLayoutConcerns) ? { rnMediaLayoutConcerns: result.behavior.rnMediaLayoutConcerns } : {}),
+        ...(pruneArray(result.behavior.rnStylePlatformConcerns) ? { rnStylePlatformConcerns: result.behavior.rnStylePlatformConcerns } : {}),
         ...(result.behavior.hasSideEffects ? { hasSideEffects: result.behavior.hasSideEffects } : {}),
       })
     : undefined;
