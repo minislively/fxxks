@@ -38,6 +38,8 @@ const {
 const {
   codexRuntimeSessionPath,
 } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-session.js"));
+const { claudeRuntimeSessionPath } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-session.js"));
+const { scanProject } = require(path.join(repoRoot, "dist", "core", "scan.js"));
 const {
   handleCodexRuntimeHook,
   isEditIntentPrompt,
@@ -1815,6 +1817,96 @@ test("runtime hook falls back when repeated-file payload build throws", () => {
     assert.equal(summary.totals.actualEstimatedBytes, targetBytes);
     assert.equal(summary.totals.savedEstimatedBytes, 0);
   });
+});
+
+test("scan and runtime policy ignore supported symlinks resolving outside the project root", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-symlink-project-"));
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-symlink-outside-"));
+  fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+  const outsideTarget = path.join(outsideDir, "Leak.tsx");
+  fs.writeFileSync(
+    outsideTarget,
+    [
+      'import React from "react";',
+      "export function Leak() {",
+      '  return <div>OUT_OF_PROJECT_SECRET_CONTEXT</div>;',
+      "}",
+      "",
+    ].join("\n"),
+  );
+  fs.symlinkSync(outsideTarget, path.join(tempDir, "src", "Leak.tsx"));
+
+  const scan = scanProject(tempDir);
+  assert.equal(scan.files.some((entry) => entry.filePath === path.join("src", "Leak.tsx")), false);
+  assert.doesNotMatch(JSON.stringify(scan), /OUT_OF_PROJECT_SECRET_CONTEXT/);
+
+  const sessionId = `hook-symlink-boundary-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "Please inspect src/Leak.tsx",
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "noop");
+  assert.deepEqual(first.reasons, ["no-eligible-file-in-prompt"]);
+  assert.equal(first.debug.eligible, false);
+
+  const directPreRead = preReadModule.decidePreRead(path.join(tempDir, "src", "Leak.tsx"), tempDir);
+  assert.equal(directPreRead.decision, "fallback");
+  assert.equal(directPreRead.eligible, false);
+  assert.deepEqual(directPreRead.reasons, ["outside-project-boundary"]);
+});
+
+test("runtime session filenames are bounded for long provider session ids", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `long-session-${"s".repeat(300)}`;
+
+  const codexStart = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  assert.equal(codexStart.action, "noop");
+  assert.ok(fs.existsSync(codexStart.statePath));
+  assert.ok(path.basename(codexRuntimeSessionPath(tempDir, sessionId)).length < 140);
+
+  const claudeStart = handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  assert.equal(claudeStart.action, "inject");
+  assert.ok(fs.existsSync(claudeStart.statePath));
+  assert.ok(path.basename(claudeRuntimeSessionPath(tempDir, sessionId)).length < 140);
+});
+
+test("codex runtime hook no-ops missing exact-file targets without recording repeated state", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-missing-target-${Date.now()}`;
+  const target = path.join("src", "components", "NewPanel.tsx");
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please implement ${target}`,
+    },
+    tempDir,
+  );
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, implement ${target}`,
+    },
+    tempDir,
+  );
+
+  for (const decision of [first, second]) {
+    assert.equal(decision.action, "noop");
+    assert.equal(decision.filePath, target);
+    assert.deepEqual(decision.reasons, ["eligible-file-target-missing"]);
+    assert.equal(decision.contextMode, "no-op");
+    assert.equal(decision.contextModeReason, "eligible-file-target-missing");
+    assert.equal(decision.debug.repeatedFile, false);
+    assert.equal(decision.debug.eligible, false);
+  }
 });
 
 test("runtime hook reuses payload only on repeated same-file prompts in one session", () => {
