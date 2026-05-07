@@ -76,7 +76,7 @@ const forbiddenReactNativeBehaviorClaims = [
   },
   {
     label: "rn-cross-file-behavior",
-    pattern: /\b(?:cross-file|navigation|route(?:\.params)?|global state|state flow)\b[^\n]{0,120}\b(?:understood|known|verified|works?|succeeds?|correct(?:ly|ness)?)\b/i,
+    pattern: /\b(?:cross-file|navigation|route(?:\.params)?|stack|back|focus|global state|state flow)\b[^\n]{0,120}\b(?:exists?|understood|known|verified|works?|succeeds?|correct(?:ly|ness)?)\b/i,
   },
   {
     label: "rn-handler-success",
@@ -345,6 +345,12 @@ test("claim-boundary doc audit rejects RN runtime/a11y/cross-file/DOM-equivalenc
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("Route params and global state behavior are understood across files.", "synthetic.md"), [
     "synthetic.md:1 [rn-cross-file-behavior] Route params and global state behavior are understood across files.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("This route exists and navigation succeeds.", "synthetic.md"), [
+    "synthetic.md:1 [rn-cross-file-behavior] This route exists and navigation succeeds.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("Stack back behavior is verified.", "synthetic.md"), [
+    "synthetic.md:1 [rn-cross-file-behavior] Stack back behavior is verified.",
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("The onPress handler works correctly.", "synthetic.md"), [
     "synthetic.md:1 [rn-handler-success] The onPress handler works correctly.",
