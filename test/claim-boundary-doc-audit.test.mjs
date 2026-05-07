@@ -356,6 +356,7 @@ test("claim-boundary doc audit rejects RN runtime/a11y/cross-file/DOM-equivalenc
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("Gesture markers remain RN evidence only; no gesture runtime safety claim.", "synthetic.md"), []);
   assert.deepEqual(findReactNativeBehaviorClaims("Same-file local handler/callback evidence may use the existing narrow payload gate, but this remains source-only evidence.", "synthetic.md"), []);
+  assert.deepEqual(findReactNativeBehaviorClaims("This source contains RN accessibility/test anchor evidence.", "synthetic.md"), []);
   assert.deepEqual(findReactNativeBehaviorClaims("TextInput must not be treated as a DOM input or web form control.", "synthetic.md"), []);
   assert.deepEqual(findReactNativeBehaviorClaims("The app was not run on a device or simulator.", "synthetic.md"), []);
 });

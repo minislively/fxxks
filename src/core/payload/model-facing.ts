@@ -179,6 +179,8 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
         ...(pruneArray(result.behavior.eventHandlers) ? { eventHandlers: result.behavior.eventHandlers } : {}),
         ...(pruneArray(result.behavior.eventHandlerSignals) ? { eventHandlerSignals: result.behavior.eventHandlerSignals } : {}),
         ...(formSurface ? { formSurface } : {}),
+        ...(result.behavior.rnPrimitiveInteractions ? { rnPrimitiveInteractions: result.behavior.rnPrimitiveInteractions } : {}),
+        ...(pruneArray(result.behavior.rnAccessibilityTestAnchors) ? { rnAccessibilityTestAnchors: result.behavior.rnAccessibilityTestAnchors } : {}),
         ...(result.behavior.hasSideEffects ? { hasSideEffects: result.behavior.hasSideEffects } : {}),
       })
     : undefined;
