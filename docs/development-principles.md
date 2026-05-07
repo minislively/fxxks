@@ -33,6 +33,15 @@ Docs/test-first work is appropriate when it is the safest way to establish or pr
 - adding focused tests that protect a behavior change;
 - defining a first-time domain boundary before runtime behavior can safely depend on it.
 
+## Coverage heuristic
+
+Do not treat tests or docs as a requirement to enumerate every possible scenario. The goal is to lock what must stay true and make unknown cases fail safely.
+
+- **Tests should protect contracts, not simulate the universe.** Prefer a small set of representative happy paths, boundary/failure cases, and concrete regression cases over combinatorial scenario growth.
+- **Docs should capture intent, boundary, and non-goals.** Do not mirror implementation detail line-by-line when the code already says it.
+- **Unknown cases should default to safe fallback behavior.** In this repo, fallback-first boundaries and claim limits are usually more valuable than speculative scenario expansion.
+- **New test/doc work should answer a specific risk.** If it does not protect supported behavior, a public claim boundary, or a previously observed regression, it is probably noise.
+
 ## Domain work
 
 Domain strategy should be positive capability design first and negative boundary management second.
