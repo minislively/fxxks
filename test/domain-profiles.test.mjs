@@ -100,6 +100,16 @@ test("domain profile registry preserves existing detector classification outcome
   assert.deepEqual(outcomeForClassification("unknown"), { outcome: "deferred" });
 });
 
+test("React Native narrow taxonomy keeps navigation, interaction/list, and media/layout outside the measured gate", () => {
+  const taxonomy = REACT_NATIVE_SIGNAL_TAXONOMY.primitiveInput;
+  assert.equal(taxonomy.supportBoundary, "measured-evidence-only; no broad RN/WebView/TUI support");
+  assert.ok(taxonomy.forbiddenPrefixes.includes("react-native:navigation-"));
+  assert.ok(taxonomy.forbiddenPrefixes.includes("react-native:api-call:PanResponder."));
+  assert.ok(taxonomy.forbiddenExactSignals.includes("react-native:primitive:FlatList"));
+  assert.ok(taxonomy.forbiddenExactSignals.includes("react-native:primitive:ScrollView"));
+  assert.ok(taxonomy.forbiddenExactSignals.includes("react-native:jsx-prop:activeOpacity"));
+});
+
 test("domain profile metadata remains evidence and policy boundary, not support wording", () => {
   const rnOutcome = outcomeForClassification("react-native");
   assert.deepEqual(profileForClassification("react-native", rnOutcome.outcome, rnOutcome.reason), {

@@ -48,6 +48,8 @@ Pre-read behavior must stay conservative for TUI/Ink: `F5` can remain extractabl
 
 The RN fixture lane is a readiness gate, not a support promise. `F1` is the first narrow runtime candidate, and `F13` is the named F1-adjacent same-file handler/callback acceptance check; both are limited to primitive/input payload reuse through `rn-primitive-input-narrow-payload`; that payload may include an RN-shaped `domainPayload` with primitive and input/press evidence, but it is not broad React Native support. Other selected RN fixtures stay fallback/evidence-only until a later detector/profile promotion plan explicitly changes runtime behavior. The current fallback reason, `unsupported-react-native-webview-boundary`, is still the shared source-reading boundary reason for detector evidence and WebView/mixed boundaries; it must not be treated as a permanent domain model for every RN semantic.
 
+For PR A claim-boundary wording, the allowed RN statements stop at source-observed evidence: primitive/input markers, measured narrow-payload policy names, and same-file local handler/callback evidence. The forbidden RN statements include runtime/mobile success, gesture success, accessibility correctness, device/simulator execution, cross-file navigation or state understanding, and DOM/form-equivalence claims.
+
 | Semantics group | Selected slots | Evidence examples | Required boundary |
 | --- | --- | --- | --- |
 | Primitives/input | `F1`, `F13` | `View`, `Text`, `TextInput`, `Pressable`, `onChangeText`, `onPress`, same-file local handler/callback evidence | Only this measured primitive/input fixture family may pass the narrow RN payload policy; it must not be reinterpreted as DOM controls, forms, broad RN support, or React Web extraction evidence. |
