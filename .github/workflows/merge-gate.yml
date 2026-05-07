@@ -37,4 +37,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           MERGE_GATE_REQUIRE_LINKED_ISSUE: "true"
           MERGE_GATE_REQUIRE_APPROVAL: "true"
+          MERGE_GATE_ALLOWED_REVIEWERS: "minislively,yeachan-heo"
         run: node scripts/validate-pr-merge-gate.mjs
