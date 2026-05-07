@@ -79,6 +79,10 @@ const forbiddenReactNativeBehaviorClaims = [
     pattern: /\b(?:cross-file|navigation|route(?:\.params)?|global state|state flow)\b[^\n]{0,120}\b(?:understood|known|verified|works?|succeeds?|correct(?:ly|ness)?)\b/i,
   },
   {
+    label: "rn-handler-success",
+    pattern: /\b(?:handler|callback|onPress|onChangeText|onSubmitEditing)\b[^\n]{0,120}\b(?:works|worked|working|succeeds|successful|correct(?:ly|ness)?|verified)\b/i,
+  },
+  {
     label: "rn-dom-form-equivalence",
     pattern: /\b(?:TextInput|Pressable|TouchableOpacity|React Native|RN)\b[^\n]{0,120}\b(?:same as|equivalent to|maps to|behaves like|treated as)\b[^\n]{0,60}\b(?:DOM|web form|form control|<input>|<button>)\b/i,
   },
@@ -337,6 +341,9 @@ test("claim-boundary doc audit rejects RN runtime/a11y/cross-file/DOM-equivalenc
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("Route params and global state behavior are understood across files.", "synthetic.md"), [
     "synthetic.md:1 [rn-cross-file-behavior] Route params and global state behavior are understood across files.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("The onPress handler works correctly.", "synthetic.md"), [
+    "synthetic.md:1 [rn-handler-success] The onPress handler works correctly.",
   ]);
   assert.deepEqual(findReactNativeBehaviorClaims("TextInput is equivalent to a DOM input form control.", "synthetic.md"), [
     "synthetic.md:1 [rn-dom-form-equivalence] TextInput is equivalent to a DOM input form control.",
