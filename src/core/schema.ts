@@ -511,6 +511,13 @@ export type CodexRuntimeHookDecision = {
     eligible: boolean;
     escapeHatchUsed: boolean;
     decision?: PreReadDecision;
+    reactWebContextPacking?: {
+      included: boolean;
+      reason: "packed" | "not-emitted";
+      fields: Array<{ name: string; count: number }>;
+      totalAnchors: number;
+      priority: string[];
+    };
   };
   fallback?: {
     action: "full-read";
