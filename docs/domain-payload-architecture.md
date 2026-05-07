@@ -122,7 +122,7 @@ Concrete examples:
 - `react-hook-form` plus React Native `TextInput` and `onChangeText` signals can be React Native domain evidence plus a form-state concern, but it still remains bounded by the measured RN `F1` policy gate.
 - A Zustand store file can be a client-state concern without being a UI-domain payload candidate at all.
 
-This is future-facing architecture language, not a declaration that concern-profile extraction exists today. Concern profiles should become another evidence input to policy; they should not bypass the domain resolver, fallback rules, or proof/claim boundary.
+Current concern-profile extraction may surface bounded metadata such as form-state or validation/schema evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary.
 
 ## RN claim boundary at the architecture layer
 

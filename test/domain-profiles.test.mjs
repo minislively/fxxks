@@ -150,3 +150,12 @@ test("concern-only react-hook-form fixture stays outside React Web domain eviden
   assert.equal(result.outcome, "deferred");
   assert.deepEqual(result.evidence, []);
 });
+
+test("concern-only validation/schema fixture stays outside React Web domain evidence", () => {
+  const { detectDomain } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+  const result = detectDomain(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "concern-only-validation-schema-non-authorizing.tsx"));
+
+  assert.equal(result.classification, "unknown");
+  assert.equal(result.outcome, "deferred");
+  assert.deepEqual(result.evidence, []);
+});
