@@ -4,7 +4,18 @@ import ts from "typescript";
 import { hashText } from "./hash";
 import { decideMode } from "./decide";
 import { detectDomainFromSource } from "./domain-detector";
-import type { A11yAnchorSignal, ExtractionResult, FormSurface, ImportSignal, Language, SourceRange, StyleSystem, StyleVariantSignal } from "./schema";
+import type {
+  A11yAnchorSignal,
+  ExtractionResult,
+  FormSurface,
+  ImportSignal,
+  Language,
+  ReactNativePrimitiveActionBindingSignal,
+  ReactNativePrimitiveInputBindingSignal,
+  SourceRange,
+  StyleSystem,
+  StyleVariantSignal,
+} from "./schema";
 
 const HOOK_NAMES = new Set(["useState", "useEffect", "useMemo", "useCallback", "useRef", "useReducer", "useLayoutEffect", "useContext", "useId", "useTransition"]);
 const EFFECT_HOOK_NAMES = new Set(["useEffect", "useLayoutEffect"]);
@@ -21,6 +32,7 @@ const MAX_CONTROL_PROPS = 8;
 const MAX_TEXT_LENGTH = 48;
 const STYLE_VARIANT_PROP_NAMES = new Set(["variant", "size", "tone", "intent", "disabled", "selected", "loading", "compact"]);
 const MAX_STYLE_VARIANT_SIGNALS = 16;
+const MAX_RN_PRIMITIVE_BINDINGS = 8;
 
 function getLanguage(filePath: string): Language {
   const ext = path.extname(filePath);
@@ -492,6 +504,8 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const callbackSignals: NonNullable<NonNullable<ExtractionResult["behavior"]>["callbackSignals"]> = [];
   const eventHandlerSignals: NonNullable<NonNullable<ExtractionResult["behavior"]>["eventHandlerSignals"]> = [];
   const formControls: NonNullable<FormSurface["controls"]> = [];
+  const rnInputBindings: ReactNativePrimitiveInputBindingSignal[] = [];
+  const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
   const submitHandlers: NonNullable<FormSurface["submitHandlers"]> = [];
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
   const stateConditions: NonNullable<FormSurface["stateConditions"]> = [];
@@ -560,6 +574,108 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     return compactText(attribute.initializer.getText(sourceFile));
   };
 
+  const jsxElementTextLabel = (element: ts.JsxElement): string | undefined => {
+    const parts: string[] = [];
+    const visitText = (child: ts.Node): void => {
+      if (ts.isJsxExpression(child)) return;
+      if (ts.isJsxText(child)) {
+        const text = compactText(child.getFullText(sourceFile));
+        if (text) parts.push(text);
+        return;
+      }
+      ts.forEachChild(child, visitText);
+    };
+
+    for (const child of element.children) visitText(child);
+    const label = compactText(parts.join(" "));
+    return label || undefined;
+  };
+
+  const collectRnPrimitiveInteraction = (
+    node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    tag: string,
+    attributeValues: Map<string, string>,
+  ): void => {
+    if (tag === "TextInput") {
+      const valueExpr = attributeValues.get("value");
+      const onChangeTextExpr = attributeValues.get("onChangeText");
+      const placeholder = attributeValues.get("placeholder");
+      const keyboardType = attributeValues.get("keyboardType");
+      const secureTextEntry = attributeValues.get("secureTextEntry");
+      const maxLength = attributeValues.get("maxLength");
+      const autoCapitalize = attributeValues.get("autoCapitalize");
+      const accessibilityLabel = attributeValues.get("accessibilityLabel");
+      const testID = attributeValues.get("testID");
+      if (
+        !valueExpr &&
+        !onChangeTextExpr &&
+        !placeholder &&
+        !keyboardType &&
+        !secureTextEntry &&
+        !maxLength &&
+        !autoCapitalize &&
+        !accessibilityLabel &&
+        !testID
+      ) {
+        return;
+      }
+
+      rnInputBindings.push({
+        primitive: "TextInput",
+        loc: sourceRangeOf(sourceFile, node),
+        ...(valueExpr ? { valueExpr } : {}),
+        ...(onChangeTextExpr ? { onChangeTextExpr } : {}),
+        ...(placeholder ? { placeholder } : {}),
+        ...(keyboardType ? { keyboardType } : {}),
+        ...(secureTextEntry ? { secureTextEntry } : {}),
+        ...(maxLength ? { maxLength } : {}),
+        ...(autoCapitalize ? { autoCapitalize } : {}),
+        ...(accessibilityLabel ? { accessibilityLabel } : {}),
+        ...(testID ? { testID } : {}),
+        evidence: [
+          ...(valueExpr ? ["jsx.TextInput.value"] : []),
+          ...(onChangeTextExpr ? ["jsx.TextInput.onChangeText"] : []),
+          ...(placeholder ? ["jsx.TextInput.placeholder"] : []),
+          ...(keyboardType ? ["jsx.TextInput.keyboardType"] : []),
+          ...(secureTextEntry ? ["jsx.TextInput.secureTextEntry"] : []),
+          ...(maxLength ? ["jsx.TextInput.maxLength"] : []),
+          ...(autoCapitalize ? ["jsx.TextInput.autoCapitalize"] : []),
+          ...(accessibilityLabel ? ["jsx.TextInput.accessibilityLabel"] : []),
+          ...(testID ? ["jsx.TextInput.testID"] : []),
+        ],
+      });
+      return;
+    }
+
+    if (tag !== "Pressable") return;
+    const onPressExpr = attributeValues.get("onPress");
+    if (!onPressExpr) return;
+    const disabled = attributeValues.get("disabled");
+    const accessibilityLabel = attributeValues.get("accessibilityLabel");
+    const accessibilityRole = attributeValues.get("accessibilityRole");
+    const testID = attributeValues.get("testID");
+
+    const label = ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? jsxElementTextLabel(node.parent) : undefined;
+    rnActionBindings.push({
+      primitive: "Pressable",
+      loc: sourceRangeOf(sourceFile, node),
+      onPressExpr,
+      ...(label ? { label } : {}),
+      ...(disabled ? { disabled } : {}),
+      ...(accessibilityLabel ? { accessibilityLabel } : {}),
+      ...(accessibilityRole ? { accessibilityRole } : {}),
+      ...(testID ? { testID } : {}),
+      evidence: [
+        "jsx.Pressable.onPress",
+        ...(label ? ["jsx.Pressable.Text.label"] : []),
+        ...(disabled ? ["jsx.Pressable.disabled"] : []),
+        ...(accessibilityLabel ? ["jsx.Pressable.accessibilityLabel"] : []),
+        ...(accessibilityRole ? ["jsx.Pressable.accessibilityRole"] : []),
+        ...(testID ? ["jsx.Pressable.testID"] : []),
+      ],
+    });
+  };
+
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
     const tag = node.tagName.getText(sourceFile);
     const attributeValues = new Map<string, string>();
@@ -575,6 +691,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     if (tag === "Controller") {
       addLocatedAnchor(validationAnchors, "Controller", node);
     }
+    collectRnPrimitiveInteraction(node, tag, attributeValues);
 
     const propNames: string[] = [];
     const propValues: Record<string, string> = {};
@@ -761,6 +878,15 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const eventHandlerSignalList = dedupeBy(eventHandlerSignals, (item) => `${item.name}:${item.trigger ?? ""}:${item.loc?.startLine ?? ""}`).slice(0, MAX_EVENT_HANDLER_SIGNALS);
   const a11yAnchorList = dedupeBy(a11yAnchors, (item) => `${item.kind}:${item.label}:${item.loc?.startLine ?? ""}`).slice(0, 16);
   const a11ySourceIdList = dedupeBy(a11ySourceIds, (item) => `${item.value}:${item.loc?.startLine ?? ""}`).slice(0, 16);
+  const rnInputBindingList = dedupeBy(
+    rnInputBindings,
+    (item) => `${item.primitive}:${item.valueExpr ?? ""}:${item.onChangeTextExpr ?? ""}:${item.placeholder ?? ""}:${item.loc?.startLine ?? ""}`,
+  ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnActionBindingList = dedupeBy(
+    rnActionBindings,
+    (item) => `${item.primitive}:${item.onPressExpr}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
+  ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0;
   return {
     behavior: {
       hooks: [...hooks],
@@ -777,6 +903,14 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
               ...(formSurface.submitHandlers.length ? { submitHandlers: formSurface.submitHandlers } : {}),
               ...(formSurface.validationAnchors.length ? { validationAnchors: formSurface.validationAnchors } : {}),
               ...(formSurface.stateConditions.length ? { stateConditions: formSurface.stateConditions } : {}),
+            },
+          }
+        : {}),
+      ...(hasRnPrimitiveInteractions
+        ? {
+            rnPrimitiveInteractions: {
+              ...(rnInputBindingList.length ? { inputBindings: rnInputBindingList } : {}),
+              ...(rnActionBindingList.length ? { actionBindings: rnActionBindingList } : {}),
             },
           }
         : {}),

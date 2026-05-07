@@ -12,8 +12,16 @@ export function InlineActionRow({ value, onChangeText, onSubmit }: InlineActionR
   return (
     <View accessibilityLabel="inline action row">
       <Text>Filter</Text>
-      <TextInput value={value} placeholder="Type filter" onChangeText={onChangeText} />
-      <Pressable onPress={submitCurrentValue}>
+      <TextInput
+        value={value}
+        placeholder="Type filter"
+        onChangeText={onChangeText}
+        keyboardType="web-search"
+        autoCapitalize="sentences"
+        accessibilityLabel="Inline filter"
+        testID="inline-filter-input"
+      />
+      <Pressable onPress={submitCurrentValue} accessibilityLabel="Submit filter" testID="submit-filter-button">
         <Text>Submit</Text>
       </Pressable>
     </View>
