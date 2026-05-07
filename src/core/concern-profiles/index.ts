@@ -8,6 +8,7 @@ import { collectReactNativeNavigationConcernProfile } from "./react-native-navig
 import { collectReactNativeStateActionConcernProfile } from "./react-native-state-action";
 import { collectReactNativeStylePlatformConcernProfile } from "./react-native-style-platform";
 import { collectRoutingConcernProfile } from "./routing";
+import { collectStylingConcernProfile } from "./styling";
 import type { FrontendConcernProfile } from "./types";
 import { collectValidationSchemaConcernProfile } from "./validation-schema";
 
@@ -23,6 +24,7 @@ export function collectFrontendConcernProfiles(result: ExtractionResult): Fronte
     collectReactNativeStylePlatformConcernProfile(result),
     collectValidationSchemaConcernProfile(result),
     collectRoutingConcernProfile(result),
+    collectStylingConcernProfile(result),
   ].filter((value): value is FrontendConcernProfile => Boolean(value));
 
   return profiles.length > 0 ? profiles : undefined;

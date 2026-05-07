@@ -87,7 +87,7 @@ test("validation/schema concern docs explicitly forbid correctness and authoriza
 
   assert.match(combined, /Zod\/Yup\/Valibot imports, resolver usage, or same-file schema keys/);
   assert.match(combined, /not\*\* runtime validation proof, backend-contract proof, or compact-payload authorization by itself/i);
-  assert.match(combined, /Current concern-profile extraction may surface bounded metadata such as form-state, validation\/schema, allowlisted client-state, or routing evidence\./);
+  assert.match(combined, /Current concern-profile extraction may surface bounded metadata such as form-state, validation\/schema, allowlisted client-state, routing, or styling evidence\./);
 });
 
 test("validation/schema concern claim audit rejects broad examples but allows bounded examples", () => {

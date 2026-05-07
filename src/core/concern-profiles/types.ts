@@ -14,6 +14,7 @@ export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   formState: "This source contains form-state concern evidence.",
   validationSchema: "This source contains validation/schema concern evidence.",
   clientState: "This source contains client-state concern evidence.",
+  styling: "This source contains styling concern evidence.",
   rnAccessibilityTestAnchor: "This source contains RN accessibility/test anchor evidence.",
   rnListRendering: "This source contains RN list/rendering pattern evidence.",
   rnMediaLayout: "This source contains RN media/layout concern evidence.",
@@ -27,6 +28,7 @@ export type FrontendConcernProfileId =
   | "form-state"
   | "validation-schema"
   | "client-state"
+  | "styling"
   | "rn-accessibility-test-anchor"
   | "rn-list-rendering"
   | "rn-media-layout"
@@ -53,6 +55,9 @@ export type FrontendConcernSignal =
   | "zustand"
   | "jotai"
   | "redux"
+  | "clsx"
+  | "cva"
+  | "tailwind-utility"
   | "rn-accessibilityLabel"
   | "rn-accessibilityRole"
   | "rn-accessibilityHint"

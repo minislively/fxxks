@@ -110,7 +110,7 @@ Examples of concern signals include:
 - client state such as allowlisted Zustand, Jotai, or Redux-library imports; custom reducer/store modules remain future/deferred;
 - server state and data fetching such as TanStack Query or SWR;
 - routing/navigation concerns such as route params, links, redirects, and navigation side effects;
-- styling concerns such as `className`, `cva`, `clsx`, variants, and style-object boundaries.
+- styling concerns such as explicit `clsx`, explicit `cva`, or same-file Tailwind-like utility evidence; generic `className`, inline `style`, imported style references, CSS modules, styled-components, and design-token style evidence remain fail-closed or future/deferred in the current first pass.
 
 Concern evidence is editor-context guidance. It can help a future packet explain what not to break, but it does not promote a domain and does not authorize compact payload reuse by itself. Payload permission still belongs to the payload planner/policy layer after domain evidence, boundary evidence, source ranges, and current maturity gates have been evaluated.
 
@@ -122,8 +122,9 @@ Concrete examples:
 - `react-hook-form` plus React Native `TextInput` and `onChangeText` signals can be React Native domain evidence plus a form-state concern, but it still remains bounded by the measured RN `F1` policy gate.
 - A Zustand store file can be a client-state concern without being a UI-domain payload candidate at all.
 - Next/React Router imports plus `Link`, `useNavigate`, `useRouter`, or same-file route/search param usage can be routing concern evidence, but they are not route-existence proof, runtime navigation proof, App Router/Pages Router verification, or compact-payload authorization.
+- `clsx`, `cva`, or same-file Tailwind-like utility evidence can be styling concern evidence, but they are not visual correctness, design-system compliance, accessibility/style-quality proof, imported-style-resolution proof, cross-file styling proof, or compact-payload authorization.
 
-Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, allowlisted client-state, or routing evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary. Client-state concern evidence is limited to explicit same-file allowlisted imports from `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit`; custom reducer/store modules remain future/deferred unless a later plan widens the allowlist.
+Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, allowlisted client-state, routing, or styling evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary. Client-state concern evidence is limited to explicit same-file allowlisted imports from `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit`; custom reducer/store modules remain future/deferred unless a later plan widens the allowlist. Styling concern evidence is limited to explicit same-file `clsx`, explicit same-file `cva` from `class-variance-authority`, or same-file Tailwind-like utility evidence; generic `className` alone, generic `className` + inline `style`, inline `style` alone, CSS modules, styled-components, design-token style evidence, and imported/cross-file style references remain fail-closed or future/deferred.
 
 ## RN claim boundary at the architecture layer
 
