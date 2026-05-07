@@ -177,3 +177,12 @@ test("concern-only routing fixture stays outside React Web domain evidence", () 
   assert.equal(result.outcome, "deferred");
   assert.deepEqual(result.evidence, []);
 });
+
+test("concern-only styling fixture stays outside React Web domain evidence", () => {
+  const { detectDomain } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+  const result = detectDomain(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "concern-only-styling-non-authorizing.tsx"));
+
+  assert.equal(result.classification, "unknown");
+  assert.equal(result.outcome, "deferred");
+  assert.deepEqual(result.evidence, []);
+});

@@ -140,6 +140,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
     : undefined;
   const domainPayloadGate = domainPayload ?? reactWebDomainPayload;
   const concernProfiles = collectFrontendConcernProfiles(result);
+  const rawConcernProfiles = concernProfiles?.filter((profile) => profile.id !== "styling");
 
   if (result.useOriginal && result.mode === "raw" && result.rawText) {
     return {
@@ -147,7 +148,7 @@ export function toModelFacingPayload(result: ExtractionResult, cwd = process.cwd
       filePath: relativeFilePath,
       useOriginal: true,
       rawText: result.rawText,
-      ...(concernProfiles ? { concernProfiles } : {}),
+      ...(rawConcernProfiles?.length ? { concernProfiles: rawConcernProfiles } : {}),
       ...(domainPayload ? { domainPayload } : {}),
     };
   }
