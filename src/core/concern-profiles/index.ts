@@ -1,5 +1,6 @@
 import type { ExtractionResult } from "../schema";
 import { collectFormStateConcernProfile } from "./form-state";
+import { collectRoutingConcernProfile } from "./routing";
 import type { FrontendConcernProfile } from "./types";
 import { collectValidationSchemaConcernProfile } from "./validation-schema";
 
@@ -7,6 +8,7 @@ export function collectFrontendConcernProfiles(result: ExtractionResult): Fronte
   const profiles = [
     collectFormStateConcernProfile(result),
     collectValidationSchemaConcernProfile(result),
+    collectRoutingConcernProfile(result),
   ].filter((value): value is FrontendConcernProfile => Boolean(value));
 
   return profiles.length > 0 ? profiles : undefined;

@@ -13,9 +13,10 @@ export type FrontendConcernProfileContract = {
 export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   formState: "This source contains form-state concern evidence.",
   validationSchema: "This source contains validation/schema concern evidence.",
+  routing: "This source contains routing concern evidence.",
 } as const;
 
-export type FrontendConcernProfileId = "form-state" | "validation-schema";
+export type FrontendConcernProfileId = "form-state" | "validation-schema" | "routing";
 
 export type FrontendConcernSignal =
   | "react-hook-form"
@@ -31,7 +32,16 @@ export type FrontendConcernSignal =
   | "yup"
   | "valibot"
   | "resolver"
-  | "same-file-schema-keys";
+  | "same-file-schema-keys"
+  | "next-navigation"
+  | "next-link"
+  | "react-router"
+  | "react-router-dom"
+  | "Link"
+  | "useRouter"
+  | "useNavigate"
+  | "route-param"
+  | "search-param";
 
 export type FrontendConcernProfile = {
   kind: "concern";
