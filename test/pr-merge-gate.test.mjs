@@ -11,12 +11,13 @@ import {
 
 const pr = { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "contributor" } };
 
-test("merge gate passes by default when PR links a closing issue", () => {
+test("merge gate requires non-author approval by default even when PR links a closing issue", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: pr,
   });
 
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.match(result.blockers.join("\n"), /GitHub PR review approval/);
   assert.deepEqual(result.approvingReviewers, []);
 });
 
@@ -68,6 +69,27 @@ test("merge gate can require approval on the current head commit when enabled", 
   assert.match(result.blockers.join("\n"), /requires re-approval/i);
 });
 
+
+test("merge gate passes by default with linked issue and current-head non-author approval", () => {
+  const result = evaluatePullRequestMergeGate({
+    pullRequest: pr,
+    reviews: [{ user: { login: "reviewer" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.approvingReviewers, ["reviewer"]);
+});
+
+test("issue comments do not satisfy the approval gate", () => {
+  const result = evaluatePullRequestMergeGate({
+    pullRequest: pr,
+    reviews: [],
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.blockers.join("\n"), /comments do not count/i);
+});
+
 test("merge gate ignores PR author self-approval", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "reviewer" } },
@@ -84,6 +106,7 @@ test("merge gate can disable linked issue enforcement explicitly", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: { title: "Improve cache", body: "Refs #42", head: { sha: "head-sha" }, user: { login: "contributor" } },
     requireLinkedIssue: false,
+    requireApproval: false,
   });
 
   assert.equal(result.ok, true);
