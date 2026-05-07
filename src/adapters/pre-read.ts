@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { detectDomainFromSource } from "../core/domain-detector";
+import { isPathInside, isSafeProjectFilePath } from "../core/paths";
 import type { ModelFacingPayloadOptions } from "../core/payload/model-facing";
 import {
   MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
@@ -69,6 +70,15 @@ export function decidePreRead(
       filePath: outputPath,
       eligible: false,
       reasons: ["ineligible-extension"],
+    });
+  }
+
+  if (isPathInside(path.resolve(cwd), resolvedPath) && !isSafeProjectFilePath(resolvedPath, cwd)) {
+    return buildPreReadFallbackDecision({
+      runtime,
+      filePath: outputPath,
+      eligible: false,
+      reasons: ["outside-project-boundary"],
     });
   }
 
