@@ -121,8 +121,9 @@ Concrete examples:
 - `react-hook-form` plus DOM-like `<form>` and `<input>` signals can be React Web domain evidence plus a form-state concern.
 - `react-hook-form` plus React Native `TextInput` and `onChangeText` signals can be React Native domain evidence plus a form-state concern, but it still remains bounded by the measured RN `F1` policy gate.
 - A Zustand store file can be a client-state concern without being a UI-domain payload candidate at all.
+- Next/React Router imports plus `Link`, `useNavigate`, `useRouter`, or same-file route/search param usage can be routing concern evidence, but they are not route-existence proof, runtime navigation proof, App Router/Pages Router verification, or compact-payload authorization.
 
-Current concern-profile extraction may surface bounded metadata such as form-state or validation/schema evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary.
+Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, or routing evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary.
 
 ## RN claim boundary at the architecture layer
 

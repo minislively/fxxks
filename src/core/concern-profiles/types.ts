@@ -15,9 +15,15 @@ export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   validationSchema: "This source contains validation/schema concern evidence.",
   rnAccessibilityTestAnchor: "This source contains RN accessibility/test anchor evidence.",
   rnStateAction: "This source contains RN state/action concern evidence.",
+  routing: "This source contains routing concern evidence.",
 } as const;
 
-export type FrontendConcernProfileId = "form-state" | "validation-schema" | "rn-accessibility-test-anchor" | "rn-state-action";
+export type FrontendConcernProfileId =
+  | "form-state"
+  | "validation-schema"
+  | "rn-accessibility-test-anchor"
+  | "rn-state-action"
+  | "routing";
 
 export type FrontendConcernSignal =
   | "react-hook-form"
@@ -42,7 +48,16 @@ export type FrontendConcernSignal =
   | "rn-useReducer"
   | "rn-local-setter"
   | "rn-local-dispatch"
-  | "rn-same-file-handler";
+  | "rn-same-file-handler"
+  | "next-navigation"
+  | "next-link"
+  | "react-router"
+  | "react-router-dom"
+  | "Link"
+  | "useRouter"
+  | "useNavigate"
+  | "route-param"
+  | "search-param";
 
 export type FrontendConcernProfile = {
   kind: "concern";
