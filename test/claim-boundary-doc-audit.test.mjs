@@ -61,6 +61,28 @@ const conservativeBoundary = /\b(?:not|no|nor|never|without|cannot|can't|does no
 
 const measuredNarrowEvidence = /\b(?:measured\s+`?F1`?|F1`?\s+RN primitive\/input|rn-primitive-input-narrow-payload|narrow\s+(?:RN\s+)?(?:pre-read\s+)?payload|measured\s+(?:primitive\/input|same-file)\s+scope)\b/i;
 
+const forbiddenReactNativeBehaviorClaims = [
+  {
+    label: "rn-runtime-success",
+    pattern: /\b(?:mobile UI|native component|gesture|press|tap|FlatList|list virtualization)\b[^\n]{0,120}\b(?:works|behaves correctly|is correct|succeeds|successful|verified|validated|proven)\b/i,
+  },
+  {
+    label: "rn-accessibility-correctness",
+    pattern: /\b(?:screen|screen reader|accessibility|a11y|React Native|RN)\b[^\n]{0,120}\b(?:accessible|accessibility-correct|a11y-correct|screen reader verified|verified accessible)\b/i,
+  },
+  {
+    label: "rn-device-simulator-execution",
+    pattern: /\b(?:app|screen|component|UI)\b[^\n]{0,120}\b(?:ran|run|running|executed|tested|verified)\b[^\n]{0,40}\b(?:on|in)\b[^\n]{0,20}\b(?:device|simulator)\b/i,
+  },
+  {
+    label: "rn-cross-file-behavior",
+    pattern: /\b(?:cross-file|navigation|route(?:\.params)?|global state|state flow)\b[^\n]{0,120}\b(?:understood|known|verified|works?|succeeds?|correct(?:ly|ness)?)\b/i,
+  },
+  {
+    label: "rn-dom-form-equivalence",
+    pattern: /\b(?:TextInput|Pressable|TouchableOpacity|React Native|RN)\b[^\n]{0,120}\b(?:same as|equivalent to|maps to|behaves like|treated as)\b[^\n]{0,60}\b(?:DOM|web form|form control|<input>|<button>)\b/i,
+  },
+];
 
 const forbiddenSchemaEditGuidanceClaims = [
   {
@@ -152,6 +174,21 @@ function findBroadSupportClaims(text, relativePath) {
   return findings;
 }
 
+function findReactNativeBehaviorClaims(text, relativePath) {
+  const findings = [];
+  const lines = text.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const normalized = line.replace(/\s+/g, " ").trim();
+    if (!normalized) continue;
+    for (const rule of forbiddenReactNativeBehaviorClaims) {
+      if (rule.pattern.test(normalized) && !isNegatedOrScoped(normalized)) {
+        findings.push(`${relativePath}:${index + 1} [${rule.label}] ${normalized}`);
+      }
+    }
+  }
+  return findings;
+}
+
 function findDomainParallelLaunchReadinessClaims(text, relativePath) {
   const findings = [];
   const lines = text.split(/\r?\n/);
@@ -216,6 +253,17 @@ test("current docs do not make broad RN/WebView/TUI support claims", () => {
   assert.deepEqual(findings, [], `forbidden broad support claims found:\n${findings.join("\n")}`);
 });
 
+test("current docs do not imply RN runtime, accessibility, device, cross-file, or DOM-equivalence claims", () => {
+  const markdownFiles = docsRoots.flatMap(collectMarkdownFiles).sort();
+
+  const findings = markdownFiles.flatMap((file) => {
+    const relativePath = path.relative(repoRoot, file);
+    return findReactNativeBehaviorClaims(fs.readFileSync(file, "utf8"), relativePath);
+  });
+
+  assert.deepEqual(findings, [], `forbidden RN behavior claims found:\n${findings.join("\n")}`);
+});
+
 test("current docs do not make broad domain-parallel execution claims", () => {
   const markdownFiles = docsRoots.flatMap(collectMarkdownFiles).sort();
 
@@ -278,6 +326,31 @@ test("claim-boundary doc audit preserves shared scanner planner builder seam res
     architecture,
     /Shared seam changes are serialized by default\.[\s\S]*?must name one shared-policy owner and a merge-order note[\s\S]*?Domain-specific lanes may run in parallel only when they stay in disjoint fixture\/docs\/test surfaces/,
   );
+});
+
+test("claim-boundary doc audit rejects RN runtime/a11y/cross-file/DOM-equivalence examples but allows scoped negatives", () => {
+  assert.deepEqual(findReactNativeBehaviorClaims("React Native gesture works correctly on device.", "synthetic.md"), [
+    "synthetic.md:1 [rn-runtime-success] React Native gesture works correctly on device.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("This screen is accessible and screen reader verified.", "synthetic.md"), [
+    "synthetic.md:1 [rn-accessibility-correctness] This screen is accessible and screen reader verified.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("Route params and global state behavior are understood across files.", "synthetic.md"), [
+    "synthetic.md:1 [rn-cross-file-behavior] Route params and global state behavior are understood across files.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("TextInput is equivalent to a DOM input form control.", "synthetic.md"), [
+    "synthetic.md:1 [rn-dom-form-equivalence] TextInput is equivalent to a DOM input form control.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("FlatList works correctly.", "synthetic.md"), [
+    "synthetic.md:1 [rn-runtime-success] FlatList works correctly.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("The list virtualization works correctly.", "synthetic.md"), [
+    "synthetic.md:1 [rn-runtime-success] The list virtualization works correctly.",
+  ]);
+  assert.deepEqual(findReactNativeBehaviorClaims("Gesture markers remain RN evidence only; no gesture runtime safety claim.", "synthetic.md"), []);
+  assert.deepEqual(findReactNativeBehaviorClaims("Same-file local handler/callback evidence may use the existing narrow payload gate, but this remains source-only evidence.", "synthetic.md"), []);
+  assert.deepEqual(findReactNativeBehaviorClaims("TextInput must not be treated as a DOM input or web form control.", "synthetic.md"), []);
+  assert.deepEqual(findReactNativeBehaviorClaims("The app was not run on a device or simulator.", "synthetic.md"), []);
 });
 
 test("claim-boundary doc audit rejects positive examples but allows negated or measured examples", () => {

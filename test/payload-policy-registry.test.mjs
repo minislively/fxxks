@@ -26,6 +26,7 @@ const samples = {
   webview: detect(`import { WebView } from "react-native-webview"; export function Preview() { return <WebView source={{ uri: "https://example.com" }} />; }`, "Preview.tsx"),
   "tui-ink": detect(`import { Box } from "ink"; export function Cli() { return <Box />; }`, "Cli.tsx"),
   "react-native": detect(`import { View, TextInput, Text, Pressable } from "react-native"; export function Native() { return <View><TextInput onChangeText={() => null} /><Pressable onPress={() => null}><Text>Save</Text></Pressable></View>; }`, "Native.tsx"),
+  "react-native-interaction": detect(`import { View, Text, TouchableOpacity, FlatList } from "react-native"; export function NativeList() { return <View><TouchableOpacity activeOpacity={0.7}><Text>Save</Text></TouchableOpacity><FlatList data={[]} renderItem={() => null} /></View>; }`, "NativeList.tsx"),
   mixed: detect(`import { Box, Text } from "ink"; export function MixedCliWeb() { return <div><Box><Text>Ready</Text></Box></div>; }`, "MixedCliWeb.tsx"),
   unknown: detect(`export function PlainUnknown() { return null; }`, "PlainUnknown.tsx"),
 };
@@ -48,6 +49,7 @@ test("frontend payload policy registry returns the same decisions as lane-owned 
     webview: assessWebViewPayloadPolicy(samples.webview),
     "tui-ink": assessTuiInkPayloadPolicy(samples["tui-ink"]),
     "react-native": assessReactNativePayloadPolicy(samples["react-native"]),
+    "react-native-interaction": assessReactNativePayloadPolicy(samples["react-native-interaction"]),
     mixed: assessFallbackPayloadPolicy(samples.mixed),
     unknown: assessFallbackPayloadPolicy(samples.unknown),
   };
@@ -94,7 +96,6 @@ test("pre-read compatibility entrypoint exports the core policy registry APIs", 
 test("frontend payload build options include domain payload for React Web and measured RN narrow policies", () => {
   const reactWebPolicy = registry.assessFrontendPayloadPolicy(samples["react-web"]);
   const reactNativePolicy = registry.assessFrontendPayloadPolicy(samples["react-native"]);
-
   assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactWebPolicy), {
     includeDomainPayload: true,
     includeReactWebContextMetadata: true,
@@ -103,6 +104,12 @@ test("frontend payload build options include domain payload for React Web and me
   assert.deepEqual(registry.toFrontendPayloadBuildOptions(reactNativePolicy), {
     includeDomainPayload: true,
     domainPayloadPolicy: reactNativePolicy.name,
+  });
+
+  assert.deepEqual(registry.assessFrontendPayloadPolicy(samples["react-native-interaction"]), {
+    name: "rn-primitive-input-narrow-payload",
+    allowed: false,
+    reason: "forbidden-signal:react-native:primitive:FlatList",
   });
 
   for (const lane of ["webview", "tui-ink", "mixed", "unknown"]) {
