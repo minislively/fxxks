@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildReactWebContextEvidence } from "./react-web-context-evidence.mjs";
 import { buildReactWebReuseEvidence } from "./react-web-reuse-evidence.mjs";
+import { buildReleaseProvenance } from "./release-provenance.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +28,7 @@ export async function buildReleaseBenchmarkEvidence({
 } = {}) {
   const contextEvidence = await buildReactWebContextEvidence({ repoRoot, runId: `${runId}-context` });
   const reuseEvidence = await buildReactWebReuseEvidence({ repoRoot, runId: `${runId}-reuse` });
+  const releaseProvenance = buildReleaseProvenance({ repoRoot });
 
   const releaseClaims = {
     npmUpdateClaimable: contextEvidence.summary.actualInjectedContextReduction.claimable && reuseEvidence.summary.reuseCorrectnessClaimable,
@@ -115,6 +117,7 @@ export async function buildReleaseBenchmarkEvidence({
         blocker: "no provider usage, tokenizer, billing dashboard, invoice, or charged-cost data is measured by this release-facing artifact",
       },
     },
+    releaseProvenance,
   };
 }
 
@@ -128,6 +131,15 @@ export function buildReleaseBenchmarkSmokeSummary(evidence) {
       cachePerformanceImprovement: evidence.nonClaims.cachePerformanceImprovement.claimable,
       runtimeTokenSavings: evidence.nonClaims.runtimeTokenSavings.claimable,
       providerBillingSavings: evidence.nonClaims.providerBillingSavings.claimable,
+    },
+    releaseProvenance: {
+      status: evidence.releaseProvenance.status,
+      claimable: evidence.releaseProvenance.claimable,
+      blockers: evidence.releaseProvenance.blockers,
+      package: evidence.releaseProvenance.package,
+      git: evidence.releaseProvenance.git,
+      github: evidence.releaseProvenance.github,
+      claimBoundary: evidence.releaseProvenance.claimBoundary,
     },
     claimBoundary: evidence.claimBoundary,
   };
@@ -194,6 +206,16 @@ ${fixtureRows}
 - Actual injected runtime context always smaller than source without fixture evidence: no
 - Diagnostic domainPayload reduction proves runtime-token savings: no
 - Broad React Web/RN/WebView support: no
+
+## Release provenance
+
+- Status: ${evidence.releaseProvenance.status}
+- Package: ${evidence.releaseProvenance.package.name}@${evidence.releaseProvenance.package.version}
+- Expected tag: ${evidence.releaseProvenance.package.expectedVersionTag}
+- Commit: ${evidence.releaseProvenance.git.commitSha || "unavailable"}
+- Tags at HEAD: ${evidence.releaseProvenance.git.tagsAtHead.length > 0 ? evidence.releaseProvenance.git.tagsAtHead.join(", ") : "none"}
+- GitHub release URL: ${evidence.releaseProvenance.github.releaseUrl || "unavailable"}
+- Claimable: ${evidence.releaseProvenance.claimable ? "yes" : "no"}
 `;
 }
 
