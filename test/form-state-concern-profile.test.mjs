@@ -95,3 +95,41 @@ test("React Web plus form-state concern keeps concern metadata separate from aut
   assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), { allowed: true });
   assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, withoutDomainPayload, policy).allowed, false);
 });
+
+test("React Native state/action concern profile stays source-only and separate from RN payload authorization", () => {
+  const source = `
+    import { useReducer, useState } from "react";
+    import { Pressable, Text, TextInput, View } from "react-native";
+    function reducer(state, action) {
+      return action.type === "submit" ? { submitted: true } : state;
+    }
+    export function NativeStateActionCard() {
+      const [query, setQuery] = useState("");
+      const [status, dispatch] = useReducer(reducer, { submitted: false });
+      const submitQuery = () => {
+        setQuery((current) => current.trim());
+        dispatch({ type: "submit" });
+      };
+      return (
+        <View>
+          <TextInput value={query} onChangeText={setQuery} onSubmitEditing={() => dispatch({ type: "submit" })} />
+          <Pressable onPress={submitQuery}><Text>{status.submitted ? "Submitted" : "Submit"}</Text></Pressable>
+        </View>
+      );
+    }
+  `;
+  const { domainDetection, policy, payload } = buildPayloadForSource(source, "NativeStateActionCard.tsx");
+
+  assert.equal(domainDetection.classification, "react-native");
+  assert.equal(policy.allowed, true);
+  assert.ok(Array.isArray(payload.concernProfiles));
+  assert.deepEqual(payload.concernProfiles.find((row) => row.id === "rn-state-action"), {
+    kind: "concern",
+    id: "rn-state-action",
+    claim: "This source contains RN state/action concern evidence.",
+    nonAuthorizationBoundary: "concern-evidence-only; never domain evidence; never standalone compact-payload authorization",
+    signals: ["rn-local-dispatch", "rn-local-setter", "rn-same-file-handler", "rn-useReducer", "rn-useState"],
+  });
+  assert.equal("concernProfiles" in payload.domainPayload, false);
+  assert.equal(payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
+});
