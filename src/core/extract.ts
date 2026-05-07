@@ -12,6 +12,7 @@ import type {
   Language,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveInputBindingSignal,
+  ReactNativeStateActionConcernSignal,
   ReactNativeRelationExpressionKind,
   ReactNativeRelationSource,
   SourceRange,
@@ -520,8 +521,11 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const formControls: NonNullable<FormSurface["controls"]> = [];
   const rnInputBindings: ReactNativePrimitiveInputBindingSignal[] = [];
   const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
+  const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
   const importedNames = new Set<string>();
   const localDeclaredNames = new Set<string>();
+  const localFunctionBodies = new Map<string, ts.FunctionLikeDeclaration>();
+  const localStateMutators = new Map<string, { hook: "useState" | "useReducer"; stateBinding: string; mutatorKind: "setter" | "dispatch" }>();
   const submitHandlers: NonNullable<FormSurface["submitHandlers"]> = [];
   const validationAnchors: NonNullable<FormSurface["validationAnchors"]> = [];
   const stateConditions: NonNullable<FormSurface["stateConditions"]> = [];
@@ -647,6 +651,68 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     return "unknown";
   };
 
+  const collectMutatorRefs = (expression: ts.Expression | undefined): Array<{ stateBinding: string; mutatorBinding: string; hook: "useState" | "useReducer"; mutatorKind: "setter" | "dispatch" }> => {
+    if (!expression) return [];
+
+    const matches = new Map<string, { stateBinding: string; mutatorBinding: string; hook: "useState" | "useReducer"; mutatorKind: "setter" | "dispatch" }>();
+    const addMatch = (name: string): void => {
+      const match = localStateMutators.get(name);
+      if (!match) return;
+      matches.set(`${match.hook}:${match.stateBinding}:${name}:${match.mutatorKind}`, {
+        stateBinding: match.stateBinding,
+        mutatorBinding: name,
+        hook: match.hook,
+        mutatorKind: match.mutatorKind,
+      });
+    };
+
+    const visitExpression = (current: ts.Node): void => {
+      if (ts.isCallExpression(current) && ts.isIdentifier(current.expression)) {
+        addMatch(current.expression.text);
+      } else if (ts.isIdentifier(current)) {
+        addMatch(current.text);
+      }
+      ts.forEachChild(current, visitExpression);
+    };
+
+    if (ts.isIdentifier(expression)) {
+      const localBody = localFunctionBodies.get(expression.text);
+      if (localBody?.body) {
+        visitExpression(localBody.body);
+        return [...matches.values()];
+      }
+    }
+
+    visitExpression(expression);
+    return [...matches.values()];
+  };
+
+  const addRnStateActionConcerns = (
+    node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    primitive: ReactNativeStateActionConcernSignal["primitive"],
+    trigger: ReactNativeStateActionConcernSignal["trigger"],
+    expressionText: string | undefined,
+    expressionNode: ts.Expression | undefined,
+  ): void => {
+    if (!expressionText || !expressionNode) return;
+    const matches = collectMutatorRefs(expressionNode);
+    for (const match of matches) {
+      rnStateActionConcerns.push({
+        hook: match.hook,
+        stateBinding: match.stateBinding,
+        mutatorBinding: match.mutatorBinding,
+        mutatorKind: match.mutatorKind,
+        primitive,
+        trigger,
+        actionExpr: expressionText,
+        ...(expressionNode ? { actionKind: expressionKindOf(expressionNode) } : {}),
+        ...(expressionNode ? { actionSource: relationSourceOf(node, expressionNode) } : {}),
+        loc: sourceRangeOf(sourceFile, node),
+        evidence: [`jsx.${primitive}.${trigger}`, `hook.${match.hook}`, `rn-state-action.${match.mutatorKind}`],
+      });
+    }
+  };
+
   const jsxElementTextLabel = (element: ts.JsxElement): string | undefined => {
     const parts: string[] = [];
     const visitText = (child: ts.Node): void => {
@@ -728,6 +794,8 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
           ...(testID ? ["jsx.TextInput.testID"] : []),
         ],
       });
+      addRnStateActionConcerns(node, "TextInput", "onChangeText", onChangeTextExpr, onChangeTextNode);
+      addRnStateActionConcerns(node, "TextInput", "onSubmitEditing", onSubmitEditingExpr, onSubmitEditingNode);
       return;
     }
 
@@ -761,6 +829,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         ...(testID ? [`jsx.${tag}.testID`] : []),
       ],
     });
+    addRnStateActionConcerns(node, tag as ReactNativeStateActionConcernSignal["primitive"], "onPress", onPressExpr, onPressNode);
   };
 
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
@@ -889,9 +958,13 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     }
     if (ts.isFunctionDeclaration(node) && node.name) {
       localDeclaredNames.add(node.name.text);
+      localFunctionBodies.set(node.name.text, node);
     }
     if (ts.isVariableDeclaration(node)) {
       collectBindingNames(node.name, localDeclaredNames);
+      if (ts.isIdentifier(node.name) && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
+        localFunctionBodies.set(node.name.text, node.initializer);
+      }
     }
     if (ts.isCallExpression(node)) {
       const callName = node.expression.getText(sourceFile);
@@ -899,11 +972,21 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       if (HOOK_NAMES.has(shortName) || /^use[A-Z]/.test(shortName)) {
         hooks.add(shortName);
       }
-      if (shortName === "useState" && ts.isVariableDeclaration(node.parent?.parent) && ts.isArrayBindingPattern(node.parent.parent.name)) {
-        const names = node.parent.parent.name.elements
-          .map((element) => element.getText(sourceFile))
-          .filter(Boolean);
-        if (names.length) stateSummary.add(names.join(", "));
+      if (shortName === "useState" && ts.isVariableDeclaration(node.parent) && ts.isArrayBindingPattern(node.parent.name)) {
+        const names = node.parent.name.elements.map((element) => element.getText(sourceFile)).filter(Boolean);
+        if (names.length) {
+          stateSummary.add(names.join(", "));
+          if (names.length >= 2) {
+            localStateMutators.set(names[1], { hook: "useState", stateBinding: names[0], mutatorKind: "setter" });
+          }
+        }
+      }
+      if (shortName === "useReducer" && ts.isVariableDeclaration(node.parent) && ts.isArrayBindingPattern(node.parent.name)) {
+        const names = node.parent.name.elements.map((element) => element.getText(sourceFile)).filter(Boolean);
+        if (names.length >= 2) {
+          stateSummary.add(names.join(", "));
+          localStateMutators.set(names[1], { hook: "useReducer", stateBinding: names[0], mutatorKind: "dispatch" });
+        }
       }
       if (EFFECT_HOOK_NAMES.has(shortName)) {
         effects.add(shortName);
@@ -994,7 +1077,13 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     rnActionBindings,
     (item) => `${item.primitive}:${item.onPressExpr}:${item.onPressSource ?? ""}:${item.label ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnStateActionConcernList = dedupeBy(
+    rnStateActionConcerns,
+    (item) =>
+      `${item.hook}:${item.stateBinding}:${item.mutatorBinding}:${item.primitive}:${item.trigger}:${item.actionExpr}:${item.actionSource ?? ""}:${item.loc?.startLine ?? ""}`,
+  ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
   const hasRnPrimitiveInteractions = rnInputBindingList.length > 0 || rnActionBindingList.length > 0;
+  const hasRnStateActionConcerns = rnStateActionConcernList.length > 0;
   return {
     behavior: {
       hooks: [...hooks],
@@ -1022,6 +1111,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
             },
           }
         : {}),
+      ...(hasRnStateActionConcerns ? { rnStateActionConcerns: rnStateActionConcernList } : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
       ...(a11ySourceIdList.length ? { a11ySourceIds: a11ySourceIdList } : {}),
       hasSideEffects,
