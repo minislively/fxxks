@@ -15,6 +15,7 @@ export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   validationSchema: "This source contains validation/schema concern evidence.",
   clientState: "This source contains client-state concern evidence.",
   rnAccessibilityTestAnchor: "This source contains RN accessibility/test anchor evidence.",
+  rnListRendering: "This source contains RN list/rendering pattern evidence.",
   rnNavigation: "This source contains RN navigation concern evidence.",
   rnStateAction: "This source contains RN state/action concern evidence.",
   routing: "This source contains routing concern evidence.",
@@ -25,6 +26,7 @@ export type FrontendConcernProfileId =
   | "validation-schema"
   | "client-state"
   | "rn-accessibility-test-anchor"
+  | "rn-list-rendering"
   | "rn-navigation"
   | "rn-state-action"
   | "routing";
@@ -51,6 +53,11 @@ export type FrontendConcernSignal =
   | "rn-accessibilityRole"
   | "rn-accessibilityHint"
   | "rn-testID"
+  | "rn-flatlist"
+  | "rn-sectionlist"
+  | "rn-scrollview"
+  | "rn-renderItem"
+  | "rn-keyExtractor"
   | "rn-navigation-import"
   | "rn-useNavigation"
   | "rn-useRoute"

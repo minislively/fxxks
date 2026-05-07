@@ -435,6 +435,57 @@ test("React Native state/action concern evidence stays same-file and source-only
   ]);
 });
 
+test("React Native list/rendering concern evidence stays source-only and blocks narrow authorization", () => {
+  const listFilePath = fixturePath("rn-interaction-gesture.tsx");
+  const listResult = extractFile(listFilePath);
+  const listDomainDetection = detect(fixtureSource("rn-interaction-gesture.tsx"), listFilePath);
+
+  assert.equal(listResult.domainDetection?.classification, "react-native");
+  assert.deepEqual(listResult.behavior?.rnListRenderingConcerns, [
+    {
+      kind: "list-primitive",
+      primitive: "FlatList",
+      loc: { startLine: 19, endLine: 23 },
+      evidence: ["jsx.FlatList"],
+    },
+    {
+      kind: "renderItem",
+      primitive: "FlatList",
+      expr: "({ item }) => <Text>{item}</Text>",
+      exprKind: "inline-callback",
+      exprSource: "same-file-inline",
+      loc: { startLine: 19, endLine: 23 },
+      evidence: ["jsx.FlatList.renderItem"],
+    },
+    {
+      kind: "keyExtractor",
+      primitive: "FlatList",
+      expr: "(item) => item",
+      exprKind: "inline-callback",
+      exprSource: "same-file-inline",
+      loc: { startLine: 19, endLine: 23 },
+      evidence: ["jsx.FlatList.keyExtractor"],
+    },
+  ]);
+  assert.deepEqual(assessReactNativePayloadPolicy(listDomainDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: false,
+    reason: "forbidden-signal:react-native:primitive:FlatList",
+  });
+
+  const scrollFilePath = fixturePath("rn-image-scrollview.tsx");
+  const scrollResult = extractFile(scrollFilePath);
+  assert.equal(scrollResult.domainDetection?.classification, "react-native");
+  assert.deepEqual(scrollResult.behavior?.rnListRenderingConcerns, [
+    {
+      kind: "list-primitive",
+      primitive: "ScrollView",
+      loc: { startLine: 7, endLine: 7 },
+      evidence: ["jsx.ScrollView"],
+    },
+  ]);
+});
+
 test("React Native navigation concern evidence stays source-only and blocks narrow authorization", () => {
   const filePath = fixturePath("rn-style-platform-navigation.tsx");
   const result = extractFile(filePath);

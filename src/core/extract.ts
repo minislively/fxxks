@@ -11,6 +11,7 @@ import type {
   ImportSignal,
   Language,
   ReactNativeAccessibilityTestAnchorSignal,
+  ReactNativeListRenderingConcernSignal,
   ReactNativeNavigationConcernSignal,
   ReactNativePrimitiveActionBindingSignal,
   ReactNativePrimitiveConstraintActionReadinessSignal,
@@ -530,6 +531,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const rnActionBindings: ReactNativePrimitiveActionBindingSignal[] = [];
   const rnActionIdentifierReads = new Map<string, Set<string>>();
   const rnAccessibilityTestAnchors: ReactNativeAccessibilityTestAnchorSignal[] = [];
+  const rnListRenderingConcerns: ReactNativeListRenderingConcernSignal[] = [];
   const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
   const rnNavigationConcerns: ReactNativeNavigationConcernSignal[] = [];
   const importedNames = new Set<string>();
@@ -938,6 +940,62 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     });
   };
 
+  const collectRnListRenderingConcern = (
+    node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    tag: string,
+    attributeValues: Map<string, string>,
+    attributeExpressions: Map<string, ts.Expression>,
+  ): void => {
+    if (!reactNativeImportedNames.has(tag)) return;
+
+    if (tag === "ScrollView") {
+      rnListRenderingConcerns.push({
+        kind: "list-primitive",
+        primitive: "ScrollView",
+        loc: sourceRangeOf(sourceFile, node),
+        evidence: ["jsx.ScrollView"],
+      });
+      return;
+    }
+
+    if (tag !== "FlatList" && tag !== "SectionList") return;
+
+    rnListRenderingConcerns.push({
+      kind: "list-primitive",
+      primitive: tag,
+      loc: sourceRangeOf(sourceFile, node),
+      evidence: [`jsx.${tag}`],
+    });
+
+    const renderItemExpr = attributeValues.get("renderItem");
+    const renderItemNode = attributeExpressions.get("renderItem");
+    if (renderItemExpr && renderItemNode) {
+      rnListRenderingConcerns.push({
+        kind: "renderItem",
+        primitive: tag,
+        expr: renderItemExpr,
+        ...(renderItemNode ? { exprKind: expressionKindOf(renderItemNode) } : {}),
+        ...(renderItemNode ? { exprSource: relationSourceOf(node, renderItemNode) } : {}),
+        loc: sourceRangeOf(sourceFile, node),
+        evidence: [`jsx.${tag}.renderItem`],
+      });
+    }
+
+    const keyExtractorExpr = attributeValues.get("keyExtractor");
+    const keyExtractorNode = attributeExpressions.get("keyExtractor");
+    if (keyExtractorExpr && keyExtractorNode) {
+      rnListRenderingConcerns.push({
+        kind: "keyExtractor",
+        primitive: tag,
+        expr: keyExtractorExpr,
+        ...(keyExtractorNode ? { exprKind: expressionKindOf(keyExtractorNode) } : {}),
+        ...(keyExtractorNode ? { exprSource: relationSourceOf(node, keyExtractorNode) } : {}),
+        loc: sourceRangeOf(sourceFile, node),
+        evidence: [`jsx.${tag}.keyExtractor`],
+      });
+    }
+  };
+
   const collectJsxOpening = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
     const tag = node.tagName.getText(sourceFile);
     const attributeValues = new Map<string, string>();
@@ -958,6 +1016,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     }
     collectRnPrimitiveInteraction(node, tag, attributeValues, attributeExpressions);
     collectRnAccessibilityTestAnchor(node, tag, attributeValues);
+    collectRnListRenderingConcern(node, tag, attributeValues, attributeExpressions);
 
     const propNames: string[] = [];
     const propValues: Record<string, string> = {};
@@ -1253,6 +1312,18 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     (item) =>
       `${item.hook}:${item.stateBinding}:${item.mutatorBinding}:${item.primitive}:${item.trigger}:${item.actionExpr}:${item.actionSource ?? ""}:${item.loc?.startLine ?? ""}`,
   ).slice(0, MAX_RN_PRIMITIVE_BINDINGS);
+  const rnListRenderingConcernList = dedupeBy(
+    rnListRenderingConcerns,
+    (item) => {
+      switch (item.kind) {
+        case "list-primitive":
+          return `${item.kind}:${item.primitive}:${item.loc?.startLine ?? ""}`;
+        case "renderItem":
+        case "keyExtractor":
+          return `${item.kind}:${item.primitive}:${item.expr}:${item.exprSource ?? ""}:${item.loc?.startLine ?? ""}`;
+      }
+    },
+  ).slice(0, 16);
   const rnInputConstraints: ReactNativePrimitiveInputConstraintSignal[] = rnInputBindingList
     .flatMap((inputBinding) => {
       const constraintBasis = [
@@ -1397,6 +1468,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
           }
         : {}),
       ...(rnAccessibilityAnchorList.length ? { rnAccessibilityTestAnchors: rnAccessibilityAnchorList } : {}),
+      ...(rnListRenderingConcernList.length ? { rnListRenderingConcerns: rnListRenderingConcernList } : {}),
       ...(hasRnStateActionConcerns ? { rnStateActionConcerns: rnStateActionConcernList } : {}),
       ...(rnNavigationConcernList.length ? { rnNavigationConcerns: rnNavigationConcernList } : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),

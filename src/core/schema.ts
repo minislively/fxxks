@@ -217,6 +217,32 @@ export type ReactNativeNavigationConcernSignal =
       evidence: string[];
     };
 
+export type ReactNativeListRenderingConcernSignal =
+  | {
+      kind: "list-primitive";
+      primitive: "FlatList" | "SectionList" | "ScrollView";
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "renderItem";
+      primitive: "FlatList" | "SectionList";
+      expr: string;
+      exprKind?: ReactNativeRelationExpressionKind;
+      exprSource?: ReactNativeRelationSource;
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "keyExtractor";
+      primitive: "FlatList" | "SectionList";
+      expr: string;
+      exprKind?: ReactNativeRelationExpressionKind;
+      exprSource?: ReactNativeRelationSource;
+      loc?: SourceRange;
+      evidence: string[];
+    };
+
 export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
@@ -463,6 +489,7 @@ export type ExtractionResult = {
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
+    rnListRenderingConcerns?: ReactNativeListRenderingConcernSignal[];
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -523,6 +550,7 @@ export type ModelFacingPayload = {
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
+    rnListRenderingConcerns?: ReactNativeListRenderingConcernSignal[];
     hasSideEffects?: boolean;
   };
   structure?: {
