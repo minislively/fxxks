@@ -11,7 +11,7 @@ This snapshot records the current pre-public release posture after the #172 LSP 
 
 - `README.md` — public package/CLI naming, installation path, supported surface, and claim boundaries.
 - `package.json` — package metadata, `bin` mapping, `files` allowlist, and npm scripts.
-- `docs/release-note-v0.1.0.md` — release-note wording and conservative evidence boundary.
+- `docs/release-note-v0.1.0.md` through `docs/release-note-v0.1.3.md` — release-note wording and conservative evidence boundary across shipped tags.
 - `docs/release.md` — public release checklist, residual risks, pre-publish blockers, and verification commands.
 - `docs/frontend-domain-contract.md` — domain-parallel launch contract gate and planning-only/no-launch boundary.
 - `scripts/release-claim-guards.mjs` and release claim tests — release-facing claim guard coverage for benchmark, provider, `.omx`, and domain-parallel launch wording.
