@@ -1,6 +1,7 @@
 import type { ExtractionResult } from "../schema";
 import { collectFormStateConcernProfile } from "./form-state";
 import { collectReactNativeAccessibilityConcernProfile } from "./react-native-accessibility";
+import { collectReactNativeNavigationConcernProfile } from "./react-native-navigation";
 import { collectReactNativeStateActionConcernProfile } from "./react-native-state-action";
 import type { FrontendConcernProfile } from "./types";
 import { collectValidationSchemaConcernProfile } from "./validation-schema";
@@ -9,6 +10,7 @@ export function collectFrontendConcernProfiles(result: ExtractionResult): Fronte
   const profiles = [
     collectFormStateConcernProfile(result),
     collectReactNativeAccessibilityConcernProfile(result),
+    collectReactNativeNavigationConcernProfile(result),
     collectReactNativeStateActionConcernProfile(result),
     collectValidationSchemaConcernProfile(result),
   ].filter((value): value is FrontendConcernProfile => Boolean(value));
