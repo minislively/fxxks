@@ -121,14 +121,15 @@ Concrete examples:
 - `react-hook-form` plus DOM-like `<form>` and `<input>` signals can be React Web domain evidence plus a form-state concern.
 - `react-hook-form` plus React Native `TextInput` and `onChangeText` signals can be React Native domain evidence plus a form-state concern, but it still remains bounded by the measured RN `F1` policy gate.
 - A Zustand store file can be a client-state concern without being a UI-domain payload candidate at all.
+- Next/React Router imports plus `Link`, `useNavigate`, `useRouter`, or same-file route/search param usage can be routing concern evidence, but they are not route-existence proof, runtime navigation proof, App Router/Pages Router verification, or compact-payload authorization.
 
-Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, or allowlisted client-state evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary. Client-state concern evidence is limited to explicit same-file allowlisted imports from `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit`; custom reducer/store modules remain future/deferred unless a later plan widens the allowlist.
+Current concern-profile extraction may surface bounded metadata such as form-state, validation/schema, allowlisted client-state evidence, or routing evidence. Those profiles remain non-authorizing metadata only; they must not bypass the domain resolver, fallback rules, or proof/claim boundary. Client-state concern evidence is limited to explicit same-file allowlisted imports from `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit`; custom reducer/store modules remain future/deferred unless a later plan widens the allowlist.
 
 ## RN claim boundary at the architecture layer
 
-At this architecture layer, safe RN wording is still source-only and policy-scoped. It is acceptable to describe observed RN primitive/input evidence, same-file handler/callback evidence, RN accessibility/test anchor evidence, the measured `F1`/`F13` narrow gate, and the exact `rn-primitive-input-narrow-payload` policy name.
+At this architecture layer, safe RN wording is still source-only and policy-scoped. It is acceptable to describe observed RN primitive/input evidence, same-file handler/callback evidence, RN accessibility/test anchor evidence, RN navigation concern evidence, the measured `F1`/`F13` narrow gate, and the exact `rn-primitive-input-narrow-payload` policy name.
 
-It is not acceptable here to claim that the mobile UI works, a gesture works, a native component behaves correctly, a screen is accessible, screen reader behavior is verified, the app was run on a device or simulator, cross-file navigation/state behavior is understood, or RN primitives are equivalent to DOM controls or React Web form semantics.
+It is not acceptable here to claim that the mobile UI works, a gesture works, a native component behaves correctly, a screen is accessible, screen reader behavior is verified, a route exists, navigation succeeds, stack/back/focus behavior is verified, the app was run on a device or simulator, cross-file navigation/state behavior is understood, or RN primitives are equivalent to DOM controls or React Web form semantics.
 
 ## Domain scanner
 

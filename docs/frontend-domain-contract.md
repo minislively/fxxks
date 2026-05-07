@@ -26,6 +26,7 @@ The frontend-domain contract separates **where code runs** from **what task-rele
 - Concern evidence such as `react-hook-form`, `useForm`, `register`, `control`, `handleSubmit`, default values, error display, or submit handlers is **not** React Web runtime evidence by itself.
 - Concern evidence such as Zod/Yup/Valibot imports, resolver usage, or same-file schema keys is **not** runtime validation proof, backend-contract proof, or compact-payload authorization by itself.
 - Concern evidence such as allowlisted `zustand`, `jotai`, `redux`, `react-redux`, or `@reduxjs/toolkit` imports is **not** state-correctness proof, reducer/store-logic proof, global app-state understanding, or compact-payload authorization by itself. Generic `useState` / `useReducer`, local `store` / `dispatch` / `selector` names, and custom reducer/store modules remain fail-closed or future/deferred unless a later plan widens the allowlist.
+- Concern evidence such as Next/React Router imports, `Link`, `useNavigate`, `useRouter`, or same-file route/search param usage is **not** route-existence proof, runtime navigation proof, App Router/Pages Router verification, or compact-payload authorization by itself.
 - Concern evidence alone must **not** authorize compact payload reuse.
 - The payload-policy architecture target is to evaluate **domain + concern + source fingerprint + lane gate** together. This wording is a boundary/architecture rule, not a claim that the current React Web lane already requires every one of those inputs as an allow condition today.
 
@@ -64,6 +65,7 @@ For the current RN PR A docs/tests lane, safe wording is limited to source-only 
 - This source contains source-only RN interaction hints inside the measured `F1`/`F13` narrow gate.
 - This source has same-file named-handler or inline-callback evidence observed in the same source file.
 - This source contains RN accessibility/test anchor evidence.
+- This source contains RN navigation concern evidence.
 - This source contains RN state/action concern evidence.
 - This fixture, payload, or policy record is limited to `rn-primitive-input-narrow-payload` measured evidence with no RN support promotion.
 
@@ -77,6 +79,8 @@ The current forbidden claim shapes are:
 - Do not claim that the screen is accessible.
 - Do not claim that screen reader behavior is verified.
 - Do not claim that the app was run on a device or simulator.
+- Do not claim that a route exists or that navigation succeeds.
+- Do not claim that stack, back, or focus behavior is verified.
 - Do not claim that cross-file navigation, route, or global-state behavior is understood.
 - Do not claim that a state transition, reducer, or setter behavior is correct or verified.
 - Do not claim that RN primitives are equivalent to DOM controls or React Web form semantics.
