@@ -44,6 +44,27 @@ WebView files are boundary files before they are extraction candidates. `react-n
 
 React Native and TUI/Ink fixtures may be useful evidence for syntax traversal, fixture shape, and future domain-signal design. They are **not support claims**. RN primitive/input `F1` may use the measured `rn-primitive-input-narrow-payload` gate, but RN primitives must not be reinterpreted as DOM controls, React Web form semantics, or broad React Native support. TUI/Ink fixtures must not be generalized into arbitrary terminal UI support, terminal behavior correctness, or runtime-token savings.
 
+## RN PR A claim boundary
+
+For the current RN PR A docs/tests lane, safe wording is limited to source-only evidence and measured policy names. The current allowed claim shapes are:
+
+- This source contains React Native primitive/input evidence.
+- This source contains source-only RN interaction hints inside the measured `F1`/`F13` narrow gate.
+- This source has same-file local handler/callback evidence observed in the same source file.
+- This fixture, payload, or policy record is limited to `rn-primitive-input-narrow-payload` measured evidence with no RN support promotion.
+
+The current forbidden claim shapes are:
+
+- Do not claim that the mobile UI works.
+- Do not claim that the gesture works.
+- Do not claim that the native component behaves correctly.
+- Do not claim that the screen is accessible.
+- Do not claim that the app was run on a device or simulator.
+- Do not claim that cross-file navigation, route, or global-state behavior is understood.
+- Do not claim that RN primitives are equivalent to DOM controls or React Web form semantics.
+
+These boundaries apply to docs, tests, fixture explanations, and payload-policy wording until a later approved PR widens the measured scope.
+
 ## Runtime debug evidence boundary
 
 `custom-wrapper-dom-signal-gap` is a traceability marker for the same-file React Web wrapper payload gate only. When it appears in pre-read or runtime-hook debug output such as `debug.frontendPayloadPolicy.evidenceGates`, it explains why a custom-component TSX fixture stayed inside the current React Web lane; it must not be interpreted as domain-parallel runtime readiness, setup/provider readiness, runtime promotion, or support for RN, WebView, TUI, Mixed, or Unknown lanes.
