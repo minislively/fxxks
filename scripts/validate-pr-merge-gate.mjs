@@ -64,7 +64,7 @@ export function evaluatePullRequestMergeGate({
   pullRequest,
   reviews = [],
   requireLinkedIssue = true,
-  requireApproval = false,
+  requireApproval = true,
 }) {
   const blockers = [];
 
@@ -126,14 +126,12 @@ async function main() {
     throw new Error("GITHUB_REPOSITORY and GITHUB_TOKEN are required in GitHub Actions.");
   }
 
-  const requireApproval = process.env.MERGE_GATE_REQUIRE_APPROVAL === "true";
-  const reviews = requireApproval
-    ? await fetchPullRequestReviews({
-      repository,
-      pullNumber: pullRequest.number,
-      token,
-    })
-    : [];
+  const requireApproval = process.env.MERGE_GATE_REQUIRE_APPROVAL !== "false";
+  const reviews = await fetchPullRequestReviews({
+    repository,
+    pullNumber: pullRequest.number,
+    token,
+  });
 
   const result = evaluatePullRequestMergeGate({
     pullRequest,
