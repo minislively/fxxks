@@ -19,6 +19,7 @@ export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   rnMediaLayout: "This source contains RN media/layout concern evidence.",
   rnNavigation: "This source contains RN navigation concern evidence.",
   rnStateAction: "This source contains RN state/action concern evidence.",
+  rnStylePlatform: "This source contains RN style/platform concern evidence.",
   routing: "This source contains routing concern evidence.",
 } as const;
 
@@ -31,6 +32,7 @@ export type FrontendConcernProfileId =
   | "rn-media-layout"
   | "rn-navigation"
   | "rn-state-action"
+  | "rn-style-platform"
   | "routing";
 
 export type FrontendConcernSignal =
@@ -64,6 +66,8 @@ export type FrontendConcernSignal =
   | "rn-resizeMode"
   | "rn-pagingEnabled"
   | "rn-dimensions-get"
+  | "rn-style-sheet-create"
+  | "rn-platform-select"
   | "rn-navigation-import"
   | "rn-useNavigation"
   | "rn-useRoute"

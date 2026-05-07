@@ -127,9 +127,9 @@ Current concern-profile extraction may surface bounded metadata such as form-sta
 
 ## RN claim boundary at the architecture layer
 
-At this architecture layer, safe RN wording is still source-only and policy-scoped. It is acceptable to describe observed RN primitive/input evidence, same-file handler/callback evidence, RN accessibility/test anchor evidence, RN navigation concern evidence, RN list/rendering pattern evidence, RN media/layout concern evidence, the measured `F1`/`F13` narrow gate, and the exact `rn-primitive-input-narrow-payload` policy name.
+At this architecture layer, safe RN wording is still source-only and policy-scoped. It is acceptable to describe observed RN primitive/input evidence, same-file handler/callback evidence, RN accessibility/test anchor evidence, RN navigation concern evidence, RN list/rendering pattern evidence, RN media/layout concern evidence, RN style/platform concern evidence, the measured `F1`/`F13` narrow gate, and the exact `rn-primitive-input-narrow-payload` policy name.
 
-It is not acceptable here to claim that the mobile UI works, a gesture works, a native component behaves correctly, a screen is accessible, screen reader behavior is verified, list performance is good, virtualization works, rendered order is correct, an image loads correctly, layout is correct, paging works correctly, a route exists, navigation succeeds, stack/back/focus behavior is verified, the app was run on a device or simulator, cross-file navigation/state behavior is understood, or RN primitives are equivalent to DOM controls or React Web form semantics.
+It is not acceptable here to claim that the mobile UI works, a gesture works, a native component behaves correctly, a screen is accessible, screen reader behavior is verified, list performance is good, virtualization works, rendered order is correct, an image loads correctly, layout is correct, style correctness or platform-specific behavior is verified, paging works correctly, a route exists, navigation succeeds, stack/back/focus behavior is verified, the app was run on a device or simulator, cross-file navigation/state behavior is understood, or RN primitives are equivalent to DOM controls or React Web form semantics.
 
 ## Domain scanner
 
@@ -169,7 +169,7 @@ type PayloadDecision = {
 The planner is where domain-specific risk belongs:
 
 - React Web can be compact-safe when existing extractor/readiness rules prove it.
-- React Native is evidence/fallback by default, except the existing measured `F1` primitive/input narrow gate named in the frontend-domain contract. That gate may build a React-Native-specific domain payload containing primitive/input evidence, but it must not reinterpret RN primitives as DOM controls or broaden to style/platform/navigation/list/media semantics.
+- React Native is evidence/fallback by default, except the existing measured `F1` primitive/input narrow gate named in the frontend-domain contract. That gate may build a React-Native-specific domain payload containing primitive/input evidence, but it must not reinterpret RN primitives as DOM controls or broaden to style/platform/navigation/list/media semantics. RN style/platform concern evidence remains metadata-only and non-authorizing.
 - WebView is boundary-aware or fallback-full-read by default.
 - TUI/Ink remains bounded by measured TSX syntax/payload behavior and does not imply terminal correctness.
 - Mixed and Unknown should choose fallback or defer when signals are weak or conflicting.

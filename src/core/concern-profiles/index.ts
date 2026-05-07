@@ -6,6 +6,7 @@ import { collectReactNativeListRenderingConcernProfile } from "./react-native-li
 import { collectReactNativeMediaLayoutConcernProfile } from "./react-native-media-layout";
 import { collectReactNativeNavigationConcernProfile } from "./react-native-navigation";
 import { collectReactNativeStateActionConcernProfile } from "./react-native-state-action";
+import { collectReactNativeStylePlatformConcernProfile } from "./react-native-style-platform";
 import { collectRoutingConcernProfile } from "./routing";
 import type { FrontendConcernProfile } from "./types";
 import { collectValidationSchemaConcernProfile } from "./validation-schema";
@@ -19,6 +20,7 @@ export function collectFrontendConcernProfiles(result: ExtractionResult): Fronte
     collectReactNativeMediaLayoutConcernProfile(result),
     collectReactNativeNavigationConcernProfile(result),
     collectReactNativeStateActionConcernProfile(result),
+    collectReactNativeStylePlatformConcernProfile(result),
     collectValidationSchemaConcernProfile(result),
     collectRoutingConcernProfile(result),
   ].filter((value): value is FrontendConcernProfile => Boolean(value));
