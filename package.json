@@ -14,6 +14,7 @@
     "evidence:react-web-context": "npm run build && node scripts/react-web-context-evidence.mjs",
     "evidence:react-native-payload": "npm run build && node scripts/react-native-payload-evidence.mjs",
     "evidence:react-web-reuse": "npm run build && node scripts/react-web-reuse-evidence.mjs",
+    "evidence:react-web-over-caching-audit": "npm run build && node scripts/react-web-over-caching-audit.mjs",
     "evidence:release-benchmark": "npm run build && node scripts/release-benchmark-evidence.mjs",
     "clean": "rm -rf dist",
     "bench": "npm run build && node benchmarks/scripts/run-all.mjs",
