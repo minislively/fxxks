@@ -131,3 +131,12 @@ test("domain profile metadata remains evidence and policy boundary, not support 
     assert.doesNotMatch(fs.readFileSync(path.join(repoRoot, file), "utf8"), forbiddenSupportClaims, `${file} must not add support claims`);
   }
 });
+
+test("concern-only react-hook-form fixture stays outside React Web domain evidence", () => {
+  const { detectDomain } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+  const result = detectDomain(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "concern-only-form-state-non-authorizing.tsx"));
+
+  assert.equal(result.classification, "unknown");
+  assert.equal(result.outcome, "deferred");
+  assert.deepEqual(result.evidence, []);
+});

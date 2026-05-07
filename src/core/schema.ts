@@ -1,6 +1,7 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
 import type { DomainDetectionResult } from "./domain-detector";
 import type { DomainPayload } from "./payload/domain-payload";
+import type { FrontendConcernProfile } from "./concern-profiles/types";
 
 export type OutputMode = "raw" | "compressed" | "hybrid";
 export type Language = "tsx" | "jsx" | "ts" | "js";
@@ -417,6 +418,7 @@ export type ModelFacingPayload = {
   editGuidance?: EditGuidance;
   designReviewMetadata?: DesignReviewMetadataV0;
   reactWebContext?: ReactWebContextMetadataV0;
+  concernProfiles?: FrontendConcernProfile[];
   domainPayload?: DomainPayload;
 };
 

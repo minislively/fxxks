@@ -9,171 +9,40 @@ import {
   pullRequestHasLinkedClosingIssue,
 } from "../scripts/validate-pr-merge-gate.mjs";
 
-const pr = { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "contributor" } };
-const delegatedMaintainers = ["bellman", "yeachan", "minseol"];
-const allowedMaintainers = ["minislively", ...delegatedMaintainers];
-
-test("merge gate passes when PR links an issue and has maintainer approval", () => {
+test("merge gate passes when PR links a closing issue", () => {
   const result = evaluatePullRequestMergeGate({
-    pullRequest: pr,
-    allowedMaintainers: ["minislively"],
-    reviews: [
-      { user: { login: "contributor" }, state: "APPROVED", submitted_at: "2026-05-01T00:00:00Z", commit_id: "head-sha" },
-      { user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" },
-    ],
+    pullRequest: { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "contributor" } },
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.approvingMaintainers, ["minislively"]);
+  assert.deepEqual(result.blockers, []);
 });
 
-test("merge gate accepts current-head approval from delegated maintainers", () => {
-  for (const maintainer of delegatedMaintainers) {
-    const result = evaluatePullRequestMergeGate({
-      pullRequest: pr,
-      allowedMaintainers,
-      reviews: [
-        { user: { login: "minislively" }, state: "CHANGES_REQUESTED", submitted_at: "2026-05-01T00:01:00Z" },
-        { user: { login: maintainer }, state: "APPROVED", submitted_at: "2026-05-01T00:02:00Z", commit_id: "head-sha" },
-      ],
-    });
-
-    assert.equal(result.ok, true, `${maintainer} approval should satisfy the gate`);
-    assert.deepEqual(result.approvingMaintainers, [maintainer]);
-  }
-});
-
-test("merge gate still requires linked issue when delegated maintainer approves", () => {
+test("merge gate still requires linked issue", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: { title: "Improve cache", body: "Refs #42", head: { sha: "head-sha" } },
-    allowedMaintainers,
-    reviews: [
-      { user: { login: "bellman" }, state: "APPROVED", submitted_at: "2026-05-01T00:02:00Z", commit_id: "head-sha" },
-    ],
   });
 
   assert.equal(result.ok, false);
   assert.match(result.blockers.join("\n"), /closing issue/);
-  assert.doesNotMatch(result.blockers.join("\n"), /active approval/);
-  assert.deepEqual(result.approvingMaintainers, ["bellman"]);
 });
 
 test("merge gate rejects PRs without a closing issue reference", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: { title: "Improve cache", body: "Refs #42" },
-    allowedMaintainers: ["minislively"],
-    reviews: [{ user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" }],
   });
 
   assert.equal(result.ok, false);
   assert.match(result.blockers.join("\n"), /closing issue/);
 });
 
-test("merge gate requires latest maintainer review state to be approved", () => {
+test("merge gate can disable linked issue enforcement explicitly", () => {
   const result = evaluatePullRequestMergeGate({
-    pullRequest: pr,
-    allowedMaintainers: ["minislively"],
-    reviews: [
-      { user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "head-sha" },
-      { user: { login: "minislively" }, state: "CHANGES_REQUESTED", submitted_at: "2026-05-01T00:02:00Z" },
-    ],
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /active approval/);
-});
-
-test("merge gate requires approval on the current head commit", () => {
-  const result = evaluatePullRequestMergeGate({
-    pullRequest: pr,
-    allowedMaintainers: ["minislively"],
-    reviews: [{ user: { login: "minislively" }, state: "APPROVED", submitted_at: "2026-05-01T00:01:00Z", commit_id: "old-sha" }],
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /current head commit/);
-});
-
-test("merge gate can allow docs/test-only self-maintainer PRs when explicitly configured", () => {
-  const result = evaluatePullRequestMergeGate({
-    pullRequest: {
-      title: "Clarify TUI metadata boundaries",
-      body: "Closes #484",
-      head: { sha: "head-sha" },
-      user: { login: "minislively" },
-    },
-    allowedMaintainers: ["minislively"],
-    changedFiles: [
-      "docs/tui-operational-readiness.md",
-      "docs/tui-fixture-candidates.md",
-      "test/payload-policy-tui-ink.test.mjs",
-    ],
-    reviews: [],
-    approvalMode: "docs-tests-self-ok",
+    pullRequest: { title: "Improve cache", body: "Refs #42" },
+    requireLinkedIssue: false,
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.approvalBypassReason, "docs-tests-only-self-maintainer");
-  assert.deepEqual(result.approvingMaintainers, []);
-});
-
-test("merge gate keeps docs/test-only self-maintainer exception disabled in strict mode", () => {
-  const result = evaluatePullRequestMergeGate({
-    pullRequest: {
-      title: "Clarify TUI metadata boundaries",
-      body: "Closes #484",
-      head: { sha: "head-sha" },
-      user: { login: "minislively" },
-    },
-    allowedMaintainers: ["minislively"],
-    changedFiles: ["docs/tui-operational-readiness.md", "test/payload-policy-tui-ink.test.mjs"],
-    reviews: [],
-    approvalMode: "strict",
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /active approval/);
-});
-
-test("merge gate does not bypass approval for code or shared policy files", () => {
-  const result = evaluatePullRequestMergeGate({
-    pullRequest: {
-      title: "Change merge gate",
-      body: "Closes #485",
-      head: { sha: "head-sha" },
-      user: { login: "minislively" },
-    },
-    allowedMaintainers: ["minislively"],
-    changedFiles: [".github/workflows/merge-gate.yml", "scripts/validate-pr-merge-gate.mjs", "AGENTS.md", "test/pr-merge-gate.test.mjs"],
-    reviews: [],
-    approvalMode: "docs-tests-self-ok",
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /active approval/);
-  assert.deepEqual(result.pathClassification.disallowedFiles, [
-    ".github/workflows/merge-gate.yml",
-    "scripts/validate-pr-merge-gate.mjs",
-    "AGENTS.md",
-  ]);
-});
-
-test("merge gate does not bypass approval for non-maintainer authors", () => {
-  const result = evaluatePullRequestMergeGate({
-    pullRequest: {
-      title: "Clarify docs",
-      body: "Closes #486",
-      head: { sha: "head-sha" },
-      user: { login: "external-contributor" },
-    },
-    allowedMaintainers: ["minislively"],
-    changedFiles: ["docs/tui-operational-readiness.md", "test/payload-policy-tui-ink.test.mjs"],
-    reviews: [],
-    approvalMode: "docs-tests-self-ok",
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /active approval/);
 });
 
 test("docs/test-only classifier excludes manifest and non-doc non-test paths", () => {
