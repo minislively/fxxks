@@ -301,6 +301,67 @@ test("React Native inline callbacks and external references stay source-only wit
   assert.equal(importedResult.behavior?.rnPrimitiveInteractions?.actionBindings?.[0].onPressSource, "imported");
 });
 
+test("React Native state/action concern evidence stays same-file and source-only", () => {
+  const filePath = fixturePath("rn-state-action-concern.tsx");
+  const result = extractFile(filePath);
+
+  assert.equal(result.domainDetection?.classification, "react-native");
+  assert.deepEqual(result.behavior?.rnStateActionConcerns, [
+    {
+      hook: "useState",
+      stateBinding: "query",
+      mutatorBinding: "setQuery",
+      mutatorKind: "setter",
+      primitive: "TextInput",
+      trigger: "onChangeText",
+      actionExpr: "setQuery",
+      actionKind: "identifier",
+      actionSource: "same-file-local",
+      loc: { startLine: 20, endLine: 26 },
+      evidence: ["jsx.TextInput.onChangeText", "hook.useState", "rn-state-action.setter"],
+    },
+    {
+      hook: "useReducer",
+      stateBinding: "status",
+      mutatorBinding: "dispatch",
+      mutatorKind: "dispatch",
+      primitive: "TextInput",
+      trigger: "onSubmitEditing",
+      actionExpr: "() => dispatch({ type: \"submit\" })",
+      actionKind: "inline-callback",
+      actionSource: "same-file-inline",
+      loc: { startLine: 20, endLine: 26 },
+      evidence: ["jsx.TextInput.onSubmitEditing", "hook.useReducer", "rn-state-action.dispatch"],
+    },
+    {
+      hook: "useState",
+      stateBinding: "query",
+      mutatorBinding: "setQuery",
+      mutatorKind: "setter",
+      primitive: "Pressable",
+      trigger: "onPress",
+      actionExpr: "submitQuery",
+      actionKind: "identifier",
+      actionSource: "same-file-local",
+      loc: { startLine: 27, endLine: 27 },
+      evidence: ["jsx.Pressable.onPress", "hook.useState", "rn-state-action.setter"],
+    },
+    {
+      hook: "useReducer",
+      stateBinding: "status",
+      mutatorBinding: "dispatch",
+      mutatorKind: "dispatch",
+      primitive: "Pressable",
+      trigger: "onPress",
+      actionExpr: "submitQuery",
+      actionKind: "identifier",
+      actionSource: "same-file-local",
+      loc: { startLine: 27, endLine: 27 },
+      evidence: ["jsx.Pressable.onPress", "hook.useReducer", "rn-state-action.dispatch"],
+    },
+  ]);
+});
+
 test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {
   const richerFixtures = [
     ["rn-style-platform-navigation.tsx", /^forbidden-signal:react-native:primitive:ScrollView/],

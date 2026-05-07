@@ -129,6 +129,20 @@ export type ReactNativeAccessibilityTestAnchorSignal = {
   evidence: string[];
 };
 
+export type ReactNativeStateActionConcernSignal = {
+  hook: "useState" | "useReducer";
+  stateBinding: string;
+  mutatorBinding: string;
+  mutatorKind: "setter" | "dispatch";
+  primitive: "TextInput" | "Pressable" | "Button" | "TouchableOpacity";
+  trigger: "onChangeText" | "onSubmitEditing" | "onPress";
+  actionExpr: string;
+  actionKind?: ReactNativeRelationExpressionKind;
+  actionSource?: ReactNativeRelationSource;
+  loc?: SourceRange;
+  evidence: string[];
+};
+
 export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
@@ -373,6 +387,7 @@ export type ExtractionResult = {
     formSurface?: FormSurface;
     rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
+    rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -431,6 +446,7 @@ export type ModelFacingPayload = {
     formSurface?: FormSurface;
     rnPrimitiveInteractions?: ReactNativePrimitiveInteractionSignal;
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
+    rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     hasSideEffects?: boolean;
   };
   structure?: {
