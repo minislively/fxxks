@@ -1,5 +1,5 @@
 import path from "node:path";
-import { collectFrontendConcernProfiles } from "../concern-profiles/form-state";
+import { collectFrontendConcernProfiles } from "../concern-profiles";
 import { deriveDesignReviewMetadata } from "../design-review-metadata";
 import { buildReactWebContextMetadata } from "../react-web-context-metadata";
 import { buildFrontendDomainPayload, buildReactWebDomainPayload, REACT_WEB_DOMAIN_PAYLOAD_POLICY } from "./domain-payload";

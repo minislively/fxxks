@@ -12,9 +12,10 @@ export type FrontendConcernProfileContract = {
 
 export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   formState: "This source contains form-state concern evidence.",
+  validationSchema: "This source contains validation/schema concern evidence.",
 } as const;
 
-export type FrontendConcernProfileId = "form-state";
+export type FrontendConcernProfileId = "form-state" | "validation-schema";
 
 export type FrontendConcernSignal =
   | "react-hook-form"
@@ -25,12 +26,18 @@ export type FrontendConcernSignal =
   | "controlled-input"
   | "submit-handler"
   | "default-values"
-  | "error-display";
+  | "error-display"
+  | "zod"
+  | "yup"
+  | "valibot"
+  | "resolver"
+  | "same-file-schema-keys";
 
 export type FrontendConcernProfile = {
   kind: "concern";
   id: FrontendConcernProfileId;
   claim: (typeof FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS)[keyof typeof FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS];
   signals: FrontendConcernSignal[];
+  schemaKeys?: string[];
   nonAuthorizationBoundary: typeof FRONTEND_CONCERN_PROFILE_NON_AUTHORIZATION;
 };
