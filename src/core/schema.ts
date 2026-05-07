@@ -217,6 +217,61 @@ export type ReactNativeNavigationConcernSignal =
       evidence: string[];
     };
 
+export type ReactNativeListRenderingConcernSignal =
+  | {
+      kind: "list-primitive";
+      primitive: "FlatList" | "SectionList" | "ScrollView";
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "renderItem";
+      primitive: "FlatList" | "SectionList";
+      expr: string;
+      exprKind?: ReactNativeRelationExpressionKind;
+      exprSource?: ReactNativeRelationSource;
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "keyExtractor";
+      primitive: "FlatList" | "SectionList";
+      expr: string;
+      exprKind?: ReactNativeRelationExpressionKind;
+      exprSource?: ReactNativeRelationSource;
+      loc?: SourceRange;
+      evidence: string[];
+    };
+
+export type ReactNativeMediaLayoutConcernSignal =
+  | {
+      kind: "media-primitive";
+      primitive: "Image";
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "resizeMode";
+      primitive: "Image";
+      value: string;
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "pagingEnabled";
+      primitive: "ScrollView";
+      value: string;
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "dimensions-get";
+      calleeExpr: "Dimensions.get";
+      argExpr?: string;
+      loc?: SourceRange;
+      evidence: string[];
+    };
+
 export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
@@ -463,6 +518,8 @@ export type ExtractionResult = {
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
+    rnListRenderingConcerns?: ReactNativeListRenderingConcernSignal[];
+    rnMediaLayoutConcerns?: ReactNativeMediaLayoutConcernSignal[];
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -523,6 +580,8 @@ export type ModelFacingPayload = {
     rnAccessibilityTestAnchors?: ReactNativeAccessibilityTestAnchorSignal[];
     rnStateActionConcerns?: ReactNativeStateActionConcernSignal[];
     rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
+    rnListRenderingConcerns?: ReactNativeListRenderingConcernSignal[];
+    rnMediaLayoutConcerns?: ReactNativeMediaLayoutConcernSignal[];
     hasSideEffects?: boolean;
   };
   structure?: {

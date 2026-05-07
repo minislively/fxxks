@@ -128,9 +128,9 @@ Current concern-profile extraction may surface bounded metadata such as form-sta
 
 ## RN claim boundary at the architecture layer
 
-At this architecture layer, safe RN wording is still source-only and policy-scoped. It is acceptable to describe observed RN primitive/input evidence, same-file handler/callback evidence, RN accessibility/test anchor evidence, RN navigation concern evidence, the measured `F1`/`F13` narrow gate, and the exact `rn-primitive-input-narrow-payload` policy name.
+At this architecture layer, safe RN wording is still source-only and policy-scoped. It is acceptable to describe observed RN primitive/input evidence, same-file handler/callback evidence, RN accessibility/test anchor evidence, RN navigation concern evidence, RN list/rendering pattern evidence, RN media/layout concern evidence, the measured `F1`/`F13` narrow gate, and the exact `rn-primitive-input-narrow-payload` policy name.
 
-It is not acceptable here to claim that the mobile UI works, a gesture works, a native component behaves correctly, a screen is accessible, screen reader behavior is verified, a route exists, navigation succeeds, stack/back/focus behavior is verified, the app was run on a device or simulator, cross-file navigation/state behavior is understood, or RN primitives are equivalent to DOM controls or React Web form semantics.
+It is not acceptable here to claim that the mobile UI works, a gesture works, a native component behaves correctly, a screen is accessible, screen reader behavior is verified, list performance is good, virtualization works, rendered order is correct, an image loads correctly, layout is correct, paging works correctly, a route exists, navigation succeeds, stack/back/focus behavior is verified, the app was run on a device or simulator, cross-file navigation/state behavior is understood, or RN primitives are equivalent to DOM controls or React Web form semantics.
 
 ## Domain scanner
 

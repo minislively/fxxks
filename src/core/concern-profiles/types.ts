@@ -16,6 +16,8 @@ export const FRONTEND_CONCERN_PROFILE_ALLOWED_CLAIMS = {
   clientState: "This source contains client-state concern evidence.",
   styling: "This source contains styling concern evidence.",
   rnAccessibilityTestAnchor: "This source contains RN accessibility/test anchor evidence.",
+  rnListRendering: "This source contains RN list/rendering pattern evidence.",
+  rnMediaLayout: "This source contains RN media/layout concern evidence.",
   rnNavigation: "This source contains RN navigation concern evidence.",
   rnStateAction: "This source contains RN state/action concern evidence.",
   routing: "This source contains routing concern evidence.",
@@ -27,6 +29,8 @@ export type FrontendConcernProfileId =
   | "client-state"
   | "styling"
   | "rn-accessibility-test-anchor"
+  | "rn-list-rendering"
+  | "rn-media-layout"
   | "rn-navigation"
   | "rn-state-action"
   | "routing";
@@ -56,6 +60,15 @@ export type FrontendConcernSignal =
   | "rn-accessibilityRole"
   | "rn-accessibilityHint"
   | "rn-testID"
+  | "rn-flatlist"
+  | "rn-sectionlist"
+  | "rn-scrollview"
+  | "rn-renderItem"
+  | "rn-keyExtractor"
+  | "rn-image"
+  | "rn-resizeMode"
+  | "rn-pagingEnabled"
+  | "rn-dimensions-get"
   | "rn-navigation-import"
   | "rn-useNavigation"
   | "rn-useRoute"
