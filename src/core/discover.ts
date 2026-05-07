@@ -25,9 +25,27 @@ export type DiscoveryResult = {
   stats: DiscoveryStats;
 };
 
+function isMissingDuringDiscovery(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ENOTDIR"),
+  );
+}
+
 function walk(dir: string, out: string[], stats: DiscoveryStats, root: string): void {
   stats.directoriesVisited += 1;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    if (isMissingDuringDiscovery(error)) {
+      return;
+    }
+    throw error;
+  }
+  for (const entry of entries) {
     if (IGNORE.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -40,8 +58,15 @@ function walk(dir: string, out: string[], stats: DiscoveryStats, root: string): 
   }
 }
 
-function readText(filePath: string): string {
-  return fs.readFileSync(filePath, "utf8");
+function readText(filePath: string): string | null {
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch (error) {
+    if (isMissingDuringDiscovery(error)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function resolveRelativeImport(
@@ -88,6 +113,7 @@ function relativeImports(
   stats: DiscoveryStats,
 ): RelativeImport[] {
   const text = readText(filePath);
+  if (text === null) return [];
   const matches = text.matchAll(/import\s+(type\s+)?(?:[\s\S]*?)from\s+["'](\.[^"']+)["']|import\s+["'](\.[^"']+)["']/g);
   const imports = new Map<string, RelativeImport>();
   for (const match of matches) {

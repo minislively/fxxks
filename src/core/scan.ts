@@ -14,6 +14,15 @@ function getExtractSource(): typeof import("./extract")["extractSource"] {
   return extractSourceModule.extractSource;
 }
 
+function isMissingPathError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ENOTDIR"),
+  );
+}
+
 export function scanProject(cwd = process.cwd()): ScanResult {
   const startedAt = performance.now();
   const discoveryStartedAt = performance.now();
@@ -54,7 +63,15 @@ export function scanProject(cwd = process.cwd()): ScanResult {
       continue;
     }
     const statStartedAt = performance.now();
-    const stat = fs.statSync(target.filePath);
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(target.filePath);
+    } catch (error) {
+      if (isMissingPathError(error)) {
+        continue;
+      }
+      throw error;
+    }
     statMs += performance.now() - statStartedAt;
     fileStatCount += 1;
 
@@ -80,7 +97,15 @@ export function scanProject(cwd = process.cwd()): ScanResult {
     }
 
     const readStartedAt = performance.now();
-    const text = fs.readFileSync(target.filePath, "utf8");
+    let text: string;
+    try {
+      text = fs.readFileSync(target.filePath, "utf8");
+    } catch (error) {
+      if (isMissingPathError(error)) {
+        continue;
+      }
+      throw error;
+    }
     fileReadMs += performance.now() - readStartedAt;
     fileReadCount += 1;
 
