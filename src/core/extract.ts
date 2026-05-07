@@ -20,6 +20,7 @@ import type {
   ReactNativePrimitiveInputConstraintSignal,
   ReactNativePrimitiveStateActionRelationSignal,
   ReactNativeStateActionConcernSignal,
+  ReactNativeStylePlatformConcernSignal,
   ReactNativeRelationExpressionKind,
   ReactNativeRelationSource,
   SourceRange,
@@ -541,6 +542,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
   const rnListRenderingConcerns: ReactNativeListRenderingConcernSignal[] = [];
   const rnMediaLayoutConcerns: ReactNativeMediaLayoutConcernSignal[] = [];
   const rnStateActionConcerns: ReactNativeStateActionConcernSignal[] = [];
+  const rnStylePlatformConcerns: ReactNativeStylePlatformConcernSignal[] = [];
   const rnNavigationConcerns: ReactNativeNavigationConcernSignal[] = [];
   const importedNames = new Set<string>();
   const reactNativeImportedNames = new Set<string>();
@@ -1268,6 +1270,45 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       if (
         ts.isPropertyAccessExpression(node.expression) &&
         ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === "StyleSheet" &&
+        node.expression.name.text === "create" &&
+        reactNativeImportedNames.has("StyleSheet")
+      ) {
+        rnStylePlatformConcerns.push({
+          kind: "style-sheet-create",
+          calleeExpr: "StyleSheet.create",
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: ["call.StyleSheet.create"],
+        });
+      }
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === "Platform" &&
+        node.expression.name.text === "select" &&
+        reactNativeImportedNames.has("Platform")
+      ) {
+        const firstArg = node.arguments[0];
+        const optionKeys = firstArg && ts.isObjectLiteralExpression(firstArg)
+          ? firstArg.properties.flatMap((property) => {
+            if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) return [];
+            const name = ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)
+              ? property.name.text
+              : property.name.getText(sourceFile);
+            return name ? [name] : [];
+          })
+          : [];
+        rnStylePlatformConcerns.push({
+          kind: "platform-select",
+          calleeExpr: "Platform.select",
+          ...(optionKeys.length ? { optionKeys } : {}),
+          loc: sourceRangeOf(sourceFile, node),
+          evidence: ["call.Platform.select"],
+        });
+      }
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
         node.expression.expression.text === "Dimensions" &&
         node.expression.name.text === "get" &&
         reactNativeImportedNames.has("Dimensions")
@@ -1403,6 +1444,17 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
           return `${item.kind}:${item.primitive}:${item.value}:${item.loc?.startLine ?? ""}`;
         case "dimensions-get":
           return `${item.kind}:${item.calleeExpr}:${item.argExpr ?? ""}:${item.loc?.startLine ?? ""}`;
+      }
+    },
+  ).slice(0, 16);
+  const rnStylePlatformConcernList = dedupeBy(
+    rnStylePlatformConcerns,
+    (item) => {
+      switch (item.kind) {
+        case "style-sheet-create":
+          return `${item.kind}:${item.calleeExpr}:${item.loc?.startLine ?? ""}`;
+        case "platform-select":
+          return `${item.kind}:${item.calleeExpr}:${item.optionKeys?.join(",") ?? ""}:${item.loc?.startLine ?? ""}`;
       }
     },
   ).slice(0, 16);
@@ -1553,6 +1605,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
       ...(rnListRenderingConcernList.length ? { rnListRenderingConcerns: rnListRenderingConcernList } : {}),
       ...(rnMediaLayoutConcernList.length ? { rnMediaLayoutConcerns: rnMediaLayoutConcernList } : {}),
       ...(hasRnStateActionConcerns ? { rnStateActionConcerns: rnStateActionConcernList } : {}),
+      ...(rnStylePlatformConcernList.length ? { rnStylePlatformConcerns: rnStylePlatformConcernList } : {}),
       ...(rnNavigationConcernList.length ? { rnNavigationConcerns: rnNavigationConcernList } : {}),
       ...(a11yAnchorList.length ? { a11yAnchors: a11yAnchorList } : {}),
       ...(a11ySourceIdList.length ? { a11ySourceIds: a11ySourceIdList } : {}),

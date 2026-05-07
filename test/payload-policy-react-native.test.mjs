@@ -588,6 +588,34 @@ test("React Native navigation concern evidence stays source-only and blocks narr
   });
 });
 
+test("React Native style/platform concern evidence stays source-only and blocks narrow authorization", () => {
+  const filePath = fixturePath("rn-style-platform-navigation.tsx");
+  const result = extractFile(filePath);
+  const domainDetection = detect(fixtureSource("rn-style-platform-navigation.tsx"), filePath);
+
+  assert.equal(result.domainDetection?.classification, "react-native");
+  assert.deepEqual(result.behavior?.rnStylePlatformConcerns, [
+    {
+      kind: "platform-select",
+      calleeExpr: "Platform.select",
+      optionKeys: ["ios", "android", "default"],
+      loc: { startLine: 17, endLine: 21 },
+      evidence: ["call.Platform.select"],
+    },
+    {
+      kind: "style-sheet-create",
+      calleeExpr: "StyleSheet.create",
+      loc: { startLine: 31, endLine: 40 },
+      evidence: ["call.StyleSheet.create"],
+    },
+  ]);
+  assert.deepEqual(assessReactNativePayloadPolicy(domainDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: false,
+    reason: "forbidden-signal:react-native:primitive:ScrollView",
+  });
+});
+
 test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {
   const richerFixtures = [
     ["rn-style-platform-navigation.tsx", /^forbidden-signal:react-native:primitive:ScrollView/],

@@ -272,6 +272,21 @@ export type ReactNativeMediaLayoutConcernSignal =
       evidence: string[];
     };
 
+export type ReactNativeStylePlatformConcernSignal =
+  | {
+      kind: "style-sheet-create";
+      calleeExpr: "StyleSheet.create";
+      loc?: SourceRange;
+      evidence: string[];
+    }
+  | {
+      kind: "platform-select";
+      calleeExpr: "Platform.select";
+      optionKeys?: string[];
+      loc?: SourceRange;
+      evidence: string[];
+    };
+
 export type A11yAnchorSignal = {
   kind: "label" | "htmlFor" | "aria" | "role" | "required" | "disabled" | "readonly" | "error-text";
   label: string;
@@ -520,6 +535,7 @@ export type ExtractionResult = {
     rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
     rnListRenderingConcerns?: ReactNativeListRenderingConcernSignal[];
     rnMediaLayoutConcerns?: ReactNativeMediaLayoutConcernSignal[];
+    rnStylePlatformConcerns?: ReactNativeStylePlatformConcernSignal[];
     a11yAnchors?: A11yAnchorSignal[];
     a11ySourceIds?: LocatedString[];
     hasSideEffects?: boolean;
@@ -582,6 +598,7 @@ export type ModelFacingPayload = {
     rnNavigationConcerns?: ReactNativeNavigationConcernSignal[];
     rnListRenderingConcerns?: ReactNativeListRenderingConcernSignal[];
     rnMediaLayoutConcerns?: ReactNativeMediaLayoutConcernSignal[];
+    rnStylePlatformConcerns?: ReactNativeStylePlatformConcernSignal[];
     hasSideEffects?: boolean;
   };
   structure?: {
