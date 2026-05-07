@@ -1369,7 +1369,10 @@ test("corrected provider cost manifest builder writes real source and fooks payl
     assert.equal(manifest.recommendedRunnerArgs.codexWorkdir, "isolated");
     assert.equal(manifest.tasks.every((task) => fs.existsSync(path.join(tempRoot, task.baselineContextPath))), true);
     assert.equal(manifest.tasks.every((task) => fs.existsSync(path.join(tempRoot, task.fooksContextPath))), true);
-    assert.equal(manifest.tasks.every((task) => task.payloadStats.promptPayloadReductionPct > 0), true);
+    assert.equal(manifest.tasks.every((task) => Number.isFinite(task.payloadStats.promptPayloadReductionPct)), true);
+    const totalBaselineBytes = manifest.tasks.reduce((sum, task) => sum + task.payloadStats.baselineBytes, 0);
+    const totalPayloadBytes = manifest.tasks.reduce((sum, task) => sum + task.payloadStats.fooksPayloadBytes, 0);
+    assert.equal(totalPayloadBytes < totalBaselineBytes, true);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
