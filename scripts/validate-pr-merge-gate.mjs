@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const CLOSING_ISSUE_PATTERN = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?:(?:[\w.-]+\/[\w.-]+)?#\d+|https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+)/i;
+const DEFAULT_ALLOWED_REVIEWERS = ["minislively", "yeachan-heo"];
 
 function normalizeLogin(value) {
   return String(value || "").trim().toLowerCase();
@@ -13,6 +14,16 @@ function normalizeLogin(value) {
 
 function normalizePath(value) {
   return String(value || "").replace(/^\/+/, "");
+}
+
+function parseAllowedReviewers(value) {
+  if (!value) return new Set(DEFAULT_ALLOWED_REVIEWERS);
+  return new Set(
+    String(value)
+      .split(",")
+      .map((item) => normalizeLogin(item))
+      .filter(Boolean),
+  );
 }
 
 const DOCS_TESTS_ONLY_ALLOWED_PREFIXES = ["docs/", "test/"];
@@ -65,6 +76,7 @@ export function evaluatePullRequestMergeGate({
   reviews = [],
   requireLinkedIssue = true,
   requireApproval = true,
+  allowedReviewerLogins = DEFAULT_ALLOWED_REVIEWERS,
 }) {
   const blockers = [];
 
@@ -74,22 +86,26 @@ export function evaluatePullRequestMergeGate({
 
   const latestByUser = latestReviewStateByUser(reviews);
   const headSha = pullRequest?.head?.sha;
-  const author = normalizeLogin(pullRequest?.user?.login);
-  const approvingReviewers = [...latestByUser.entries()]
-    .filter(([login, latest]) => login !== author && latest?.state === "APPROVED" && (!headSha || latest.commitId === headSha))
+  const allowedReviewers = new Set((allowedReviewerLogins || []).map((login) => normalizeLogin(login)).filter(Boolean));
+  const qualifyingReviewers = [...latestByUser.entries()]
+    .filter(([login, latest]) => {
+      if (!allowedReviewers.has(login)) return false;
+      if (!latest?.state || latest.state === "DISMISSED") return false;
+      return !headSha || latest.commitId === headSha;
+    })
     .map(([login]) => login)
     .sort();
 
-  if (requireApproval && approvingReviewers.length === 0) {
+  if (requireApproval && qualifyingReviewers.length === 0) {
     blockers.push(
-      "PR must have an active GitHub PR review approval on the current head commit from a reviewer other than the PR author. Issue comments and regular PR comments do not count, and any new push/amend/rebase/force-push after approval requires re-approval.",
+      `PR must have an active GitHub PR review on the current head commit from at least one allowed reviewer (${[...allowedReviewers].join(", ")}). Self-review by those accounts is allowed. Issue comments and regular PR comments do not count, and any new push/amend/rebase/force-push after review requires re-review.`,
     );
   }
 
   return {
     ok: blockers.length === 0,
     blockers,
-    approvingReviewers,
+    approvingReviewers: qualifyingReviewers,
   };
 }
 
@@ -138,6 +154,7 @@ async function main() {
     reviews,
     requireLinkedIssue: process.env.MERGE_GATE_REQUIRE_LINKED_ISSUE !== "false",
     requireApproval,
+    allowedReviewerLogins: [...parseAllowedReviewers(process.env.MERGE_GATE_ALLOWED_REVIEWERS)],
   });
 
   if (!result.ok) {
@@ -148,7 +165,7 @@ async function main() {
   }
 
   const approvalSummary = result.approvingReviewers.length > 0
-    ? ` Approving reviewer(s): ${result.approvingReviewers.join(", ")}`
+    ? ` Qualifying reviewer(s): ${result.approvingReviewers.join(", ")}`
     : "";
   console.log(`Merge gate passed. Linked issue detected.${approvalSummary}`);
 }
