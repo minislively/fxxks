@@ -362,6 +362,53 @@ test("React Native state/action concern evidence stays same-file and source-only
   ]);
 });
 
+test("React Native navigation concern evidence stays source-only and blocks narrow authorization", () => {
+  const filePath = fixturePath("rn-style-platform-navigation.tsx");
+  const result = extractFile(filePath);
+  const domainDetection = detect(fixtureSource("rn-style-platform-navigation.tsx"), filePath);
+
+  assert.equal(result.domainDetection?.classification, "react-native");
+  assert.deepEqual(result.behavior?.rnNavigationConcerns, [
+    {
+      kind: "navigation-import",
+      moduleSpecifier: "@react-navigation/native",
+      importedSymbols: ["useNavigation", "useRoute"],
+      loc: { startLine: 2, endLine: 2 },
+      evidence: ["import.@react-navigation/native"],
+    },
+    {
+      kind: "navigation-hook",
+      hook: "useNavigation",
+      loc: { startLine: 5, endLine: 5 },
+      evidence: ["hook.useNavigation"],
+    },
+    {
+      kind: "navigation-hook",
+      hook: "useRoute",
+      loc: { startLine: 6, endLine: 6 },
+      evidence: ["hook.useRoute"],
+    },
+    {
+      kind: "route-params",
+      accessExpr: "route.params",
+      loc: { startLine: 7, endLine: 7 },
+      evidence: ["member.route.params"],
+    },
+    {
+      kind: "navigation-navigate",
+      calleeExpr: "navigation.navigate",
+      routeNameExpr: "\"Settings\"",
+      loc: { startLine: 22, endLine: 22 },
+      evidence: ["call.navigation.navigate"],
+    },
+  ]);
+  assert.deepEqual(assessReactNativePayloadPolicy(domainDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: false,
+    reason: "forbidden-signal:react-native:primitive:ScrollView",
+  });
+});
+
 test("React Native richer adjacent fixtures stay outside the narrow payload lane", () => {
   const richerFixtures = [
     ["rn-style-platform-navigation.tsx", /^forbidden-signal:react-native:primitive:ScrollView/],
