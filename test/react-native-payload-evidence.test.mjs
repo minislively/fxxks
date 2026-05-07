@@ -10,7 +10,7 @@ import {
 test("React Native payload evidence exposes primitiveInteractions without widening RN scope", async () => {
   const evidence = await buildReactNativePayloadEvidence({ runId: `test-${Date.now()}-${Math.random()}` });
 
-  assert.equal(evidence.schemaVersion, "react-native-payload-evidence.v2");
+  assert.equal(evidence.schemaVersion, "react-native-payload-evidence.v3");
   assert.equal(evidence.measurement, "local-fixture-pre-read-and-model-facing-domain-payload-evidence");
   assert.match(evidence.claimBoundary, /Local fixture payload evidence only/);
   assert.match(evidence.claimBoundary, /not broad React Native support/);
@@ -25,6 +25,12 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.boundaryFallbacksPreserved.blocker, null);
   assert.equal(evidence.summary.metadataAnchorsVisible.claimable, true);
   assert.equal(evidence.summary.metadataAnchorsVisible.blocker, null);
+  assert.equal(evidence.summary.inputConstraintsVisible.claimable, true);
+  assert.equal(evidence.summary.inputConstraintsVisible.scope, "rn-primitive-input-narrow-payload-only");
+  assert.equal(evidence.summary.stateActionRelationsVisible.claimable, true);
+  assert.equal(evidence.summary.stateActionRelationsVisible.relationKind, "actionReadsInputValue");
+  assert.equal(evidence.summary.constraintActionReadinessVisible.claimable, true);
+  assert.equal(evidence.summary.constraintActionReadinessVisible.relationKind, "constraintActionReadiness");
   assert.deepEqual(
     evidence.summary.metadataAnchorsVisible.textInputFields.map((row) => row.field),
     RN_TEXT_INPUT_METADATA_FIELDS,
@@ -96,8 +102,15 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].onPressExpr, "submitCurrentValue");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].onPressSource, "same-file-local");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].label, "Submit");
+  assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].disabled, "isSubmitDisabled");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Submit filter");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].testID, "submit-filter-button");
+  assert.deepEqual(inline.preRead.primitiveInteractions.stateActionRelations, inline.modelFacing.primitiveInteractions.stateActionRelations);
+  assert.equal(inline.preRead.primitiveInteractions.stateActionRelations[0].relationKind, "actionReadsInputValue");
+  assert.equal(inline.preRead.primitiveInteractions.stateActionRelations[0].onPressExpr, "submitCurrentValue");
+  assert.deepEqual(inline.preRead.primitiveInteractions.constraintActionReadiness, inline.modelFacing.primitiveInteractions.constraintActionReadiness);
+  assert.equal(inline.preRead.primitiveInteractions.constraintActionReadiness[0].relationKind, "constraintActionReadiness");
+  assert.equal(inline.preRead.primitiveInteractions.constraintActionReadiness[0].disabledExpr, "isSubmitDisabled");
 });
 
 test("React Native payload evidence keeps richer RN WebView and TUI boundaries fallback-only", async () => {
@@ -123,6 +136,9 @@ test("React Native payload evidence Markdown keeps claim boundaries explicit", a
   assert.match(markdown, /RN primitive interaction facts visible: yes/);
   assert.match(markdown, /Richer RN\/WebView\/TUI boundaries preserved: yes/);
   assert.match(markdown, /RN metadata anchors visible: yes/);
+  assert.match(markdown, /Measured RN narrow constraint\/action readiness visible: yes/);
+  assert.match(markdown, /actionReadsInputValue:submitCurrentValue->value/);
+  assert.match(markdown, /constraintActionReadiness:submitCurrentValue->value,disabled=isSubmitDisabled/);
   assert.match(markdown, /\| TextInput \| keyboardType \| yes \| yes \| yes \|/);
   assert.match(markdown, /\| TextInput \| secureTextEntry \| yes \| yes \| yes \|/);
   assert.match(markdown, /\| TextInput \| maxLength \| yes \| yes \| yes \|/);

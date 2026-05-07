@@ -124,7 +124,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
     {
       primitive: "TextInput",
-      loc: { startLine: 15, endLine: 23 },
+      loc: { startLine: 16, endLine: 24 },
       valueExpr: "value",
       onChangeTextExpr: "onChangeText",
       onChangeTextKind: "identifier",
@@ -148,14 +148,85 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.deepEqual(payload?.facts.primitiveInteractions?.actionBindings, [
     {
       primitive: "Pressable",
-      loc: { startLine: 24, endLine: 24 },
+      loc: { startLine: 25, endLine: 25 },
       onPressExpr: "submitCurrentValue",
       onPressKind: "identifier",
       onPressSource: "same-file-local",
       label: "Submit",
+      disabled: "isSubmitDisabled",
       accessibilityLabel: "Submit filter",
       testID: "submit-filter-button",
-      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label", "jsx.Pressable.accessibilityLabel", "jsx.Pressable.testID"],
+      evidence: ["jsx.Pressable.onPress", "jsx.Pressable.Text.label", "jsx.Pressable.disabled", "jsx.Pressable.accessibilityLabel", "jsx.Pressable.testID"],
+    },
+  ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.inputConstraints, [
+    {
+      primitive: "TextInput",
+      loc: { startLine: 16, endLine: 24 },
+      valueExpr: "value",
+      constraintKind: "textInputMetadataConstraints",
+      keyboardType: "web-search",
+      autoCapitalize: "sentences",
+      descriptiveHint: "Type filter",
+      constraintBasis: ["jsx.TextInput.keyboardType", "jsx.TextInput.autoCapitalize"],
+      evidence: ["jsx.TextInput.keyboardType", "jsx.TextInput.autoCapitalize", "jsx.TextInput.placeholder"],
+    },
+  ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.stateActionRelations, [
+    {
+      relationKind: "actionReadsInputValue",
+      inputPrimitive: "TextInput",
+      actionPrimitive: "Pressable",
+      valueExpr: "value",
+      onChangeTextExpr: "onChangeText",
+      onPressExpr: "submitCurrentValue",
+      label: "Submit",
+      relationBasis: ["handler.submitCurrentValue.reads.value"],
+      loc: { startLine: 16, endLine: 25 },
+      evidence: [
+        "rn.stateActionRelation.actionReadsInputValue",
+        "jsx.TextInput.value",
+        "jsx.TextInput.onChangeText",
+        "jsx.TextInput.placeholder",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.accessibilityLabel",
+        "jsx.TextInput.testID",
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.testID",
+        "handler.submitCurrentValue.reads.value",
+      ],
+    },
+  ]);
+  assert.deepEqual(payload?.facts.primitiveInteractions?.constraintActionReadiness, [
+    {
+      relationKind: "constraintActionReadiness",
+      inputPrimitive: "TextInput",
+      actionPrimitive: "Pressable",
+      valueExpr: "value",
+      onPressExpr: "submitCurrentValue",
+      constraintKind: "textInputMetadataConstraints",
+      readinessKind: "pressableDisabledReadiness",
+      disabledExpr: "isSubmitDisabled",
+      constraintBasis: ["jsx.TextInput.keyboardType", "jsx.TextInput.autoCapitalize"],
+      readinessBasis: ["jsx.Pressable.disabled"],
+      relationBasis: ["handler.submitCurrentValue.reads.value"],
+      loc: { startLine: 16, endLine: 25 },
+      evidence: [
+        "rn.constraintActionReadiness.pressableDisabledReadsConstrainedInput",
+        "jsx.TextInput.keyboardType",
+        "jsx.TextInput.autoCapitalize",
+        "jsx.TextInput.placeholder",
+        "jsx.Pressable.onPress",
+        "jsx.Pressable.Text.label",
+        "jsx.Pressable.disabled",
+        "jsx.Pressable.accessibilityLabel",
+        "jsx.Pressable.testID",
+        "handler.submitCurrentValue.reads.value",
+      ],
     },
   ]);
   assert.equal("formControls" in payload.facts, false);
@@ -172,6 +243,8 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].onPressExpr, "submitCurrentValue");
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].onPressSource, "same-file-local");
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.actionBindings[0].label, "Submit");
+  assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.constraintActionReadiness[0].disabledExpr, "isSubmitDisabled");
+  assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.constraintActionReadiness[0].relationKind, "constraintActionReadiness");
   assert.equal(preReadDecision.debug.domainDetection.classification, "react-native");
   assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
 });
