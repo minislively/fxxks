@@ -313,11 +313,25 @@ function compactReactNativePrimitiveInteractions(
   if (!interactions) return undefined;
   const inputBindings = interactions.inputBindings?.slice(0, 8);
   const actionBindings = interactions.actionBindings?.slice(0, 8);
+  const inputConstraints = interactions.inputConstraints?.slice(0, 8);
+  const stateActionRelations = interactions.stateActionRelations?.slice(0, 8);
+  const constraintActionReadiness = interactions.constraintActionReadiness?.slice(0, 8);
 
-  if (!inputBindings?.length && !actionBindings?.length) return undefined;
+  if (
+    !inputBindings?.length &&
+    !actionBindings?.length &&
+    !inputConstraints?.length &&
+    !stateActionRelations?.length &&
+    !constraintActionReadiness?.length
+  ) {
+    return undefined;
+  }
   return {
     ...(inputBindings?.length ? { inputBindings } : {}),
     ...(actionBindings?.length ? { actionBindings } : {}),
+    ...(inputConstraints?.length ? { inputConstraints } : {}),
+    ...(stateActionRelations?.length ? { stateActionRelations } : {}),
+    ...(constraintActionReadiness?.length ? { constraintActionReadiness } : {}),
   };
 }
 
