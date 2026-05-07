@@ -30,6 +30,10 @@ const forbiddenBroadReactWebRuntimeClaims = [
     label: "wrapper-debug-domain-parallel-readiness",
     pattern: /\b(?:custom-wrapper-dom-signal-gap|wrapper(?:-lane)?|pre-read\s+runtime\s+debug\s+evidence|runtime\s+debug\s+evidence|frontendPayloadPolicy(?:\.evidenceGates)?)\b[^\n]{0,120}\b(?:proves?|guarantees?|establishes?|unlocks?|counts\s+as|interpreted\s+as)\b[^\n]{0,120}\b(?:domain-parallel|parallel\s+domain|multi-domain|cross-domain|runtime\s+readiness|runtime\s+promotion|setup\s+readiness|provider\s+readiness)\b/i,
   },
+  {
+    label: "concern-proves-react-web-runtime",
+    pattern: /\b(?:react-hook-form|useForm|register|control|handleSubmit|default values?|error display|submit handlers?)\b[^\n]{0,120}\b(?:proves?|guarantees?|establishes?|counts\s+as|means|is)\b[^\n]{0,120}\b(?:React\s*Web|React\/Web|web\s+React)\b[^\n]{0,120}\b(?:runtime\s+evidence|domain\s+evidence|support|payload\s+reuse|compact\s+payload)\b/i,
+  },
 ];
 
 const boundedClaimBoundary = /\b(?:measured|same-file|current supported lane only|current supported lane|fixture(?:-backed)?|local synthetic|claim boundary|does not|do not|not|no|without|cannot|must not|only|fallback|deferred|narrow|before any|separate approval|not broad|not stable|not provider|not runtime-token)\b/i;
@@ -94,6 +98,8 @@ test("React Web runtime evidence audit preserves the narrow fixture boundary", (
   assert.match(combined, /React Web evidence is used to imply RN, WebView, TUI, Mixed, or Unknown support/);
   assert.match(combined, /`custom-wrapper-dom-signal-gap` is a traceability marker for the same-file React Web wrapper payload gate only/);
   assert.match(combined, /must not be interpreted as domain-parallel runtime readiness/);
+  assert.match(combined, /Concern evidence such as `react-hook-form`.*is \*\*not\*\* React Web runtime evidence by itself\./s);
+  assert.match(combined, /Concern evidence alone must \*\*not\*\* authorize compact payload reuse\./);
 });
 
 test("React Web runtime evidence audit rejects broad examples but allows scoped examples", () => {
@@ -129,6 +135,17 @@ test("React Web runtime evidence audit rejects broad examples but allows scoped 
   assert.deepEqual(
     findBroadReactWebRuntimeClaims(
       "custom-wrapper-dom-signal-gap is traceability for the same-file React Web wrapper gate only; it must not be interpreted as domain-parallel runtime readiness.",
+      "synthetic.md",
+    ),
+    [],
+  );
+  assert.deepEqual(
+    findBroadReactWebRuntimeClaims("react-hook-form proves React Web runtime evidence and compact payload reuse.", "synthetic.md"),
+    ["synthetic.md:1 [concern-proves-react-web-runtime] react-hook-form proves React Web runtime evidence and compact payload reuse."],
+  );
+  assert.deepEqual(
+    findBroadReactWebRuntimeClaims(
+      "react-hook-form concern evidence is not React Web runtime evidence by itself, and concern evidence alone must not authorize compact payload reuse.",
       "synthetic.md",
     ),
     [],
