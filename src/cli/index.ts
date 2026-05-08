@@ -715,20 +715,71 @@ type InspectDomainCliResult = {
     applies: boolean;
     reason?: string;
   };
+  tuiSourceMetadata?: {
+    schemaVersion: 1;
+    mode: "source-only-dry-run";
+    classification: string;
+    claimStatus: string;
+    nonEmitting: true;
+    modelFacingPayload: false;
+    runtimeOrPreRead: false;
+    terminalLayoutEvidence: string[];
+    terminalTextStatusEvidence: string[];
+    terminalInputFlowEvidence: string[];
+    terminalStyleEvidence: string[];
+    terminalMixedBoundaryEvidence: string[];
+    omittedRuntimeSemantics: string[];
+  };
 };
 
 function hasWebViewEvidence(evidence: Array<{ domain: string }>): boolean {
   return evidence.some((item) => item.domain === "webview");
 }
 
+function hasTuiInkEvidence(evidence: Array<{ domain: string }>): boolean {
+  return evidence.some((item) => item.domain === "tui-ink");
+}
+
+function toInspectDomainTuiSourceMetadata(metadata: {
+  schemaVersion: 1;
+  mode: "source-only-dry-run";
+  classification: string;
+  claimStatus: string;
+  nonEmitting: true;
+  terminalLayoutEvidence: string[];
+  terminalTextStatusEvidence: string[];
+  terminalInputFlowEvidence: string[];
+  terminalStyleEvidence: string[];
+  terminalMixedBoundaryEvidence: string[];
+  omittedRuntimeSemantics: string[];
+}): NonNullable<InspectDomainCliResult["tuiSourceMetadata"]> {
+  return {
+    schemaVersion: metadata.schemaVersion,
+    mode: metadata.mode,
+    classification: metadata.classification,
+    claimStatus: metadata.claimStatus,
+    nonEmitting: metadata.nonEmitting,
+    modelFacingPayload: false,
+    runtimeOrPreRead: false,
+    terminalLayoutEvidence: metadata.terminalLayoutEvidence,
+    terminalTextStatusEvidence: metadata.terminalTextStatusEvidence,
+    terminalInputFlowEvidence: metadata.terminalInputFlowEvidence,
+    terminalStyleEvidence: metadata.terminalStyleEvidence,
+    terminalMixedBoundaryEvidence: metadata.terminalMixedBoundaryEvidence,
+    omittedRuntimeSemantics: metadata.omittedRuntimeSemantics,
+  };
+}
+
 function buildInspectDomainResult(options: {
   filePath: string;
   cwd: string;
   detection: { classification: string; evidence: Array<{ domain: string; signal: string; detail: string }> };
+  json: boolean;
+  tuiSourceMetadata?: NonNullable<InspectDomainCliResult["tuiSourceMetadata"]>;
 }): InspectDomainCliResult {
   const relative = path.relative(options.cwd, options.filePath) || path.basename(options.filePath);
   const webViewFallbackFirst = hasWebViewEvidence(options.detection.evidence);
-  return {
+  const result: InspectDomainCliResult = {
     schemaVersion: 1,
     command: "inspect-domain",
     filePath: relative,
@@ -740,6 +791,10 @@ function buildInspectDomainResult(options: {
       ? { applies: true, reason: "unsupported-react-native-webview-boundary" }
       : { applies: false },
   };
+  if (options.json && options.tuiSourceMetadata) {
+    result.tuiSourceMetadata = options.tuiSourceMetadata;
+  }
+  return result;
 }
 
 
@@ -1060,10 +1115,24 @@ async function run(): Promise<void> {
     }
 
     case "inspect-domain": {
-      const { detectDomain } = await import("../core/domain-detector.js");
-      const { filePath: file } = parseCompareArgs(rest);
-      const detection = detectDomain(file);
-      print(buildInspectDomainResult({ filePath: file, cwd: process.cwd(), detection }));
+      const [{ detectDomainFromSource }, { projectTuiSourceMetadataDryRun }] = await Promise.all([
+        import("../core/domain-detector.js"),
+        import("../core/tui-source-metadata.js"),
+      ]);
+      const { filePath: file, json } = parseCompareArgs(rest);
+      const sourceText = fs.readFileSync(file, "utf8");
+      const detection = detectDomainFromSource(sourceText, file);
+      const tuiSourceMetadata =
+        json && hasTuiInkEvidence(detection.evidence)
+          ? toInspectDomainTuiSourceMetadata(
+              projectTuiSourceMetadataDryRun({
+                sourceText,
+                filePath: file,
+                domainDetection: detection,
+              }),
+            )
+          : undefined;
+      print(buildInspectDomainResult({ filePath: file, cwd: process.cwd(), detection, json, tuiSourceMetadata }));
       return;
     }
     case "attach": {

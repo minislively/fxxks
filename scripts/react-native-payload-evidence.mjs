@@ -15,6 +15,7 @@ export const DEFAULT_RN_PAYLOAD_EVIDENCE_FIXTURES = [
 ];
 
 export const DEFAULT_RN_BOUNDARY_FIXTURES = [
+  "test/fixtures/frontend-domain-expectations/rn-primitive-inline-callback.tsx",
   "test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx",
   "test/fixtures/frontend-domain-expectations/rn-interaction-gesture.tsx",
   "test/fixtures/frontend-domain-expectations/rn-image-scrollview.tsx",
@@ -58,6 +59,12 @@ export const RN_STAGED_SLOT_FIXTURES = [
     lane: "RN primitive/input state-action adjacent",
     boundary: "measured narrow payload",
     relativeFile: "test/fixtures/frontend-domain-expectations/rn-state-action-concern.tsx",
+  },
+  {
+    slot: "F16",
+    lane: "RN primitive/input inline-callback alternate-primitive boundary",
+    boundary: "adjacent fallback boundary",
+    relativeFile: "test/fixtures/frontend-domain-expectations/rn-primitive-inline-callback.tsx",
   },
   {
     slot: "F2",
@@ -493,7 +500,7 @@ ${boundaryRows}
 
 The constraint/action readiness claim is scoped to \`${evidence.summary.constraintActionReadinessVisible.scope}\` and requires source-observed TextInput constraints, a direct actionReadsInputValue relation, and a source-observed Pressable disabled expression.
 
-The staged RN surface inventory is source-only closeout evidence for \`F1\`, \`F13\`, \`F14\`, \`F15\`, \`F2\`, \`F9\`, and \`F10\`. It records local concern-profile visibility and fallback posture only; it does not prove broad React Native support, route existence, navigation success, list virtualization correctness, image/layout correctness, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
+The staged RN surface inventory is source-only closeout evidence for \`F1\`, \`F13\`, \`F14\`, \`F15\`, \`F16\`, \`F2\`, \`F9\`, and \`F10\`. It records local concern-profile visibility and fallback posture only; it does not prove broad React Native support, route existence, navigation success, list virtualization correctness, image/layout correctness, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
 
 This artifact supports bounded local statements only for the existing \`rn-primitive-input-narrow-payload\` lane. It does not support broad React Native support, WebView/TUI promotion, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
 `;

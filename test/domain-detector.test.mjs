@@ -325,6 +325,73 @@ test("CLI inspect-domain prints detector evidence without support claims", () =>
   assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });
 
+test("CLI inspect-domain exposes top-level TUI source metadata only on JSON TUI evidence paths", () => {
+  const fixture = path.join(fixtureRoot, "tui-ink-basic.tsx");
+  const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(cli.status, 0, cli.stderr);
+  const result = JSON.parse(cli.stdout);
+
+  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.command, "inspect-domain");
+  assert.equal(result.filePath, path.relative(repoRoot, fixture));
+  assert.deepEqual(Object.keys(result.domainDetection).sort(), ["classification", "evidence"]);
+  assert.equal(result.domainDetection.classification, "tui-ink");
+  assert.deepEqual(result.fallbackFirst, { applies: false });
+  assert.ok(result.tuiSourceMetadata);
+  assert.equal(result.tuiSourceMetadata.schemaVersion, 1);
+  assert.equal(result.tuiSourceMetadata.mode, "source-only-dry-run");
+  assert.equal(result.tuiSourceMetadata.classification, "tui-ink");
+  assert.equal(result.tuiSourceMetadata.claimStatus, "evidence-only");
+  assert.equal(result.tuiSourceMetadata.nonEmitting, true);
+  assert.equal(result.tuiSourceMetadata.modelFacingPayload, false);
+  assert.equal(result.tuiSourceMetadata.runtimeOrPreRead, false);
+  assert.equal("integration" in result.tuiSourceMetadata, false);
+  assert.ok(result.tuiSourceMetadata.terminalLayoutEvidence.includes("primitive:Box"));
+  assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain keeps TUI source metadata out of unflagged and non-TUI paths", () => {
+  const tuiFixture = path.join(fixtureRoot, "tui-ink-basic.tsx");
+  const nonTuiFixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
+
+  for (const args of [
+    ["inspect-domain", tuiFixture],
+    ["inspect-domain", nonTuiFixture, "--json"],
+  ]) {
+    const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), ...args], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    assert.equal(cli.status, 0, cli.stderr);
+    const result = JSON.parse(cli.stdout);
+    assert.equal("tuiSourceMetadata" in result, false);
+  }
+});
+
+test("CLI inspect-domain keeps mixed TUI evidence top-level while preserving domainDetection shape", () => {
+  const fixture = path.join(fixtureRoot, "tui-ink-web-dom-mixed.tsx");
+  const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(cli.status, 0, cli.stderr);
+  const result = JSON.parse(cli.stdout);
+
+  assert.deepEqual(Object.keys(result.domainDetection).sort(), ["classification", "evidence"]);
+  assert.equal(result.domainDetection.classification, "mixed");
+  assert.ok(result.tuiSourceMetadata);
+  assert.equal(result.tuiSourceMetadata.classification, "mixed");
+  assert.equal(result.tuiSourceMetadata.claimStatus, "fallback-boundary");
+  assert.ok(result.tuiSourceMetadata.terminalMixedBoundaryEvidence.includes("mixed-with:react-web"));
+  assert.equal("tuiSourceMetadata" in result.domainDetection, false);
+});
+
 test("CLI inspect-domain keeps non-WebView fixture output as evidence-only non-fallback inspection", () => {
   const fixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
   const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture], {

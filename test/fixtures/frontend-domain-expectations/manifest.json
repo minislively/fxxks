@@ -157,6 +157,39 @@
       "payloadPolicy": "rn-primitive-input-narrow-payload"
     },
     {
+      "slot": "F16",
+      "id": "rn-inline-callback-boundary",
+      "lane": "rn-primitive",
+      "path": "test/fixtures/frontend-domain-expectations/rn-primitive-inline-callback.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": [
+        "react-native import",
+        "View",
+        "Text",
+        "TextInput",
+        "TouchableOpacity",
+        "Button",
+        "onChangeText",
+        "onPress",
+        "onSubmitEditing",
+        "same-file inline callback evidence"
+      ],
+      "forbiddenClaims": [
+        "No React Native support claim",
+        "No DOM/form semantic inference",
+        "No alternate primitive payload promotion claim"
+      ],
+      "verification": "detectDomain remains react-native fallback evidence; decidePreRead returns fallback with unsupported-frontend-domain-profile because same-file inline callback evidence attached to TouchableOpacity/Button stays outside the RN primitive/input narrow payload policy and does not introduce F2/F9/F10/WebView/TUI/React Web signals",
+      "supportClaim": "none",
+      "evidenceScope": "rn-primitive-input-adjacent-boundary-only",
+      "preReadExpectedOutcome": "fallback",
+      "preReadExpectedReason": "unsupported-frontend-domain-profile",
+      "fallbackReasonScope": "current-boundary-reason-only"
+    },
+    {
       "slot": "F2",
       "id": "rn-style-platform-navigation",
       "lane": "rn-style-platform",

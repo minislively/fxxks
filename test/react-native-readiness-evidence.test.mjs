@@ -28,17 +28,17 @@ test("React Native readiness evidence emits the approved slot map without wideni
   assert.match(evidence.claimBoundary, /not broad React Native support/);
   assert.match(evidence.claimBoundary, /not runtime correctness/);
 
-  assert.equal(evidence.summary.slotCount, 7);
+  assert.equal(evidence.summary.slotCount, 8);
   assert.deepEqual(evidence.slots.map((row) => row.slot), RN_READINESS_SLOT_ORDER);
   assert.deepEqual(evidence.summary.payloadCapableSlots, ["F1", "F13", "F14", "F15"]);
-  assert.deepEqual(evidence.summary.readinessOnlySlots, ["F2", "F9", "F10"]);
+  assert.deepEqual(evidence.summary.readinessOnlySlots, ["F16", "F2", "F9", "F10"]);
   assert.deepEqual(evidence.claimability, {
     broadReactNativeSupport: false,
     runtimeCorrectness: false,
     providerBillingSavings: false,
   });
   assert.equal(evidence.summary.childArtifact.schemaVersion, "react-native-payload-evidence.v4");
-  assert.equal(evidence.summary.childArtifact.stagedSlotCount, 7);
+  assert.equal(evidence.summary.childArtifact.stagedSlotCount, 8);
 
   const bySlot = new Map(evidence.slots.map((row) => [row.slot, row]));
   assert.deepEqual(bySlot.get("F1"), {
@@ -85,6 +85,21 @@ test("React Native readiness evidence emits the approved slot map without wideni
     evidenceScope: "rn-primitive-input-narrow-payload-only",
     fixture: "test/fixtures/frontend-domain-expectations/rn-state-action-concern.tsx",
   });
+  assert.deepEqual(bySlot.get("F16"), {
+    slot: "F16",
+    id: "rn-inline-callback-boundary",
+    surface: "RN primitive/input inline-callback alternate-primitive boundary",
+    outcome: "fallback",
+    policy: "source-only-adjacent-boundary",
+    supportClaim: "none",
+    evidenceScope: "rn-primitive-input-adjacent-boundary-only",
+    fixture: "test/fixtures/frontend-domain-expectations/rn-primitive-inline-callback.tsx",
+    fallbackReason: "unsupported-frontend-domain-profile",
+    blockers: [
+      "alternate action primitives stay outside the current Pressable-based narrow gate",
+      "must not imply payload promotion or broad RN support",
+    ],
+  });
   assert.equal(bySlot.get("F2").outcome, "fallback");
   assert.equal(bySlot.get("F2").policy, "source-only-readiness");
   assert.equal(bySlot.get("F2").fallbackReason, "unsupported-frontend-domain-profile");
@@ -110,12 +125,13 @@ test("React Native readiness evidence markdown keeps non-claims explicit", async
 
   assert.match(markdown, /# React Native readiness evidence/);
   assert.match(markdown, /Profile: react-native/);
-  assert.match(markdown, /Slot count: 7/);
+  assert.match(markdown, /Slot count: 8/);
   assert.match(markdown, /Payload-capable slots: F1, F13, F14, F15/);
-  assert.match(markdown, /Readiness-only slots: F2, F9, F10/);
+  assert.match(markdown, /Readiness-only slots: F16, F2, F9, F10/);
   assert.match(markdown, /Broad React Native support claimable: no/);
   assert.match(markdown, /Runtime correctness claimable: no/);
   assert.match(markdown, /Provider billing savings claimable: no/);
+  assert.match(markdown, /\| F16 \| rn-inline-callback-boundary \| RN primitive\/input inline-callback alternate-primitive boundary \| fallback \| source-only-adjacent-boundary \| unsupported-frontend-domain-profile \| alternate action primitives stay outside the current Pressable-based narrow gate; must not imply payload promotion or broad RN support \|/);
   assert.match(markdown, /\| F2 \| rn-style-platform-navigation \| RN style\/platform\/navigation \| fallback \| source-only-readiness \| unsupported-frontend-domain-profile \| no runtime navigation correctness evidence; must not imply broad RN support \|/);
   assert.doesNotMatch(markdown, /Broad React Native support claimable: yes/i);
   assert.doesNotMatch(markdown, /Runtime correctness claimable: yes/i);
@@ -153,4 +169,5 @@ test("React Native readiness evidence command writes bounded JSON and Markdown r
   assert.deepEqual(fileEvidence, stdoutEvidence);
   assert.match(markdown, /# React Native readiness evidence/);
   assert.match(markdown, /Payload-capable slots: F1, F13, F14, F15/);
+  assert.match(markdown, /Readiness-only slots: F16, F2, F9, F10/);
 });
