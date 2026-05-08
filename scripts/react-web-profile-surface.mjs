@@ -21,6 +21,24 @@ export const REACT_WEB_PROFILE_ARTIFACT_KEYS = [
   "knowledgeContext",
 ];
 
+export function assertReactWebProfileSurfaceContract(evidence) {
+  if (evidence?.schemaVersion !== "react-web-profile-surface.v1") {
+    throw new Error("React Web profile surface contract broken: schemaVersion is missing or unsupported");
+  }
+  if (evidence?.profile !== "react-web") {
+    throw new Error("React Web profile surface contract broken: profile must stay on react-web");
+  }
+  if (JSON.stringify(Object.keys(evidence?.artifacts ?? {})) !== JSON.stringify(REACT_WEB_PROFILE_ARTIFACT_KEYS)) {
+    throw new Error("React Web profile surface contract broken: artifact keys changed");
+  }
+  if (evidence?.summary?.artifactCount !== REACT_WEB_PROFILE_ARTIFACT_KEYS.length) {
+    throw new Error("React Web profile surface contract broken: artifactCount changed");
+  }
+  if (JSON.stringify(evidence?.summary?.artifactKeys ?? []) !== JSON.stringify(REACT_WEB_PROFILE_ARTIFACT_KEYS)) {
+    throw new Error("React Web profile surface contract broken: summary artifactKeys changed");
+  }
+}
+
 function prefixedWarnings(prefix, warnings = []) {
   return warnings.map((warning) => `${prefix}: ${warning}`);
 }
@@ -45,7 +63,7 @@ export async function buildReactWebProfileSurface({
     knowledgeContext,
   };
 
-  return {
+  const evidence = {
     schemaVersion: "react-web-profile-surface.v1",
     generatedAt: new Date().toISOString(),
     runId,
@@ -85,6 +103,9 @@ export async function buildReactWebProfileSurface({
       ],
     },
   };
+
+  assertReactWebProfileSurfaceContract(evidence);
+  return evidence;
 }
 
 export function renderReactWebProfileSurfaceMarkdown(evidence) {

@@ -43,7 +43,8 @@
     "pr:alerts": "node scripts/guard-pr-alerts.mjs",
     "pr:merge-cleanup": "node scripts/classify-pr-merge-cleanup.mjs",
     "evidence:react-native-readiness": "npm run build && node scripts/react-native-readiness-evidence.mjs",
-    "evidence:react-web-pr-advisory": "npm run build && node scripts/react-web-pr-advisory-surface.mjs"
+    "evidence:react-web-pr-advisory": "npm run build && node scripts/react-web-pr-advisory-surface.mjs",
+    "evidence:react-web-pr-gate": "npm run build && node scripts/react-web-pr-gate-surface.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
