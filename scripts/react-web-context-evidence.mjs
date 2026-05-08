@@ -13,6 +13,9 @@ export const DEFAULT_REACT_WEB_EVIDENCE_FIXTURES = [
   "fixtures/hybrid/DashboardPanel.tsx",
   "test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
   "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+  "test/fixtures/react-web-context-expansion/route-page-account-settings.tsx",
+  "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+  "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
 ];
 
 function byteLength(value) {
