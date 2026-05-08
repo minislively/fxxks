@@ -4783,6 +4783,8 @@ test("docs describe TUI/Ink fixture survey as future candidate evidence only", (
   assert.match(survey, /No extractor, pre-read, setup, doctor, or runtime behavior change/);
   assert.match(survey, /No provider-token, billing, runtime-token, performance, or terminal correctness claim/);
   assert.match(survey, /No default TUI compact extraction or profile promotion/);
+  assert.match(survey, /Evidence-only review checklist/);
+  assert.match(survey, /must not be reused as README, roadmap, release-note, or package support wording/);
   assert.equal(pkg.files.includes("docs/tui-fixture-candidates.md"), false);
 
   assert.doesNotMatch(combined, /TUI support is available/i);
