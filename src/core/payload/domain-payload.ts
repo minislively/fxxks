@@ -71,7 +71,7 @@ export type ReactNativeSourceAnchorBetaContract = {
   sourceDerivedOnly: true;
   anchorKinds: readonly (typeof RN_SOURCE_ANCHOR_BETA_ANCHOR_KINDS)[number][];
   fallbackFirstBoundaries: readonly (typeof RN_SOURCE_ANCHOR_BETA_FALLBACK_FIRST_BOUNDARIES)[number][];
-  nextImplementationStep: "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates";
+  nextImplementationStep: "treat RN sourceAnchorBeta as closeout/frozen after located-anchor hardening until a new extract/compare/inspect-domain visibility plan is explicitly approved";
 };
 
 export type ReactNativeSourceAnchorBetaLocatedAnchor = {
@@ -283,7 +283,7 @@ function buildReactNativeSourceAnchorBetaContract(): ReactNativeSourceAnchorBeta
     anchorKinds: [...RN_SOURCE_ANCHOR_BETA_ANCHOR_KINDS],
     fallbackFirstBoundaries: [...RN_SOURCE_ANCHOR_BETA_FALLBACK_FIRST_BOUNDARIES],
     nextImplementationStep:
-      "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates",
+      "treat RN sourceAnchorBeta as closeout/frozen after located-anchor hardening until a new extract/compare/inspect-domain visibility plan is explicitly approved",
   };
 }
 

@@ -85,7 +85,7 @@ function isReactNativeSourceAnchorBetaPayload(value: unknown): value is ReactNat
       "tui-ink",
     ]) &&
     contract.nextImplementationStep ===
-      "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates" &&
+      "treat RN sourceAnchorBeta as closeout/frozen after located-anchor hardening until a new extract/compare/inspect-domain visibility plan is explicitly approved" &&
     Boolean(anchors) &&
     anchors?.sourceFingerprintRequired === true &&
     arraysContainValues(anchors?.primitives, ["Pressable", "Text", "TextInput", "View"]) &&

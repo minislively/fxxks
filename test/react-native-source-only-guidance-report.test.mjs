@@ -14,6 +14,7 @@ test("RN source-only guidance report locks the slot taxonomy boundary", () => {
 
   assert.match(report, /`F1`, `F13`, `F14`, and `F15` are the only RN slots that may emit narrow payload evidence\./);
   assert.match(report, /`F16`, `F2`, `F9`, and `F10` remain fallback\/readiness lanes with source-only concern or boundary metadata\./);
+  assert.match(report, /Located-anchor hardening is already complete; RN `sourceAnchorBeta` should now be treated as closeout\/frozen until a new `extract` \/ `compare` \/ `inspect-domain` visibility plan is explicitly approved\./);
   assert.match(report, /`F1` \/ `F13` \/ `F14` \/ `F15` primitive\/input[\s\S]*`rn-primitive-input-narrow-payload`/);
   assert.match(report, /`F16` adjacent inline-callback boundary[\s\S]*alternate action primitives such as `TouchableOpacity` or `Button`/);
   assert.match(report, /`F2` style\/platform\/navigation[\s\S]*Must not claim route existence, navigation success/);
