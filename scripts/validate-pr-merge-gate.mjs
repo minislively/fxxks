@@ -74,13 +74,16 @@ export function pullRequestHasLinkedClosingIssue(pullRequest) {
 export function evaluatePullRequestMergeGate({
   pullRequest,
   reviews = [],
+  changedFiles = [],
   requireLinkedIssue = true,
   requireApproval = true,
   allowedReviewerLogins = DEFAULT_ALLOWED_REVIEWERS,
 }) {
   const blockers = [];
+  const docsTestsOnlyChange = classifyDocsTestsOnlyChange(changedFiles);
+  const linkedIssueRequired = requireLinkedIssue && !docsTestsOnlyChange.docsTestsOnly;
 
-  if (requireLinkedIssue && !pullRequestHasLinkedClosingIssue(pullRequest)) {
+  if (linkedIssueRequired && !pullRequestHasLinkedClosingIssue(pullRequest)) {
     blockers.push("PR body or title must link a closing issue with Fixes/Closes/Resolves #123.");
   }
 
@@ -106,6 +109,7 @@ export function evaluatePullRequestMergeGate({
     ok: blockers.length === 0,
     blockers,
     approvingReviewers: qualifyingReviewers,
+    docsTestsOnly: docsTestsOnlyChange.docsTestsOnly,
   };
 }
 
@@ -123,6 +127,33 @@ async function fetchPullRequestReviews({ repository, pullNumber, token }) {
     throw new Error(`Failed to fetch PR reviews: ${response.status} ${response.statusText}`);
   }
   return response.json();
+}
+
+async function fetchPullRequestFiles({ repository, pullNumber, token }) {
+  const files = [];
+  let page = 1;
+
+  while (true) {
+    const url = `https://api.github.com/repos/${repository}/pulls/${pullNumber}/files?per_page=100&page=${page}`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "fooks-merge-gate",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PR files: ${response.status} ${response.statusText}`);
+    }
+
+    const payload = await response.json();
+    files.push(...payload.map((item) => item?.filename).filter(Boolean));
+    if (payload.length < 100) break;
+    page += 1;
+  }
+
+  return files;
 }
 
 async function main() {
@@ -143,15 +174,23 @@ async function main() {
   }
 
   const requireApproval = process.env.MERGE_GATE_REQUIRE_APPROVAL !== "false";
-  const reviews = await fetchPullRequestReviews({
+  const changedFiles = await fetchPullRequestFiles({
     repository,
     pullNumber: pullRequest.number,
     token,
   });
+  const reviews = requireApproval
+    ? await fetchPullRequestReviews({
+      repository,
+      pullNumber: pullRequest.number,
+      token,
+    })
+    : [];
 
   const result = evaluatePullRequestMergeGate({
     pullRequest,
     reviews,
+    changedFiles,
     requireLinkedIssue: process.env.MERGE_GATE_REQUIRE_LINKED_ISSUE !== "false",
     requireApproval,
     allowedReviewerLogins: [...parseAllowedReviewers(process.env.MERGE_GATE_ALLOWED_REVIEWERS)],
@@ -164,10 +203,16 @@ async function main() {
     return;
   }
 
+  const docsTestsOnlySummary = result.docsTestsOnly
+    ? " Docs/test-only change detected; linked issue requirement skipped."
+    : "";
   const approvalSummary = result.approvingReviewers.length > 0
     ? ` Qualifying reviewer(s): ${result.approvingReviewers.join(", ")}`
     : "";
-  console.log(`Merge gate passed. Linked issue detected.${approvalSummary}`);
+  const linkedIssueSummary = result.docsTestsOnly
+    ? ""
+    : " Linked issue detected.";
+  console.log(`Merge gate passed.${linkedIssueSummary}${docsTestsOnlySummary}${approvalSummary}`);
 }
 
 function isMainModule() {
