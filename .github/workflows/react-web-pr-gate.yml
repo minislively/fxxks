@@ -1,0 +1,51 @@
+name: React Web PR Gate
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  react-web-pr-gate:
+    name: React Web PR gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run React Web PR gate
+        run: |
+          set +e
+          npm run evidence:react-web-pr-gate -- --run-id=pr-${{ github.event.pull_request.number }} --output=$RUNNER_TEMP/react-web-pr-gate.json --markdown-output=$RUNNER_TEMP/react-web-pr-gate.md
+          gate_status=$?
+          echo "REACT_WEB_PR_GATE_EXIT_CODE=$gate_status" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Publish React Web PR gate summary
+        if: always()
+        run: cat "$RUNNER_TEMP/react-web-pr-gate.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail when the bounded React Web PR gate trips
+        if: env.REACT_WEB_PR_GATE_EXIT_CODE != '0'
+        run: exit 1
