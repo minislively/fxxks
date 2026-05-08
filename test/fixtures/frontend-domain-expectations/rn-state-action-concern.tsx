@@ -1,26 +1,34 @@
 import { useReducer, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
+type StateActionAdjacentRowProps = {
+  initialValue?: string;
+  onCommit?: (value: string) => void;
+};
+
 function reducer(state: { submitted: boolean }, action: { type: "submit" | "reset" }) {
   if (action.type === "reset") return { submitted: false };
   return { submitted: true };
 }
 
-export function StateActionConcernCard() {
-  const [query, setQuery] = useState("");
+export function StateActionAdjacentRow({ initialValue = "", onCommit = () => {} }: StateActionAdjacentRowProps) {
+  const [query, setQuery] = useState(initialValue);
   const [status, dispatch] = useReducer(reducer, { submitted: false });
 
   const submitQuery = () => {
-    setQuery((current) => current.trim());
+    const trimmed = query.trim();
+    setQuery(trimmed);
     dispatch({ type: "submit" });
+    onCommit(trimmed);
   };
 
   return (
-    <View accessibilityLabel="state action concern card">
+    <View accessibilityLabel="state action adjacent row" testID="state-action-row">
+      <Text>Query</Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
-        onSubmitEditing={() => dispatch({ type: "submit" })}
+        onSubmitEditing={submitQuery}
         placeholder="Filter"
         testID="state-action-input"
       />

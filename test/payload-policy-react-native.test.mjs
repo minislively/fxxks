@@ -73,11 +73,12 @@ test("React Native payload policy allows the measured primitive/input signal set
   });
 });
 
-test("React Native payload leakage guard allows only F1 and F13 pre-read payloads", () => {
+test("React Native payload leakage guard allows only the named F1-adjacent pre-read payloads", () => {
   const cases = [
     ["F1", "rn-primitive-basic.tsx", "payload", undefined],
     ["F13", "rn-primitive-inline-action.tsx", "payload", undefined],
     ["F14", "rn-accessibility-test-anchor.tsx", "payload", undefined],
+    ["F15", "rn-state-action-concern.tsx", "payload", undefined],
     ["F2", "rn-style-platform-navigation.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F9", "rn-interaction-gesture.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F10", "rn-image-scrollview.tsx", "fallback", "unsupported-frontend-domain-profile"],
@@ -472,10 +473,33 @@ test("React Native inline callbacks and external references stay source-only wit
   assert.equal(importedResult.behavior?.rnPrimitiveInteractions?.actionBindings?.[0].onPressSource, "imported");
 });
 
-test("React Native state/action concern evidence stays same-file and source-only", () => {
+test("React Native F15 state/action adjacent fixture remains inside the narrow payload lane", () => {
   const filePath = fixturePath("rn-state-action-concern.tsx");
+  const domainDetection = detect(fixtureSource("rn-state-action-concern.tsx"), filePath);
+  const policy = preRead.assessFrontendPayloadPolicy(domainDetection);
+  const decision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
   const result = extractFile(filePath);
 
+  assert.equal(domainDetection.classification, "react-native");
+  assert.deepEqual(policy, {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: true,
+  });
+  assert.equal(decision.decision, "payload");
+  assert.equal(decision.payload.domainPayload.domain, "react-native");
+  assert.equal(decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(decision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.deepEqual(decision.payload.domainPayload.sourceAnchorBeta.anchors.hooks, ["useReducer", "useState"]);
+  assert.ok(
+    decision.payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some(
+      (item) => item.kind === "component-name" && item.label === "StateActionAdjacentRow",
+    ),
+  );
+  assert.ok(
+    decision.payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some(
+      (item) => item.kind === "event-handlers" && item.label === "onSubmitEditing:submitQuery",
+    ),
+  );
   assert.equal(result.domainDetection?.classification, "react-native");
   assert.deepEqual(result.behavior?.rnStateActionConcerns, [
     {
@@ -488,8 +512,21 @@ test("React Native state/action concern evidence stays same-file and source-only
       actionExpr: "setQuery",
       actionKind: "identifier",
       actionSource: "same-file-local",
-      loc: { startLine: 20, endLine: 26 },
+      loc: { startLine: 28, endLine: 34 },
       evidence: ["jsx.TextInput.onChangeText", "hook.useState", "rn-state-action.setter"],
+    },
+    {
+      hook: "useState",
+      stateBinding: "query",
+      mutatorBinding: "setQuery",
+      mutatorKind: "setter",
+      primitive: "TextInput",
+      trigger: "onSubmitEditing",
+      actionExpr: "submitQuery",
+      actionKind: "identifier",
+      actionSource: "same-file-local",
+      loc: { startLine: 28, endLine: 34 },
+      evidence: ["jsx.TextInput.onSubmitEditing", "hook.useState", "rn-state-action.setter"],
     },
     {
       hook: "useReducer",
@@ -498,10 +535,10 @@ test("React Native state/action concern evidence stays same-file and source-only
       mutatorKind: "dispatch",
       primitive: "TextInput",
       trigger: "onSubmitEditing",
-      actionExpr: "() => dispatch({ type: \"submit\" })",
-      actionKind: "inline-callback",
-      actionSource: "same-file-inline",
-      loc: { startLine: 20, endLine: 26 },
+      actionExpr: "submitQuery",
+      actionKind: "identifier",
+      actionSource: "same-file-local",
+      loc: { startLine: 28, endLine: 34 },
       evidence: ["jsx.TextInput.onSubmitEditing", "hook.useReducer", "rn-state-action.dispatch"],
     },
     {
@@ -514,7 +551,7 @@ test("React Native state/action concern evidence stays same-file and source-only
       actionExpr: "submitQuery",
       actionKind: "identifier",
       actionSource: "same-file-local",
-      loc: { startLine: 27, endLine: 27 },
+      loc: { startLine: 35, endLine: 35 },
       evidence: ["jsx.Pressable.onPress", "hook.useState", "rn-state-action.setter"],
     },
     {
@@ -527,7 +564,7 @@ test("React Native state/action concern evidence stays same-file and source-only
       actionExpr: "submitQuery",
       actionKind: "identifier",
       actionSource: "same-file-local",
-      loc: { startLine: 27, endLine: 27 },
+      loc: { startLine: 35, endLine: 35 },
       evidence: ["jsx.Pressable.onPress", "hook.useReducer", "rn-state-action.dispatch"],
     },
   ]);
