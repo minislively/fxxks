@@ -18,6 +18,7 @@
     "evidence:react-web-stability": "npm run build && node scripts/react-web-stability-evidence.mjs",
     "evidence:react-web-mixed-routing": "npm run build && node scripts/react-web-mixed-routing-evidence.mjs",
     "evidence:react-web-knowledge-context": "npm run build && node scripts/react-web-knowledge-context-evidence.mjs",
+    "evidence:react-web-profile": "npm run build && node scripts/react-web-profile-surface.mjs",
     "evidence:release-benchmark": "npm run build && node scripts/release-benchmark-evidence.mjs",
     "clean": "rm -rf dist",
     "bench": "npm run build && node benchmarks/scripts/run-all.mjs",
