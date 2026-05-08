@@ -1,0 +1,152 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  buildReactWebProfileSurface,
+  REACT_WEB_PROFILE_ARTIFACT_KEYS,
+} from "./react-web-profile-surface.mjs";
+import {
+  buildReleaseBenchmarkEvidence,
+  buildReleaseBenchmarkSmokeSummary,
+} from "./release-benchmark-evidence.mjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const defaultRepoRoot = path.resolve(__dirname, "..");
+
+export function assertReactWebPrAdvisoryContract({ profileSurface, releaseBenchmarkEvidence }) {
+  if (profileSurface?.schemaVersion !== "react-web-profile-surface.v1") {
+    throw new Error("React Web PR advisory contract broken: profile surface schemaVersion is missing or unsupported");
+  }
+  if (profileSurface?.profile !== "react-web") {
+    throw new Error("React Web PR advisory contract broken: profile surface must stay on react-web");
+  }
+  if (JSON.stringify(Object.keys(profileSurface?.artifacts ?? {})) !== JSON.stringify(REACT_WEB_PROFILE_ARTIFACT_KEYS)) {
+    throw new Error("React Web PR advisory contract broken: profile surface artifact keys changed");
+  }
+  if (profileSurface?.claimability?.contextReduction !== false
+    || profileSurface?.claimability?.cachePerformance !== false
+    || profileSurface?.claimability?.providerBillingSavings !== false) {
+    throw new Error("React Web PR advisory contract broken: profile surface top-level claimability widened");
+  }
+
+  if (releaseBenchmarkEvidence?.schemaVersion !== "release-benchmark-evidence.v1") {
+    throw new Error("React Web PR advisory contract broken: release benchmark schemaVersion is missing or unsupported");
+  }
+  if (typeof releaseBenchmarkEvidence?.releaseClaims?.headline !== "string" || releaseBenchmarkEvidence.releaseClaims.headline.length === 0) {
+    throw new Error("React Web PR advisory contract broken: release benchmark headline is missing");
+  }
+  if (releaseBenchmarkEvidence?.nonClaims?.cachePerformanceImprovement?.claimable !== false
+    || releaseBenchmarkEvidence?.nonClaims?.runtimeTokenSavings?.claimable !== false
+    || releaseBenchmarkEvidence?.nonClaims?.providerBillingSavings?.claimable !== false) {
+    throw new Error("React Web PR advisory contract broken: release benchmark non-claims widened");
+  }
+}
+
+export async function buildReactWebPrAdvisorySurface({
+  repoRoot = defaultRepoRoot,
+  runId = new Date().toISOString().replace(/[:.]/g, "-"),
+  profileSurfaceBuilder = buildReactWebProfileSurface,
+  releaseBenchmarkBuilder = buildReleaseBenchmarkEvidence,
+} = {}) {
+  const profileSurface = await profileSurfaceBuilder({ repoRoot, runId: `${runId}-profile` });
+  const releaseBenchmarkEvidence = await releaseBenchmarkBuilder({ repoRoot, runId: `${runId}-release-benchmark` });
+
+  assertReactWebPrAdvisoryContract({ profileSurface, releaseBenchmarkEvidence });
+
+  const releaseBenchmarkSummary = buildReleaseBenchmarkSmokeSummary(releaseBenchmarkEvidence);
+
+  return {
+    schemaVersion: "react-web-pr-advisory-surface.v1",
+    generatedAt: new Date().toISOString(),
+    runId,
+    advisory: true,
+    consumer: "pull-request",
+    status: "advisory",
+    checkName: "React Web PR advisory",
+    profile: "react-web",
+    claimBoundary:
+      "PR-facing advisory summary only: presentation adapter over the existing bounded React Web profile surface. This check does not create a new evidence lane, does not change merge policy, and does not prove cache performance, runtime-token savings, provider cost, billing, invoice, charged-cost, or broad multi-domain support claims.",
+    profileSurface,
+    releaseBenchmarkSummary,
+    summary: {
+      advisoryOnly: true,
+      profileArtifactCount: profileSurface.summary.artifactCount,
+      artifactKeys: profileSurface.summary.artifactKeys,
+      childSignals: profileSurface.summary.childSignals,
+      warningCount: profileSurface.summary.warnings.length,
+      warnings: profileSurface.summary.warnings,
+      releaseSafeHeadline: releaseBenchmarkSummary.headline,
+      nonClaims: {
+        profileTopLevelContextReduction: profileSurface.claimability.contextReduction,
+        cachePerformance: releaseBenchmarkSummary.nonClaims.cachePerformanceImprovement,
+        runtimeTokenSavings: releaseBenchmarkSummary.nonClaims.runtimeTokenSavings,
+        providerBillingSavings: releaseBenchmarkSummary.nonClaims.providerBillingSavings,
+        broadSupport: false,
+      },
+    },
+  };
+}
+
+export function renderReactWebPrAdvisoryMarkdown(evidence) {
+  const warnings = evidence.summary.warnings.length > 0
+    ? evidence.summary.warnings.map((warning) => `- ${warning}`).join("\n")
+    : "- none";
+
+  return `# React Web PR advisory
+
+${evidence.claimBoundary}
+
+## Advisory status
+
+- Advisory only: ${evidence.summary.advisoryOnly ? "yes" : "no"}
+- Consumer: ${evidence.consumer}
+- Check name: ${evidence.checkName}
+- Profile: ${evidence.profile}
+- Artifact count: ${evidence.summary.profileArtifactCount}
+- Artifact keys: ${evidence.summary.artifactKeys.join(", ")}
+- Release-safe headline: ${evidence.summary.releaseSafeHeadline}
+
+## Child evidence snapshot
+
+- Context actual injected context reduction claimable inside child evidence: ${evidence.summary.childSignals.contextActualInjectedContextReductionClaimable ? "yes" : "no"}
+- Reuse correctness claimable inside child evidence: ${evidence.summary.childSignals.reuseCorrectnessClaimable ? "yes" : "no"}
+- Over-caching audit verdict: ${evidence.summary.childSignals.overCachingAuditVerdictName}
+- Stability warning-only: ${evidence.summary.childSignals.stabilityWarningOnly ? "yes" : "no"}
+- Mixed-routing boundary isolation claimable: ${evidence.summary.childSignals.mixedRoutingBoundaryIsolationClaimable ? "yes" : "no"}
+- Knowledge-context boundary evidence claimable: ${evidence.summary.childSignals.knowledgeContextBoundaryEvidenceClaimable ? "yes" : "no"}
+
+## Non-claims
+
+- This advisory does not block merge or release in pass 1.
+- Profile top-level context reduction claim widened: ${evidence.summary.nonClaims.profileTopLevelContextReduction ? "yes" : "no"}
+- Cache performance proof: ${evidence.summary.nonClaims.cachePerformance ? "yes" : "no"}
+- Runtime-token savings proof: ${evidence.summary.nonClaims.runtimeTokenSavings ? "yes" : "no"}
+- Provider billing/cost savings proof: ${evidence.summary.nonClaims.providerBillingSavings ? "yes" : "no"}
+- Broad React/RN/WebView/TUI support proof: ${evidence.summary.nonClaims.broadSupport ? "yes" : "no"}
+
+## Warnings
+
+${warnings}
+`;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const runId = process.argv.find((arg) => arg.startsWith("--run-id="))?.slice("--run-id=".length) ?? "local";
+  const outputArg = process.argv.find((arg) => arg.startsWith("--output="))?.slice("--output=".length);
+  const markdownArg = process.argv.find((arg) => arg.startsWith("--markdown-output="))?.slice("--markdown-output=".length);
+  const evidence = await buildReactWebPrAdvisorySurface({ repoRoot: defaultRepoRoot, runId });
+
+  if (outputArg) {
+    const outputPath = path.resolve(defaultRepoRoot, outputArg);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
+  }
+  if (markdownArg) {
+    const markdownPath = path.resolve(defaultRepoRoot, markdownArg);
+    fs.mkdirSync(path.dirname(markdownPath), { recursive: true });
+    fs.writeFileSync(markdownPath, renderReactWebPrAdvisoryMarkdown(evidence));
+  }
+
+  process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`);
+}
