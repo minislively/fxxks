@@ -65,9 +65,27 @@ test("summarizeWorktreeStatus separates tracked, untracked, ignored, and conflic
   assert.deepEqual(summary.untrackedPaths, ["scratch.log"]);
   assert.deepEqual(summary.ignoredPaths, ["dist/index.js"]);
   assert.deepEqual(summary.conflictedPaths, ["src/conflict.ts"]);
+  assert.deepEqual(summary.changeKindCounts, {
+    modified: 1,
+    untracked: 1,
+    unmerged: 1,
+  });
 });
 
 test("parseAndSummarizeWorktreeStatus treats empty or ignored-only output as clean", () => {
   assert.equal(parseAndSummarizeWorktreeStatus("\n").clean, true);
   assert.equal(parseAndSummarizeWorktreeStatus("!! dist/index.js\n").clean, true);
+});
+
+test("summarizeWorktreeStatus counts additive change kinds for downstream worktree evidence", () => {
+  const summary = parseAndSummarizeWorktreeStatus(
+    "R  src/old.ts -> src/new.ts\n?? scratch.log\n D docs/old.md\nT  scripts/run.sh\n",
+  );
+
+  assert.deepEqual(summary.changeKindCounts, {
+    renamed: 1,
+    untracked: 1,
+    deleted: 1,
+    "type-changed": 1,
+  });
 });

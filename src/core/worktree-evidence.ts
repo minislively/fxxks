@@ -33,6 +33,7 @@ export type WorktreeSnapshot = {
   untrackedPaths: string[];
   ignoredPaths: string[];
   conflictedPaths: string[];
+  changeKindCounts: Partial<Record<import("./worktree-status").WorktreeChangeKind, number>>;
   branchDivergence?: BranchDivergence;
 };
 
@@ -230,6 +231,7 @@ export function captureWorktreeSnapshot(cwd = process.cwd(), options: WorktreeEv
         untrackedPaths: uniqueSorted(summary.untrackedPaths),
         ignoredPaths: uniqueSorted(summary.ignoredPaths),
         conflictedPaths: uniqueSorted(summary.conflictedPaths),
+        changeKindCounts: summary.changeKindCounts,
         branchDivergence,
       },
       blockers: [],

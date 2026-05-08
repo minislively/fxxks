@@ -53,6 +53,7 @@ test("captureWorktreeSnapshot parses clean, untracked, conflicted, and rename ev
   assert.deepEqual(clean.blockers, []);
   assert.equal(clean.snapshot.clean, true);
   assert.deepEqual(clean.snapshot.changedPaths, []);
+  assert.deepEqual(clean.snapshot.changeKindCounts, {});
 
   const dirty = captureWorktreeSnapshot("/tmp/project", {
     runner: outputRunner(" M src/App.tsx\0?? scratch.log\0UU conflict.ts\0R  src/NewName.tsx\0src/OldName.tsx\0"),
@@ -64,6 +65,12 @@ test("captureWorktreeSnapshot parses clean, untracked, conflicted, and rename ev
   assert.deepEqual(dirty.snapshot.trackedPaths, ["conflict.ts", "src/App.tsx", "src/NewName.tsx"]);
   assert.deepEqual(dirty.snapshot.untrackedPaths, ["scratch.log"]);
   assert.deepEqual(dirty.snapshot.conflictedPaths, ["conflict.ts"]);
+  assert.deepEqual(dirty.snapshot.changeKindCounts, {
+    modified: 1,
+    untracked: 1,
+    unmerged: 1,
+    renamed: 1,
+  });
 });
 
 test("session evidence records baseline/latest and computes dirty deltas with a fake runner", () => {
@@ -358,6 +365,7 @@ test("dirty worktrees keep dirty verdict primary even with local tracking diverg
   assert.equal(dirty.worktreeVerdict.severity, "warning");
   assert.equal(dirty.worktreeVerdict.primary, "dirty");
   assert.equal(dirty.worktreeVerdict.summary, "dirty worktree");
+  assert.deepEqual(dirty.snapshot.changeKindCounts, { untracked: 1 });
 });
 
 test("doctor warns for clean local tracking divergence but suppresses dirty divergence", () => {

@@ -41,6 +41,7 @@ export type WorktreeStatusSummary = {
   untrackedPaths: string[];
   ignoredPaths: string[];
   conflictedPaths: string[];
+  changeKindCounts: Partial<Record<WorktreeChangeKind, number>>;
 };
 
 export type ParseWorktreeStatusOptions = {
@@ -112,6 +113,13 @@ function parsePorcelainLine(line: string): WorktreeStatusEntry | undefined {
   };
 }
 
+function countChangeKinds(entries: WorktreeStatusEntry[]): Partial<Record<WorktreeChangeKind, number>> {
+  return entries.reduce<Partial<Record<WorktreeChangeKind, number>>>((counts, entry) => {
+    counts[entry.kind] = (counts[entry.kind] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
 function parseNulTerminatedPorcelain(output: string): WorktreeStatusEntry[] {
   const fields = output.split("\0").filter((field) => field.length > 0);
   const entries: WorktreeStatusEntry[] = [];
@@ -154,6 +162,7 @@ export function summarizeWorktreeStatus(entries: WorktreeStatusEntry[]): Worktre
     untrackedPaths: entries.filter((entry) => entry.kind === "untracked").map((entry) => entry.path),
     ignoredPaths: entries.filter((entry) => entry.kind === "ignored").map((entry) => entry.path),
     conflictedPaths: entries.filter((entry) => entry.conflicted).map((entry) => entry.path),
+    changeKindCounts: countChangeKinds(changedEntries),
   };
 }
 
