@@ -2250,8 +2250,18 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
     available: true,
     verdict: "would-activate",
     repeatedFilePositive: true,
+    profileGateVerdict: "would-activate",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "direct-file-evidence-present",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    deferredTriggers: ["always-on", "glob-match", "model-decision"],
     blockedReasons: [],
   });
   const runtimePayload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
@@ -2397,8 +2407,18 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
     available: true,
     verdict: "would-activate",
     repeatedFilePositive: true,
+    profileGateVerdict: "would-activate",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "direct-file-evidence-present",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    deferredTriggers: ["always-on", "glob-match", "model-decision"],
     blockedReasons: [],
   });
 
@@ -2468,8 +2488,18 @@ test("runtime hook fail-closes repeated React Web activation promotion when fres
     available: true,
     verdict: "deferred",
     repeatedFilePositive: false,
+    profileGateVerdict: "deferred",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-file-evidence-present",
+      "evidence-strength-adjacent",
+      "missing-sourceFingerprint",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
     promoted: false,
-    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    deferredTriggers: ["always-on", "glob-match", "model-decision"],
     blockedReasons: [],
   });
 });
