@@ -16,7 +16,7 @@ const repoRoot = process.cwd();
 test("React Native payload evidence exposes primitiveInteractions without widening RN scope", async () => {
   const evidence = await buildReactNativePayloadEvidence({ runId: `test-${Date.now()}-${Math.random()}` });
 
-  assert.equal(evidence.schemaVersion, "react-native-payload-evidence.v3");
+  assert.equal(evidence.schemaVersion, "react-native-payload-evidence.v4");
   assert.equal(evidence.measurement, "local-fixture-pre-read-and-model-facing-domain-payload-evidence");
   assert.match(evidence.claimBoundary, /Local fixture payload evidence only/);
   assert.match(evidence.claimBoundary, /not broad React Native support/);
@@ -37,6 +37,8 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.stateActionRelationsVisible.relationKind, "actionReadsInputValue");
   assert.equal(evidence.summary.constraintActionReadinessVisible.claimable, true);
   assert.equal(evidence.summary.constraintActionReadinessVisible.relationKind, "constraintActionReadiness");
+  assert.equal(evidence.summary.stagedRnSurfaceInventory.claimable, true);
+  assert.equal(evidence.summary.stagedRnSurfaceInventory.stagedSlots.length, 5);
   assert.deepEqual(
     evidence.summary.metadataAnchorsVisible.textInputFields.map((row) => row.field),
     RN_TEXT_INPUT_METADATA_FIELDS,
@@ -57,6 +59,23 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.runtimeReusePromotion.claimable, false);
   assert.equal(evidence.summary.editRouting.claimable, false);
   assert.equal(evidence.summary.providerBillingSavings.claimable, false);
+
+  const stagedSlots = new Map(evidence.summary.stagedRnSurfaceInventory.stagedSlots.map((row) => [row.slot, row]));
+  assert.deepEqual([...stagedSlots.keys()], ["F1", "F13", "F2", "F9", "F10"]);
+  assert.deepEqual(stagedSlots.get("F1").concernProfileIds, ["rn-accessibility-test-anchor"]);
+  assert.deepEqual(stagedSlots.get("F13").concernProfileIds, ["form-state", "rn-accessibility-test-anchor"]);
+  assert.deepEqual(stagedSlots.get("F2").concernProfileIds, ["rn-list-rendering", "rn-navigation", "rn-style-platform"]);
+  assert.deepEqual(stagedSlots.get("F2").visibleBehaviorConcernKinds, ["rnNavigationConcerns", "rnListRenderingConcerns", "rnStylePlatformConcerns"]);
+  assert.equal(stagedSlots.get("F2").preReadDecision, "fallback");
+  assert.equal(stagedSlots.get("F2").preReadExpectation, "unsupported-frontend-domain-profile");
+  assert.deepEqual(stagedSlots.get("F9").concernProfileIds, ["rn-accessibility-test-anchor", "rn-list-rendering"]);
+  assert.deepEqual(stagedSlots.get("F9").visibleBehaviorConcernKinds, ["rnAccessibilityTestAnchors", "rnListRenderingConcerns"]);
+  assert.deepEqual(stagedSlots.get("F10").concernProfileIds, ["rn-accessibility-test-anchor", "rn-list-rendering", "rn-media-layout"]);
+  assert.deepEqual(stagedSlots.get("F10").visibleBehaviorConcernKinds, ["rnAccessibilityTestAnchors", "rnListRenderingConcerns", "rnMediaLayoutConcerns"]);
+  for (const row of stagedSlots.values()) {
+    assert.equal(row.sourceOnly, true, row.slot);
+    assert.equal(row.broadSupportClaimable, false, row.slot);
+  }
 
   for (const row of evidence.fixtures) {
     assert.equal(row.classification, "react-native");
@@ -140,6 +159,7 @@ test("React Native payload evidence Markdown keeps claim boundaries explicit", a
   const markdown = renderReactNativePayloadEvidenceMarkdown(evidence);
 
   assert.match(markdown, /RN primitive interaction facts visible: yes/);
+  assert.match(markdown, /RN staged surface inventory visible: yes/);
   assert.match(markdown, /Richer RN\/WebView\/TUI boundaries preserved: yes/);
   assert.match(markdown, /RN metadata anchors visible: yes/);
   assert.match(markdown, /Measured RN narrow constraint\/action readiness visible: yes/);
@@ -151,10 +171,16 @@ test("React Native payload evidence Markdown keeps claim boundaries explicit", a
   assert.match(markdown, /\| TextInput \| autoCapitalize \| yes \| yes \| yes \|/);
   assert.match(markdown, /\| Pressable \| disabled \| yes \| yes \| yes \|/);
   assert.match(markdown, /\| Pressable \| accessibilityRole \| yes \| yes \| yes \|/);
+  assert.match(markdown, /RN staged surface inventory visible: yes/);
   assert.match(markdown, /Broad React Native support claimable: no/);
   assert.match(markdown, /Runtime reuse promotion claimable: no/);
   assert.match(markdown, /RN edit routing claimable: no/);
   assert.match(markdown, /Provider billing savings claimable: no/);
+  assert.match(markdown, /\| F2 \| RN style\/platform\/navigation \| readiness evidence only \|/);
+  assert.match(markdown, /\| F10 \| RN media\/layout \| readiness evidence only \|/);
+  assert.match(markdown, /rn-list-rendering, rn-navigation, rn-style-platform/);
+  assert.match(markdown, /rn-accessibility-test-anchor, rn-list-rendering, rn-media-layout/);
+  assert.match(markdown, /staged RN surface inventory is source-only closeout evidence/i);
   assert.match(markdown, /existing `rn-primitive-input-narrow-payload` lane/);
   assert.doesNotMatch(markdown, /Broad React Native support claimable: yes/i);
   assert.doesNotMatch(markdown, /Runtime reuse promotion claimable: yes/i);
@@ -189,12 +215,14 @@ test("React Native payload evidence command writes bounded JSON and Markdown rep
   const fileEvidence = JSON.parse(fs.readFileSync(outputPath, "utf8"));
   const markdown = fs.readFileSync(markdownPath, "utf8");
 
-  assert.equal(stdoutEvidence.schemaVersion, "react-native-payload-evidence.v3");
+  assert.equal(stdoutEvidence.schemaVersion, "react-native-payload-evidence.v4");
   assert.equal(stdoutEvidence.runId, "cli-test");
   assert.deepEqual(fileEvidence, stdoutEvidence);
   assert.match(markdown, /# React Native payload evidence/);
   assert.match(markdown, /Local fixture payload evidence only/);
   assert.match(markdown, /RN primitive interaction facts visible: yes/);
+  assert.match(markdown, /RN staged surface inventory visible: yes/);
+  assert.match(markdown, /RN staged surface inventory visible: yes/);
   assert.match(markdown, /Broad React Native support claimable: no/);
   assert.match(markdown, /Provider billing savings claimable: no/);
 });
