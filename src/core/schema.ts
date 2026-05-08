@@ -733,6 +733,8 @@ export type CodexRuntimeHookDecision = {
       available: boolean;
       verdict: "would-activate" | "deferred" | "blocked" | "unavailable";
       repeatedFilePositive: boolean;
+      profileGateVerdict: "would-activate" | "deferred" | "blocked" | "unavailable";
+      profileGateReasons: string[];
       promoted: boolean;
       deferredTriggers: string[];
       blockedReasons: string[];

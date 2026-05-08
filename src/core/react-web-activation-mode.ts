@@ -10,16 +10,16 @@ import {
 
 export const REACT_WEB_ACTIVATION_MODE_SCHEMA_VERSION = "react-web-activation-mode.v1";
 export const REACT_WEB_ACTIVATION_MODE_COMMAND = "inspect activation-mode";
-export const REACT_WEB_ACTIVATION_MODE_MODE = "repeated-file-runtime";
+export const REACT_WEB_ACTIVATION_MODE_MODE = "repeated-file-runtime+profile-gate-advisory";
 export const REACT_WEB_ACTIVATION_MODE_CLAIM_BOUNDARY =
-  "Local React Web repeated-file activation contract only: reports when bounded repeated-file React Web evidence qualifies for activation and now governs the Codex runtime promotion path for that same bounded lane. This surface does not widen support claims, does not enable always-on or model-driven activation, and does not promote RN/TUI/WebView or generic context-manager behavior.";
+  "Local React Web activation contract only: reports when bounded repeated-file React Web evidence qualifies for activation and when the bounded profile-gate policy would activate in advisory mode. This surface does not widen support claims, does not enable always-on or model-driven activation, does not auto-promote profile-gate runtime behavior, and does not promote RN/TUI/WebView or generic context-manager behavior.";
 
 export const REACT_WEB_ACTIVATION_SUPPORTED_TRIGGER = "repeated-file";
+export const REACT_WEB_ACTIVATION_PROFILE_GATE_TRIGGER = "profile-gate";
 export const REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS = [
   "always-on",
   "glob-match",
   "model-decision",
-  "profile-gate",
 ] as const;
 
 export type ReactWebActivationDeferredTrigger = (typeof REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS)[number];
@@ -42,6 +42,11 @@ export type ReactWebActivationModeResult = {
     positive: boolean;
     reasons: string[];
   };
+  profileGate: {
+    name: typeof REACT_WEB_ACTIVATION_PROFILE_GATE_TRIGGER;
+    verdict: ReactWebActivationVerdict;
+    reasons: string[];
+  };
   deferredTriggers: Array<{
     name: ReactWebActivationDeferredTrigger;
     reason: string;
@@ -53,6 +58,8 @@ export type ReactWebActivationModeSummary = {
   available: boolean;
   verdict: ReactWebActivationVerdict | "unavailable";
   repeatedFilePositive: boolean;
+  profileGateVerdict: ReactWebActivationVerdict | "unavailable";
+  profileGateReasons: string[];
   deferredTriggers: ReactWebActivationDeferredTrigger[];
   blockedReasons: string[];
 };
@@ -133,9 +140,85 @@ function repeatedFilePositive(cwd: string, artifact: ReactWebEvidenceArtifact): 
   );
 }
 
+function profileGateReasons(cwd: string, artifact: ReactWebEvidenceArtifact): string[] {
+  const reasons: string[] = [];
+  if (artifact.domainPayload?.domain === "react-web") {
+    reasons.push("react-web-domain-payload-present");
+  } else {
+    reasons.push("missing-react-web-domain-payload");
+  }
+  if (artifact.domainPayload?.claimStatus === "current-supported-lane") {
+    reasons.push("current-supported-lane-claim");
+  } else {
+    reasons.push("non-current-supported-lane-claim");
+  }
+  if (artifact.domainPayload?.plannerDecision === "compact-safe") {
+    reasons.push("planner-decision-compact-safe");
+  } else {
+    reasons.push("planner-decision-not-compact-safe");
+  }
+  if (artifact.evidenceStrength === "direct") {
+    reasons.push("direct-evidence-strength");
+  } else {
+    reasons.push(`evidence-strength-${artifact.evidenceStrength}`);
+  }
+  if (artifact.sourceFingerprint) {
+    const current = currentSourceFingerprint(path.resolve(cwd, artifact.filePath));
+    if (!current) {
+      reasons.push("source-file-missing");
+    } else if (sourceFingerprintsEqual(artifact.sourceFingerprint, current)) {
+      reasons.push("freshness-current");
+    } else {
+      reasons.push("freshness-stale");
+    }
+  } else {
+    reasons.push("missing-sourceFingerprint");
+  }
+  if (artifact.files.some((file) => file.whySelected.some((reason) => reason === "exact-file-prompt-target" || reason === "exact-file-runtime-target"))) {
+    reasons.push("direct-file-evidence-present");
+  } else {
+    reasons.push("missing-direct-file-evidence");
+  }
+  if (artifact.decision === "use") {
+    reasons.push("runtime-decision-use");
+  } else if (artifact.decision === "fallback") {
+    reasons.push("runtime-decision-fallback");
+  } else {
+    reasons.push("runtime-decision-deny");
+  }
+  return uniqueSorted(reasons);
+}
+
+function profileGateVerdict(cwd: string, artifact: ReactWebEvidenceArtifact): {
+  verdict: ReactWebActivationVerdict;
+  reasons: string[];
+} {
+  const reasons = profileGateReasons(cwd, artifact);
+  const blockedReasons = blockedReasonsFor(artifact);
+  if (blockedReasons.length > 0 || artifact.decision === "deny") {
+    return { verdict: "blocked", reasons };
+  }
+
+  const current = artifact.sourceFingerprint ? currentSourceFingerprint(path.resolve(cwd, artifact.filePath)) : null;
+  const wouldActivate =
+    artifact.decision === "use" &&
+    artifact.domainPayload?.domain === "react-web" &&
+    artifact.domainPayload?.claimStatus === "current-supported-lane" &&
+    artifact.domainPayload?.plannerDecision === "compact-safe" &&
+    artifact.evidenceStrength === "direct" &&
+    artifact.files.some((file) => file.whySelected.some((reason) => reason === "exact-file-prompt-target" || reason === "exact-file-runtime-target")) &&
+    sourceFingerprintsEqual(artifact.sourceFingerprint, current);
+
+  return {
+    verdict: wouldActivate ? "would-activate" : "deferred",
+    reasons,
+  };
+}
+
 export function buildReactWebActivationMode(cwd: string, artifact: ReactWebEvidenceArtifact): ReactWebActivationModeResult {
   const positive = repeatedFilePositive(cwd, artifact);
   const blockedReasons = blockedReasonsFor(artifact);
+  const profileGate = profileGateVerdict(cwd, artifact);
   const verdict: ReactWebActivationVerdict =
     blockedReasons.length > 0 || artifact.decision === "deny"
       ? "blocked"
@@ -159,6 +242,11 @@ export function buildReactWebActivationMode(cwd: string, artifact: ReactWebEvide
       name: REACT_WEB_ACTIVATION_SUPPORTED_TRIGGER,
       positive,
       reasons: repeatedFileReasons(cwd, artifact),
+    },
+    profileGate: {
+      name: REACT_WEB_ACTIVATION_PROFILE_GATE_TRIGGER,
+      verdict: profileGate.verdict,
+      reasons: profileGate.reasons,
     },
     deferredTriggers: REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS.map((name) => ({
       name,
@@ -188,6 +276,8 @@ export function summarizeReactWebActivationMode(
       available: false,
       verdict: "unavailable",
       repeatedFilePositive: false,
+      profileGateVerdict: "unavailable",
+      profileGateReasons: [],
       deferredTriggers: [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
       blockedReasons: [],
     };
@@ -197,6 +287,8 @@ export function summarizeReactWebActivationMode(
     available: true,
     verdict: activationMode.verdict,
     repeatedFilePositive: activationMode.supportedTrigger.positive,
+    profileGateVerdict: activationMode.profileGate.verdict,
+    profileGateReasons: activationMode.profileGate.reasons,
     deferredTriggers: activationMode.deferredTriggers.map((item) => item.name),
     blockedReasons: activationMode.blockedReasons,
   };
@@ -210,6 +302,7 @@ export function renderReactWebActivationModeMarkdown(activationMode: ReactWebAct
   const blockedReasons = activationMode.blockedReasons.length > 0
     ? activationMode.blockedReasons.map((reason) => `- ${reason}`).join("\n")
     : "- none";
+  const profileGateReasons = activationMode.profileGate.reasons.map((reason) => `- ${reason}`).join("\n");
 
-  return `# React Web activation mode\n\n${activationMode.claimBoundary}\n\n## Summary\n\n- artifact id: ${activationMode.artifactId}\n- file: ${activationMode.filePath}\n- mode: ${activationMode.mode}\n- verdict: ${activationMode.verdict}\n- runtime decision: ${activationMode.runtimeDecision}\n- evidence strength: ${activationMode.evidenceStrength}\n- repeated-file positive: ${activationMode.supportedTrigger.positive ? "yes" : "no"}\n\n## Supported trigger\n\n- ${activationMode.supportedTrigger.name}\n${reasons}\n\n## Deferred triggers\n\n${deferred}\n\n## Blocked reasons\n\n${blockedReasons}\n`;
+  return `# React Web activation mode\n\n${activationMode.claimBoundary}\n\n## Summary\n\n- artifact id: ${activationMode.artifactId}\n- file: ${activationMode.filePath}\n- mode: ${activationMode.mode}\n- verdict: ${activationMode.verdict}\n- runtime decision: ${activationMode.runtimeDecision}\n- evidence strength: ${activationMode.evidenceStrength}\n- repeated-file positive: ${activationMode.supportedTrigger.positive ? "yes" : "no"}\n- profile-gate verdict: ${activationMode.profileGate.verdict}\n\n## Supported trigger\n\n- ${activationMode.supportedTrigger.name}\n${reasons}\n\n## Advisory profile-gate\n\n- ${activationMode.profileGate.name}\n${profileGateReasons}\n\n## Deferred triggers\n\n${deferred}\n\n## Blocked reasons\n\n${blockedReasons}\n`;
 }

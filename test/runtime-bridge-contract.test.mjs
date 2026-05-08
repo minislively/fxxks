@@ -763,8 +763,18 @@ test("codex runtime activates React Web payload semantics only for the React Web
     available: true,
     verdict: "would-activate",
     repeatedFilePositive: true,
+    profileGateVerdict: "would-activate",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "direct-file-evidence-present",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    deferredTriggers: ["always-on", "glob-match", "model-decision"],
     blockedReasons: [],
   });
 

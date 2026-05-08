@@ -46,7 +46,9 @@ test("status react-web reports blocked without failing when no latest evidence e
     available: false,
     verdict: "unavailable",
     repeatedFilePositive: false,
-    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    profileGateVerdict: "unavailable",
+    profileGateReasons: [],
+    deferredTriggers: ["always-on", "glob-match", "model-decision"],
     blockedReasons: [],
   });
   assert.deepEqual(status.rankedBundle, {
@@ -96,6 +98,7 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.equal(status.activationMode.available, true);
   assert.equal(status.activationMode.verdict, "would-activate");
   assert.equal(status.activationMode.repeatedFilePositive, true);
+  assert.equal(status.activationMode.profileGateVerdict, "would-activate");
   assert.equal(status.rankedBundle.available, true);
   assert.equal(status.rankedBundle.verdict, "ranked");
   assert.ok(status.rankedBundle.selectedCount > 0);
@@ -115,6 +118,7 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.match(cliText.stdout, /React Web status/);
   assert.match(cliText.stdout, /profile status: ready/);
   assert.match(cliText.stdout, /summarized=no/);
+  assert.match(cliText.stdout, /profile-gate advisory: would-activate/);
 });
 
 test("status react-web reports blocked mixed-routing boundary from a deny artifact without failing", () => {
@@ -135,6 +139,7 @@ test("status react-web reports blocked mixed-routing boundary from a deny artifa
   assert.equal(status.activationMode.available, true);
   assert.equal(status.activationMode.verdict, "blocked");
   assert.equal(status.activationMode.repeatedFilePositive, false);
+  assert.equal(status.activationMode.profileGateVerdict, "blocked");
   assert.equal(status.rankedBundle.available, true);
   assert.equal(status.rankedBundle.verdict, "blocked");
   assert.deepEqual(status.interop, {
