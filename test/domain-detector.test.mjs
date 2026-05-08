@@ -354,23 +354,59 @@ test("CLI inspect-domain exposes top-level TUI source metadata only on JSON TUI 
   assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
 });
 
-test("CLI inspect-domain keeps TUI source metadata out of unflagged and non-TUI paths", () => {
+test("CLI inspect-domain exposes bounded RN sourceAnchorBeta visibility only on JSON RN paths", () => {
+  const fixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
+  const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(cli.status, 0, cli.stderr);
+  const result = JSON.parse(cli.stdout);
+
+  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.command, "inspect-domain");
+  assert.equal(result.filePath, path.relative(repoRoot, fixture));
+  assert.deepEqual(Object.keys(result.domainDetection).sort(), ["classification", "evidence"]);
+  assert.equal(result.domainDetection.classification, "react-native");
+  assert.deepEqual(result.fallbackFirst, { applies: false });
+  assert.ok(result.reactNativeSourceAnchorBeta);
+  assert.equal(result.reactNativeSourceAnchorBeta.schemaVersion, 1);
+  assert.equal(result.reactNativeSourceAnchorBeta.proofSurface, "inspect-domain");
+  assert.equal(result.reactNativeSourceAnchorBeta.contractVersion, "rn-source-anchor-beta.v0");
+  assert.equal(result.reactNativeSourceAnchorBeta.scope, "local-proof-only");
+  assert.equal(result.reactNativeSourceAnchorBeta.runtimeReusePromotion, "not-promoted");
+  assert.equal(result.reactNativeSourceAnchorBeta.sourceDerivedOnly, true);
+  assert.deepEqual(result.reactNativeSourceAnchorBeta.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);
+  assert.equal(result.reactNativeSourceAnchorBeta.claimBoundary, "source-backed-rn-located-anchor-visibility-only");
+  assert.equal(result.reactNativeSourceAnchorBeta.anchors.componentName, "SearchRow");
+  assert.equal(result.reactNativeSourceAnchorBeta.anchors.propsName, "SearchRowProps");
+  assert.ok(result.reactNativeSourceAnchorBeta.anchors.locatedAnchors.some((item) => item.kind === "rn-primitive-outline" && item.label === "TextInput"));
+  assert.equal("reactNativeSourceAnchorBeta" in result.domainDetection, false);
+  assert.doesNotMatch(JSON.stringify(result.reactNativeSourceAnchorBeta), forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain keeps TUI metadata out of unflagged and non-TUI paths while allowing RN appendix on JSON RN paths", () => {
   const tuiFixture = path.join(fixtureRoot, "tui-ink-basic.tsx");
-  const nonTuiFixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
+  const rnFixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
 
-  for (const args of [
-    ["inspect-domain", tuiFixture],
-    ["inspect-domain", nonTuiFixture, "--json"],
-  ]) {
-    const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), ...args], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    });
+  const tuiCli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", tuiFixture], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(tuiCli.status, 0, tuiCli.stderr);
+  const tuiResult = JSON.parse(tuiCli.stdout);
+  assert.equal("tuiSourceMetadata" in tuiResult, false);
+  assert.equal("reactNativeSourceAnchorBeta" in tuiResult, false);
 
-    assert.equal(cli.status, 0, cli.stderr);
-    const result = JSON.parse(cli.stdout);
-    assert.equal("tuiSourceMetadata" in result, false);
-  }
+  const rnCli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", rnFixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(rnCli.status, 0, rnCli.stderr);
+  const rnResult = JSON.parse(rnCli.stdout);
+  assert.equal("tuiSourceMetadata" in rnResult, false);
+  assert.ok(rnResult.reactNativeSourceAnchorBeta);
 });
 
 test("CLI inspect-domain keeps mixed TUI evidence top-level while preserving domainDetection shape", () => {
