@@ -98,6 +98,7 @@ export {
   REACT_WEB_ACTIVATION_MODE_SCHEMA_VERSION,
   REACT_WEB_ACTIVATION_SUPPORTED_TRIGGER,
   buildReactWebActivationMode,
+  buildReactWebActivationModeFromRuntimeDecision,
   readReactWebActivationMode,
   renderReactWebActivationModeMarkdown,
   summarizeReactWebActivationMode,

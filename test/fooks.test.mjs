@@ -189,6 +189,21 @@ function withThrowingCodexPreRead(callback) {
   }
 }
 
+function withPatchedCodexPreRead(patchDecision, callback) {
+  const originalDecideCodexPreRead = codexPreReadModule.decideCodexPreRead;
+  const originalDecidePreRead = preReadModule.decidePreRead;
+  const patchedFn = (...args) => patchDecision(originalDecidePreRead(...args));
+  codexPreReadModule.decideCodexPreRead = patchedFn;
+  preReadModule.decidePreRead = patchedFn;
+
+  try {
+    return callback();
+  } finally {
+    codexPreReadModule.decideCodexPreRead = originalDecideCodexPreRead;
+    preReadModule.decidePreRead = originalDecidePreRead;
+  }
+}
+
 function makeTempProject(repositoryUrl = "https://github.com/minislively/temp-project.git") {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-"));
   fs.mkdirSync(path.join(tempDir, "src", "components"), { recursive: true });
@@ -2231,6 +2246,14 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.ok(second.debug.decision.payload.editGuidance.patchTargets.length <= 12);
   assert.equal(second.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
   assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+  assert.deepEqual(second.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "would-activate",
+    repeatedFilePositive: true,
+    promoted: true,
+    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    blockedReasons: [],
+  });
   const runtimePayload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
   assert.ok(Array.isArray(runtimePayload.reactWebContext.editTargetRouting));
   assert.ok(runtimePayload.reactWebContext.editTargetRouting.length > 0);
@@ -2370,6 +2393,14 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
   assert.equal(reviewOnly.action, "inject");
   assert.equal(reviewOnly.additionalContext.includes("\"editGuidance\""), false);
   assert.equal(reviewOnly.reasons.includes("edit-guidance-opt-in"), false);
+  assert.deepEqual(reviewOnly.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "would-activate",
+    repeatedFilePositive: true,
+    promoted: true,
+    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    blockedReasons: [],
+  });
 
   const multiFileSession = `hook-multifile-no-edit-guidance-${Date.now()}`;
   const otherTarget = path.join("fixtures", "jsx", "SimpleWidget.jsx");
@@ -2394,6 +2425,53 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
   assert.equal(multiFile.promptSpecificity, "exact-file");
   assert.equal(multiFile.additionalContext.includes("\"editGuidance\""), false);
   assert.equal(multiFile.reasons.includes("edit-guidance-opt-in"), false);
+});
+
+test("runtime hook fail-closes repeated React Web activation promotion when freshness evidence is missing", () => {
+  const target = path.join("fixtures", "compressed", "FormSection.tsx");
+  const sessionId = `hook-react-web-activation-fallback-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${target}`,
+    },
+    repoRoot,
+  );
+
+  const second = withPatchedCodexPreRead((decision) => {
+    if (decision?.decision === "payload" && decision.payload?.domainPayload?.domain === "react-web") {
+      return {
+        ...decision,
+        payload: {
+          ...decision.payload,
+          sourceFingerprint: undefined,
+        },
+      };
+    }
+    return decision;
+  }, () =>
+    handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      repoRoot,
+    ));
+
+  assert.equal(second.action, "fallback");
+  assert.equal(second.contextModeReason, "activation-mode-not-promoted");
+  assert.deepEqual(second.reasons, ["repeated-file", "activation-mode-not-promoted"]);
+  assert.deepEqual(second.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "deferred",
+    repeatedFilePositive: false,
+    promoted: false,
+    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    blockedReasons: [],
+  });
 });
 
 test("bare status reports fast estimated session savings without exposing session contribution internals", () => {

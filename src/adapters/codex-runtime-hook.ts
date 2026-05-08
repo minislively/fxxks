@@ -21,6 +21,7 @@ import {
 } from "../core/session-metrics";
 import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
 import { emitReactWebEvidenceArtifact } from "../core/react-web-evidence-artifact";
+import { buildReactWebActivationModeFromRuntimeDecision, summarizeReactWebActivationMode } from "../core/react-web-activation-mode";
 
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
@@ -361,6 +362,27 @@ function attachReactWebEvidenceArtifact(
   return runtimeDecision;
 }
 
+function attachReactWebActivationDebug(
+  runtimeDecision: CodexRuntimeHookDecision,
+  options: { promoted: boolean },
+  cwd: string,
+): CodexRuntimeHookDecision {
+  const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
+  };
+  runtimeDecision.debug = {
+    ...debug,
+    reactWebActivationMode: {
+      ...summarizeReactWebActivationMode(activationMode),
+      promoted: options.promoted,
+    },
+  };
+  return runtimeDecision;
+}
+
 export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = process.cwd()): CodexRuntimeHookDecision {
   const hookEventName = input.hookEventName;
   const sessionKey = resolveCodexRuntimeSessionKey(input.sessionId, input.threadId);
@@ -593,6 +615,37 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         ...(reactWebContextPacking ? { reactWebContextPacking } : {}),
       },
     };
+
+    if (decision.payload.domainPayload?.domain === "react-web" && !decision.payload.useOriginal) {
+      const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
+      if (!activationMode || activationMode.verdict !== "would-activate") {
+        const activationFallback = attachReactWebActivationDebug(
+          fallbackDecision(
+            hookEventName,
+            target,
+            statePath,
+            ["repeated-file", "activation-mode-not-promoted"],
+            true,
+            true,
+            false,
+            "activation-mode-not-promoted",
+            policy,
+            decision,
+          ),
+          { promoted: false },
+          cwd,
+        );
+        recordRuntimeDecisionMetric(cwd, sessionKey, activationFallback, {
+          originalEstimatedBytes,
+          actualEstimatedBytes: originalEstimatedBytes,
+          comparableForSavings: originalEstimatedBytes !== undefined,
+        });
+        return attachReactWebEvidenceArtifact(cwd, activationFallback);
+      }
+
+      attachReactWebActivationDebug(runtimeDecision, { promoted: true }, cwd);
+    }
+
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
       actualEstimatedBytes: estimateTextBytes(additionalContext),

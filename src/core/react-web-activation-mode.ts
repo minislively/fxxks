@@ -1,17 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { hashText } from "./hash";
-import type { SourceFingerprint } from "./schema";
+import type { CodexRuntimeHookDecision, SourceFingerprint } from "./schema";
 import {
+  buildReactWebEvidenceArtifact,
   type ReactWebEvidenceArtifact,
   readReactWebEvidenceArtifact,
 } from "./react-web-evidence-artifact";
 
 export const REACT_WEB_ACTIVATION_MODE_SCHEMA_VERSION = "react-web-activation-mode.v1";
 export const REACT_WEB_ACTIVATION_MODE_COMMAND = "inspect activation-mode";
-export const REACT_WEB_ACTIVATION_MODE_MODE = "shadow-advisory";
+export const REACT_WEB_ACTIVATION_MODE_MODE = "repeated-file-runtime";
 export const REACT_WEB_ACTIVATION_MODE_CLAIM_BOUNDARY =
-  "Local React Web activation-mode advisory only: reports when bounded repeated-file React Web evidence would qualify for activation under the current contract, while leaving runtime selection and injection behavior unchanged. This surface does not widen support claims, does not enable always-on or model-driven activation, and does not promote RN/TUI/WebView or generic context-manager behavior.";
+  "Local React Web repeated-file activation contract only: reports when bounded repeated-file React Web evidence qualifies for activation and now governs the Codex runtime promotion path for that same bounded lane. This surface does not widen support claims, does not enable always-on or model-driven activation, and does not promote RN/TUI/WebView or generic context-manager behavior.";
 
 export const REACT_WEB_ACTIVATION_SUPPORTED_TRIGGER = "repeated-file";
 export const REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS = [
@@ -127,7 +128,6 @@ function repeatedFilePositive(cwd: string, artifact: ReactWebEvidenceArtifact): 
   return (
     artifact.decision === "use" &&
     artifact.domainPayload?.domain === "react-web" &&
-    Boolean(artifact.editGuidance?.patchTargets?.length) &&
     Boolean(artifact.sourceFingerprint) &&
     sourceFingerprintsEqual(artifact.sourceFingerprint, current)
   );
@@ -170,6 +170,14 @@ export function buildReactWebActivationMode(cwd: string, artifact: ReactWebEvide
 
 export function readReactWebActivationMode(cwd: string, id: string): ReactWebActivationModeResult {
   return buildReactWebActivationMode(cwd, readReactWebEvidenceArtifact(cwd, id));
+}
+
+export function buildReactWebActivationModeFromRuntimeDecision(
+  cwd: string,
+  runtimeDecision: CodexRuntimeHookDecision,
+): ReactWebActivationModeResult | null {
+  const artifact = buildReactWebEvidenceArtifact(runtimeDecision);
+  return artifact ? buildReactWebActivationMode(cwd, artifact) : null;
 }
 
 export function summarizeReactWebActivationMode(
