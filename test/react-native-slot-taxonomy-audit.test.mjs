@@ -47,6 +47,17 @@ const SLOT_EXPECTATIONS = [
     fixturePath: "test/fixtures/frontend-domain-expectations/rn-accessibility-test-anchor.tsx",
   },
   {
+    slot: "F15",
+    id: "rn-state-action-adjacent",
+    manifestLane: "rn-primitive",
+    scriptLane: "RN primitive/input state-action adjacent",
+    boundary: "measured narrow payload",
+    preReadExpectedOutcome: "payload",
+    payloadPolicy: "rn-primitive-input-narrow-payload",
+    evidenceScope: "rn-primitive-input-narrow-payload-only",
+    fixturePath: "test/fixtures/frontend-domain-expectations/rn-state-action-concern.tsx",
+  },
+  {
     slot: "F2",
     id: "rn-style-platform-navigation",
     manifestLane: "rn-style-platform",
@@ -128,11 +139,12 @@ test("RN selected manifest slots keep payload-vs-readiness taxonomy aligned", ()
 test("RN fixture expectation docs keep the same slot taxonomy story", () => {
   const docs = fs.readFileSync(docsFixtureExpectationsPath, "utf8");
 
-  assert.match(docs, /`F1`, `F13`, and `F14` are the selected RN primitive\/input narrow payload candidates/i);
+  assert.match(docs, /`F1`, `F13`, `F14`, and `F15` are the selected RN primitive\/input narrow payload candidates/i);
   assert.match(docs, /`F2`, `F9`, and `F10` remain fallback\/readiness-only/i);
   assert.match(docs, /\| F1 \| `rn-primitive-basic` \| `rn-primitive` \|[\s\S]*pre-read `payload` only through `rn-primitive-input-narrow-payload`/);
   assert.match(docs, /\| F13 \| `rn-primitive-inline-action` \| `rn-primitive` \|[\s\S]*pre-read `payload` only through `rn-primitive-input-narrow-payload`/);
   assert.match(docs, /\| F14 \| `rn-accessibility-test-anchor` \| `rn-primitive` \|[\s\S]*pre-read `payload` only through `rn-primitive-input-narrow-payload`/);
+  assert.match(docs, /\| F15 \| `rn-state-action-adjacent` \| `rn-primitive` \|[\s\S]*pre-read `payload` only through `rn-primitive-input-narrow-payload`/);
   assert.match(docs, /\| F2 \| `rn-style-platform-navigation` \| `rn-style-platform` \|[\s\S]*pre-read `fallback` with `unsupported-frontend-domain-profile`/);
   assert.match(docs, /\| F9 \| `rn-interaction-gesture` \| `rn-interaction` \|[\s\S]*pre-read `fallback` with `unsupported-frontend-domain-profile`/);
   assert.match(docs, /\| F10 \| `rn-image-scrollview` \| `rn-image-scrollview` \|[\s\S]*pre-read `fallback` with `unsupported-frontend-domain-profile`/);
@@ -144,10 +156,11 @@ test("RN boundary regression map keeps the expected slot labels", () => {
   assert.match(docs, /\| `F1` \| RN primitive\/input \| measured narrow payload \|/);
   assert.match(docs, /\| `F13` \| RN primitive\/input adjacent \| measured narrow payload \|/);
   assert.match(docs, /\| `F14` \| RN primitive\/input accessibility adjacent \| measured narrow payload \|/);
+  assert.match(docs, /\| `F15` \| RN primitive\/input state-action adjacent \| measured narrow payload \|/);
   assert.match(docs, /\| `F2` \| RN style\/platform\/navigation \| readiness evidence only \|/);
   assert.match(docs, /\| `F9` \| RN interaction\/list \| readiness evidence only \|/);
   assert.match(docs, /\| `F10` \| RN media\/layout \| readiness evidence only \|/);
-  assert.match(docs, /Keep only RN slots `F1`, `F13`, and `F14` on `payloadPolicy: "rn-primitive-input-narrow-payload"`/);
+  assert.match(docs, /Keep only RN slots `F1`, `F13`, `F14`, and `F15` on `payloadPolicy: "rn-primitive-input-narrow-payload"`/);
 });
 
 test("RN payload evidence staged inventory stays aligned with the audited slot contract", async () => {
