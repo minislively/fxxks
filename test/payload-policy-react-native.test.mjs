@@ -79,6 +79,7 @@ test("React Native payload leakage guard allows only the named F1-adjacent pre-r
     ["F13", "rn-primitive-inline-action.tsx", "payload", undefined],
     ["F14", "rn-accessibility-test-anchor.tsx", "payload", undefined],
     ["F15", "rn-state-action-concern.tsx", "payload", undefined],
+    ["F16", "rn-primitive-inline-callback.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F2", "rn-style-platform-navigation.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F9", "rn-interaction-gesture.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F10", "rn-image-scrollview.tsx", "fallback", "unsupported-frontend-domain-profile"],
@@ -413,6 +414,7 @@ test("React Native primitive basic fixture emits TextInput and Pressable interac
 test("React Native inline callbacks and external references stay source-only with explicit locality metadata", () => {
   const inlineFilePath = fixturePath("rn-primitive-inline-callback.tsx");
   const inlineResult = extractFile(inlineFilePath);
+  const inlineDecision = preRead.decidePreRead(inlineFilePath, repoRoot, "codex", { includeEditGuidance: true });
   assert.equal(inlineResult.domainDetection?.classification, "react-native");
   const inlineInput = inlineResult.behavior?.rnPrimitiveInteractions?.inputBindings?.[0];
   assert.equal(inlineInput?.primitive, "TextInput");
@@ -464,6 +466,12 @@ test("React Native inline callbacks and external references stay source-only wit
       },
     ],
   );
+  assert.equal(inlineDecision.decision, "fallback");
+  assert.deepEqual(inlineDecision.reasons, ["unsupported-frontend-domain-profile"]);
+  assert.equal(inlineDecision.fallback.reason, "unsupported-frontend-domain-profile");
+  assert.equal(inlineDecision.debug.frontendPayloadPolicy.allowed, false);
+  assert.equal(inlineDecision.debug.frontendPayloadPolicy.reason, "forbidden-signal:react-native:primitive:TouchableOpacity");
+  assert.equal("payload" in inlineDecision, false);
 
   const importedFilePath = fixturePath("rn-primitive-imported-handler.tsx");
   const importedResult = extractFile(importedFilePath);

@@ -5096,7 +5096,7 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
     return resolved;
   };
 
-  assert.deepEqual([...selected.keys()], ["F0", "F1", "F13", "F14", "F15", "F2", "F3", "F4", "F5", "F6", "F9", "F10", "F11", "F12"]);
+  assert.deepEqual([...selected.keys()], ["F0", "F1", "F13", "F14", "F15", "F16", "F2", "F3", "F4", "F5", "F6", "F9", "F10", "F11", "F12"]);
   assert.deepEqual([...deferred.keys()], ["F7"]);
   assert.deepEqual(expectations.forbiddenFirstPassSourceKinds, ["public-snapshot"]);
 
@@ -5147,6 +5147,10 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.equal(selected.get("F15").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F15").preReadExpectedOutcome, "payload");
   assert.equal(selected.get("F15").payloadPolicy, preReadModule.RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(selected.get("F16").expectedOutcome, "fallback");
+  assert.equal(selected.get("F16").expectedReason, "unsupported-react-native-webview-boundary");
+  assert.equal(selected.get("F16").preReadExpectedOutcome, "fallback");
+  assert.equal(selected.get("F16").preReadExpectedReason, preReadModule.UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON);
   assert.equal(selected.get("F2").expectedOutcome, "fallback");
   assert.equal(selected.get("F2").expectedReason, "unsupported-react-native-webview-boundary");
   assert.equal(selected.get("F3").expectedOutcome, "fallback");
@@ -5196,6 +5200,13 @@ test("frontend domain fixture expectations keep exact local outcomes", () => {
   assert.ok(selected.get("F15").requiredSignals.includes("useState"));
   assert.ok(selected.get("F15").requiredSignals.includes("useReducer"));
   assert.match(selected.get("F15").verification, /same-file local state\/action evidence/i);
+  assert.ok(selected.get("F16").requiredSignals.includes("same-file inline callback evidence"));
+  assert.ok(selected.get("F16").requiredSignals.includes("TouchableOpacity"));
+  assert.ok(selected.get("F16").requiredSignals.includes("Button"));
+  assert.equal(selected.get("F16").supportClaim, "none");
+  assert.equal(selected.get("F16").evidenceScope, "rn-primitive-input-adjacent-boundary-only");
+  assert.equal(selected.get("F16").fallbackReasonScope, "current-boundary-reason-only");
+  assert.match(selected.get("F16").verification, /TouchableOpacity\/Button stays outside the RN primitive\/input narrow payload policy/i);
 
   for (const slot of ["F2", "F9", "F10"]) {
     assert.equal(selected.get(slot).supportClaim, "none", `${selected.get(slot).id} must not claim RN support`);
@@ -5481,7 +5492,7 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
   );
   const manifestBySlot = new Map([...expectations.selected, ...expectations.deferred].map((item) => [item.slot, item]));
 
-  assert.deepEqual([...docsBySlot.keys()], ["F1", "F13", "F14", "F15", "F2", "F9", "F10", "F3", "F4", "F6", "F5", "F7"]);
+  assert.deepEqual([...docsBySlot.keys()], ["F1", "F13", "F14", "F15", "F16", "F2", "F9", "F10", "F3", "F4", "F6", "F5", "F7"]);
 
   for (const slot of docsBySlot.keys()) {
     assert.ok(manifestBySlot.has(slot), `${slot} boundary map row must exist in manifest`);
@@ -5516,6 +5527,13 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
   assert.match(rnStateActionAdjacent.preReadExpectation, /rn-primitive-input-narrow-payload/);
   assert.match(rnStateActionAdjacent.mustNotClaim, /state-transition correctness/);
   assert.match(rnStateActionAdjacent.reviewCue, /Same-file local state\/action evidence/i);
+
+  const rnInlineCallbackBoundary = docsBySlot.get("F16");
+  assert.equal(rnInlineCallbackBoundary.boundaryLabel, "adjacent fallback boundary");
+  assert.match(rnInlineCallbackBoundary.detectorExpectation, /fallback/);
+  assert.match(rnInlineCallbackBoundary.preReadExpectation, /unsupported-frontend-domain-profile/);
+  assert.match(rnInlineCallbackBoundary.mustNotClaim, /alternate primitive payload promotion/);
+  assert.match(rnInlineCallbackBoundary.reviewCue, /TouchableOpacity/);
 
   for (const slot of ["F2", "F9", "F10"]) {
     const row = docsBySlot.get(slot);
@@ -5557,7 +5575,7 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
   assert.match(deferred.preReadExpectation, /no executable fixture path/);
   assert.match(deferred.mustNotClaim, /broad terminal renderer support/);
 
-  for (const slot of ["F1", "F13", "F14", "F15", "F2", "F9", "F10", "F3", "F4", "F6", "F5"]) {
+  for (const slot of ["F1", "F13", "F14", "F15", "F16", "F2", "F9", "F10", "F3", "F4", "F6", "F5"]) {
     assert.equal(manifestBySlot.get(slot).supportClaim, "none", `${slot} must stay no-support in manifest`);
   }
   assert.doesNotMatch(
