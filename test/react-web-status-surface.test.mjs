@@ -42,6 +42,13 @@ test("status react-web reports blocked without failing when no latest evidence e
   assert.equal(status.profileStatus, "blocked");
   assert.equal(status.latestEvidenceId, null);
   assert.equal(status.repeatedSameFileReady, false);
+  assert.deepEqual(status.activationMode, {
+    available: false,
+    verdict: "unavailable",
+    repeatedFilePositive: false,
+    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    blockedReasons: [],
+  });
   assert.deepEqual(status.rankedBundle, {
     available: false,
     verdict: "unavailable",
@@ -86,6 +93,9 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.equal(status.repeatedSameFileReady, true);
   assert.equal(status.boundaryStatus.mixedRouting.status, "bounded");
   assert.equal(status.boundaryStatus.projectKnowledge.status, "advisory-only");
+  assert.equal(status.activationMode.available, true);
+  assert.equal(status.activationMode.verdict, "would-activate");
+  assert.equal(status.activationMode.repeatedFilePositive, true);
   assert.equal(status.rankedBundle.available, true);
   assert.equal(status.rankedBundle.verdict, "ranked");
   assert.ok(status.rankedBundle.selectedCount > 0);
@@ -122,6 +132,9 @@ test("status react-web reports blocked mixed-routing boundary from a deny artifa
   assert.equal(status.profileStatus, "blocked");
   assert.equal(status.latestDecision, "deny");
   assert.equal(status.boundaryStatus.mixedRouting.status, "blocked");
+  assert.equal(status.activationMode.available, true);
+  assert.equal(status.activationMode.verdict, "blocked");
+  assert.equal(status.activationMode.repeatedFilePositive, false);
   assert.equal(status.rankedBundle.available, true);
   assert.equal(status.rankedBundle.verdict, "blocked");
   assert.deepEqual(status.interop, {
