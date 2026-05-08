@@ -1,0 +1,28 @@
+{
+  "version": "project-knowledge.v1",
+  "rules": [
+    {
+      "id": "claim-boundary.rn-no-broad-support",
+      "family": "claim-boundary",
+      "summary": "Do not claim broad React Native support. Keep wording bounded to observed source-only evidence and the documented claim boundary.",
+      "appliesWhen": {
+        "keywords": [
+          "react native",
+          "rn",
+          "claim boundary",
+          "broad support",
+          "primitiveinteractions"
+        ],
+        "paths": [
+          "scripts/react-native-",
+          "test/react-web-release-smoke.test.mjs"
+        ]
+      },
+      "evidence": [
+        "docs/domain-payload-architecture.md#rn-claim-boundary-at-the-architecture-layer"
+      ],
+      "severity": "warning",
+      "authority": "tracked"
+    }
+  ]
+}

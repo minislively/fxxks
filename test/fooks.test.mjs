@@ -60,6 +60,11 @@ const {
   sessionsSummaryPath,
 } = require(path.join(repoRoot, "dist", "core", "paths.js"));
 const { classifyPromptContext, discoverRelevantFilesByPolicy } = require(path.join(repoRoot, "dist", "core", "context-policy.js"));
+const {
+  DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH,
+  loadProjectKnowledgeRules,
+  resolveProjectKnowledgeContext,
+} = require(path.join(repoRoot, "dist", "core", "project-knowledge.js"));
 const { prepareExecutionContext } = require(path.join(repoRoot, "dist", "adapters", "codex.js"));
 const { attachClaude } = require(path.join(repoRoot, "dist", "adapters", "claude.js"));
 const { handleCodexNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "codex-native-hook.js"));
@@ -69,6 +74,7 @@ const { readCodexTrustStatus } = require(path.join(repoRoot, "dist", "adapters",
 const { readClaudeTrustStatus } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-trust.js"));
 const { handleClaudeNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "claude-native-hook.js"));
 const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
+const { discoverProjectFilesWithStats } = require(path.join(repoRoot, "dist", "core", "discover.js"));
 const ts = require("typescript");
 
 const repoMetricTestSessionPrefixes = ["hook-", "cli-hook-", "bridge-contract-"];
@@ -207,6 +213,44 @@ function makeTempProject(repositoryUrl = "https://github.com/minislively/temp-pr
   );
   fs.writeFileSync(path.join(tempDir, "package.json"), JSON.stringify({ name: "temp-project", repository: { url: repositoryUrl } }, null, 2));
   return tempDir;
+}
+
+function writeProjectKnowledgeFixture(tempDir, overrides = {}) {
+  const docsDir = path.join(tempDir, "docs", "project-knowledge");
+  fs.mkdirSync(docsDir, { recursive: true });
+  fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tempDir, "docs", "domain-payload-architecture.md"),
+    [
+      "## RN claim boundary at the architecture layer",
+      "",
+      "Do not claim broad React Native support.",
+      "Keep wording bounded to observed source-only evidence.",
+      "",
+    ].join("\n"),
+  );
+  const ruleFile = {
+    version: "project-knowledge.v1",
+    rules: [
+      {
+        id: "claim-boundary.rn-no-broad-support",
+        family: "claim-boundary",
+        summary: "Do not claim broad React Native support. Keep wording bounded to observed source-only evidence and the documented claim boundary.",
+        appliesWhen: {
+          keywords: ["react native", "support", "claim boundary", "payload"],
+          paths: ["src/core/"],
+        },
+        evidence: ["docs/domain-payload-architecture.md#rn-claim-boundary-at-the-architecture-layer"],
+        severity: "warning",
+        authority: "tracked",
+      },
+    ],
+  };
+  fs.writeFileSync(path.join(tempDir, DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH), JSON.stringify(overrides.ruleFile ?? ruleFile, null, 2));
+  if (overrides.ignoredRuleFile) {
+    fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, ".fooks", "project-knowledge.json"), JSON.stringify(overrides.ignoredRuleFile, null, 2));
+  }
 }
 
 function makeTempTsJsBetaProject(repositoryUrl = "https://github.com/minislively/temp-ts-js-project.git") {
@@ -1700,6 +1744,106 @@ test("prepareExecutionContext writes context policy metadata and resolves files 
   assert.match(context, /## src\/components\/FormSection.tsx/);
 });
 
+test("project knowledge loader prefers tracked rules and ignores .fooks rules by default", () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir, {
+    ignoredRuleFile: {
+      version: "project-knowledge.v1",
+      rules: [
+        {
+          id: "claim-boundary.local-override",
+          family: "claim-boundary",
+          summary: "local-only override that must not be loaded by default",
+          appliesWhen: { keywords: ["react native"] },
+          evidence: ["docs/local-only.md"],
+        },
+      ],
+    },
+  });
+
+  const loaded = loadProjectKnowledgeRules(tempDir);
+  assert.equal(loaded.rulesPath, DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH);
+  assert.equal(loaded.authority, "tracked");
+  assert.equal(loaded.errors.length, 0);
+  assert.deepEqual(loaded.rules.map((rule) => rule.id), ["claim-boundary.rn-no-broad-support"]);
+  assert.equal(loaded.rules[0].summary.includes("local-only override"), false);
+});
+
+test("project knowledge resolves matching rule metadata and block without persistence wording", () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir);
+  const resolved = resolveProjectKnowledgeContext(
+    "Tighten the React Native support claim boundary for src/components/FormSection.tsx",
+    [path.join("src", "components", "FormSection.tsx")],
+    tempDir,
+  );
+
+  assert.ok(resolved);
+  assert.deepEqual(resolved.metadata.appliedRuleIds, ["claim-boundary.rn-no-broad-support"]);
+  assert.equal(resolved.metadata.family, "claim-boundary");
+  assert.equal(resolved.metadata.authority, "tracked");
+  assert.equal(resolved.metadata.rulesPath, DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH);
+  assert.ok(resolved.metadata.matchReasons.some((reason) => reason.startsWith("prompt-keyword:react native")));
+  assert.match(resolved.block, /PROJECT KNOWLEDGE CONTEXT/);
+  assert.match(resolved.block, /claim-boundary\.rn-no-broad-support/);
+  assert.doesNotMatch(resolved.block, /remembered|enforced|validated|guaranteed/i);
+});
+
+test("prepareExecutionContext keeps project knowledge out of first-run temp context", async () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir);
+  const prompt = "Update src/components/FormSection.tsx and keep the React Native support wording inside the documented claim boundary";
+  const policy = classifyPromptContext(prompt, tempDir);
+  const result = await prepareExecutionContext(prompt, [path.join("src", "components", "FormSection.tsx")], tempDir, policy);
+  const context = fs.readFileSync(result.contextPath, "utf8");
+
+  assert.equal(result.projectKnowledge, undefined);
+  assert.doesNotMatch(context, /PROJECT KNOWLEDGE CONTEXT/);
+  assert.doesNotMatch(context, /claim-boundary\.rn-no-broad-support/);
+});
+
+test("prepareExecutionContext leaves project knowledge absent for non-matching prompts", async () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir);
+  const prompt = "Modify src/components/FormSection.tsx";
+  const policy = classifyPromptContext(prompt, tempDir);
+  const result = await prepareExecutionContext(prompt, [path.join("src", "components", "FormSection.tsx")], tempDir, policy);
+  const context = fs.readFileSync(result.contextPath, "utf8");
+
+  assert.equal(result.projectKnowledge, undefined);
+  assert.doesNotMatch(context, /PROJECT KNOWLEDGE CONTEXT/);
+});
+
+test("project knowledge matching does not treat embedded short tokens like 'rn' inside unrelated words as a match", () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir, {
+    ruleFile: {
+      version: "project-knowledge.v1",
+      rules: [
+        {
+          id: "claim-boundary.rn-short-token",
+          family: "claim-boundary",
+          summary: "Short rn token should only match as a standalone token.",
+          appliesWhen: {
+            keywords: ["rn"],
+          },
+          evidence: ["docs/domain-payload-architecture.md#rn-claim-boundary-at-the-architecture-layer"],
+        },
+      ],
+    },
+  });
+
+  assert.equal(resolveProjectKnowledgeContext("Return src/components/FormSection.tsx unchanged", [], tempDir), null);
+  assert.equal(resolveProjectKnowledgeContext("Turn src/components/FormSection.tsx into cleaner code", [], tempDir), null);
+  assert.ok(resolveProjectKnowledgeContext("Keep the rn claim boundary narrow", [], tempDir));
+});
+
+test("default tracked project knowledge rules stay narrow for generic support/core/adapter tasks", () => {
+  assert.equal(resolveProjectKnowledgeContext("Add support for dark mode", [path.join("src", "components", "FormSection.tsx")], repoRoot), null);
+  assert.equal(resolveProjectKnowledgeContext("Refactor src/core/cache.ts for clarity", [path.join("src", "core", "cache.ts")], repoRoot), null);
+  assert.equal(resolveProjectKnowledgeContext("Fix typo in src/adapters/codex.ts", [path.join("src", "adapters", "codex.ts")], repoRoot), null);
+});
+
 test("cli run keeps exact-file prompts to one light context file", () => {
   const tempDir = makeTempProject();
   const output = runText(["run", "Please", "update", "src/components/FormSection.tsx"], tempDir);
@@ -1767,6 +1911,82 @@ test("cli run prefers direct Codex prompt guidance when setup is already ready o
   assert.match(output, /If you intentionally want another runtime, use your original prompt there instead of the metadata-only temp context\./);
   assert.doesNotMatch(output, /Reliable first success: run `fooks setup` in this repo first\./);
   assert.doesNotMatch(output, /Optional check: `fooks status codex`/);
+});
+
+test("codex runtime hook keeps matching no-target claim-boundary prompts as no-op without project knowledge", () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir);
+  const sessionId = `hook-knowledge-no-target-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+
+  const decision = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "Tighten the React Native support claim boundary wording",
+    },
+    tempDir,
+  );
+
+  assert.equal(decision.action, "noop");
+  assert.equal(decision.projectKnowledge, undefined);
+  const summary = readSessionMetricSummary(tempDir, sessionId);
+  const events = fs
+    .readFileSync(sessionEventsPath(tempDir, summary.metricSessionKey), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const lastEvent = events.at(-1);
+  assert.equal("appliedRuleIds" in lastEvent, false);
+  assert.equal("matchReasons" in lastEvent, false);
+});
+
+test("codex runtime hook records first matching exact-file prompt without project knowledge and injects it on repeated file", () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir);
+  const sessionId = `hook-knowledge-repeated-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Review ${target} and keep the React Native support claim boundary narrow`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+  assert.equal(first.projectKnowledge, undefined);
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, review ${target} and keep the React Native support claim boundary narrow`,
+    },
+    tempDir,
+  );
+  assert.equal(second.action, "inject");
+  assert.ok(second.additionalContext.length <= CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS);
+  assert.ok(second.additionalContext.includes("PROJECT KNOWLEDGE CONTEXT"));
+  assert.deepEqual(second.projectKnowledge.appliedRuleIds, ["claim-boundary.rn-no-broad-support"]);
+  assert.equal(second.projectKnowledge.family, "claim-boundary");
+  assert.ok(second.projectKnowledge.matchReasons.some((reason) => reason.startsWith("prompt-keyword:react native")));
+
+  const summary = readSessionMetricSummary(tempDir, sessionId);
+  const events = fs
+    .readFileSync(sessionEventsPath(tempDir, summary.metricSessionKey), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const lastEvent = events.at(-1);
+  assert.deepEqual(lastEvent.appliedRuleIds, ["claim-boundary.rn-no-broad-support"]);
+  assert.equal(lastEvent.family, "claim-boundary");
+  assert.ok(lastEvent.matchReasons.some((reason) => reason.startsWith("prompt-keyword:react native")));
+  assert.equal(lastEvent.authority, "tracked");
+  assert.equal(lastEvent.rulesPath, DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH);
+  assert.equal(lastEvent.mode, "advisory");
 });
 
 test("runtime hook falls back when repeated-file payload build throws", () => {
@@ -2795,6 +3015,70 @@ test("scan excludes cross-folder linked ts even when directly imported", () => {
   assert.ok(!filePaths.includes(path.join("src", "date-utils.ts")));
 });
 
+test("discover tolerates files that disappear during linked-import inspection", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-discover-race-"));
+  const componentFile = path.join(tempDir, "src", "components", "Widget.tsx");
+  const linkedTypesFile = path.join(tempDir, "src", "components", "Widget.types.ts");
+  fs.mkdirSync(path.dirname(componentFile), { recursive: true });
+  fs.writeFileSync(
+    componentFile,
+    [
+      'import type { WidgetProps } from "./Widget.types";',
+      "",
+      "export function Widget(_props: WidgetProps) {",
+      "  return null;",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  fs.writeFileSync(linkedTypesFile, "export type WidgetProps = { label: string };\n");
+
+  const originalReadFileSync = fs.readFileSync;
+  fs.readFileSync = ((filePath, ...args) => {
+    if (String(filePath) === componentFile) {
+      fs.rmSync(componentFile, { force: true });
+      const error = new Error(`ENOENT: no such file or directory, open '${componentFile}'`);
+      error.code = "ENOENT";
+      throw error;
+    }
+    return originalReadFileSync.call(fs, filePath, ...args);
+  });
+
+  try {
+    const result = discoverProjectFilesWithStats(tempDir);
+    const filePaths = result.targets.map((item) => item.filePath);
+    assert.ok(filePaths.includes(componentFile));
+    assert.ok(!filePaths.includes(linkedTypesFile));
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+  }
+});
+
+test("discover tolerates directories that disappear during traversal", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-discover-dir-race-"));
+  const componentsDir = path.join(tempDir, "src", "components");
+  fs.mkdirSync(componentsDir, { recursive: true });
+  fs.writeFileSync(path.join(componentsDir, "Widget.tsx"), "export function Widget() { return null; }\n");
+  const originalReaddirSync = fs.readdirSync;
+
+  fs.readdirSync = ((dirPath, ...args) => {
+    if (String(dirPath) === componentsDir) {
+      const error = new Error(`ENOTDIR: not a directory, scandir '${componentsDir}'`);
+      error.code = "ENOTDIR";
+      throw error;
+    }
+    return originalReaddirSync.call(fs, dirPath, ...args);
+  });
+
+  try {
+    const result = discoverProjectFilesWithStats(tempDir);
+    assert.deepEqual(result.targets, []);
+  } finally {
+    fs.readdirSync = originalReaddirSync;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("scan regenerates when the persisted scan index is corrupt", () => {
   const tempDir = makeTempProject();
   fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
@@ -2826,6 +3110,34 @@ test("scan only refreshes changed files after cache warm-up", () => {
   const indexEntry = secondScan.files.find((item) => item.filePath === path.join("src", "components", "FormSection.tsx"));
   assert.ok(indexEntry);
   assert.notEqual(indexEntry.fileHash, firstScan.files.find((item) => item.filePath === indexEntry.filePath).fileHash);
+});
+
+test("scan skips files that disappear after discovery instead of crashing", () => {
+  const tempDir = makeTempProject();
+  const disappearingFile = path.join(tempDir, "src", "components", "FormSection.tsx");
+  const relativeDisappearingFile = path.join("src", "components", "FormSection.tsx");
+  const originalReadFileSync = fs.readFileSync;
+  let injectedMissingPath = false;
+
+  fs.readFileSync = ((filePath, ...args) => {
+    if (!injectedMissingPath && String(filePath) === disappearingFile) {
+      injectedMissingPath = true;
+      fs.rmSync(disappearingFile, { force: true });
+      const error = new Error(`ENOENT: no such file or directory, open '${disappearingFile}'`);
+      error.code = "ENOENT";
+      throw error;
+    }
+    return originalReadFileSync.call(fs, filePath, ...args);
+  });
+
+  try {
+    const result = scanProject(tempDir);
+    const filePaths = result.files.map((item) => item.filePath);
+    assert.ok(!filePaths.includes(relativeDisappearingFile));
+    assert.ok(filePaths.includes(path.join("src", "components", "SimpleButton.tsx")));
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+  }
 });
 
 test("scan writes benchmark-only command-path timings to a side channel without changing stdout", () => {
@@ -3704,6 +4016,53 @@ test("claude runtime hook records first eligible prompt, injects repeated same-f
   assert.equal(linkedTs.action, "noop");
   const missing = handleClaudeRuntimeHook({ hookEventName: "UserPromptSubmit", prompt: "Create src/components/NewPanel.tsx" }, tempDir);
   assert.equal(missing.action, "noop");
+});
+
+test("claude runtime hook keeps first-seen matching prompts free of project knowledge and adds it on repeated file", () => {
+  const tempDir = makeTempProject();
+  writeProjectKnowledgeFixture(tempDir);
+  const sessionId = `claude-knowledge-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+
+  handleClaudeRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Explain ${target} and keep the React Native support claim boundary narrow`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+  assert.equal(first.projectKnowledge, undefined);
+
+  const second = handleClaudeRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, explain ${target} and keep the React Native support claim boundary narrow`,
+    },
+    tempDir,
+  );
+  assert.equal(second.action, "inject");
+  assert.ok(second.additionalContext.includes("PROJECT KNOWLEDGE CONTEXT"));
+  assert.deepEqual(second.projectKnowledge.appliedRuleIds, ["claim-boundary.rn-no-broad-support"]);
+  assert.equal(second.projectKnowledge.family, "claim-boundary");
+  assert.ok(second.projectKnowledge.matchReasons.some((reason) => reason.startsWith("prompt-keyword:react native")));
+
+  const summary = readSessionMetricSummary(tempDir, sessionId, { runtime: "claude", measurementSource: "project-local-context-hook" });
+  const events = fs
+    .readFileSync(sessionEventsPath(tempDir, summary.metricSessionKey), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  const lastEvent = events.at(-1);
+  assert.deepEqual(lastEvent.appliedRuleIds, ["claim-boundary.rn-no-broad-support"]);
+  assert.equal(lastEvent.family, "claim-boundary");
+  assert.ok(lastEvent.matchReasons.some((reason) => reason.startsWith("prompt-keyword:react native")));
+  assert.equal(lastEvent.authority, "tracked");
+  assert.equal(lastEvent.rulesPath, DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH);
+  assert.equal(lastEvent.mode, "advisory");
 });
 
 test("claude runtime hook refreshes stale target state and clears active file on stop", () => {

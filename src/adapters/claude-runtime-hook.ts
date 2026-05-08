@@ -11,6 +11,8 @@ import {
   CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS,
 } from "./claude-runtime-status";
 import type { ContextBudget, ContextMode, ModelFacingPayload, PromptSpecificity } from "../core/schema";
+import { appendProjectKnowledgeBlock, resolveProjectKnowledgeContext } from "../core/project-knowledge";
+import type { ProjectKnowledgeMetadata } from "../core/project-knowledge";
 import {
   estimateFileBytes,
   estimateTextBytes,
@@ -44,6 +46,7 @@ export type ClaudeRuntimeHookDecision = {
   contextBudget?: ContextBudget;
   promptSpecificity?: PromptSpecificity;
   contextPolicyVersion?: "context-policy.v1";
+  projectKnowledge?: ProjectKnowledgeMetadata;
   debug?: {
     repeatedFile: boolean;
     eligible: boolean;
@@ -183,6 +186,13 @@ function recordClaudeMetric(
     actualEstimatedBytes: options.actualEstimatedBytes,
     comparableForSavings: options.comparableForSavings,
     observedOriginalEstimatedBytes: options.observedOriginalEstimatedBytes,
+    appliedRuleIds: decision.projectKnowledge?.appliedRuleIds,
+    family: decision.projectKnowledge?.family,
+    matchReasons: decision.projectKnowledge?.matchReasons,
+    evidencePaths: decision.projectKnowledge?.evidencePaths,
+    authority: decision.projectKnowledge?.authority,
+    rulesPath: decision.projectKnowledge?.rulesPath,
+    mode: decision.projectKnowledge?.mode,
   });
 }
 
@@ -451,7 +461,9 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
 
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
-    const { context: additionalContext, truncated, removedSections } = buildPayloadContext(target, decision.payload, contextMode);
+    const { context: payloadContext, truncated, removedSections } = buildPayloadContext(target, decision.payload, contextMode);
+    const projectKnowledge = resolveProjectKnowledgeContext(prompt, [target], cwd);
+    const additionalContext = clampAdditionalContext(appendProjectKnowledgeBlock(payloadContext, projectKnowledge?.block));
     const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
     const reasons = [
       "repeated-file",
@@ -474,6 +486,7 @@ export function handleClaudeRuntimeHook(input: ClaudeRuntimeHookInput, cwd = pro
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
+      ...(projectKnowledge ? { projectKnowledge: projectKnowledge.metadata } : {}),
       debug: {
         repeatedFile: true,
         eligible: true,
