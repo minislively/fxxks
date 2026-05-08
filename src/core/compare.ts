@@ -1,5 +1,6 @@
 import { extractFile } from "./extract";
 import { toModelFacingPayload } from "./payload/model-facing";
+import { assessFrontendPayloadPolicy } from "./payload-policy/registry";
 import {
   FOOKS_METRIC_CLAIM_BOUNDARY,
   FOOKS_SESSION_METRIC_TIER,
@@ -12,6 +13,11 @@ import {
   reactWebContextSummaryFor,
   type ReactWebContextSummary,
 } from "./react-web-context-summary";
+import {
+  formatReactNativeSourceAnchorBetaSummary,
+  reactNativeSourceAnchorBetaSummaryFor,
+  type ReactNativeSourceAnchorBetaSummary,
+} from "./react-native-proof-surface";
 
 export const FOOKS_COMPARE_CLAIM_BOUNDARY = `${FOOKS_METRIC_CLAIM_BOUNDARY} Compare values are local model-facing payload estimates, not provider tokenizer output, not runtime hook envelope overhead, and not provider invoice/dashboard/charged-cost proof.`;
 
@@ -22,6 +28,7 @@ export type FooksCompareUserSummary = {
 };
 
 export type FooksCompareReactWebContextSummary = ReactWebContextSummary;
+export type FooksCompareReactNativeSourceAnchorBetaSummary = ReactNativeSourceAnchorBetaSummary;
 
 export type FooksCompareResult = {
   filePath: string;
@@ -38,6 +45,7 @@ export type FooksCompareResult = {
   payloadLarger: boolean;
   nonSavingReason?: "original-source-preserved-for-small-raw-file" | "model-facing-payload-not-smaller";
   reactWebContextSummary?: FooksCompareReactWebContextSummary;
+  reactNativeSourceAnchorBetaSummary?: FooksCompareReactNativeSourceAnchorBetaSummary;
   metricTier: typeof FOOKS_SESSION_METRIC_TIER;
   measurement: "local-model-facing-payload";
   excludes: string[];
@@ -92,6 +100,9 @@ export function formatCompare(result: FooksCompareResult): string {
   const reactWebContextLine = result.reactWebContextSummary
     ? formatReactWebContextSummary(result.reactWebContextSummary)
     : undefined;
+  const reactNativeVisibilityLine = result.reactNativeSourceAnchorBetaSummary
+    ? formatReactNativeSourceAnchorBetaSummary(result.reactNativeSourceAnchorBetaSummary)
+    : undefined;
   const lines = [
     `fooks compare ${result.filePath}`,
     "",
@@ -100,6 +111,7 @@ export function formatCompare(result: FooksCompareResult): string {
     `Mode: ${result.mode}${result.useOriginal ? " (original source preserved)" : ""}`,
     proofLine,
     ...(reactWebContextLine ? [reactWebContextLine] : []),
+    ...(reactNativeVisibilityLine ? [reactNativeVisibilityLine] : []),
     `Next action: ${result.userSummary.nextAction}`,
     "",
     "Boundary: Local model-facing payload estimate only; not provider tokenizer output, billing tokens, invoices, dashboards, or charged costs.",
@@ -112,11 +124,18 @@ export function compareModelFacingPayload(filePath: string, cwd = process.cwd())
   const extracted = extractFile(filePath);
   const payload = toModelFacingPayload(extracted, cwd);
   const useOriginal = extracted.useOriginal === true;
+  const frontendPayloadPolicy = extracted.domainDetection
+    ? assessFrontendPayloadPolicy(extracted.domainDetection)
+    : undefined;
   const contextPayload = toModelFacingPayload(extracted, cwd, {
     includeDomainPayload: true,
     includeReactWebContextMetadata: true,
+    ...(frontendPayloadPolicy ? { domainPayloadPolicy: frontendPayloadPolicy.name } : {}),
   });
-  const reactWebContextSummary = reactWebContextSummaryFor(contextPayload, useOriginal);
+  const reactWebContextSummary = contextPayload.domainPayload?.domain === "react-web"
+    ? reactWebContextSummaryFor(contextPayload, useOriginal)
+    : undefined;
+  const reactNativeSourceAnchorBetaSummary = reactNativeSourceAnchorBetaSummaryFor(contextPayload);
   const sourceBytes = extracted.meta.rawSizeBytes;
   const modelFacingBytes = estimateTextBytes(JSON.stringify(payload));
   const estimatedSourceTokens = estimateTokensFromBytes(sourceBytes);
@@ -141,6 +160,7 @@ export function compareModelFacingPayload(filePath: string, cwd = process.cwd())
     payloadLarger,
     ...(payloadLarger || useOriginal ? { nonSavingReason: nonSavingReason(useOriginal, payloadLarger) } : {}),
     ...(reactWebContextSummary ? { reactWebContextSummary } : {}),
+    ...(reactNativeSourceAnchorBetaSummary ? { reactNativeSourceAnchorBetaSummary } : {}),
     metricTier: FOOKS_SESSION_METRIC_TIER,
     measurement: "local-model-facing-payload",
     excludes: [
