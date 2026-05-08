@@ -42,6 +42,11 @@ test("status react-web reports blocked without failing when no latest evidence e
   assert.equal(status.profileStatus, "blocked");
   assert.equal(status.latestEvidenceId, null);
   assert.equal(status.repeatedSameFileReady, false);
+  assert.deepEqual(status.interop, {
+    mayBeStored: true,
+    mayBeSummarized: false,
+    mayOverrideDecision: false,
+  });
   assert.match(status.claimBoundary, /source-context decision status only/);
   assert.ok(status.risks.some((risk) => /no React Web evidence artifact found/.test(risk)));
 
@@ -52,6 +57,7 @@ test("status react-web reports blocked without failing when no latest evidence e
   assert.equal(cliJson.status, 0, cliJson.stderr);
   const parsed = JSON.parse(cliJson.stdout);
   assert.equal(parsed.profileStatus, "blocked");
+  assert.deepEqual(parsed.interop, status.interop);
 });
 
 test("status react-web reports ready from a current repeated same-file use artifact", () => {
@@ -71,6 +77,11 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.equal(status.repeatedSameFileReady, true);
   assert.equal(status.boundaryStatus.mixedRouting.status, "bounded");
   assert.equal(status.boundaryStatus.projectKnowledge.status, "advisory-only");
+  assert.deepEqual(status.interop, {
+    mayBeStored: true,
+    mayBeSummarized: false,
+    mayOverrideDecision: false,
+  });
   assert.deepEqual(status.risks, []);
   assert.equal(status.claimBoundary, REACT_WEB_STATUS_CLAIM_BOUNDARY);
 
@@ -81,6 +92,7 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.equal(cliText.status, 0, cliText.stderr);
   assert.match(cliText.stdout, /React Web status/);
   assert.match(cliText.stdout, /profile status: ready/);
+  assert.match(cliText.stdout, /summarized=no/);
 });
 
 test("status react-web reports blocked mixed-routing boundary from a deny artifact without failing", () => {
@@ -98,6 +110,11 @@ test("status react-web reports blocked mixed-routing boundary from a deny artifa
   assert.equal(status.profileStatus, "blocked");
   assert.equal(status.latestDecision, "deny");
   assert.equal(status.boundaryStatus.mixedRouting.status, "blocked");
+  assert.deepEqual(status.interop, {
+    mayBeStored: true,
+    mayBeSummarized: false,
+    mayOverrideDecision: false,
+  });
   assert.match(status.fallbackReasons.join("\n"), /unsupported-react-native-webview-boundary/);
   assert.ok(status.risks.some((risk) => /latest React Web decision is deny/.test(risk)));
 
@@ -109,6 +126,7 @@ test("status react-web reports blocked mixed-routing boundary from a deny artifa
   const parsed = JSON.parse(cliJson.stdout);
   assert.equal(parsed.profileStatus, "blocked");
   assert.equal(parsed.boundaryStatus.mixedRouting.status, "blocked");
+  assert.deepEqual(parsed.interop, status.interop);
 });
 
 test("status react-web fails non-zero when the latest artifact index is corrupt", () => {
