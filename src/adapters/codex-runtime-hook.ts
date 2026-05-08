@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { decidePreRead } from "./pre-read";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
+import { appendProjectKnowledgeBlock, resolveProjectKnowledgeContext } from "../core/project-knowledge";
 import { buildPreReadReuseStatus } from "./codex-runtime-status";
 import { clearCodexActiveFile, ensureFreshCodexContextForTarget, markCodexAttachPrepared, markCodexReady } from "./codex-runtime-trust";
 import {
@@ -283,6 +284,13 @@ function recordRuntimeDecisionMetric(
     actualEstimatedBytes: options.actualEstimatedBytes,
     comparableForSavings: options.comparableForSavings,
     observedOriginalEstimatedBytes: options.observedOriginalEstimatedBytes,
+    appliedRuleIds: decision.projectKnowledge?.appliedRuleIds,
+    family: decision.projectKnowledge?.family,
+    matchReasons: decision.projectKnowledge?.matchReasons,
+    evidencePaths: decision.projectKnowledge?.evidencePaths,
+    authority: decision.projectKnowledge?.authority,
+    rulesPath: decision.projectKnowledge?.rulesPath,
+    mode: decision.projectKnowledge?.mode,
   });
 }
 
@@ -524,7 +532,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
     const runtimeContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes);
-    const { additionalContext, reactWebContextPacking } = runtimeContext;
+    const projectKnowledge = resolveProjectKnowledgeContext(prompt, [target], cwd);
+    const additionalContext = appendProjectKnowledgeBlock(runtimeContext.additionalContext, projectKnowledge?.block);
+    const { reactWebContextPacking } = runtimeContext;
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
     const runtimeDecision: CodexRuntimeHookDecision = {
@@ -544,6 +554,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
+      ...(projectKnowledge ? { projectKnowledge: projectKnowledge.metadata } : {}),
       debug: {
         repeatedFile: true,
         eligible: true,

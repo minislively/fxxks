@@ -1,5 +1,6 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
 import type { DomainDetectionResult } from "./domain-detector";
+import type { ProjectKnowledgeMetadata } from "./project-knowledge";
 import type { DomainPayload } from "./payload/domain-payload";
 import type { FrontendConcernProfile } from "./concern-profiles/types";
 
@@ -709,6 +710,7 @@ export type CodexRuntimeHookDecision = {
   contextBudget?: ContextBudget;
   promptSpecificity?: PromptSpecificity;
   contextPolicyVersion?: "context-policy.v1";
+  projectKnowledge?: ProjectKnowledgeMetadata;
   debug?: {
     repeatedFile: boolean;
     eligible: boolean;

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { sessionEventsPath, sessionSummaryPath, sessionsSummaryPath, sanitizeDataKey } from "./paths";
 import type { ContextMode } from "./schema";
+import type { ProjectKnowledgeAuthority, ProjectKnowledgeMode } from "./project-knowledge";
 
 export const FOOKS_SESSION_METRICS_SCHEMA_VERSION = 1;
 export const FOOKS_SESSION_METRIC_TIER = "estimated" as const;
@@ -68,6 +69,13 @@ export type FooksSessionMetricEvent = {
   fallbackReason?: string;
   comparableForSavings: boolean;
   estimated: FooksEstimatedUsage;
+  appliedRuleIds?: string[];
+  family?: "claim-boundary";
+  matchReasons?: string[];
+  evidencePaths?: string[];
+  authority?: ProjectKnowledgeAuthority;
+  rulesPath?: string;
+  mode?: ProjectKnowledgeMode;
   observedOpportunity?: {
     originalEstimatedBytes: number;
     originalEstimatedTokens: number;
@@ -142,6 +150,13 @@ export type RecordFooksSessionMetricInput = {
   actualEstimatedBytes?: number;
   comparableForSavings?: boolean;
   observedOriginalEstimatedBytes?: number;
+  appliedRuleIds?: string[];
+  family?: "claim-boundary";
+  matchReasons?: string[];
+  evidencePaths?: string[];
+  authority?: ProjectKnowledgeAuthority;
+  rulesPath?: string;
+  mode?: ProjectKnowledgeMode;
 };
 
 type MetricIdentity = {
@@ -592,6 +607,13 @@ export function recordFooksSessionMetricEvent(cwd: string, sessionKey: string, i
     fallbackReason: input.fallbackReason ? truncateString(input.fallbackReason) : undefined,
     comparableForSavings,
     estimated: eventUsage,
+    appliedRuleIds: input.appliedRuleIds?.length ? input.appliedRuleIds : undefined,
+    family: input.family,
+    matchReasons: input.matchReasons?.length ? input.matchReasons.map((reason) => truncateString(reason)) : undefined,
+    evidencePaths: input.evidencePaths?.length ? input.evidencePaths.map((entry) => truncateString(entry)) : undefined,
+    authority: input.authority,
+    rulesPath: input.rulesPath ? truncateString(input.rulesPath) : undefined,
+    mode: input.mode,
     observedOpportunity: observedOpportunity
       ? {
           originalEstimatedBytes: observedOriginalEstimatedBytes,
