@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
@@ -241,5 +241,20 @@ test("status artifacts emits JSON and remains read-only when git and tmux are un
   assert.equal(result.command, "status artifacts");
   assert.match(result.claimBoundary, /never deletes/);
   assert.ok(Array.isArray(result.blockers));
+  assert.deepEqual(fs.readdirSync(tempDir), before);
+});
+
+test("status artifacts accepts explicit --json and rejects unknown extra args", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-artifact-audit-json-"));
+  const before = fs.readdirSync(tempDir);
+  const result = JSON.parse(execFileSync(process.execPath, [cli, "status", "artifacts", "--json"], { cwd: tempDir, encoding: "utf8" }));
+
+  assert.equal(result.command, "status artifacts");
+  assert.equal(result.claimBoundary, ARTIFACT_AUDIT_CLAIM_BOUNDARY);
+  assert.deepEqual(fs.readdirSync(tempDir), before);
+
+  const rejected = spawnSync(process.execPath, [cli, "status", "artifacts", "--cleanup"], { cwd: tempDir, encoding: "utf8" });
+  assert.notEqual(rejected.status, 0);
+  assert.match(`${rejected.stdout}${rejected.stderr}`, /Unexpected status artifacts argument: --cleanup/);
   assert.deepEqual(fs.readdirSync(tempDir), before);
 });
