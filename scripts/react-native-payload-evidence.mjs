@@ -32,6 +32,48 @@ export const RN_TEXT_INPUT_METADATA_FIELDS = [
 export const RN_PRESSABLE_METADATA_FIELDS = ["disabled", "accessibilityLabel", "accessibilityRole", "testID"];
 export const RN_TEXT_INPUT_CONSTRAINT_FIELDS = ["maxLength", "secureTextEntry", "keyboardType", "autoCapitalize"];
 
+export const RN_STAGED_SLOT_FIXTURES = [
+  {
+    slot: "F1",
+    lane: "RN primitive/input",
+    boundary: "measured narrow payload",
+    relativeFile: "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx",
+  },
+  {
+    slot: "F13",
+    lane: "RN primitive/input adjacent",
+    boundary: "measured narrow payload",
+    relativeFile: "test/fixtures/frontend-domain-expectations/rn-primitive-inline-action.tsx",
+  },
+  {
+    slot: "F2",
+    lane: "RN style/platform/navigation",
+    boundary: "readiness evidence only",
+    relativeFile: "test/fixtures/frontend-domain-expectations/rn-style-platform-navigation.tsx",
+  },
+  {
+    slot: "F9",
+    lane: "RN interaction/list",
+    boundary: "readiness evidence only",
+    relativeFile: "test/fixtures/frontend-domain-expectations/rn-interaction-gesture.tsx",
+  },
+  {
+    slot: "F10",
+    lane: "RN media/layout",
+    boundary: "readiness evidence only",
+    relativeFile: "test/fixtures/frontend-domain-expectations/rn-image-scrollview.tsx",
+  },
+];
+
+const RN_BEHAVIOR_CONCERN_KEYS = [
+  "rnAccessibilityTestAnchors",
+  "rnStateActionConcerns",
+  "rnNavigationConcerns",
+  "rnListRenderingConcerns",
+  "rnMediaLayoutConcerns",
+  "rnStylePlatformConcerns",
+];
+
 function loadDist(repoRoot) {
   const require = createRequire(import.meta.url);
   return {
@@ -60,6 +102,14 @@ function hasStrictRnContracts(domainPayload) {
 
 function uniqueSorted(values) {
   return [...new Set(values)].sort();
+}
+
+function toConcernProfileIds(payload) {
+  return uniqueSorted((payload?.concernProfiles ?? []).map((profile) => profile.id).filter(Boolean));
+}
+
+function toVisibleBehaviorConcernKinds(behavior) {
+  return RN_BEHAVIOR_CONCERN_KEYS.filter((key) => Array.isArray(behavior?.[key]) && behavior[key].length > 0);
 }
 
 function presentFields(bindings, fields) {
@@ -151,6 +201,8 @@ function measureRnFixture({ repoRoot, relativeFile, dist }) {
       claimBoundary: modelDomainPayload?.claimBoundary ?? null,
       strictContractsPresent: hasStrictRnContracts(modelDomainPayload),
       primitiveInteractions: modelInteractions,
+      concernProfileIds: toConcernProfileIds(modelPayload),
+      visibleBehaviorConcernKinds: toVisibleBehaviorConcernKinds(modelPayload.behavior),
     },
     claimable:
       preReadDecision.decision === "payload" &&
@@ -166,6 +218,10 @@ function measureRnFixture({ repoRoot, relativeFile, dist }) {
 function measureBoundaryFixture({ repoRoot, relativeFile, dist }) {
   const filePath = path.join(repoRoot, relativeFile);
   const decision = dist.preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: false });
+  const extracted = dist.extract.extractFile(filePath);
+  const modelPayload = dist.modelFacing.toModelFacingPayload(extracted, repoRoot, {
+    includeEditGuidance: false,
+  });
   const domainPayload = readDomainPayload(decision);
   return {
     file: relativeFile,
@@ -176,6 +232,10 @@ function measureBoundaryFixture({ repoRoot, relativeFile, dist }) {
     payloadExposed: Boolean(domainPayload),
     rnPrimitiveInteractionsExposed: Boolean(domainPayload?.facts?.primitiveInteractions),
     boundaryPreserved: decision.decision === "fallback" && !domainPayload,
+    modelFacing: {
+      concernProfileIds: toConcernProfileIds(modelPayload),
+      visibleBehaviorConcernKinds: toVisibleBehaviorConcernKinds(modelPayload.behavior),
+    },
   };
 }
 
@@ -210,9 +270,46 @@ export async function buildReactNativePayloadEvidence({
   const readinessRows = rnFixtures.filter(
     (row) => row.preRead.primitiveInteractions.hasConstraintActionReadiness && row.modelFacing.primitiveInteractions.hasConstraintActionReadiness,
   );
+  const measuredByFile = new Map(rnFixtures.map((row) => [row.file, row]));
+  const boundaryByFile = new Map(boundaries.map((row) => [row.file, row]));
+  const stagedRnSurfaceInventory = RN_STAGED_SLOT_FIXTURES.map(({ slot, lane, boundary, relativeFile }) => {
+    const measured = measuredByFile.get(relativeFile);
+    if (measured) {
+      return {
+        slot,
+        lane,
+        boundary,
+        file: relativeFile,
+        classification: measured.classification,
+        preReadDecision: measured.preReadDecision,
+        preReadExpectation: measured.payloadPolicy,
+        claimBoundary: measured.preRead.claimBoundary,
+        concernProfileIds: measured.modelFacing.concernProfileIds,
+        visibleBehaviorConcernKinds: measured.modelFacing.visibleBehaviorConcernKinds,
+        sourceOnly: true,
+        broadSupportClaimable: false,
+      };
+    }
+
+    const fallback = boundaryByFile.get(relativeFile);
+    return {
+      slot,
+      lane,
+      boundary,
+      file: relativeFile,
+      classification: fallback?.classification ?? null,
+      preReadDecision: fallback?.decision ?? null,
+      preReadExpectation: fallback?.fallbackReason ?? null,
+      claimBoundary: "unsupported-frontend-domain-profile",
+      concernProfileIds: fallback?.modelFacing?.concernProfileIds ?? [],
+      visibleBehaviorConcernKinds: fallback?.modelFacing?.visibleBehaviorConcernKinds ?? [],
+      sourceOnly: true,
+      broadSupportClaimable: false,
+    };
+  });
 
   return {
-    schemaVersion: "react-native-payload-evidence.v3",
+    schemaVersion: "react-native-payload-evidence.v4",
     generatedAt: new Date().toISOString(),
     runId,
     measurement: "local-fixture-pre-read-and-model-facing-domain-payload-evidence",
@@ -269,6 +366,11 @@ export async function buildReactNativePayloadEvidence({
         directReadinessFixtures: readinessRows.map((row) => row.file),
         blocker: readinessRows.length > 0 ? null : "no measured RN fixture exposed constraintActionReadiness in both pre-read and model-facing payloads",
       },
+      stagedRnSurfaceInventory: {
+        claimable: true,
+        stagedSlots: stagedRnSurfaceInventory,
+        blocker: null,
+      },
       broadReactNativeSupport: {
         claimable: false,
         blocker: "evidence is limited to the existing rn-primitive-input-narrow-payload measured lane",
@@ -324,6 +426,12 @@ export function renderReactNativePayloadEvidenceMarkdown(evidence) {
       (row) => `| Pressable | ${row.field} | ${row.preRead ? "yes" : "no"} | ${row.modelFacing ? "yes" : "no"} | ${row.claimable ? "yes" : "no"} |`,
     ),
   ].join("\n");
+  const stagedInventoryRows = evidence.summary.stagedRnSurfaceInventory.stagedSlots
+    .map(
+      (row) =>
+        `| ${row.slot} | ${row.lane} | ${row.boundary} | \`${row.file}\` | ${row.preReadDecision ?? "n/a"} | ${row.preReadExpectation ?? "n/a"} | ${row.concernProfileIds.join(", ") || "omitted"} | ${row.visibleBehaviorConcernKinds.join(", ") || "omitted"} | ${row.sourceOnly ? "yes" : "no"} | ${row.broadSupportClaimable ? "yes" : "no"} |`,
+    )
+    .join("\n");
 
   return `# React Native payload evidence
 
@@ -337,6 +445,7 @@ ${evidence.claimBoundary}
 - Measured RN narrow input constraints visible: ${evidence.summary.inputConstraintsVisible.claimable ? "yes" : "no"}
 - RN direct state/action relation visible: ${evidence.summary.stateActionRelationsVisible.claimable ? "yes" : "no"}
 - Measured RN narrow constraint/action readiness visible: ${evidence.summary.constraintActionReadinessVisible.claimable ? "yes" : "no"}
+- RN staged surface inventory visible: ${evidence.summary.stagedRnSurfaceInventory.claimable ? "yes" : "no"}
 - Broad React Native support claimable: no
 - Runtime reuse promotion claimable: no
 - RN edit routing claimable: no
@@ -347,6 +456,12 @@ ${evidence.claimBoundary}
 | Fixture | pre-read decision | source fingerprint | strict RN contracts | input bindings | action bindings | constraints | action relation | readiness | claimable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ${fixtureRows}
+
+## RN staged surface inventory
+
+| Slot | lane | boundary | fixture | pre-read decision | pre-read expectation | concern profiles | visible behavior concern kinds | source-only | broad support claimable |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+${stagedInventoryRows}
 
 ## Metadata anchor coverage
 
@@ -363,6 +478,8 @@ ${boundaryRows}
 ## Claim boundary
 
 The constraint/action readiness claim is scoped to \`${evidence.summary.constraintActionReadinessVisible.scope}\` and requires source-observed TextInput constraints, a direct actionReadsInputValue relation, and a source-observed Pressable disabled expression.
+
+The staged RN surface inventory is source-only closeout evidence for \`F1\`, \`F13\`, \`F2\`, \`F9\`, and \`F10\`. It records local concern-profile visibility and fallback posture only; it does not prove broad React Native support, route existence, navigation success, list virtualization correctness, image/layout correctness, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
 
 This artifact supports bounded local statements only for the existing \`rn-primitive-input-narrow-payload\` lane. It does not support broad React Native support, WebView/TUI promotion, runtime reuse promotion, RN edit routing, runtime-token savings, provider-cost, billing, invoice, or charged-cost claims.
 `;

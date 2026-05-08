@@ -5492,6 +5492,7 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
     assert.match(row.preReadExpectation, /unsupported-frontend-domain-profile/);
     assert.match(row.mustNotClaim, /React Native support/);
     assert.doesNotMatch(row.preReadExpectation, /rn-primitive-input-narrow-payload/);
+    assert.match(row.reviewCue, /source-only concern metadata/i, `${slot} review cue must stay source-only`);
   }
 
   for (const slot of ["F3", "F4", "F6"]) {
@@ -5504,6 +5505,10 @@ test("frontend fixture boundary regression map keeps RN WebView TUI claim bounda
     assert.match(row.mustNotClaim, /compact-payload reuse/);
     assert.doesNotMatch(`${row.preReadExpectation} ${row.reviewCue}`, /payload construction is allowed|payload reuse is enabled/i);
   }
+
+  assert.match(docsBySlot.get("F2").reviewCue, /route existence|navigation success/i);
+  assert.match(docsBySlot.get("F9").reviewCue, /gesture\/list runtime success/i);
+  assert.match(docsBySlot.get("F10").reviewCue, /image\/layout correctness/i);
 
   const tui = docsBySlot.get("F5");
   assert.equal(tui.boundaryLabel, "syntax-only evidence");
