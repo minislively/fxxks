@@ -223,7 +223,7 @@ No. opencode support is a project-local `fooks_extract` tool and `/fooks-extract
 
 The strongest path today is repeated same-file React `.tsx` / `.jsx` work in Codex. Unsupported or unsafe cases fall back to normal full-source behavior.
 
-React Native and embedded WebView files are not supported today. Treat `.tsx` parsing as syntax-level eligibility only; it is not evidence that fooks understands RN primitives, native platform semantics, bridge behavior, or WebView boundaries.
+React Native and embedded WebView files are not supported today. Treat `.tsx` parsing as syntax-level eligibility only; it is not evidence that fooks understands RN primitives, native platform semantics, bridge behavior, or WebView boundaries. For the measured RN primitive/input narrow lane only, `fooks compare <file> --json` and `fooks inspect-domain <file> --json` may expose the existing `sourceAnchorBeta` located-anchor proof as local evidence; that appendix is not extract expansion, runtime reuse promotion, edit routing, or broad RN support.
 
 ## Everyday commands
 

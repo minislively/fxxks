@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { ExtractionResult } from "../core/schema";
+import type { ReactNativeSourceAnchorBetaPayload } from "../core/payload/domain-payload";
 
 function print(value: unknown): void {
   console.log(JSON.stringify(value));
@@ -715,6 +716,16 @@ type InspectDomainCliResult = {
     applies: boolean;
     reason?: string;
   };
+  reactNativeSourceAnchorBeta?: {
+    schemaVersion: "rn-source-anchor-beta-visibility.v1";
+    proofSurface: "inspect-domain";
+    claimBoundary: "rn-primitive-input-narrow-payload-only";
+    nonEmitting: true;
+    modelFacingPayload: false;
+    runtimeOrPreRead: false;
+    sourceAnchorBeta: ReactNativeSourceAnchorBetaPayload;
+    warnings: string[];
+  };
   tuiSourceMetadata?: {
     schemaVersion: 1;
     mode: "source-only-dry-run";
@@ -775,6 +786,7 @@ function buildInspectDomainResult(options: {
   cwd: string;
   detection: { classification: string; evidence: Array<{ domain: string; signal: string; detail: string }> };
   json: boolean;
+  reactNativeSourceAnchorBeta?: NonNullable<InspectDomainCliResult["reactNativeSourceAnchorBeta"]>;
   tuiSourceMetadata?: NonNullable<InspectDomainCliResult["tuiSourceMetadata"]>;
 }): InspectDomainCliResult {
   const relative = path.relative(options.cwd, options.filePath) || path.basename(options.filePath);
@@ -791,6 +803,9 @@ function buildInspectDomainResult(options: {
       ? { applies: true, reason: "unsupported-react-native-webview-boundary" }
       : { applies: false },
   };
+  if (options.json && options.reactNativeSourceAnchorBeta) {
+    result.reactNativeSourceAnchorBeta = options.reactNativeSourceAnchorBeta;
+  }
   if (options.json && options.tuiSourceMetadata) {
     result.tuiSourceMetadata = options.tuiSourceMetadata;
   }
@@ -1115,13 +1130,43 @@ async function run(): Promise<void> {
     }
 
     case "inspect-domain": {
-      const [{ detectDomainFromSource }, { projectTuiSourceMetadataDryRun }] = await Promise.all([
+      const [
+        { detectDomainFromSource },
+        { projectTuiSourceMetadataDryRun },
+        { extractFile },
+        { toModelFacingPayload },
+        { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions },
+      ] = await Promise.all([
         import("../core/domain-detector.js"),
         import("../core/tui-source-metadata.js"),
+        import("../core/extract.js"),
+        import("../core/payload/model-facing.js"),
+        import("../core/payload-policy/registry.js"),
       ]);
       const { filePath: file, json } = parseCompareArgs(rest);
       const sourceText = fs.readFileSync(file, "utf8");
       const detection = detectDomainFromSource(sourceText, file);
+      const extracted = json ? extractFile(file) : undefined;
+      const frontendPayloadPolicy = extracted?.domainDetection ? assessFrontendPayloadPolicy(extracted.domainDetection) : undefined;
+      const domainPayload = extracted
+        ? toModelFacingPayload(extracted, process.cwd(), {
+            includeEditGuidance: false,
+            ...toFrontendPayloadBuildOptions(frontendPayloadPolicy),
+          }).domainPayload
+        : undefined;
+      const reactNativeSourceAnchorBeta =
+        domainPayload?.domain === "react-native"
+          ? {
+              schemaVersion: "rn-source-anchor-beta-visibility.v1" as const,
+              proofSurface: "inspect-domain" as const,
+              claimBoundary: domainPayload.claimBoundary,
+              nonEmitting: true as const,
+              modelFacingPayload: false as const,
+              runtimeOrPreRead: false as const,
+              sourceAnchorBeta: domainPayload.sourceAnchorBeta,
+              warnings: domainPayload.warnings,
+            }
+          : undefined;
       const tuiSourceMetadata =
         json && hasTuiInkEvidence(detection.evidence)
           ? toInspectDomainTuiSourceMetadata(
@@ -1132,7 +1177,7 @@ async function run(): Promise<void> {
               }),
             )
           : undefined;
-      print(buildInspectDomainResult({ filePath: file, cwd: process.cwd(), detection, json, tuiSourceMetadata }));
+      print(buildInspectDomainResult({ filePath: file, cwd: process.cwd(), detection, json, reactNativeSourceAnchorBeta, tuiSourceMetadata }));
       return;
     }
     case "attach": {

@@ -392,6 +392,42 @@ test("CLI inspect-domain keeps mixed TUI evidence top-level while preserving dom
   assert.equal("tuiSourceMetadata" in result.domainDetection, false);
 });
 
+
+test("CLI inspect-domain JSON exposes bounded RN sourceAnchorBeta located-anchor proof", () => {
+  const fixture = path.join(fixtureRoot, "rn-primitive-inline-action.tsx");
+  const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(cli.status, 0, cli.stderr);
+  const result = JSON.parse(cli.stdout);
+
+  assert.equal(result.command, "inspect-domain");
+  assert.equal(result.domainDetection.classification, "react-native");
+  assert.deepEqual(result.fallbackFirst, { applies: false });
+  assert.equal(result.reactNativeSourceAnchorBeta.schemaVersion, "rn-source-anchor-beta-visibility.v1");
+  assert.equal(result.reactNativeSourceAnchorBeta.proofSurface, "inspect-domain");
+  assert.equal(result.reactNativeSourceAnchorBeta.nonEmitting, true);
+  assert.equal(result.reactNativeSourceAnchorBeta.modelFacingPayload, false);
+  assert.equal(result.reactNativeSourceAnchorBeta.runtimeOrPreRead, false);
+  assert.equal(result.reactNativeSourceAnchorBeta.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.contract.contractVersion, "rn-source-anchor-beta.v0");
+  assert.deepEqual(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);
+  assert.equal(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.contract.runtimeReusePromotion, "not-promoted");
+  assert.deepEqual(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.anchors.locatedAnchors, [
+    { kind: "component-name", label: "InlineActionRow", loc: { startLine: 9, endLine: 30 } },
+    { kind: "props-interface", label: "InlineActionRowProps", loc: { startLine: 3, endLine: 7 } },
+    { kind: "event-handlers", label: "onChangeText:onChangeText", loc: { startLine: 19, endLine: 19 } },
+    { kind: "event-handlers", label: "onPress:submitCurrentValue", loc: { startLine: 25, endLine: 25 } },
+    { kind: "rn-primitive-outline", label: "TextInput", loc: { startLine: 16, endLine: 24 } },
+    { kind: "rn-primitive-outline", label: "Pressable", loc: { startLine: 25, endLine: 25 } },
+  ]);
+  assert.equal("domainPayload" in result, false);
+  assert.equal("tuiSourceMetadata" in result, false);
+  assert.doesNotMatch(JSON.stringify(result.reactNativeSourceAnchorBeta), forbiddenSupportClaims);
+});
+
 test("CLI inspect-domain keeps non-WebView fixture output as evidence-only non-fallback inspection", () => {
   const fixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
   const cli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture], {

@@ -1,5 +1,7 @@
 import { extractFile } from "./extract";
 import { toModelFacingPayload } from "./payload/model-facing";
+import type { ReactNativeSourceAnchorBetaPayload } from "./payload/domain-payload";
+import { assessFrontendPayloadPolicy, toFrontendPayloadBuildOptions } from "./payload-policy/registry";
 import {
   FOOKS_METRIC_CLAIM_BOUNDARY,
   FOOKS_SESSION_METRIC_TIER,
@@ -23,6 +25,14 @@ export type FooksCompareUserSummary = {
 
 export type FooksCompareReactWebContextSummary = ReactWebContextSummary;
 
+export type FooksCompareReactNativeSourceAnchorBetaVisibility = {
+  schemaVersion: "rn-source-anchor-beta-visibility.v1";
+  proofSurface: "compare";
+  claimBoundary: "rn-primitive-input-narrow-payload-only";
+  sourceAnchorBeta: ReactNativeSourceAnchorBetaPayload;
+  warnings: string[];
+};
+
 export type FooksCompareResult = {
   filePath: string;
   mode: OutputMode;
@@ -38,6 +48,7 @@ export type FooksCompareResult = {
   payloadLarger: boolean;
   nonSavingReason?: "original-source-preserved-for-small-raw-file" | "model-facing-payload-not-smaller";
   reactWebContextSummary?: FooksCompareReactWebContextSummary;
+  reactNativeSourceAnchorBeta?: FooksCompareReactNativeSourceAnchorBetaVisibility;
   metricTier: typeof FOOKS_SESSION_METRIC_TIER;
   measurement: "local-model-facing-payload";
   excludes: string[];
@@ -112,11 +123,19 @@ export function compareModelFacingPayload(filePath: string, cwd = process.cwd())
   const extracted = extractFile(filePath);
   const payload = toModelFacingPayload(extracted, cwd);
   const useOriginal = extracted.useOriginal === true;
-  const contextPayload = toModelFacingPayload(extracted, cwd, {
-    includeDomainPayload: true,
-    includeReactWebContextMetadata: true,
-  });
+  const frontendPayloadPolicy = extracted.domainDetection ? assessFrontendPayloadPolicy(extracted.domainDetection) : undefined;
+  const contextPayload = toModelFacingPayload(extracted, cwd, toFrontendPayloadBuildOptions(frontendPayloadPolicy));
   const reactWebContextSummary = reactWebContextSummaryFor(contextPayload, useOriginal);
+  const reactNativeSourceAnchorBeta =
+    contextPayload.domainPayload?.domain === "react-native"
+      ? {
+          schemaVersion: "rn-source-anchor-beta-visibility.v1" as const,
+          proofSurface: "compare" as const,
+          claimBoundary: contextPayload.domainPayload.claimBoundary,
+          sourceAnchorBeta: contextPayload.domainPayload.sourceAnchorBeta,
+          warnings: contextPayload.domainPayload.warnings,
+        }
+      : undefined;
   const sourceBytes = extracted.meta.rawSizeBytes;
   const modelFacingBytes = estimateTextBytes(JSON.stringify(payload));
   const estimatedSourceTokens = estimateTokensFromBytes(sourceBytes);
@@ -141,6 +160,7 @@ export function compareModelFacingPayload(filePath: string, cwd = process.cwd())
     payloadLarger,
     ...(payloadLarger || useOriginal ? { nonSavingReason: nonSavingReason(useOriginal, payloadLarger) } : {}),
     ...(reactWebContextSummary ? { reactWebContextSummary } : {}),
+    ...(reactNativeSourceAnchorBeta ? { reactNativeSourceAnchorBeta } : {}),
     metricTier: FOOKS_SESSION_METRIC_TIER,
     measurement: "local-model-facing-payload",
     excludes: [

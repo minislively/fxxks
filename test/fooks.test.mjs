@@ -622,6 +622,31 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.ok(result.excludes.includes("optional-edit-guidance-overhead"));
 });
 
+
+test("compare JSON exposes bounded RN sourceAnchorBeta located-anchor proof", () => {
+  const result = run(["compare", "test/fixtures/frontend-domain-expectations/rn-primitive-inline-action.tsx", "--json"]);
+
+  assert.equal(result.filePath, path.join("test", "fixtures", "frontend-domain-expectations", "rn-primitive-inline-action.tsx"));
+  assert.equal(result.reactNativeSourceAnchorBeta.schemaVersion, "rn-source-anchor-beta-visibility.v1");
+  assert.equal(result.reactNativeSourceAnchorBeta.proofSurface, "compare");
+  assert.equal(result.reactNativeSourceAnchorBeta.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.contract.contractVersion, "rn-source-anchor-beta.v0");
+  assert.deepEqual(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.contract.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);
+  assert.equal(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.contract.runtimeReusePromotion, "not-promoted");
+  assert.deepEqual(result.reactNativeSourceAnchorBeta.sourceAnchorBeta.anchors.locatedAnchors, [
+    { kind: "component-name", label: "InlineActionRow", loc: { startLine: 9, endLine: 30 } },
+    { kind: "props-interface", label: "InlineActionRowProps", loc: { startLine: 3, endLine: 7 } },
+    { kind: "event-handlers", label: "onChangeText:onChangeText", loc: { startLine: 19, endLine: 19 } },
+    { kind: "event-handlers", label: "onPress:submitCurrentValue", loc: { startLine: 25, endLine: 25 } },
+    { kind: "rn-primitive-outline", label: "TextInput", loc: { startLine: 16, endLine: 24 } },
+    { kind: "rn-primitive-outline", label: "Pressable", loc: { startLine: 25, endLine: 25 } },
+  ]);
+  assert.match(JSON.stringify(result.reactNativeSourceAnchorBeta.warnings), /local-proof beta contract only/);
+  assert.equal("domainPayload" in result, false);
+  assert.equal("reactWebContextSummary" in result, false);
+  assert.doesNotMatch(JSON.stringify(result.reactNativeSourceAnchorBeta), /runtimeReusePromotion":"promoted|React Native support is available|editTargetRouting/i);
+});
+
 test("compare keeps tiny raw fallback from reporting false positive savings", () => {
   const result = run(["compare", "fixtures/raw/SimpleButton.tsx", "--json"]);
   assert.equal(result.filePath, path.join("fixtures", "raw", "SimpleButton.tsx"));

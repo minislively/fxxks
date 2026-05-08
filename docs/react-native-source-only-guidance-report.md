@@ -10,7 +10,7 @@ Use this report when reviewing or writing RN-facing docs/tests so the current me
 - That narrow payload evidence is limited to the existing `rn-primitive-input-narrow-payload` policy.
 - `F16`, `F2`, `F9`, and `F10` remain fallback/readiness lanes with source-only concern or boundary metadata.
 - No current RN surface is a broad React Native support claim.
-- Located-anchor hardening is already complete; RN `sourceAnchorBeta` should now be treated as closeout/frozen until a new `extract` / `compare` / `inspect-domain` visibility plan is explicitly approved.
+- Located-anchor hardening is already complete; RN `sourceAnchorBeta` remains closeout/frozen. The weak proof surfaces `compare --json` and `inspect-domain --json` may show that existing located-anchor proof for the measured narrow lane only; this does not change extraction, detector breadth, payload policy, runtime reuse, or the `sourceAnchorBeta` contract meaning.
 
 ## Slot-by-slot guidance
 
