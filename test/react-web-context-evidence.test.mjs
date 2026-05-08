@@ -15,6 +15,9 @@ const EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES = [
   "test/fixtures/react-web-context-expansion/route-page-account-settings.tsx",
   "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
   "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+  "test/fixtures/react-web-context-expansion/table-list-filter-results.tsx",
+  "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+  "test/fixtures/react-web-context-expansion/wrapper-heavy-ops-overview.tsx",
 ];
 
 test("React Web context evidence measures actual injected additionalContext without broad savings claims", async () => {
