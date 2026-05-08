@@ -195,3 +195,131 @@ test("React Web runtime payload adds jsxComponentCount for wrapper-heavy current
   });
   assertNoNonWhitelistedDetails(customFormPayload.facts);
 });
+
+test("React Web runtime payload stays exact for the first-pass context-expansion fixtures", () => {
+  const routePagePayload = repeatedPayloadFor(
+    "test/fixtures/react-web-context-expansion/route-page-account-settings.tsx",
+    "route-page-account-settings",
+  );
+
+  assertExactPayload(routePagePayload, {
+    schemaVersion: "domain-payload.v1",
+    domain: "react-web",
+    policy: "react-web-current-supported-lane",
+    plannerDecision: "compact-safe",
+    claimStatus: "current-supported-lane",
+    claimBoundary: "react-web-measured-extraction",
+    evidence: [
+      "react-web:dom-tag:button",
+      "react-web:dom-tag:div",
+      "react-web:dom-tag:form",
+      "react-web:dom-tag:input",
+      "react-web:dom-tag:label",
+      "react-web:dom-tag:select",
+      "react-web:dom-tag:span",
+      "react-web:dom-tag:textarea",
+      "react-web:jsx-attribute:className",
+      "react-web:jsx-attribute:htmlFor",
+    ],
+    facts: {
+      componentName: "AccountSettingsPage",
+      exports: [{ name: "AccountSettingsPage", kind: "named", type: "function" }],
+      jsxDepth: 6,
+      hasSideEffects: false,
+      hasStyleBranching: false,
+      domTags: ["button", "div", "form", "input", "label", "select", "span", "textarea"],
+      jsxAttributes: ["className", "htmlFor"],
+      formControls: [
+        { tag: "input", handlers: ["onChange"] },
+        { tag: "select", handlers: ["onChange"] },
+        { tag: "textarea", handlers: ["onChange"] },
+      ],
+      eventHandlers: ["onChange", "onClick"],
+      styleSystem: "tailwind",
+    },
+    warnings: reactWebWarnings,
+  });
+  assertNoNonWhitelistedDetails(routePagePayload.facts);
+
+  const modalDialogPayload = repeatedPayloadFor(
+    "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+    "modal-dialog-preferences-form",
+  );
+
+  assertExactPayload(modalDialogPayload, {
+    schemaVersion: "domain-payload.v1",
+    domain: "react-web",
+    policy: "react-web-current-supported-lane",
+    plannerDecision: "compact-safe",
+    claimStatus: "current-supported-lane",
+    claimBoundary: "react-web-measured-extraction",
+    evidence: [
+      "react-web:dom-tag:button",
+      "react-web:dom-tag:div",
+      "react-web:dom-tag:form",
+      "react-web:dom-tag:input",
+      "react-web:dom-tag:label",
+      "react-web:dom-tag:select",
+      "react-web:dom-tag:span",
+      "react-web:jsx-attribute:className",
+      "react-web:jsx-attribute:htmlFor",
+    ],
+    facts: {
+      componentName: "PreferencesDialog",
+      exports: [{ name: "PreferencesDialog", kind: "named", type: "function" }],
+      hooks: ["useMemo"],
+      jsxDepth: 6,
+      hasSideEffects: false,
+      hasStyleBranching: false,
+      domTags: ["button", "div", "form", "input", "label", "select", "span"],
+      jsxAttributes: ["className", "htmlFor"],
+      formControls: [
+        { tag: "input", type: "checkbox", handlers: ["onChange"] },
+        { tag: "select", handlers: ["onChange"] },
+      ],
+      eventHandlers: ["onChange", "onClick"],
+      styleSystem: "tailwind",
+    },
+    warnings: reactWebWarnings,
+  });
+  assertNoNonWhitelistedDetails(modalDialogPayload.facts);
+
+  const dataFetchingPayload = repeatedPayloadFor(
+    "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+    "data-fetching-user-table",
+  );
+
+  assertExactPayload(dataFetchingPayload, {
+    schemaVersion: "domain-payload.v1",
+    domain: "react-web",
+    policy: "react-web-current-supported-lane",
+    plannerDecision: "compact-safe",
+    claimStatus: "current-supported-lane",
+    claimBoundary: "react-web-measured-extraction",
+    evidence: [
+      "react-web:dom-tag:button",
+      "react-web:dom-tag:div",
+      "react-web:dom-tag:form",
+      "react-web:dom-tag:input",
+      "react-web:dom-tag:label",
+      "react-web:dom-tag:span",
+      "react-web:jsx-attribute:className",
+      "react-web:jsx-attribute:htmlFor",
+    ],
+    facts: {
+      componentName: "UserDirectoryTable",
+      exports: [{ name: "UserDirectoryTable", kind: "named", type: "function" }],
+      hooks: ["useState", "useUserTableQuery"],
+      jsxDepth: 5,
+      hasSideEffects: false,
+      hasStyleBranching: false,
+      domTags: ["button", "div", "form", "input", "label", "span"],
+      jsxAttributes: ["className", "htmlFor"],
+      formControls: [{ tag: "input", handlers: ["onChange"] }],
+      eventHandlers: ["onChange", "onClick"],
+      styleSystem: "tailwind",
+    },
+    warnings: reactWebWarnings,
+  });
+  assertNoNonWhitelistedDetails(dataFetchingPayload.facts);
+});

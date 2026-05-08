@@ -1,9 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DEFAULT_REACT_WEB_EVIDENCE_FIXTURES,
   buildReactWebContextEvidence,
   renderReactWebContextEvidenceMarkdown,
 } from "../scripts/react-web-context-evidence.mjs";
+
+const EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES = [
+  "fixtures/compressed/HookEffectPanel.tsx",
+  "fixtures/compressed/FormSection.tsx",
+  "fixtures/hybrid/DashboardPanel.tsx",
+  "test/fixtures/frontend-domain-expectations/react-web/custom-design-system-card.tsx",
+  "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+  "test/fixtures/react-web-context-expansion/route-page-account-settings.tsx",
+  "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+  "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+];
 
 test("React Web context evidence measures actual injected additionalContext without broad savings claims", async () => {
   const evidence = await buildReactWebContextEvidence({ runId: `test-${Date.now()}-${Math.random()}` });
@@ -21,7 +33,12 @@ test("React Web context evidence measures actual injected additionalContext with
   assert.ok(evidence.metricProvenance.actualInjectedContextReduction.notComparableTo.includes("cacheHitRate"));
   assert.ok(evidence.metricProvenance.actualInjectedContextReduction.notComparableTo.includes("providerBillingSavings"));
 
-  assert.equal(evidence.summary.fixtureCount, 5);
+  assert.deepEqual(DEFAULT_REACT_WEB_EVIDENCE_FIXTURES, EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES);
+  assert.deepEqual(
+    evidence.fixtures.map((row) => row.file),
+    EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES,
+  );
+  assert.equal(evidence.summary.fixtureCount, EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES.length);
   assert.equal(evidence.summary.allReactWebInjects, true);
   assert.equal(evidence.summary.actualInjectedContextReduction.claimable, true);
   assert.equal(evidence.summary.actualInjectedContextReduction.blocker, null);
@@ -38,7 +55,7 @@ test("React Web context evidence measures actual injected additionalContext with
 
   assert.equal(evidence.summary.domainPayloadReduction.claimable, true);
   assert.equal(evidence.summary.domainPayloadReduction.diagnosticOnly, true);
-  assert.ok(evidence.summary.domainPayloadReduction.minPct > 25);
+  assert.ok(evidence.summary.domainPayloadReduction.minPct > 30);
 
   assert.equal(evidence.summary.fullRuntimePayloadReduction.claimable, false);
   assert.match(evidence.summary.fullRuntimePayloadReduction.blocker, /not smaller than source for every fixture/);
@@ -63,6 +80,18 @@ test("React Web context evidence measures actual injected additionalContext with
     assert.equal(row.classification, "react-web");
     assert.ok(row.additionalContextBytes > 0);
     assert.equal(typeof row.additionalContextReductionPct, "number");
+    assert.equal(row.domainPayloadLargerThanSource, false);
+    assert.equal(row.claimBoundary, "react-web-measured-extraction");
+    assert.equal(row.claimStatus, "current-supported-lane");
+  }
+
+  for (const promotedFixture of EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES.slice(5)) {
+    const row = evidence.fixtures.find((fixture) => fixture.file === promotedFixture);
+    assert.ok(row, `${promotedFixture} should be present in the promoted default suite`);
+    assert.equal(row.firstAction, "record");
+    assert.equal(row.secondAction, "inject");
+    assert.equal(row.decision, "payload");
+    assert.equal(row.classification, "react-web");
     assert.equal(row.domainPayloadLargerThanSource, false);
     assert.equal(row.claimBoundary, "react-web-measured-extraction");
     assert.equal(row.claimStatus, "current-supported-lane");
