@@ -651,7 +651,7 @@ Everyday commands:
   ${displayCliName} status claude
   ${displayCliName} status cache
   ${displayCliName} status worktree
-  ${displayCliName} status artifacts
+  ${displayCliName} status artifacts [--json]
   ${displayCliName} status activity [--include-remote-counts]
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
@@ -740,6 +740,21 @@ function buildInspectDomainResult(options: {
       ? { applies: true, reason: "unsupported-react-native-webview-boundary" }
       : { applies: false },
   };
+}
+
+
+function parseStatusArtifactsArgs(args: string[]): { json: boolean } {
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    throw new Error(`Unexpected status artifacts argument: ${arg}`);
+  }
+
+  return { json };
 }
 
 function parseDoctorArgs(args: string[]): { target: "all" | "codex" | "claude"; json: boolean; help: boolean } {
@@ -1122,6 +1137,7 @@ async function run(): Promise<void> {
         return;
       }
       if (arg1 === "artifacts") {
+        parseStatusArtifactsArgs(rest.slice(1));
         const { auditArtifacts } = await import("../core/artifact-audit.js");
         print(auditArtifacts(process.cwd()));
         return;
