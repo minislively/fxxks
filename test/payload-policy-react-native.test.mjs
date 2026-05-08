@@ -77,6 +77,7 @@ test("React Native payload leakage guard allows only F1 and F13 pre-read payload
   const cases = [
     ["F1", "rn-primitive-basic.tsx", "payload", undefined],
     ["F13", "rn-primitive-inline-action.tsx", "payload", undefined],
+    ["F14", "rn-accessibility-test-anchor.tsx", "payload", undefined],
     ["F2", "rn-style-platform-navigation.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F9", "rn-interaction-gesture.tsx", "fallback", "unsupported-frontend-domain-profile"],
     ["F10", "rn-image-scrollview.tsx", "fallback", "unsupported-frontend-domain-profile"],
@@ -311,6 +312,30 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   assert.equal(preReadDecision.payload.domainPayload.facts.primitiveInteractions.constraintActionReadiness[0].relationKind, "constraintActionReadiness");
   assert.equal(preReadDecision.debug.domainDetection.classification, "react-native");
   assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
+});
+
+test("React Native F14 accessibility anchor fixture remains inside the narrow payload lane", () => {
+  const filePath = fixturePath("rn-accessibility-test-anchor.tsx");
+  const domainDetection = detect(fixtureSource("rn-accessibility-test-anchor.tsx"), filePath);
+
+  assert.equal(domainDetection.classification, "react-native");
+  assert.deepEqual(assessReactNativePayloadPolicy(domainDetection), {
+    name: RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    allowed: true,
+  });
+
+  const decision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
+  assert.equal(decision.decision, "payload");
+  assert.equal(decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(decision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only");
+
+  const payload = buildReactNativePrimitiveInputDomainPayload(extractFile(filePath), domainDetection);
+  assert.equal(payload?.domain, "react-native");
+  assert.equal(payload?.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
+  assert.equal(payload?.claimBoundary, "rn-primitive-input-narrow-payload-only");
+  assert.equal(payload?.facts.primitiveInteractions?.inputBindings[0].accessibilityLabel, "Search input");
+  assert.equal(payload?.facts.primitiveInteractions?.actionBindings[0].accessibilityRole, "button");
+  assert.equal(payload?.facts.primitiveInteractions?.actionBindings[0].testID, "apply-filters");
 });
 
 

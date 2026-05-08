@@ -28,9 +28,9 @@ test("React Native readiness evidence emits the approved slot map without wideni
   assert.match(evidence.claimBoundary, /not broad React Native support/);
   assert.match(evidence.claimBoundary, /not runtime correctness/);
 
-  assert.equal(evidence.summary.slotCount, 5);
+  assert.equal(evidence.summary.slotCount, 6);
   assert.deepEqual(evidence.slots.map((row) => row.slot), RN_READINESS_SLOT_ORDER);
-  assert.deepEqual(evidence.summary.payloadCapableSlots, ["F1", "F13"]);
+  assert.deepEqual(evidence.summary.payloadCapableSlots, ["F1", "F13", "F14"]);
   assert.deepEqual(evidence.summary.readinessOnlySlots, ["F2", "F9", "F10"]);
   assert.deepEqual(evidence.claimability, {
     broadReactNativeSupport: false,
@@ -38,7 +38,7 @@ test("React Native readiness evidence emits the approved slot map without wideni
     providerBillingSavings: false,
   });
   assert.equal(evidence.summary.childArtifact.schemaVersion, "react-native-payload-evidence.v4");
-  assert.equal(evidence.summary.childArtifact.stagedSlotCount, 5);
+  assert.equal(evidence.summary.childArtifact.stagedSlotCount, 6);
 
   const bySlot = new Map(evidence.slots.map((row) => [row.slot, row]));
   assert.deepEqual(bySlot.get("F1"), {
@@ -62,6 +62,17 @@ test("React Native readiness evidence emits the approved slot map without wideni
     supportClaim: "none",
     evidenceScope: "rn-primitive-input-narrow-payload-only",
     fixture: "test/fixtures/frontend-domain-expectations/rn-primitive-inline-action.tsx",
+  });
+  assert.deepEqual(bySlot.get("F14"), {
+    slot: "F14",
+    id: "rn-accessibility-test-anchor",
+    surface: "RN primitive/input accessibility adjacent",
+    outcome: "payload",
+    policy: "rn-primitive-input-narrow-payload",
+    claim: "narrow measured evidence only",
+    supportClaim: "none",
+    evidenceScope: "rn-primitive-input-narrow-payload-only",
+    fixture: "test/fixtures/frontend-domain-expectations/rn-accessibility-test-anchor.tsx",
   });
   assert.equal(bySlot.get("F2").outcome, "fallback");
   assert.equal(bySlot.get("F2").policy, "source-only-readiness");
@@ -88,8 +99,8 @@ test("React Native readiness evidence markdown keeps non-claims explicit", async
 
   assert.match(markdown, /# React Native readiness evidence/);
   assert.match(markdown, /Profile: react-native/);
-  assert.match(markdown, /Slot count: 5/);
-  assert.match(markdown, /Payload-capable slots: F1, F13/);
+  assert.match(markdown, /Slot count: 6/);
+  assert.match(markdown, /Payload-capable slots: F1, F13, F14/);
   assert.match(markdown, /Readiness-only slots: F2, F9, F10/);
   assert.match(markdown, /Broad React Native support claimable: no/);
   assert.match(markdown, /Runtime correctness claimable: no/);
@@ -130,5 +141,5 @@ test("React Native readiness evidence command writes bounded JSON and Markdown r
   assert.equal(stdoutEvidence.profile, "react-native");
   assert.deepEqual(fileEvidence, stdoutEvidence);
   assert.match(markdown, /# React Native readiness evidence/);
-  assert.match(markdown, /Payload-capable slots: F1, F13/);
+  assert.match(markdown, /Payload-capable slots: F1, F13, F14/);
 });
