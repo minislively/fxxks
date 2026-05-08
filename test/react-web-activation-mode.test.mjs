@@ -122,6 +122,8 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
   assert.equal(activationMode.verdict, "would-activate");
   assert.equal(activationMode.supportedTrigger.name, "repeated-file");
   assert.equal(activationMode.supportedTrigger.positive, true);
+  assert.equal(activationMode.profileGate.name, "profile-gate");
+  assert.equal(activationMode.profileGate.verdict, "would-activate");
   assert.deepEqual(
     activationMode.deferredTriggers.map((item) => item.name),
     [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
@@ -139,6 +141,7 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
   const parsed = JSON.parse(cliJson.stdout);
   assert.equal(parsed.artifactId, ref.id);
   assert.equal(parsed.verdict, "would-activate");
+  assert.equal(parsed.profileGate.verdict, "would-activate");
 });
 
 test("activation mode keeps non-repeated activation triggers explicitly deferred", () => {
@@ -163,6 +166,7 @@ test("activation mode keeps non-repeated activation triggers explicitly deferred
 
   assert.equal(activationMode.verdict, "deferred");
   assert.equal(activationMode.supportedTrigger.positive, false);
+  assert.equal(activationMode.profileGate.verdict, "deferred");
   assert.deepEqual(
     activationMode.deferredTriggers.map((item) => item.name),
     [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
@@ -220,6 +224,7 @@ test("runtime activation promotion does not require patchTargets when repeated R
   const activationMode = buildReactWebActivationModeFromRuntimeDecision(tempDir, runtimeDecision);
   assert.equal(activationMode?.verdict, "would-activate");
   assert.equal(activationMode?.supportedTrigger.positive, true);
+  assert.equal(activationMode?.profileGate.verdict, "would-activate");
 });
 
 test("activation mode fail-closes deny boundary artifacts instead of widening support", () => {
@@ -242,5 +247,6 @@ test("activation mode fail-closes deny boundary artifacts instead of widening su
 
   assert.equal(activationMode.verdict, "blocked");
   assert.equal(activationMode.supportedTrigger.positive, false);
+  assert.equal(activationMode.profileGate.verdict, "blocked");
   assert.ok(activationMode.blockedReasons.includes("unsupported-react-native-webview-boundary"));
 });
