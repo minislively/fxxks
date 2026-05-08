@@ -91,6 +91,24 @@ export type {
   ReactWebStatusResult,
 } from "./core/react-web-status";
 export {
+  REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS,
+  REACT_WEB_ACTIVATION_MODE_CLAIM_BOUNDARY,
+  REACT_WEB_ACTIVATION_MODE_COMMAND,
+  REACT_WEB_ACTIVATION_MODE_MODE,
+  REACT_WEB_ACTIVATION_MODE_SCHEMA_VERSION,
+  REACT_WEB_ACTIVATION_SUPPORTED_TRIGGER,
+  buildReactWebActivationMode,
+  readReactWebActivationMode,
+  renderReactWebActivationModeMarkdown,
+  summarizeReactWebActivationMode,
+} from "./core/react-web-activation-mode";
+export type {
+  ReactWebActivationDeferredTrigger,
+  ReactWebActivationModeResult,
+  ReactWebActivationModeSummary,
+  ReactWebActivationVerdict,
+} from "./core/react-web-activation-mode";
+export {
   REACT_WEB_RANKED_BUNDLE_BUDGET_LIMIT,
   REACT_WEB_RANKED_BUNDLE_CLAIM_BOUNDARY,
   REACT_WEB_RANKED_BUNDLE_COMMAND,

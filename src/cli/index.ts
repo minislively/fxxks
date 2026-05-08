@@ -643,6 +643,7 @@ Everyday commands:
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
   ${displayCliName} inspect evidence <id> [--json]
+  ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
@@ -748,6 +749,29 @@ function parseInspectRankedBundleArgs(args: string[]): { id: string; json: boole
 
   if (!id) {
     throw new Error("inspect ranked-bundle requires an artifact id");
+  }
+
+  return { id, json };
+}
+
+function parseInspectActivationModeArgs(args: string[]): { id: string; json: boolean } {
+  let id: string | undefined;
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (!id) {
+      id = arg;
+      continue;
+    }
+    throw new Error(`Unexpected inspect activation-mode argument: ${arg}`);
+  }
+
+  if (!id) {
+    throw new Error("inspect activation-mode requires an artifact id");
   }
 
   return { id, json };
@@ -1249,6 +1273,17 @@ async function run(): Promise<void> {
         }
         return;
       }
+      if (arg1 === "activation-mode") {
+        const { id, json } = parseInspectActivationModeArgs(rest.slice(1));
+        const { readReactWebActivationMode, renderReactWebActivationModeMarkdown } = await import("../core/react-web-activation-mode.js");
+        const activationMode = readReactWebActivationMode(process.cwd(), id);
+        if (json) {
+          print(activationMode);
+        } else {
+          process.stdout.write(renderReactWebActivationModeMarkdown(activationMode));
+        }
+        return;
+      }
       if (arg1 === "ranked-bundle") {
         const { id, json } = parseInspectRankedBundleArgs(rest.slice(1));
         const { readReactWebRankedBundle, renderReactWebRankedBundleMarkdown } = await import("../core/react-web-ranked-bundle.js");
@@ -1260,7 +1295,7 @@ async function run(): Promise<void> {
         }
         return;
       }
-      throw new Error("inspect expects 'evidence' or 'ranked-bundle'");
+      throw new Error("inspect expects 'evidence', 'activation-mode', or 'ranked-bundle'");
     }
     case "attach": {
       const runtime = arg1;

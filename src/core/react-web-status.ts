@@ -9,6 +9,7 @@ import {
   readReactWebEvidenceArtifact,
   reactWebEvidenceArtifactsDir,
 } from "./react-web-evidence-artifact";
+import { buildReactWebActivationMode, summarizeReactWebActivationMode, type ReactWebActivationModeSummary } from "./react-web-activation-mode";
 import { buildReactWebRankedBundle, summarizeReactWebRankedBundle, type ReactWebRankedBundleSummary } from "./react-web-ranked-bundle";
 import type { SourceFingerprint } from "./schema";
 
@@ -52,6 +53,7 @@ export type ReactWebStatusResult = {
     currentSourceFingerprint: SourceFingerprint | null;
     staleWhen: string[];
   };
+  activationMode: ReactWebActivationModeSummary;
   rankedBundle: ReactWebRankedBundleSummary;
   risks: string[];
 };
@@ -112,6 +114,7 @@ function buildBlockedNoEvidenceStatus(cwd: string, generatedAt: string): ReactWe
       currentSourceFingerprint: null,
       staleWhen: [],
     },
+    activationMode: summarizeReactWebActivationMode(null),
     rankedBundle: summarizeReactWebRankedBundle(null),
     risks: [
       `no React Web evidence artifact found at ${path.relative(cwd, latestArtifactIndexPath(cwd)) || ".fooks/artifacts/react-web-evidence/latest.json"}`,
@@ -250,6 +253,7 @@ export function readReactWebStatus(cwd = process.cwd()): ReactWebStatusResult {
   const mixedRouting = buildMixedRoutingBoundary(artifact);
   const projectKnowledge = buildProjectKnowledgeBoundary(artifact);
   const fallbackReasons = artifact.decision === "use" ? [] : uniqueSorted(artifact.whyDenied);
+  const activationMode = buildReactWebActivationMode(cwd, artifact);
   const rankedBundle = buildReactWebRankedBundle(artifact);
   const risks = buildRisks(artifact, freshness, repeatedSameFileReady);
 
@@ -273,6 +277,7 @@ export function readReactWebStatus(cwd = process.cwd()): ReactWebStatusResult {
       projectKnowledge,
     },
     freshness,
+    activationMode: summarizeReactWebActivationMode(activationMode),
     rankedBundle: summarizeReactWebRankedBundle(rankedBundle),
     risks,
   };
@@ -297,6 +302,7 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
     `- mixed-routing boundary: ${status.boundaryStatus.mixedRouting.status}`,
     `- project-knowledge boundary: ${status.boundaryStatus.projectKnowledge.status}`,
     `- freshness: ${status.freshness.status}`,
+    `- activation mode: ${status.activationMode.verdict} (repeated-file positive=${status.activationMode.repeatedFilePositive ? "yes" : "no"})`,
     `- ranked bundle: ${status.rankedBundle.verdict} (${status.rankedBundle.selectedCount}/${status.rankedBundle.budgetLimit ?? 0} selected, ${status.rankedBundle.deferredCount} deferred)`,
     "",
     "## Risks",
