@@ -14,6 +14,12 @@ test("React Web context evidence measures actual injected additionalContext with
   assert.match(evidence.claimBoundary, /not runtime-token savings/);
   assert.match(evidence.claimBoundary, /not cache performance/);
   assert.match(evidence.claimBoundary, /not provider billing or invoice savings/);
+  assert.equal(evidence.metricProvenance.actualInjectedContextReduction.metric, "actualInjectedContextReduction");
+  assert.equal(evidence.metricProvenance.actualInjectedContextReduction.unit, "percent");
+  assert.equal(evidence.metricProvenance.actualInjectedContextReduction.numerator, "sourceBytes - additionalContextBytes");
+  assert.equal(evidence.metricProvenance.actualInjectedContextReduction.denominator, "sourceBytes");
+  assert.ok(evidence.metricProvenance.actualInjectedContextReduction.notComparableTo.includes("cacheHitRate"));
+  assert.ok(evidence.metricProvenance.actualInjectedContextReduction.notComparableTo.includes("providerBillingSavings"));
 
   assert.equal(evidence.summary.fixtureCount, 5);
   assert.equal(evidence.summary.allReactWebInjects, true);
@@ -72,6 +78,9 @@ test("React Web context evidence Markdown keeps the public claim boundary explic
   assert.match(markdown, /Internal runtime payload reduction diagnostic-only: no/);
   assert.match(markdown, /Cache performance improvement claimable: no/);
   assert.match(markdown, /Provider billing savings claimable: no/);
+  assert.match(markdown, /Metric provenance/);
+  assert.match(markdown, /sourceBytes - additionalContextBytes/);
+  assert.match(markdown, /Not comparable to: wallClockSpeedup, cacheHitRate, runtimeTokenSavings, providerBillingSavings/);
   assert.match(markdown, /domainPayload metric is diagnostic-only/);
   assert.match(markdown, /does not support broad runtime-token, latency, cache-performance, provider-cost, billing, invoice, or charged-cost claims/);
   assert.doesNotMatch(markdown, /provider billing savings claimable: yes/i);
