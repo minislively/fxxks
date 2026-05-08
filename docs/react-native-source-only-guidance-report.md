@@ -54,6 +54,10 @@ The following claims remain out of bounds for current RN docs/tests/reporting:
 - Do not claim that RN primitives are equivalent to DOM controls or React Web form semantics.
 - Do not claim WebView support, TUI support, or React Web equivalence from RN evidence.
 
+## Readiness evidence surface
+
+Use `npm run evidence:react-native-readiness` when you want the current merged RN slot boundary in one dedicated report surface. The readiness report must keep `F1` / `F13` as narrow measured evidence only, keep `F2` / `F9` / `F10` as readiness/fallback-only, and keep broad RN support plus runtime correctness non-claimable.
+
 ## Reviewer checklist
 
 Before merging RN docs/tests wording, confirm all of the following:
