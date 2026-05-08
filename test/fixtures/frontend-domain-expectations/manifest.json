@@ -123,6 +123,40 @@
       "payloadPolicy": "rn-primitive-input-narrow-payload"
     },
     {
+      "slot": "F15",
+      "id": "rn-state-action-adjacent",
+      "lane": "rn-primitive",
+      "path": "test/fixtures/frontend-domain-expectations/rn-state-action-concern.tsx",
+      "sourceKind": "synthetic-local",
+      "sourceReference": "Synthetic local fixture, no external repository copy",
+      "expectedOutcome": "fallback",
+      "expectedReason": "unsupported-react-native-webview-boundary",
+      "requiredSignals": [
+        "react-native import",
+        "View",
+        "Text",
+        "TextInput",
+        "Pressable",
+        "onChangeText",
+        "onPress",
+        "onSubmitEditing",
+        "useState",
+        "useReducer",
+        "same-file local state/action evidence"
+      ],
+      "forbiddenClaims": [
+        "No React Native support claim",
+        "No DOM/form semantic inference",
+        "No state-transition correctness claim",
+        "Narrow payload gate is not broad React Native support"
+      ],
+      "verification": "detectDomain remains react-native fallback evidence; decidePreRead returns payload only through the RN primitive/input narrow payload policy; same-file local state/action evidence stays source-observed and does not introduce F2/F9/F10/WebView/TUI/React Web signals or state-transition correctness claims",
+      "supportClaim": "none",
+      "evidenceScope": "rn-primitive-input-narrow-payload-only",
+      "preReadExpectedOutcome": "payload",
+      "payloadPolicy": "rn-primitive-input-narrow-payload"
+    },
+    {
       "slot": "F2",
       "id": "rn-style-platform-navigation",
       "lane": "rn-style-platform",
