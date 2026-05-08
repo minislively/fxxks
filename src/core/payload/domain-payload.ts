@@ -95,7 +95,7 @@ export type ReactNativeSourceAnchorBetaPayload = {
     primitives: string[];
     jsxProps: string[];
     sourceFingerprintRequired: true;
-    locatedAnchors?: ReactNativeSourceAnchorBetaLocatedAnchor[];
+    locatedAnchors: ReactNativeSourceAnchorBetaLocatedAnchor[];
   };
 };
 
@@ -356,9 +356,10 @@ function buildReactNativeSourceAnchorBetaPayload(
 ): ReactNativeSourceAnchorBetaPayload {
   const eventHandlers = uniqueSorted(result.behavior?.eventHandlers ?? []);
   const hooks = uniqueSorted(result.behavior?.hooks ?? []);
+  const primitiveInteractions = result.behavior?.rnPrimitiveInteractions;
   const locatedHooks = buildReactNativeLocatedHookAnchors(result);
   const locatedEventHandlers = buildReactNativeLocatedEventHandlerAnchors(result);
-  const locatedPrimitives = buildReactNativeLocatedPrimitiveAnchors(result.behavior?.rnPrimitiveInteractions);
+  const locatedPrimitives = buildReactNativeLocatedPrimitiveAnchors(primitiveInteractions);
   const locatedAnchors = uniqueLocatedByKey(
     [
       ...(result.componentName && result.componentLoc
@@ -384,7 +385,7 @@ function buildReactNativeSourceAnchorBetaPayload(
       primitives: evidenceFacts.primitives,
       jsxProps: evidenceFacts.jsxProps,
       sourceFingerprintRequired: true,
-      ...(locatedAnchors.length > 0 ? { locatedAnchors } : {}),
+      locatedAnchors,
     },
   };
 }

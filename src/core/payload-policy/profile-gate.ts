@@ -37,6 +37,23 @@ function arraysContainValues(left: string[] | readonly string[] | undefined, rig
   return right.every((value) => left.includes(value));
 }
 
+function isSourceRange(value: unknown): boolean {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    typeof (value as { startLine?: unknown }).startLine === "number" &&
+    typeof (value as { endLine?: unknown }).endLine === "number"
+  );
+}
+
+function hasLocatedAnchor(
+  anchors: ReactNativeSourceAnchorBetaPayload["anchors"] | Partial<ReactNativeSourceAnchorBetaPayload["anchors"]> | undefined,
+  predicate: (item: { kind?: string; label?: string; loc?: unknown }) => boolean,
+): boolean {
+  if (!anchors || !Array.isArray(anchors.locatedAnchors)) return false;
+  return anchors.locatedAnchors.some((item) => predicate(item) && isSourceRange(item.loc));
+}
+
 function isReactNativeSourceAnchorBetaPayload(value: unknown): value is ReactNativeSourceAnchorBetaPayload {
   if (!value || typeof value !== "object") return false;
   const payload = value as Partial<ReactNativeSourceAnchorBetaPayload>;
@@ -72,7 +89,13 @@ function isReactNativeSourceAnchorBetaPayload(value: unknown): value is ReactNat
     Boolean(anchors) &&
     anchors?.sourceFingerprintRequired === true &&
     arraysContainValues(anchors?.primitives, ["Pressable", "Text", "TextInput", "View"]) &&
-    arraysContainValues(anchors?.jsxProps, ["onChangeText", "onPress"])
+    arraysContainValues(anchors?.jsxProps, ["onChangeText", "onPress"]) &&
+    hasLocatedAnchor(anchors, (item) => item.kind === "component-name" && item.label === anchors.componentName) &&
+    (!anchors.propsName || hasLocatedAnchor(anchors, (item) => item.kind === "props-interface" && item.label === anchors.propsName)) &&
+    hasLocatedAnchor(anchors, (item) => item.kind === "event-handlers" && Boolean(item.label?.startsWith("onChangeText:"))) &&
+    hasLocatedAnchor(anchors, (item) => item.kind === "event-handlers" && Boolean(item.label?.startsWith("onPress:"))) &&
+    hasLocatedAnchor(anchors, (item) => item.kind === "rn-primitive-outline" && item.label === "TextInput") &&
+    hasLocatedAnchor(anchors, (item) => item.kind === "rn-primitive-outline" && item.label === "Pressable")
   );
 }
 
