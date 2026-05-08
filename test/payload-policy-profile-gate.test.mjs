@@ -151,7 +151,10 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
 
   const withoutLocatedAnchors = clonePayload(payload);
   delete withoutLocatedAnchors.domainPayload.sourceAnchorBeta.anchors.locatedAnchors;
-  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, withoutLocatedAnchors, policy), { allowed: true });
+  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, withoutLocatedAnchors, policy), {
+    allowed: false,
+    reason: MISSING_REACT_NATIVE_DOMAIN_PAYLOAD_REASON,
+  });
 });
 
 test("frontend profile gate requires RN domain payload for the measured narrow RN policy", () => {
@@ -228,6 +231,23 @@ test("frontend profile gate rejects adversarial RN narrow payload contract and f
     ["missing source-anchor fingerprint requirement", () => {
       const stale = clonePayload(payload);
       stale.domainPayload.sourceAnchorBeta.anchors.sourceFingerprintRequired = false;
+      return stale;
+    }],
+    ["missing located anchors", () => {
+      const stale = clonePayload(payload);
+      delete stale.domainPayload.sourceAnchorBeta.anchors.locatedAnchors;
+      return stale;
+    }],
+    ["missing located component anchor", () => {
+      const stale = clonePayload(payload);
+      stale.domainPayload.sourceAnchorBeta.anchors.locatedAnchors = stale.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.filter(
+        (item) => !(item.kind === "component-name" && item.label === "Native"),
+      );
+      return stale;
+    }],
+    ["missing located anchor loc", () => {
+      const stale = clonePayload(payload);
+      delete stale.domainPayload.sourceAnchorBeta.anchors.locatedAnchors[0].loc;
       return stale;
     }],
     ["missing reuse contract", () => {

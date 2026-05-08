@@ -37,6 +37,8 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.stateActionRelationsVisible.relationKind, "actionReadsInputValue");
   assert.equal(evidence.summary.constraintActionReadinessVisible.claimable, true);
   assert.equal(evidence.summary.constraintActionReadinessVisible.relationKind, "constraintActionReadiness");
+  assert.equal(evidence.summary.locatedAnchorsVisible.claimable, true);
+  assert.equal(evidence.summary.locatedAnchorsVisible.fixtureCoverage.length, evidence.fixtures.length);
   assert.equal(evidence.summary.stagedRnSurfaceInventory.claimable, true);
   assert.equal(evidence.summary.stagedRnSurfaceInventory.stagedSlots.length, 8);
   assert.deepEqual(
@@ -102,11 +104,16 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
     assert.equal(row.preRead.strictContractsPresent, true);
     assert.equal(row.preRead.primitiveInteractions.hasTextInputBinding, true);
     assert.equal(row.preRead.primitiveInteractions.hasPressableAction, true);
+    assert.equal(row.preRead.locatedAnchors.allLocated, true);
+    assert.ok(row.preRead.locatedAnchors.kinds.includes("component-name"), row.file);
+    assert.ok(row.preRead.locatedAnchors.kinds.includes("event-handlers"), row.file);
+    assert.ok(row.preRead.locatedAnchors.kinds.includes("rn-primitive-outline"), row.file);
     assert.ok(row.preRead.primitiveInteractions.metadataCoverage.textInputFields.length > 0, row.file);
     assert.ok(row.preRead.primitiveInteractions.metadataCoverage.pressableFields.length > 0, row.file);
     assert.equal(row.modelFacing.strictContractsPresent, true);
     assert.equal(row.modelFacing.primitiveInteractions.hasTextInputBinding, true);
     assert.equal(row.modelFacing.primitiveInteractions.hasPressableAction, true);
+    assert.equal(row.modelFacing.locatedAnchors.allLocated, true);
     assert.ok(row.modelFacing.primitiveInteractions.metadataCoverage.textInputFields.length > 0, row.file);
     assert.ok(row.modelFacing.primitiveInteractions.metadataCoverage.pressableFields.length > 0, row.file);
     assert.equal(row.claimable, true);
@@ -143,6 +150,14 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].disabled, "isSubmitDisabled");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Submit filter");
   assert.equal(inline.preRead.primitiveInteractions.actionBindings[0].testID, "submit-filter-button");
+  assert.deepEqual(inline.preRead.locatedAnchors.labels, [
+    "InlineActionRow",
+    "InlineActionRowProps",
+    "Pressable",
+    "TextInput",
+    "onChangeText:onChangeText",
+    "onPress:submitCurrentValue",
+  ]);
   assert.deepEqual(inline.preRead.primitiveInteractions.stateActionRelations, inline.modelFacing.primitiveInteractions.stateActionRelations);
   assert.equal(inline.preRead.primitiveInteractions.stateActionRelations[0].relationKind, "actionReadsInputValue");
   assert.equal(inline.preRead.primitiveInteractions.stateActionRelations[0].onPressExpr, "submitCurrentValue");
@@ -195,6 +210,7 @@ test("React Native payload evidence Markdown keeps claim boundaries explicit", a
   assert.match(markdown, /Richer RN\/WebView\/TUI boundaries preserved: yes/);
   assert.match(markdown, /RN metadata anchors visible: yes/);
   assert.match(markdown, /Measured RN narrow constraint\/action readiness visible: yes/);
+  assert.match(markdown, /RN sourceAnchorBeta located anchors visible: yes/);
   assert.match(markdown, /actionReadsInputValue:submitCurrentValue->value/);
   assert.match(markdown, /constraintActionReadiness:submitCurrentValue->value,disabled=isSubmitDisabled/);
   assert.match(markdown, /\| TextInput \| keyboardType \| yes \| yes \| yes \|/);
