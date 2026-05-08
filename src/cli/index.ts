@@ -653,6 +653,7 @@ Everyday commands:
   ${displayCliName} status claude
   ${displayCliName} status cache
   ${displayCliName} status worktree
+  ${displayCliName} status react-web [--json]
   ${displayCliName} status artifacts [--json]
   ${displayCliName} status activity [--include-remote-counts]
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -837,6 +838,20 @@ function parseStatusArtifactsArgs(args: string[]): { json: boolean } {
       continue;
     }
     throw new Error(`Unexpected status artifacts argument: ${arg}`);
+  }
+
+  return { json };
+}
+
+function parseStatusReactWebArgs(args: string[]): { json: boolean } {
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    throw new Error(`Unexpected status react-web argument: ${arg}`);
   }
 
   return { json };
@@ -1282,6 +1297,17 @@ async function run(): Promise<void> {
         print(currentWorktreeEvidenceStatus(process.cwd()));
         return;
       }
+      if (arg1 === "react-web") {
+        const { json } = parseStatusReactWebArgs(rest.slice(1));
+        const { readReactWebStatus, renderReactWebStatusText } = await import("../core/react-web-status.js");
+        const status = readReactWebStatus(process.cwd());
+        if (json) {
+          print(status);
+        } else {
+          process.stdout.write(renderReactWebStatusText(status));
+        }
+        return;
+      }
       if (arg1 === "artifacts") {
         parseStatusArtifactsArgs(rest.slice(1));
         const { auditArtifacts } = await import("../core/artifact-audit.js");
@@ -1299,7 +1325,7 @@ async function run(): Promise<void> {
         print(readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: rest.includes("--include-remote-counts") }));
         return;
       }
-      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', 'artifacts', or 'activity'");
+      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', 'react-web', 'artifacts', or 'activity'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");

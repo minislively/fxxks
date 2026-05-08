@@ -3522,6 +3522,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks inspect evidence <id> \[--json\]/);
   assert.match(help, /fooks inspect-domain <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
+  assert.match(help, /fooks status react-web \[--json\]/);
   assert.match(help, /fooks status artifacts/);
   assert.match(help, /Codex: automatic repeated-file runtime hook path/);
   assert.match(help, /Claude: project-local context hooks/);
