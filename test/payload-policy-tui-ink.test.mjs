@@ -532,7 +532,7 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /TUI-safe metadata projection contract/);
   assert.match(survey, /forbidden React Web-only projections/);
   assert.match(survey, /Minimal payload candidate vocabulary/);
-  assert.match(survey, /Source-only dry-run implementation handoff/);
+  assert.match(survey, /Landed source-only dry-run boundary/);
   assert.match(survey, /pre-read emits no model-facing TUI payload/);
   assert.match(survey, /separate serialized plan/);
   assert.match(survey, /tui-ink-evidence-only-payload/);
@@ -544,9 +544,14 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
     assert.ok(survey.includes(field), field);
     assert.ok(survey.includes(fixture), fixture);
   }
-  assert.match(survey, /not model-facing payload fields yet/);
-  assert.match(survey, /non-emitting metadata projection/);
-  assert.match(survey, /keep `assessTuiInkPayloadPolicy` denied with `allowed: false`/);
+  assert.match(survey, /not model-facing payload fields/);
+  assert.match(survey, /non-emitting `tuiSourceMetadata` summary/);
+  assert.match(survey, /`assessTuiInkPayloadPolicy` denied with `allowed: false`/);
+  assert.match(survey, /inspect-domain --json/);
+  assert.match(survey, /candidate\/evidence-only survey/);
+  assert.match(survey, /not a support contract/);
+  assert.match(survey, /PRD \+ test-spec pair/);
+  assert.doesNotMatch(survey, /A future dry-run PR may implement/);
   assert.doesNotMatch(survey, forbiddenSupportClaims);
 });
 
@@ -565,7 +570,7 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /## Promotion criteria before payload-design planning/);
   assert.match(guide, /## Payload design readiness gate/);
   assert.match(guide, /## Minimal payload candidate schema contract/);
-  assert.match(guide, /## Source-only dry-run handoff/);
+  assert.match(guide, /## Landed source-only dry-run boundary/);
   assert.match(guide, /## Stop rules/);
   assert.match(guide, /tui-ink-evidence-only-payload/);
   assert.match(guide, /fallback\/no-payload/);
@@ -573,6 +578,11 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /\*\*not\*\* compact extraction permission/);
   assert.match(guide, /\*\*not\*\* model-facing output/);
   assert.match(guide, /serialized shared-policy plan/);
+  assert.match(guide, /debug\/test-owned `tuiSourceMetadata` appendix/);
+  assert.match(guide, /fooks inspect-domain <file> --json/);
+  assert.match(guide, /`domainDetection` and `fallbackFirst` as the primary inspect contract/);
+  assert.match(guide, /The next approved artifact is a separate \*\*PRD \+ test-spec pair\*\*/);
+  assert.doesNotMatch(guide, /The next implementation PR may build only a \*\*source-only dry-run\*\*/);
   for (const category of metadataProjectionCategories) {
     assert.ok(guide.includes(category), category);
   }

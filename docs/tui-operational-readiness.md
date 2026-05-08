@@ -95,7 +95,7 @@ The disqualifier list is intentionally strict. Stop the current lane and write a
 
 ## Minimal payload candidate schema contract
 
-This contract names the first metadata vocabulary a future **source-only dry-run** may prototype. It is a schema target, not permission to emit a payload. Every field below must stay source-derived, fixture-backed, and denied by the current TUI payload policy until a later plan explicitly promotes it.
+This contract names the first metadata vocabulary the landed **source-only dry-run** may surface in debug/test-owned evidence. It is a schema target, not permission to emit a payload. Every field below must stay source-derived, fixture-backed, and denied by the current TUI payload policy until a later plan explicitly promotes it.
 
 | Candidate metadata field | What current fixtures can prove | Full-source / non-claim boundary |
 | --- | --- | --- |
@@ -108,17 +108,20 @@ This contract names the first metadata vocabulary a future **source-only dry-run
 
 The schema vocabulary above is intentionally smaller than terminal behavior. It may guide a future metadata projection, but it must not be described as compact context support, token reduction, runtime correctness, provider-cost improvement, or default TUI extraction.
 
-## Source-only dry-run handoff
+## Landed source-only dry-run boundary
 
-The next implementation PR may build only a **source-only dry-run** that reports the candidate metadata fields above in debug or test-owned evidence. That PR must continue to keep:
+The first source-only dry-run step is already landed as a debug/test-owned `tuiSourceMetadata` appendix on `fooks inspect-domain <file> --json` when actual TUI evidence is present. That landed surface must continue to keep:
 
 - `tui-ink-evidence-only-payload` denied with `allowed: false`;
-- pre-read fallback/no-payload behavior for every current TUI fixture;
-- mixed and non-Ink cases outside TUI payload authorization;
+- `domainDetection` and `fallbackFirst` as the primary inspect contract, with `tuiSourceMetadata` additive and non-promotional;
 - model-facing payload emission out of scope;
+- runtime and pre-read integration out of scope;
+- mixed and non-Ink cases outside TUI payload authorization;
 - runtime hooks, detector registries, fixture manifest entries, and cross-lane RN/React Web/WebView files unchanged unless a new serialized plan names owners and fallback regressions first.
 
-If the dry-run needs a payload builder, `allowed: true`, runtime injection, token/performance claims, or shared-seam edits, stop and create a new PRD/test-spec pair before implementation.
+The next approved artifact is a separate **PRD + test-spec pair** for serialized shared-policy planning. It is not another opportunistic implementation-promotion PR from this readiness guide.
+
+If a follow-up wants to widen beyond the current `inspect-domain --json` appendix, add a payload builder, turn `allowed: true`, integrate runtime/pre-read, or make token/performance/support claims, stop and create a new PRD/test-spec pair before implementation.
 
 ## Stop rules
 
