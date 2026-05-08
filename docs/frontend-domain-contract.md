@@ -97,6 +97,7 @@ The current forbidden claim shapes are:
 - Do not claim that RN primitives are equivalent to DOM controls or React Web form semantics.
 
 These boundaries apply to docs, tests, fixture explanations, and payload-policy wording until a later approved PR widens the measured scope.
+For a reviewer-oriented summary of the current merged RN wording boundary, see [React Native source-only guidance report](./react-native-source-only-guidance-report.md).
 
 ## Runtime debug evidence boundary
 
