@@ -18,7 +18,7 @@ fooks compare src/components/Button.tsx
 
 Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
 
-Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. The first-minute proof is local model-facing payload evidence, not provider billing or stable runtime-token proof. React Native/WebView, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
+Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
 
 - Public npm package: `fxxk-frontend-hooks`
 - CLI command: `fooks`
@@ -29,7 +29,7 @@ Use fooks when you are iterating on the same large supported file in Codex and w
 
 - **Best today:** Codex + repeated same-file `.tsx` / `.jsx` work.
 - **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
-- **Roadmap asks, not current support:** React Native/WebView, Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
+- **Roadmap asks, not current support:** React Native/WebView, TUI / React CLI promotion beyond candidate / evidence-only status, Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
 - **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
 - **Benchmark impact:** the latest launch-grade evidence is estimate-scoped API cost, not billing proof: the corrected 2026-04-22 Codex OAuth campaign accepted 15/15 matched pairs and reduced median estimated OpenAI API cost by 4.171% under recorded pricing assumptions; larger Next.js and Tailwind profiles reported 26.492% and 38.238% median estimated API-cost reductions.
 - **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
@@ -55,9 +55,11 @@ If you run `fooks doctor` from a source checkout, new git worktree, or freshly c
 
 | Strongest path today | Narrow beta path | Not today |
 | --- | --- | --- |
-| Repeated same-file React `.tsx` / `.jsx` work in Codex. This includes normal React apps, Next.js components, and Ink-style React CLI components when the target file is real TSX/JSX. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
+| Repeated same-file React `.tsx` / `.jsx` work in Codex for the current measured web/component lane. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
 | Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior or read-interception parity. |
 | Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider usage/billing-token telemetry, provider tokenizer behavior, provider invoice/dashboard/charged-cost proof, or a `ccusage` replacement. |
+
+TUI / React CLI TSX remains a candidate / evidence-only lane. Ink-style syntax can appear in local compare evidence, but that does **not** mean TUI support, terminal correctness, or default compact payload reuse is available today.
 
 ## Common scope questions
 
@@ -73,7 +75,7 @@ If you run `fooks doctor` from a source checkout, new git worktree, or freshly c
 | Project shape | Setup expectation | Best verification command | Boundary |
 | --- | --- | --- | --- |
 | React / Next.js with `.tsx` or `.jsx` components | Full Codex setup path; Claude/opencode helpers can also be prepared when their homes/settings are available. | `fooks doctor` then `fooks compare src/components/Button.tsx` | Same-file repeated Codex work is the strongest supported workflow. |
-| Ink or other React-based CLI with `.tsx` / `.jsx` components | Treated like TSX/JSX React source for Codex repeated same-file work. | `fooks compare path/to/App.tsx` | DOM/form/style signals may be weaker than web UI components; unsupported cases fall back safely. |
+| Ink or other React-based CLI with `.tsx` / `.jsx` components | Not a current support claim. `fooks compare` may still show syntax-level local evidence for a real TSX file, but this lane remains candidate / evidence-only until future fixtures and policy gates promote it. | `fooks compare path/to/App.tsx` for local syntax/payload evidence only | Candidate / evidence-only lane; no terminal correctness, no default compact reuse, and unsupported cases fall back safely. |
 | React Native or embedded WebView `.tsx` files | Not a current support claim. TSX parsing only proves syntax can be read; it does not prove React Native component semantics, native platform behavior, bridge behavior, or WebView boundary safety. | Use normal source reading unless a future release adds RN/WebView fixtures, benchmarks, and explicit evidence. | Deferred lane; obvious RN/WebView markers fall back to full-source reading rather than compact fooks payload reuse. |
 | Pure TypeScript/JavaScript library | Codex-only setup may qualify if a `.ts` / `.js` file passes the strong beta readiness gate. | `fooks doctor codex` and `fooks compare path/to/module.ts` | No Claude/opencode helper parity and no broad semantic/framework claim. |
 | Vue/Svelte/SFC or arbitrary backend repo | Not a current support claim. | Use normal source reading unless a strong `.ts` / `.js` beta module qualifies for Codex. | Roadmap only; no universal read interception. |

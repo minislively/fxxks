@@ -311,7 +311,7 @@ test("claim-boundary doc audit preserves measured narrow evidence wording", () =
   assert.match(combined, /`rn-primitive-input-narrow-payload`/);
   assert.match(combined, /not broad React Native support/);
   assert.match(combined, /WebView starts as a boundary\/fallback profile, not default compact extraction/);
-  assert.match(combined, /TUI \/ React CLI profiles[\s\S]*Future profile candidate only; no implementation or support promise/);
+  assert.match(combined, /TUI \/ React CLI profiles[\s\S]*(?:Future profile candidate only; no implementation or support promise|Candidate \/ evidence-only future profile; no current TUI support claim, no default compact extraction claim, and no implementation promise)/);
 });
 
 test("claim-boundary doc audit preserves shared scanner planner builder seam responsibilities", () => {
