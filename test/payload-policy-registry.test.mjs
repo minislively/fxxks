@@ -111,6 +111,13 @@ test("frontend payload build options include domain payload for React Web and me
     allowed: false,
     reason: "forbidden-signal:react-native:primitive:FlatList",
   });
+  assert.deepEqual(
+    registry.toFrontendPayloadBuildOptions(registry.assessFrontendPayloadPolicy(samples["react-native-interaction"])),
+    {
+      includeDomainPayload: false,
+      domainPayloadPolicy: "rn-primitive-input-narrow-payload",
+    },
+  );
 
   for (const lane of ["webview", "tui-ink", "mixed", "unknown"]) {
     const policy = registry.assessFrontendPayloadPolicy(samples[lane]);
