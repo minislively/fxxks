@@ -70,6 +70,7 @@ function parseArgs(argv) {
     format: "markdown",
     output: "",
     archiveDocsDir: process.env.FOOKS_BRANCH_AUDIT_ARCHIVE_DOCS_DIR || DEFAULT_ARCHIVE_DOCS_DIR,
+    includeRedundantDetails: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -80,6 +81,7 @@ function parseArgs(argv) {
     else if (arg === "--archive-docs-dir") options.archiveDocsDir = argv[++index];
     else if (arg === "--json") options.format = "json";
     else if (arg === "--markdown") options.format = "markdown";
+    else if (arg === "--include-redundant-details") options.includeRedundantDetails = true;
     else if (arg === "--no-fetch") options.fetch = false;
     else if (arg === "--help" || arg === "-h") {
       printHelp();
@@ -97,14 +99,16 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/audit-remote-branches.mjs [options]\n\nAudits remote branches against a base ref and classifies branches that can add\nstale-branch noise after main has absorbed equivalent work.\n\nOptions:\n  --base <ref>      Base ref to compare against (default: origin/main)\n  --remote <name>   Remote namespace to audit (default: origin)\n  --no-fetch        Use local remote-tracking refs without fetching first\n  --json            Emit machine-readable JSON instead of markdown\n  --markdown        Emit markdown (default)\n  --output <path>   Write output to a file instead of stdout\n  --archive-docs-dir <path>\n                   Directory containing branch archive docs (default: docs)\n  -h, --help        Show this help\n\nClassification:\n  redundant-merged            branch has no commits ahead of base\n  redundant-patch-equivalent  branch commits are patch-equivalent to base\n  valid-candidate             branch has unique patch commits and no open PR\n  open-pr                     branch has an open PR and is not stale-branch noise
+  console.log(`Usage: node scripts/audit-remote-branches.mjs [options]\n\nAudits remote branches against a base ref and classifies branches that can add\nstale-branch noise after main has absorbed equivalent work.\n\nOptions:\n  --base <ref>      Base ref to compare against (default: origin/main)\n  --remote <name>   Remote namespace to audit (default: origin)\n  --no-fetch        Use local remote-tracking refs without fetching first\n  --json            Emit machine-readable JSON instead of markdown\n  --markdown        Emit markdown (default)\n  --output <path>   Write output to a file instead of stdout\n  --archive-docs-dir <path>\n                   Directory containing branch archive docs (default: docs)\n  --include-redundant-details\n                   Include full redundant branch tables in markdown output\n  -h, --help        Show this help\n\nClassification:\n  redundant-merged            branch has no commits ahead of base\n  redundant-patch-equivalent  branch commits are patch-equivalent to base\n  valid-candidate             branch has unique patch commits and no open PR\n  open-pr                     branch has an open PR and is not stale-branch noise
   archived                    otherwise-valid branch has an exact archive doc match
 
 Next-action shortlist:
   Markdown and JSON include a read-only Discord-friendly valid-candidate
   shortlist for operator triage. Archived branches are suppressed from that
-  shortlist and reported with archive evidence. This audit does not recommend
-  deleting branches or merging code.`);
+  shortlist and reported with archive evidence. By default markdown summarizes
+  redundant branches without listing every redundant remote; pass
+  --include-redundant-details when an operator needs the full redundant tables.
+  This audit does not recommend deleting branches or merging code.`);
 }
 
 
@@ -367,10 +371,19 @@ function renderSafeCloseoutProcedure(summary) {
   return `## Safe closeout procedure\n\nThis branch audit is evidence, not authority. It supports operator review of redundant remote branch noise, but it does not approve remote deletion, merging branch tips, or replaying stale-tree deletes.\n\n- Preserve this generated report or the JSON artifact before any closeout decision.\n- Confirm the fresh audit still reports ${summary.counts["valid-candidate"] ?? 0} valid-candidate branches and ${summary.counts["open-pr"] ?? 0} open PR branches before treating the ${redundantTotal} redundant branches as noise.\n- Record an owner plus keep/follow-up/no-op outcome for any branch that is not redundant or archived.\n- Do not delete, merge, or replay changes from this artifact alone; remote pruning requires explicit operator approval outside this report.\n`;
 }
 
+function renderRedundantMarkdown(result) {
+  const { summary, branches, options } = result;
+  if (options.includeRedundantDetails) {
+    return `## Redundant: fully merged by commit\n\n${markdownTable(branches, "redundant-merged")}\n## Redundant: patch-equivalent to base\n\nThese branches still have commits ahead of the base ref, but \`git cherry\` reports their patches as already present in \`${summary.base}\`.\n\n${markdownTable(branches, "redundant-patch-equivalent")}`;
+  }
+
+  return `## Redundant branches\n\nRedundant branch details are summarized only to keep the audit focused on branches needing review. JSON output still contains all branch rows, and markdown callers can pass \`--include-redundant-details\` for the full redundant tables. This read-only omission is not a cleanup recommendation and does not change branch classification.\n\n- Fully merged by commit: ${summary.counts["redundant-merged"] ?? 0}\n- Patch-equivalent to base: ${summary.counts["redundant-patch-equivalent"] ?? 0}\n`;
+}
+
 function renderMarkdown(result) {
   const { summary, branches } = result;
   const redundantTotal = (summary.counts["redundant-merged"] ?? 0) + (summary.counts["redundant-patch-equivalent"] ?? 0);
-  return `# Remote branch stale-work audit\n\nGenerated: ${summary.generatedAt}\n\nBase: \`${summary.base}\`\n\nRemote: \`${summary.remote}\`\nGitHub open PR check: ${summary.githubPullRequestsChecked ? `yes (${summary.openPullRequests} open PRs in ${summary.githubRepository})` : "unavailable"}\n\nRegenerate this report with \`npm run --silent branch:audit -- --output docs/remote-branch-audit.md\`. Use \`--json\` for automation.\n\n## Summary\n\n- Total remote branches audited: ${summary.totalBranches}\n- Redundant branches: ${redundantTotal}\n  - Fully merged by commit: ${summary.counts["redundant-merged"] ?? 0}\n  - Patch-equivalent to base: ${summary.counts["redundant-patch-equivalent"] ?? 0}\n- Valid candidates needing human review: ${summary.counts["valid-candidate"] ?? 0}\n- Archived valid candidates suppressed: ${summary.counts["archived"] ?? 0}\n- Branches with open PRs: ${summary.counts["open-pr"] ?? 0}\n\n${renderSafeCloseoutProcedure(summary)}\n## Discord-friendly valid-candidate next-action shortlist\n\n${renderDiscordNextActionShortlist(result.discordNextActionShortlist)}\n## Valid candidates without open PRs\n\nThese branches still have unique patch commits relative to \`${summary.base}\`. This audit is read-only and does not recommend deleting branches or merging code.\n\n${markdownTable(branches, "valid-candidate")}\n## Archived valid candidates\n\nThese branches still have unique patch commits, but current repository archive docs record a bounded stale-branch decision for the exact branch name. This read-only suppression is not a recommendation to delete remote branches, merge stale trees, or replay stale-tree deletes.\n\n${markdownTable(branches, "archived")}\n## Redundant: fully merged by commit\n\n${markdownTable(branches, "redundant-merged")}\n## Redundant: patch-equivalent to base\n\nThese branches still have commits ahead of the base ref, but \`git cherry\` reports their patches as already present in \`${summary.base}\`.\n\n${markdownTable(branches, "redundant-patch-equivalent")}\n## Open PR branches\n\n${markdownTable(branches, "open-pr")}`;
+  return `# Remote branch stale-work audit\n\nGenerated: ${summary.generatedAt}\n\nBase: \`${summary.base}\`\n\nRemote: \`${summary.remote}\`\nGitHub open PR check: ${summary.githubPullRequestsChecked ? `yes (${summary.openPullRequests} open PRs in ${summary.githubRepository})` : "unavailable"}\n\nRegenerate this report with \`npm run --silent branch:audit -- --output docs/remote-branch-audit.md\`. Use \`--json\` for automation. Add \`--include-redundant-details\` only when you need full redundant branch tables.\n\n## Summary\n\n- Total remote branches audited: ${summary.totalBranches}\n- Redundant branches: ${redundantTotal}\n  - Fully merged by commit: ${summary.counts["redundant-merged"] ?? 0}\n  - Patch-equivalent to base: ${summary.counts["redundant-patch-equivalent"] ?? 0}\n- Valid candidates needing human review: ${summary.counts["valid-candidate"] ?? 0}\n- Archived valid candidates suppressed: ${summary.counts["archived"] ?? 0}\n- Branches with open PRs: ${summary.counts["open-pr"] ?? 0}\n\n${renderSafeCloseoutProcedure(summary)}\n## Discord-friendly valid-candidate next-action shortlist\n\n${renderDiscordNextActionShortlist(result.discordNextActionShortlist)}\n## Valid candidates without open PRs\n\nThese branches still have unique patch commits relative to \`${summary.base}\`. This audit is read-only and does not recommend deleting branches or merging code.\n\n${markdownTable(branches, "valid-candidate")}\n## Archived valid candidates\n\nThese branches still have unique patch commits, but current repository archive docs record a bounded stale-branch decision for the exact branch name. This read-only suppression is not a recommendation to delete remote branches, merge stale trees, or replay stale-tree deletes.\n\n${markdownTable(branches, "archived")}\n${renderRedundantMarkdown(result)}\n## Open PR branches\n\n${markdownTable(branches, "open-pr")}`;
 }
 
 function main() {
@@ -401,8 +414,10 @@ function main() {
     summary,
     branches,
     discordNextActionShortlist: buildDiscordNextActionShortlist(branches, summary),
+    options: { includeRedundantDetails: options.includeRedundantDetails },
   };
-  const output = options.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : renderMarkdown(result);
+  const jsonResult = { ...result, options: undefined };
+  const output = options.format === "json" ? `${JSON.stringify(jsonResult, null, 2)}\n` : renderMarkdown(result);
 
   if (options.output) {
     fs.writeFileSync(path.resolve(repoRoot, options.output), output);
