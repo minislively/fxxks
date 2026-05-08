@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
 
-export const RN_READINESS_SLOT_ORDER = ["F1", "F13", "F14", "F15", "F2", "F9", "F10"];
+export const RN_READINESS_SLOT_ORDER = ["F1", "F13", "F14", "F15", "F16", "F2", "F9", "F10"];
 
 function readSelectedManifestRows(repoRoot) {
   const manifestPath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json");
@@ -18,8 +18,22 @@ function readSelectedManifestRows(repoRoot) {
   return new Map(manifest.selected.map((row) => [row.slot, row]));
 }
 
+function fallbackPolicyForReadinessSlot(slot) {
+  switch (slot) {
+    case "F16":
+      return "source-only-adjacent-boundary";
+    default:
+      return "source-only-readiness";
+  }
+}
+
 function blockersForReadinessSlot(slot) {
   switch (slot) {
+    case "F16":
+      return [
+        "alternate action primitives stay outside the current Pressable-based narrow gate",
+        "must not imply payload promotion or broad RN support",
+      ];
     case "F2":
       return [
         "no runtime navigation correctness evidence",
@@ -74,7 +88,7 @@ export async function buildReactNativeReadinessEvidence({
       id: manifest?.id ?? null,
       surface,
       outcome: "fallback",
-      policy: "source-only-readiness",
+      policy: fallbackPolicyForReadinessSlot(slot),
       supportClaim: manifest?.supportClaim ?? "none",
       evidenceScope: manifest?.evidenceScope ?? "rn-component-semantics-readiness-only",
       fixture: manifest?.path ?? staged?.file ?? null,
