@@ -759,6 +759,14 @@ test("codex runtime activates React Web payload semantics only for the React Web
   assert.equal(reactWeb.second.debug.decision.debug.frontendPayloadPolicy.name, REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY);
   assert.equal(reactWeb.second.debug.decision.payload.domainPayload.domain, "react-web");
   assert.equal(reactWeb.second.debug.decision.payload.domainPayload.plannerDecision, "compact-safe");
+  assert.deepEqual(reactWeb.second.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "would-activate",
+    repeatedFilePositive: true,
+    promoted: true,
+    deferredTriggers: ["always-on", "glob-match", "model-decision", "profile-gate"],
+    blockedReasons: [],
+  });
 
   const rnPrimitive = runRepeatedPrompt("rn-primitive", "inspect test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx");
   assert.equal(rnPrimitive.second.action, "inject");
@@ -770,6 +778,7 @@ test("codex runtime activates React Web payload semantics only for the React Web
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.reuseContract.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY);
   assert.equal(rnPrimitive.second.debug.decision.payload.domainPayload.reuseContract.freshnessSource, "sourceFingerprint");
+  assert.equal(rnPrimitive.second.debug.reactWebActivationMode, undefined);
   assert.equal(rnPrimitive.second.additionalContext.includes('"domainPayload"'), true);
   assert.equal(rnPrimitive.second.additionalContext.includes('"reuseContract"'), true);
   assert.match(rnPrimitive.second.additionalContext, /"domain":\s*"react-native"/);
