@@ -8,7 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const workflowPath = path.join(repoRoot, ".github", "workflows", "merge-gate.yml");
 const pullRequestTemplatePath = path.join(repoRoot, ".github", "PULL_REQUEST_TEMPLATE.md");
 
-test("merge gate workflow validates linked issues and current-head allowed-reviewer review", () => {
+test("merge gate workflow validates linked issues and allowed-reviewer participation", () => {
   const workflow = fs.readFileSync(workflowPath, "utf8");
   assert.match(workflow, /pull_request_target:/);
   assert.match(workflow, /pull_request_review:/);
@@ -24,6 +24,6 @@ test("pull request template keeps linked issue prompt and approval checklist", (
   assert.match(template, /minislively/i);
   assert.match(template, /yeachan-heo/i);
   assert.match(template, /self-review.*allowed/i);
-  assert.match(template, /Current head/i);
-  assert.match(template, /Issue comments and regular PR comments do not count/i);
+  assert.match(template, /review, review comment, or PR\/issue comment/i);
+  assert.match(template, /current head commit/i);
 });
