@@ -729,6 +729,14 @@ export type CodexRuntimeHookDecision = {
       totalAnchors: number;
       priority: string[];
     };
+    reactWebActivationMode?: {
+      available: boolean;
+      verdict: "would-activate" | "deferred" | "blocked" | "unavailable";
+      repeatedFilePositive: boolean;
+      promoted: boolean;
+      deferredTriggers: string[];
+      blockedReasons: string[];
+    };
   };
   fallback?: {
     action: "full-read";

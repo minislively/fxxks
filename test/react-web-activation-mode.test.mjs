@@ -16,6 +16,7 @@ const {
   REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS,
   REACT_WEB_ACTIVATION_MODE_SCHEMA_VERSION,
   buildReactWebActivationMode,
+  buildReactWebActivationModeFromRuntimeDecision,
   readReactWebActivationMode,
   renderReactWebActivationModeMarkdown,
 } = require(path.join(repoRoot, "dist", "core", "react-web-activation-mode.js"));
@@ -28,6 +29,7 @@ const {
   REACT_WEB_EVIDENCE_ARTIFACT_PROFILE,
   REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
 } = require(path.join(repoRoot, "dist", "core", "react-web-evidence-artifact.js"));
+const { hashText } = require(path.join(repoRoot, "dist", "core", "hash.js"));
 
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
 
@@ -127,7 +129,7 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
 
   const markdown = renderReactWebActivationModeMarkdown(activationMode);
   assert.match(markdown, /React Web activation mode/);
-  assert.match(markdown, /shadow-advisory/);
+  assert.match(markdown, /repeated-file-runtime/);
 
   const cliJson = spawnSync(process.execPath, [cliPath, "inspect", "activation-mode", ref.id, "--json"], {
     cwd: tempDir,
@@ -165,6 +167,59 @@ test("activation mode keeps non-repeated activation triggers explicitly deferred
     activationMode.deferredTriggers.map((item) => item.name),
     [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
   );
+});
+
+test("runtime activation promotion does not require patchTargets when repeated React Web evidence is fresh", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-activation-runtime-candidate-"));
+  fs.mkdirSync(path.join(tempDir, "src", "components"), { recursive: true });
+  const source = "export function FormSection() { return null; }\n";
+  const filePath = path.join(tempDir, "src", "components", "FormSection.tsx");
+  fs.writeFileSync(filePath, source);
+
+  const runtimeDecision = {
+    runtime: "codex",
+    hookEventName: "UserPromptSubmit",
+    action: "inject",
+    filePath: "src/components/FormSection.tsx",
+    reasons: ["repeated-file"],
+    contextMode: "light",
+    contextModeReason: "repeated-exact-file-react-web-payload",
+    promptSpecificity: "exact-file",
+    debug: {
+      repeatedFile: true,
+      eligible: true,
+      escapeHatchUsed: false,
+      decision: {
+        decision: "payload",
+        eligible: true,
+        reasons: ["react-web-current-supported-payload"],
+        payload: makeArtifact({
+          filePath: "src/components/FormSection.tsx",
+          sourceFingerprint: {
+            fileHash: hashText(source),
+            lineCount: 2,
+          },
+          freshness: {
+            sourceFingerprint: {
+              fileHash: hashText(source),
+              lineCount: 2,
+            },
+            staleWhen: ["sourceFingerprint.fileHash changes"],
+          },
+          editGuidance: undefined,
+        }),
+        debug: {
+          domainDetection: {
+            classification: "react-web",
+          },
+        },
+      },
+    },
+  };
+
+  const activationMode = buildReactWebActivationModeFromRuntimeDecision(tempDir, runtimeDecision);
+  assert.equal(activationMode?.verdict, "would-activate");
+  assert.equal(activationMode?.supportedTrigger.positive, true);
 });
 
 test("activation mode fail-closes deny boundary artifacts instead of widening support", () => {
