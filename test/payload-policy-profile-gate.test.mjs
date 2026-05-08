@@ -128,10 +128,30 @@ test("frontend profile gate allows narrow allowed non-web frontend policies", ()
   assert.deepEqual(payload.domainPayload.sourceAnchorBeta.anchors.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload.domainPayload.sourceAnchorBeta.anchors.jsxProps, ["onChangeText", "onPress"]);
   assert.equal(payload.domainPayload.sourceAnchorBeta.anchors.sourceFingerprintRequired, true);
+  assert.ok(Array.isArray(payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors));
+  assert.ok(
+    payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some((item) => item.kind === "component-name" && item.label === "Native"),
+  );
+  assert.ok(
+    payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some((item) => item.kind === "event-handlers" && item.label === "onChangeText:() => null"),
+  );
+  assert.ok(
+    payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some((item) => item.kind === "event-handlers" && item.label === "onPress:() => null"),
+  );
+  assert.ok(
+    payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some((item) => item.kind === "rn-primitive-outline" && item.label === "TextInput"),
+  );
+  assert.ok(
+    payload.domainPayload.sourceAnchorBeta.anchors.locatedAnchors.some((item) => item.kind === "rn-primitive-outline" && item.label === "Pressable"),
+  );
   assert.equal(payload.domainPayload.reuseContract.sourceDerivedOnly, true);
   assert.equal(payload.domainPayload.reuseContract.policy, policy.name);
   assert.equal(payload.domainPayload.reuseContract.freshnessSource, "sourceFingerprint");
   assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), { allowed: true });
+
+  const withoutLocatedAnchors = clonePayload(payload);
+  delete withoutLocatedAnchors.domainPayload.sourceAnchorBeta.anchors.locatedAnchors;
+  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, withoutLocatedAnchors, policy), { allowed: true });
 });
 
 test("frontend profile gate requires RN domain payload for the measured narrow RN policy", () => {

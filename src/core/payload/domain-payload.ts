@@ -6,7 +6,13 @@ import {
   RN_PRIMITIVE_INPUT_REQUIRED_SIGNALS,
   RN_PRIMITIVE_INPUT_SUPPORT_BOUNDARY,
 } from "../payload-policy/react-native";
-import type { ExtractionResult, FormControlSignal, ReactNativePrimitiveInteractionSignal, StyleSystem } from "../schema";
+import type {
+  ExtractionResult,
+  FormControlSignal,
+  ReactNativePrimitiveInteractionSignal,
+  SourceRange,
+  StyleSystem,
+} from "../schema";
 
 export const DOMAIN_PAYLOAD_SCHEMA_VERSION = "domain-payload.v1";
 export const REACT_WEB_DOMAIN_PAYLOAD_POLICY = "react-web-current-supported-lane";
@@ -68,6 +74,17 @@ export type ReactNativeSourceAnchorBetaContract = {
   nextImplementationStep: "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates";
 };
 
+export type ReactNativeSourceAnchorBetaLocatedAnchor = {
+  kind:
+    | "component-name"
+    | "props-interface"
+    | "hooks-effects"
+    | "event-handlers"
+    | "rn-primitive-outline";
+  label: string;
+  loc: SourceRange;
+};
+
 export type ReactNativeSourceAnchorBetaPayload = {
   contract: ReactNativeSourceAnchorBetaContract;
   anchors: {
@@ -78,6 +95,7 @@ export type ReactNativeSourceAnchorBetaPayload = {
     primitives: string[];
     jsxProps: string[];
     sourceFingerprintRequired: true;
+    locatedAnchors?: ReactNativeSourceAnchorBetaLocatedAnchor[];
   };
 };
 
@@ -269,12 +287,92 @@ function buildReactNativeSourceAnchorBetaContract(): ReactNativeSourceAnchorBeta
   };
 }
 
+function uniqueLocatedByKey<T>(items: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const item of items) {
+    const itemKey = key(item);
+    if (seen.has(itemKey)) continue;
+    seen.add(itemKey);
+    result.push(item);
+  }
+  return result;
+}
+
+function buildReactNativeLocatedHookAnchors(result: ExtractionResult): ReactNativeSourceAnchorBetaLocatedAnchor[] | undefined {
+  const hooks = [
+    ...(result.behavior?.effectSignals ?? []).flatMap((item) =>
+      item.loc ? [{ kind: "hooks-effects" as const, label: item.hook, loc: item.loc }] : [],
+    ),
+    ...(result.behavior?.callbackSignals ?? []).flatMap((item) =>
+      item.loc ? [{ kind: "hooks-effects" as const, label: item.hook, loc: item.loc }] : [],
+    ),
+  ];
+  if (hooks.length === 0) return undefined;
+  return uniqueLocatedByKey(hooks, (item) => `${item.kind}:${item.label}:${item.loc.startLine}:${item.loc.endLine}`);
+}
+
+function buildReactNativeLocatedEventHandlerAnchors(
+  result: ExtractionResult,
+): ReactNativeSourceAnchorBetaLocatedAnchor[] | undefined {
+  const handlers =
+    result.behavior?.eventHandlerSignals?.flatMap((item) =>
+      item.loc
+        ? [
+            {
+              kind: "event-handlers" as const,
+              label: item.trigger ? `${item.trigger}:${item.name}` : item.name,
+              loc: item.loc,
+            },
+          ]
+        : [],
+    ) ?? [];
+  if (handlers.length === 0) return undefined;
+  return uniqueLocatedByKey(handlers, (item) => `${item.kind}:${item.label}:${item.loc.startLine}:${item.loc.endLine}`);
+}
+
+function buildReactNativeLocatedPrimitiveAnchors(
+  interactions: ReactNativePrimitiveInteractionSignal | undefined,
+): ReactNativeSourceAnchorBetaLocatedAnchor[] | undefined {
+  if (!interactions) return undefined;
+  const items = [
+    ...(interactions.inputBindings ?? []).flatMap((item) =>
+      item.loc ? [{ kind: "rn-primitive-outline" as const, label: item.primitive, loc: item.loc }] : [],
+    ),
+    ...(interactions.actionBindings ?? []).flatMap((item) =>
+      item.loc ? [{ kind: "rn-primitive-outline" as const, label: item.primitive, loc: item.loc }] : [],
+    ),
+    ...(interactions.inputConstraints ?? []).flatMap((item) =>
+      item.loc ? [{ kind: "rn-primitive-outline" as const, label: item.primitive, loc: item.loc }] : [],
+    ),
+  ];
+  if (items.length === 0) return undefined;
+  return uniqueLocatedByKey(items, (item) => `${item.kind}:${item.label}:${item.loc.startLine}:${item.loc.endLine}`);
+}
+
 function buildReactNativeSourceAnchorBetaPayload(
   result: ExtractionResult,
   evidenceFacts: ReactNativePayloadEvidenceFacts,
 ): ReactNativeSourceAnchorBetaPayload {
   const eventHandlers = uniqueSorted(result.behavior?.eventHandlers ?? []);
   const hooks = uniqueSorted(result.behavior?.hooks ?? []);
+  const locatedHooks = buildReactNativeLocatedHookAnchors(result);
+  const locatedEventHandlers = buildReactNativeLocatedEventHandlerAnchors(result);
+  const locatedPrimitives = buildReactNativeLocatedPrimitiveAnchors(result.behavior?.rnPrimitiveInteractions);
+  const locatedAnchors = uniqueLocatedByKey(
+    [
+      ...(result.componentName && result.componentLoc
+        ? [{ kind: "component-name" as const, label: result.componentName, loc: result.componentLoc }]
+        : []),
+      ...(result.contract?.propsName && result.contract.propsLoc
+        ? [{ kind: "props-interface" as const, label: result.contract.propsName, loc: result.contract.propsLoc }]
+        : []),
+      ...(locatedHooks ?? []),
+      ...(locatedEventHandlers ?? []),
+      ...(locatedPrimitives ?? []),
+    ],
+    (item) => `${item.kind}:${item.label}:${item.loc.startLine}:${item.loc.endLine}`,
+  );
 
   return {
     contract: buildReactNativeSourceAnchorBetaContract(),
@@ -286,6 +384,7 @@ function buildReactNativeSourceAnchorBetaPayload(
       primitives: evidenceFacts.primitives,
       jsxProps: evidenceFacts.jsxProps,
       sourceFingerprintRequired: true,
+      ...(locatedAnchors.length > 0 ? { locatedAnchors } : {}),
     },
   };
 }
