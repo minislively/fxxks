@@ -77,3 +77,16 @@ export type {
   ArtifactAuditStatus,
   ArtifactAuditWorktree,
 } from "./core/artifact-audit";
+export {
+  REACT_WEB_STATUS_CLAIM_BOUNDARY,
+  REACT_WEB_STATUS_COMMAND,
+  REACT_WEB_STATUS_SCHEMA_VERSION,
+  readReactWebStatus,
+  renderReactWebStatusText,
+} from "./core/react-web-status";
+export type {
+  ReactWebBoundaryState,
+  ReactWebFreshnessState,
+  ReactWebProfileStatus,
+  ReactWebStatusResult,
+} from "./core/react-web-status";
