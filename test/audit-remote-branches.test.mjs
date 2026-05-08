@@ -240,7 +240,30 @@ JSON
     assert.match(markdown, /Confirm the fresh audit still reports 1 valid-candidate branches and 1 open PR branches/);
     assert.match(markdown, /## Archived valid candidates/);
     assert.match(markdown, /not a recommendation to delete remote branches, merge stale trees, or replay stale-tree deletes/);
+    assert.match(markdown, /## Redundant branches/);
+    assert.match(markdown, /Redundant branch details are summarized only/);
+    assert.match(markdown, /--include-redundant-details/);
+    assert.doesNotMatch(markdown, /## Redundant: fully merged by commit/);
+    assert.doesNotMatch(markdown, /`feature-merged-archived`/);
+    assert.doesNotMatch(markdown, /`feature-patch-archived`/);
     assert.doesNotMatch(markdown.split("## Discord-friendly valid-candidate next-action shortlist")[1].split("## Valid candidates without open PRs")[0], /feature-archived/);
+
+    const verboseMarkdown = execFileSync(process.execPath, [
+      auditScript,
+      "--markdown",
+      "--include-redundant-details",
+      "--archive-docs-dir",
+      archiveDocsDir,
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.match(verboseMarkdown, /## Redundant: fully merged by commit/);
+    assert.match(verboseMarkdown, /`feature-merged-archived`/);
+    assert.match(verboseMarkdown, /## Redundant: patch-equivalent to base/);
+    assert.match(verboseMarkdown, /`feature-patch-archived`/);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
