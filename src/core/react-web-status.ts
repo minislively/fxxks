@@ -3,7 +3,9 @@ import path from "node:path";
 import { hashText } from "./hash";
 import {
   REACT_WEB_EVIDENCE_ARTIFACT_CLAIM_BOUNDARY,
+  REACT_WEB_EVIDENCE_ARTIFACT_INTEROP,
   type ReactWebEvidenceArtifact,
+  type ReactWebEvidenceArtifactInterop,
   readReactWebEvidenceArtifact,
   reactWebEvidenceArtifactsDir,
 } from "./react-web-evidence-artifact";
@@ -24,6 +26,7 @@ export type ReactWebStatusResult = {
   profile: "react-web";
   generatedAt: string;
   claimBoundary: typeof REACT_WEB_STATUS_CLAIM_BOUNDARY;
+  interop: ReactWebEvidenceArtifactInterop;
   profileStatus: ReactWebProfileStatus;
   latestEvidenceId: string | null;
   latestEvidenceGeneratedAt: string | null;
@@ -82,6 +85,7 @@ function buildBlockedNoEvidenceStatus(cwd: string, generatedAt: string): ReactWe
     profile: "react-web",
     generatedAt,
     claimBoundary: REACT_WEB_STATUS_CLAIM_BOUNDARY,
+    interop: { ...REACT_WEB_EVIDENCE_ARTIFACT_INTEROP },
     profileStatus: "blocked",
     latestEvidenceId: null,
     latestEvidenceGeneratedAt: null,
@@ -251,6 +255,7 @@ export function readReactWebStatus(cwd = process.cwd()): ReactWebStatusResult {
     profile: "react-web",
     generatedAt,
     claimBoundary: REACT_WEB_STATUS_CLAIM_BOUNDARY,
+    interop: artifact.interop,
     profileStatus: deriveProfileStatus(artifact, mixedRouting.status, freshness.status, repeatedSameFileReady, risks),
     latestEvidenceId: artifact.id,
     latestEvidenceGeneratedAt: artifact.generatedAt,
@@ -278,6 +283,7 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
     "",
     "## Summary",
     `- profile status: ${status.profileStatus}`,
+    `- interop: stored=${status.interop.mayBeStored ? "yes" : "no"}, summarized=${status.interop.mayBeSummarized ? "yes" : "no"}, override=${status.interop.mayOverrideDecision ? "yes" : "no"}`,
     `- latest evidence id: ${status.latestEvidenceId ?? "none"}`,
     `- latest decision: ${status.latestDecision ?? "none"}`,
     `- evidence strength: ${status.evidenceStrength ?? "none"}`,

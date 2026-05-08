@@ -9,6 +9,11 @@ export const REACT_WEB_EVIDENCE_ARTIFACT_PRODUCER = "fooks";
 export const REACT_WEB_EVIDENCE_ARTIFACT_PROFILE = "react-web";
 export const REACT_WEB_EVIDENCE_ARTIFACT_PAYLOAD_KIND = "frontend-source-evidence";
 export const REACT_WEB_EVIDENCE_ARTIFACT_COMPRESSION_POLICY = "do-not-summarize";
+export const REACT_WEB_EVIDENCE_ARTIFACT_INTEROP = Object.freeze({
+  mayBeStored: true,
+  mayBeSummarized: false,
+  mayOverrideDecision: false,
+});
 export const REACT_WEB_EVIDENCE_ARTIFACT_CLAIM_BOUNDARY =
   "Local React Web repeated same-file source-context evidence only: captures why fooks used, fell back, or denied a bounded React Web source payload. This artifact is not a generic context-manager memory surface, not RN/TUI/WebView support promotion, and not runtime-token, latency, cache-performance, provider-cost, billing, invoice, or charged-cost proof.";
 
@@ -21,6 +26,8 @@ export type ReactWebEvidenceArtifactFile = {
   lineRanges: string[];
   whySelected: string[];
 };
+
+export type ReactWebEvidenceArtifactInterop = typeof REACT_WEB_EVIDENCE_ARTIFACT_INTEROP;
 
 export type ReactWebEvidenceArtifact = {
   schemaVersion: typeof REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION;
@@ -38,6 +45,7 @@ export type ReactWebEvidenceArtifact = {
   whyDenied: string[];
   claimBoundary: typeof REACT_WEB_EVIDENCE_ARTIFACT_CLAIM_BOUNDARY;
   compressionPolicy: typeof REACT_WEB_EVIDENCE_ARTIFACT_COMPRESSION_POLICY;
+  interop: ReactWebEvidenceArtifactInterop;
   contextMode?: ContextMode;
   contextModeReason?: string;
   sourceFingerprint?: SourceFingerprint;
@@ -171,6 +179,23 @@ function evidenceArtifactId(seed: {
   return sanitizeDataKey(`react-web-evidence-${hash}`);
 }
 
+function defaultReactWebEvidenceArtifactInterop(): ReactWebEvidenceArtifactInterop {
+  return { ...REACT_WEB_EVIDENCE_ARTIFACT_INTEROP };
+}
+
+function isCanonicalReactWebInterop(
+  interop: Partial<ReactWebEvidenceArtifactInterop> | undefined,
+): interop is ReactWebEvidenceArtifactInterop {
+  return interop?.mayBeStored === true && interop?.mayBeSummarized === false && interop?.mayOverrideDecision === false;
+}
+
+function normalizeReactWebEvidenceArtifact(artifact: ReactWebEvidenceArtifact): ReactWebEvidenceArtifact {
+  return {
+    ...artifact,
+    interop: isCanonicalReactWebInterop(artifact.interop) ? artifact.interop : defaultReactWebEvidenceArtifactInterop(),
+  };
+}
+
 export function reactWebEvidenceArtifactsDir(cwd = process.cwd()): string {
   return path.join(canonicalProjectDataDir(cwd), "artifacts", "react-web-evidence");
 }
@@ -202,6 +227,9 @@ function assertValidArtifact(artifact: unknown): asserts artifact is ReactWebEvi
   }
   if (candidate.compressionPolicy !== REACT_WEB_EVIDENCE_ARTIFACT_COMPRESSION_POLICY) {
     throw new Error("React Web evidence artifact compressionPolicy changed");
+  }
+  if (candidate.interop !== undefined && !isCanonicalReactWebInterop(candidate.interop)) {
+    throw new Error("React Web evidence artifact interop contract changed");
   }
 }
 
@@ -244,6 +272,7 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
     whyDenied: decision === "use" ? [] : buildWhyDenied(runtimeDecision, classification),
     claimBoundary: REACT_WEB_EVIDENCE_ARTIFACT_CLAIM_BOUNDARY,
     compressionPolicy: REACT_WEB_EVIDENCE_ARTIFACT_COMPRESSION_POLICY,
+    interop: defaultReactWebEvidenceArtifactInterop(),
     ...(runtimeDecision.contextMode ? { contextMode: runtimeDecision.contextMode } : {}),
     ...(runtimeDecision.contextModeReason ? { contextModeReason: runtimeDecision.contextModeReason } : {}),
     ...(payload?.sourceFingerprint ? { sourceFingerprint: payload.sourceFingerprint } : {}),
@@ -259,25 +288,26 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
 }
 
 export function writeReactWebEvidenceArtifact(cwd: string, artifact: ReactWebEvidenceArtifact): ReactWebEvidenceArtifactRef {
-  assertValidArtifact(artifact);
+  const normalizedArtifact = normalizeReactWebEvidenceArtifact(artifact);
+  assertValidArtifact(normalizedArtifact);
   const root = reactWebEvidenceArtifactsDir(cwd);
   fs.mkdirSync(root, { recursive: true });
-  const artifactPath = reactWebEvidenceArtifactPath(cwd, artifact.id);
-  fs.writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  const artifactPath = reactWebEvidenceArtifactPath(cwd, normalizedArtifact.id);
+  fs.writeFileSync(artifactPath, `${JSON.stringify(normalizedArtifact, null, 2)}\n`);
 
   const latest: ReactWebEvidenceArtifactIndex = {
     schemaVersion: 1,
     latest: {
-      id: artifact.id,
+      id: normalizedArtifact.id,
       path: artifactPath,
-      generatedAt: artifact.generatedAt,
-      filePath: artifact.filePath,
-      decision: artifact.decision,
-      evidenceStrength: artifact.evidenceStrength,
+      generatedAt: normalizedArtifact.generatedAt,
+      filePath: normalizedArtifact.filePath,
+      decision: normalizedArtifact.decision,
+      evidenceStrength: normalizedArtifact.evidenceStrength,
     },
   };
   fs.writeFileSync(reactWebEvidenceLatestPath(cwd), `${JSON.stringify(latest, null, 2)}\n`);
-  return { emitted: true, id: artifact.id, path: artifactPath };
+  return { emitted: true, id: normalizedArtifact.id, path: artifactPath };
 }
 
 export function emitReactWebEvidenceArtifact(cwd: string, runtimeDecision: CodexRuntimeHookDecision): ReactWebEvidenceArtifactRef | null {
@@ -305,7 +335,7 @@ export function readReactWebEvidenceArtifact(cwd: string, id: string): ReactWebE
   }
   const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8")) as ReactWebEvidenceArtifact;
   assertValidArtifact(artifact);
-  return artifact;
+  return normalizeReactWebEvidenceArtifact(artifact);
 }
 
 export function renderReactWebEvidenceArtifactMarkdown(artifact: ReactWebEvidenceArtifact): string {
@@ -327,5 +357,5 @@ export function renderReactWebEvidenceArtifactMarkdown(artifact: ReactWebEvidenc
     : "- none";
   const whyDenied = artifact.whyDenied.length > 0 ? artifact.whyDenied.map((reason) => `- ${reason}`).join("\n") : "- none";
 
-  return `# React Web evidence artifact\n\n${artifact.claimBoundary}\n\n## Summary\n\n- id: ${artifact.id}\n- producer: ${artifact.producer}\n- profile: ${artifact.profile}\n- payload kind: ${artifact.payloadKind}\n- decision: ${artifact.decision}\n- evidence strength: ${artifact.evidenceStrength}\n- file: ${artifact.filePath}\n- context mode: ${artifact.contextMode ?? "none"}\n- context mode reason: ${artifact.contextModeReason ?? "none"}\n- compression policy: ${artifact.compressionPolicy}\n\n## Freshness\n\n- source fingerprint: ${artifact.sourceFingerprint ? `${artifact.sourceFingerprint.fileHash} / ${artifact.sourceFingerprint.lineCount} lines` : "none"}\n- stale when: ${artifact.freshness.staleWhen.join(", ")}\n\n## Reasons\n\n${artifact.reasons.length > 0 ? artifact.reasons.map((reason) => `- ${reason}`).join("\n") : "- none"}\n\n## Why denied\n\n${whyDenied}\n\n## Selected files\n\n${fileLines}\n\n## Concern profiles\n\n${concernProfiles}\n\n## Patch targets\n\n${patchTargets}\n`;
+  return `# React Web evidence artifact\n\n${artifact.claimBoundary}\n\n## Summary\n\n- id: ${artifact.id}\n- producer: ${artifact.producer}\n- profile: ${artifact.profile}\n- payload kind: ${artifact.payloadKind}\n- decision: ${artifact.decision}\n- evidence strength: ${artifact.evidenceStrength}\n- file: ${artifact.filePath}\n- context mode: ${artifact.contextMode ?? "none"}\n- context mode reason: ${artifact.contextModeReason ?? "none"}\n- compression policy: ${artifact.compressionPolicy}\n- interop: stored=${artifact.interop.mayBeStored ? "yes" : "no"}, summarized=${artifact.interop.mayBeSummarized ? "yes" : "no"}, override=${artifact.interop.mayOverrideDecision ? "yes" : "no"}\n\n## Freshness\n\n- source fingerprint: ${artifact.sourceFingerprint ? `${artifact.sourceFingerprint.fileHash} / ${artifact.sourceFingerprint.lineCount} lines` : "none"}\n- stale when: ${artifact.freshness.staleWhen.join(", ")}\n\n## Reasons\n\n${artifact.reasons.length > 0 ? artifact.reasons.map((reason) => `- ${reason}`).join("\n") : "- none"}\n\n## Why denied\n\n${whyDenied}\n\n## Selected files\n\n${fileLines}\n\n## Concern profiles\n\n${concernProfiles}\n\n## Patch targets\n\n${patchTargets}\n`;
 }
