@@ -716,6 +716,12 @@ export type CodexRuntimeHookDecision = {
     eligible: boolean;
     escapeHatchUsed: boolean;
     decision?: PreReadDecision;
+    reactWebEvidenceArtifact?: {
+      emitted: boolean;
+      id?: string;
+      path?: string;
+      reason?: string;
+    };
     reactWebContextPacking?: {
       included: boolean;
       reason: "packed" | "not-emitted";
