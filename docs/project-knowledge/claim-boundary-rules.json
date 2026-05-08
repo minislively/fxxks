@@ -23,6 +23,26 @@
       ],
       "severity": "warning",
       "authority": "tracked"
+    },
+    {
+      "id": "claim-boundary.react-web-knowledge-boundary",
+      "family": "claim-boundary",
+      "summary": "Do not widen React Web repeated same-file context wording into actual context-reduction percentages, runtime-token savings, billing savings, or broad frontend support. Keep it advisory and bounded to the documented claim boundary.",
+      "appliesWhen": {
+        "keywords": [
+          "react web claim boundary",
+          "context reduction claim",
+          "actual injected context reduction",
+          "runtime token savings",
+          "billing savings"
+        ]
+      },
+      "evidence": [
+        "docs/react-web-context-retention.md",
+        "docs/release.md"
+      ],
+      "severity": "warning",
+      "authority": "tracked"
     }
   ]
 }
