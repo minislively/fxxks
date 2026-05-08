@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildReactWebMetricProvenance } from "./react-web-metric-provenance.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,6 +115,7 @@ export async function buildReactWebContextEvidence({
   const additionalContextReductionValues = rows.map((row) => row.additionalContextReductionPct);
   const allRuntimePayloadsSmaller = rows.every((row) => row.secondAction === "inject" && !row.runtimePayloadLargerThanSource);
   const allAdditionalContextsSmaller = rows.every((row) => row.secondAction === "inject" && !row.additionalContextLargerThanSource);
+  const metricProvenance = buildReactWebMetricProvenance();
 
   return {
     schemaVersion: "react-web-context-evidence.v2",
@@ -122,6 +124,9 @@ export async function buildReactWebContextEvidence({
     measurement: "local-source-bytes-vs-host-facing-additional-context-bytes",
     claimBoundary:
       "Local fixture byte-size evidence only: actual host-facing additionalContext compactness for React Web current-lane reuse; domainPayload is diagnostic-only. This is not provider tokenizer output, not runtime-token savings, not cache performance, not latency, and not provider billing or invoice savings.",
+    metricProvenance: {
+      actualInjectedContextReduction: metricProvenance.actualInjectedContextReduction,
+    },
     fixtures: rows,
     summary: {
       fixtureCount: rows.length,
@@ -185,6 +190,12 @@ ${evidence.claimBoundary}
 | Fixture | Source bytes | actual additionalContext bytes | actual additionalContext reduction | diagnostic domainPayload bytes | diagnostic domainPayload reduction | diagnostic runtime payload bytes | diagnostic runtime payload reduction |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${rows}
+
+## Metric provenance
+
+- \`actualInjectedContextReduction\`: ${evidence.metricProvenance.actualInjectedContextReduction.formula}
+- Claim boundary: ${evidence.metricProvenance.actualInjectedContextReduction.claimBoundary}
+- Not comparable to: ${evidence.metricProvenance.actualInjectedContextReduction.notComparableTo.join(", ")}
 
 ## Claim boundary
 
