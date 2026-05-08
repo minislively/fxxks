@@ -626,7 +626,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|run|scan|extract|compare|decide|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|run|scan|extract|compare|decide|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -642,6 +642,7 @@ Everyday commands:
   ${displayCliName} run <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
+  ${displayCliName} inspect evidence <id> [--json]
   ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
@@ -702,6 +703,29 @@ function parseCompareArgs(args: string[]): { filePath: string; json: boolean } {
   }
 
   return { filePath: requireFilePath(filePath), json };
+}
+
+function parseInspectEvidenceArgs(args: string[]): { id: string; json: boolean } {
+  let id: string | undefined;
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (!id) {
+      id = arg;
+      continue;
+    }
+    throw new Error(`Unexpected inspect evidence argument: ${arg}`);
+  }
+
+  if (!id) {
+    throw new Error("inspect evidence requires an artifact id");
+  }
+
+  return { id, json };
 }
 
 type InspectDomainCliResult = {
@@ -1172,6 +1196,20 @@ async function run(): Promise<void> {
         tuiSourceMetadata,
         reactNativeSourceAnchorBeta,
       }));
+      return;
+    }
+    case "inspect": {
+      if (arg1 !== "evidence") {
+        throw new Error("inspect expects 'evidence'");
+      }
+      const { id, json } = parseInspectEvidenceArgs(rest.slice(1));
+      const { readReactWebEvidenceArtifact, renderReactWebEvidenceArtifactMarkdown } = await import("../core/react-web-evidence-artifact.js");
+      const artifact = readReactWebEvidenceArtifact(process.cwd(), id);
+      if (json) {
+        print(artifact);
+      } else {
+        process.stdout.write(renderReactWebEvidenceArtifactMarkdown(artifact));
+      }
       return;
     }
     case "attach": {

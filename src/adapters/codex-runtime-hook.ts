@@ -20,6 +20,7 @@ import {
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
 import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
+import { emitReactWebEvidenceArtifact } from "../core/react-web-evidence-artifact";
 
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
@@ -331,6 +332,35 @@ function fallbackDecision(
   };
 }
 
+function attachReactWebEvidenceArtifact(
+  cwd: string,
+  runtimeDecision: CodexRuntimeHookDecision,
+): CodexRuntimeHookDecision {
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
+  };
+  try {
+    const artifact = emitReactWebEvidenceArtifact(cwd, runtimeDecision);
+    if (artifact) {
+      runtimeDecision.debug = {
+        ...debug,
+        reactWebEvidenceArtifact: artifact,
+      };
+    }
+  } catch (error) {
+    runtimeDecision.debug = {
+      ...debug,
+      reactWebEvidenceArtifact: {
+        emitted: false,
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+  return runtimeDecision;
+}
+
 export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = process.cwd()): CodexRuntimeHookDecision {
   const hookEventName = input.hookEventName;
   const sessionKey = resolveCodexRuntimeSessionKey(input.sessionId, input.threadId);
@@ -568,7 +598,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       actualEstimatedBytes: estimateTextBytes(additionalContext),
       comparableForSavings: editGuidanceIncluded ? false : originalEstimatedBytes !== undefined,
     });
-    return runtimeDecision;
+    return attachReactWebEvidenceArtifact(cwd, runtimeDecision);
   }
 
   markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
@@ -589,5 +619,5 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     actualEstimatedBytes: originalEstimatedBytes,
     comparableForSavings: originalEstimatedBytes !== undefined,
   });
-  return runtimeDecision;
+  return attachReactWebEvidenceArtifact(cwd, runtimeDecision);
 }

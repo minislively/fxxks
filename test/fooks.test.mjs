@@ -3519,6 +3519,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks setup/);
   assert.match(help, /fooks doctor \[codex\|claude\] \[--json\]/);
   assert.match(help, /fooks compare <file> \[--json\]/);
+  assert.match(help, /fooks inspect evidence <id> \[--json\]/);
   assert.match(help, /fooks inspect-domain <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /fooks status artifacts/);
