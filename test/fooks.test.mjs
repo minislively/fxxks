@@ -459,6 +459,28 @@ test("file commands accept --json before or after the file path", () => {
   assert.deepEqual(extractBefore, extractAfter);
 });
 
+test("inspect-domain keeps top-level TUI JSON appendix gated behind --json only", () => {
+  const tuiJsonAfter = run(["inspect-domain", "test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx", "--json"]);
+  const tuiJsonBefore = run(["inspect-domain", "--json", "test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx"]);
+  const tuiPlain = run(["inspect-domain", "test/fixtures/frontend-domain-expectations/tui-ink-basic.tsx"]);
+  const mixedJson = run(["inspect-domain", "test/fixtures/frontend-domain-expectations/tui-ink-web-dom-mixed.tsx", "--json"]);
+  const rnJson = run(["inspect-domain", "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx", "--json"]);
+
+  assert.deepEqual(tuiJsonBefore, tuiJsonAfter);
+  assert.ok(tuiJsonAfter.tuiSourceMetadata);
+  assert.deepEqual(Object.keys(tuiJsonAfter.domainDetection).sort(), ["classification", "evidence"]);
+  assert.equal(tuiJsonAfter.tuiSourceMetadata.nonEmitting, true);
+  assert.equal(tuiJsonAfter.tuiSourceMetadata.modelFacingPayload, false);
+  assert.equal(tuiJsonAfter.tuiSourceMetadata.runtimeOrPreRead, false);
+  assert.equal("integration" in tuiJsonAfter.tuiSourceMetadata, false);
+  assert.equal("tuiSourceMetadata" in tuiPlain, false);
+
+  assert.ok(mixedJson.tuiSourceMetadata);
+  assert.deepEqual(Object.keys(mixedJson.domainDetection).sort(), ["classification", "evidence"]);
+  assert.ok(mixedJson.tuiSourceMetadata.terminalMixedBoundaryEvidence.includes("mixed-with:react-web"));
+  assert.equal("tuiSourceMetadata" in rnJson, false);
+});
+
 test("extract adds source ranges and hook intent signals to frontend payloads", () => {
   const samplePath = path.join(repoRoot, "fixtures", "compressed", "HookEffectPanel.tsx");
   const result = extractFile(samplePath);
