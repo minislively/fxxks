@@ -85,7 +85,7 @@ function isReactNativeSourceAnchorBetaPayload(value: unknown): value is ReactNat
       "tui-ink",
     ]) &&
     contract.nextImplementationStep ===
-      "treat RN sourceAnchorBeta as closeout/frozen after located-anchor hardening until a new extract/compare/inspect-domain visibility plan is explicitly approved" &&
+      "keep RN sourceAnchorBeta visibility additive and local-proof-only across extract/compare/inspect-domain; require a new explicit plan before any further runtime-reuse or support widening" &&
     Boolean(anchors) &&
     anchors?.sourceFingerprintRequired === true &&
     arraysContainValues(anchors?.primitives, ["Pressable", "Text", "TextInput", "View"]) &&
