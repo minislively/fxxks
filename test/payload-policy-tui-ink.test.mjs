@@ -193,6 +193,23 @@ const tuiMinimalPayloadFixtureMap = [
   ["terminalNegativeBoundaryEvidence", "tui-non-ink-cli-renderer.tsx"],
 ];
 
+const surveyReviewChecklistTerms = [
+  "Evidence-only review checklist",
+  "every positive Ink row still ends in `evidence-only`, denied policy, and fallback/no-payload",
+  "at least one non-Ink or mixed fallback row remains visible whenever positive Ink evidence expands",
+  "must not be reused as README, roadmap, release-note, or package support wording",
+  "shared detector/pre-read/runtime seams",
+];
+
+const operationalReviewChecklistTerms = [
+  "Evidence reinforcement review checklist",
+  "docs/tests-only evidence reinforcement",
+  "denied policy, fallback reason, or stop rules",
+  "positive Ink evidence remains paired with non-Ink or mixed fallback visibility",
+  "README, roadmap, release, package, and runtime-facing wording stay candidate/evidence-only",
+  "manifest, detector, policy, pre-read, or runtime request stops the lane",
+];
+
 function tuiFixturePath(fileName) {
   return path.join("test", "fixtures", "frontend-domain-expectations", fileName);
 }
@@ -507,6 +524,9 @@ test("TUI/Ink fixture survey documents evidence-only reinforcement without suppo
   assert.match(survey, /tui-ink-rn-narrow-mixed\.tsx/);
   assert.match(survey, /Negative\/fallback reinforcement/);
   assert.match(survey, /Current TUI evidence matrix/);
+  for (const term of surveyReviewChecklistTerms) {
+    assert.ok(survey.includes(term), term);
+  }
   assert.match(survey, /Payload design readiness handoff/);
   assert.match(survey, /not itself a payload contract/);
   assert.match(survey, /TUI-safe metadata projection contract/);
@@ -539,6 +559,9 @@ test("TUI operational readiness guide keeps payload planning separate", () => {
   assert.match(guide, /Concern category/);
   assert.match(guide, /concern evidence is not payload permission/);
   assert.match(guide, /## Allowed next work/);
+  for (const term of operationalReviewChecklistTerms) {
+    assert.ok(guide.includes(term), term);
+  }
   assert.match(guide, /## Promotion criteria before payload-design planning/);
   assert.match(guide, /## Payload design readiness gate/);
   assert.match(guide, /## Minimal payload candidate schema contract/);
