@@ -17,10 +17,11 @@ test("merge gate requires an allowed reviewer by default even when PR links a cl
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /GitHub PR review/);
+  assert.match(result.blockers.join("\n"), /review, review comment, or PR\/issue comment/);
   assert.match(result.blockers.join("\n"), /minislively/i);
   assert.match(result.blockers.join("\n"), /yeachan-heo/i);
   assert.deepEqual(result.approvingReviewers, []);
+  assert.deepEqual(result.qualifyingParticipants, []);
 });
 
 test("merge gate still requires linked issue when approval checks are disabled", () => {
@@ -32,6 +33,7 @@ test("merge gate still requires linked issue when approval checks are disabled",
   assert.match(result.blockers.join("\n"), /closing issue/);
   assert.doesNotMatch(result.blockers.join("\n"), /active approval/);
   assert.deepEqual(result.approvingReviewers, []);
+  assert.deepEqual(result.qualifyingParticipants, []);
 });
 
 test("merge gate rejects PRs without a closing issue reference", () => {
@@ -54,7 +56,7 @@ test("merge gate ignores dismissed allowed reviews when review checks are enable
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /GitHub PR review/);
+  assert.match(result.blockers.join("\n"), /review, review comment, or PR\/issue comment/);
   assert.match(result.blockers.join("\n"), /requires re-review/i);
 });
 
@@ -66,8 +68,7 @@ test("merge gate can require approval on the current head commit when enabled", 
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /current head commit/);
-  assert.match(result.blockers.join("\n"), /comments do not count/i);
+  assert.match(result.blockers.join("\n"), /current head commit/i);
   assert.match(result.blockers.join("\n"), /requires re-review/i);
 });
 
@@ -80,16 +81,31 @@ test("merge gate passes by default with linked issue and current-head allowed re
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.approvingReviewers, ["minislively"]);
+  assert.deepEqual(result.qualifyingParticipants, ["minislively"]);
 });
 
-test("issue comments do not satisfy the approval gate", () => {
+test("issue comments from allowed users satisfy the approval gate", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: pr,
     reviews: [],
+    issueComments: [{ user: { login: "yeachan-heo" } }],
   });
 
-  assert.equal(result.ok, false);
-  assert.match(result.blockers.join("\n"), /comments do not count/i);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.approvingReviewers, []);
+  assert.deepEqual(result.qualifyingParticipants, ["yeachan-heo"]);
+});
+
+test("review comments from allowed users satisfy the approval gate", () => {
+  const result = evaluatePullRequestMergeGate({
+    pullRequest: pr,
+    reviews: [],
+    reviewComments: [{ user: { login: "Yeachan-Heo" } }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.approvingReviewers, []);
+  assert.deepEqual(result.qualifyingParticipants, ["yeachan-heo"]);
 });
 
 test("merge gate allows self-review when the author is an allowed reviewer", () => {
@@ -101,6 +117,7 @@ test("merge gate allows self-review when the author is an allowed reviewer", () 
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.approvingReviewers, ["minislively"]);
+  assert.deepEqual(result.qualifyingParticipants, ["minislively"]);
 });
 
 test("merge gate rejects reviews from users outside the allowed reviewer set", () => {
@@ -113,6 +130,7 @@ test("merge gate rejects reviews from users outside the allowed reviewer set", (
   assert.equal(result.ok, false);
   assert.match(result.blockers.join("\n"), /allowed reviewer/i);
   assert.deepEqual(result.approvingReviewers, []);
+  assert.deepEqual(result.qualifyingParticipants, []);
 });
 
 test("merge gate can disable linked issue enforcement explicitly", () => {
@@ -156,6 +174,7 @@ test("merge gate can disable approval enforcement explicitly", () => {
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.approvingReviewers, []);
+  assert.deepEqual(result.qualifyingParticipants, []);
 });
 
 test("docs/test-only classifier excludes manifest and non-doc non-test paths", () => {

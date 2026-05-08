@@ -65,6 +65,14 @@ function latestReviewStateByUser(reviews) {
   return latest;
 }
 
+function collectCommentAuthors(comments = []) {
+  return new Set(
+    (comments || [])
+      .map((comment) => normalizeLogin(comment?.user?.login))
+      .filter(Boolean),
+  );
+}
+
 export function pullRequestHasLinkedClosingIssue(pullRequest) {
   const title = pullRequest?.title || "";
   const body = pullRequest?.body || "";
@@ -74,6 +82,8 @@ export function pullRequestHasLinkedClosingIssue(pullRequest) {
 export function evaluatePullRequestMergeGate({
   pullRequest,
   reviews = [],
+  issueComments = [],
+  reviewComments = [],
   changedFiles = [],
   requireLinkedIssue = true,
   requireApproval = true,
@@ -98,10 +108,21 @@ export function evaluatePullRequestMergeGate({
     })
     .map(([login]) => login)
     .sort();
+  const qualifyingIssueCommenters = [...collectCommentAuthors(issueComments)]
+    .filter((login) => allowedReviewers.has(login))
+    .sort();
+  const qualifyingReviewCommenters = [...collectCommentAuthors(reviewComments)]
+    .filter((login) => allowedReviewers.has(login))
+    .sort();
+  const qualifyingParticipants = [...new Set([
+    ...qualifyingReviewers,
+    ...qualifyingIssueCommenters,
+    ...qualifyingReviewCommenters,
+  ])].sort();
 
-  if (requireApproval && qualifyingReviewers.length === 0) {
+  if (requireApproval && qualifyingParticipants.length === 0) {
     blockers.push(
-      `PR must have an active GitHub PR review on the current head commit from at least one allowed reviewer (${[...allowedReviewers].join(", ")}). Self-review by those accounts is allowed. Issue comments and regular PR comments do not count, and any new push/amend/rebase/force-push after review requires re-review.`,
+      `PR must have at least one GitHub PR review, review comment, or PR/issue comment from an allowed reviewer (${[...allowedReviewers].join(", ")}). Self-review and self-comment by those accounts are allowed. Official PR reviews must be on the current head commit, and any new push/amend/rebase/force-push after review requires re-review unless a qualifying comment remains present.`,
     );
   }
 
@@ -109,6 +130,7 @@ export function evaluatePullRequestMergeGate({
     ok: blockers.length === 0,
     blockers,
     approvingReviewers: qualifyingReviewers,
+    qualifyingParticipants,
     docsTestsOnly: docsTestsOnlyChange.docsTestsOnly,
   };
 }
@@ -127,6 +149,33 @@ async function fetchPullRequestReviews({ repository, pullNumber, token }) {
     throw new Error(`Failed to fetch PR reviews: ${response.status} ${response.statusText}`);
   }
   return response.json();
+}
+
+async function fetchAllPages({ repository, pullNumber, token, resourcePath, errorLabel }) {
+  const items = [];
+  let page = 1;
+
+  while (true) {
+    const url = `https://api.github.com/repos/${repository}/${resourcePath}/${pullNumber}/comments?per_page=100&page=${page}`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "fooks-merge-gate",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${errorLabel}: ${response.status} ${response.statusText}`);
+    }
+
+    const payload = await response.json();
+    items.push(...payload);
+    if (payload.length < 100) break;
+    page += 1;
+  }
+
+  return items;
 }
 
 async function fetchPullRequestFiles({ repository, pullNumber, token }) {
@@ -154,6 +203,26 @@ async function fetchPullRequestFiles({ repository, pullNumber, token }) {
   }
 
   return files;
+}
+
+async function fetchPullRequestIssueComments({ repository, pullNumber, token }) {
+  return fetchAllPages({
+    repository,
+    pullNumber,
+    token,
+    resourcePath: "issues",
+    errorLabel: "PR issue comments",
+  });
+}
+
+async function fetchPullRequestReviewComments({ repository, pullNumber, token }) {
+  return fetchAllPages({
+    repository,
+    pullNumber,
+    token,
+    resourcePath: "pulls",
+    errorLabel: "PR review comments",
+  });
 }
 
 async function main() {
@@ -186,10 +255,26 @@ async function main() {
       token,
     })
     : [];
+  const issueComments = requireApproval
+    ? await fetchPullRequestIssueComments({
+      repository,
+      pullNumber: pullRequest.number,
+      token,
+    })
+    : [];
+  const reviewComments = requireApproval
+    ? await fetchPullRequestReviewComments({
+      repository,
+      pullNumber: pullRequest.number,
+      token,
+    })
+    : [];
 
   const result = evaluatePullRequestMergeGate({
     pullRequest,
     reviews,
+    issueComments,
+    reviewComments,
     changedFiles,
     requireLinkedIssue: process.env.MERGE_GATE_REQUIRE_LINKED_ISSUE !== "false",
     requireApproval,
@@ -206,8 +291,8 @@ async function main() {
   const docsTestsOnlySummary = result.docsTestsOnly
     ? " Docs/test-only change detected; linked issue requirement skipped."
     : "";
-  const approvalSummary = result.approvingReviewers.length > 0
-    ? ` Qualifying reviewer(s): ${result.approvingReviewers.join(", ")}`
+  const approvalSummary = result.qualifyingParticipants.length > 0
+    ? ` Qualifying participant(s): ${result.qualifyingParticipants.join(", ")}`
     : "";
   const linkedIssueSummary = result.docsTestsOnly
     ? ""
