@@ -38,7 +38,8 @@
     "branch:audit": "node scripts/audit-remote-branches.mjs",
     "ci:alerts": "node scripts/triage-ci-alerts.mjs",
     "pr:alerts": "node scripts/guard-pr-alerts.mjs",
-    "pr:merge-cleanup": "node scripts/classify-pr-merge-cleanup.mjs"
+    "pr:merge-cleanup": "node scripts/classify-pr-merge-cleanup.mjs",
+    "bench:profile": "npm run build && node scripts/bench-profile.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
