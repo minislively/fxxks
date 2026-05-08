@@ -58,6 +58,11 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.equal(artifact.decision, "use");
   assert.equal(artifact.evidenceStrength, "direct");
   assert.equal(artifact.compressionPolicy, "do-not-summarize");
+  assert.deepEqual(artifact.interop, {
+    mayBeStored: true,
+    mayBeSummarized: false,
+    mayOverrideDecision: false,
+  });
   assert.equal(artifact.domainPayload?.domain, "react-web");
   assert.ok(artifact.sourceFingerprint);
   assert.ok(artifact.editGuidance?.patchTargets?.length > 0);
@@ -72,6 +77,7 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.match(markdown, /React Web evidence artifact/);
   assert.match(markdown, /do-not-summarize/);
   assert.match(markdown, /frontend-source-evidence/);
+  assert.match(markdown, /summarized=no/);
 
   const cliJson = spawnSync(process.execPath, [cliPath, "inspect", "evidence", ref.id, "--json"], {
     cwd: tempDir,
@@ -81,6 +87,7 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   const parsed = JSON.parse(cliJson.stdout);
   assert.equal(parsed.id, artifact.id);
   assert.equal(parsed.decision, "use");
+  assert.deepEqual(parsed.interop, artifact.interop);
 
   const cliText = spawnSync(process.execPath, [cliPath, "inspect", "evidence", ref.id], {
     cwd: tempDir,
@@ -108,6 +115,11 @@ test("repeated unsupported boundary emits a denied evidence artifact instead of 
   const artifact = readReactWebEvidenceArtifact(tempDir, ref.id);
   assert.equal(artifact.decision, "deny");
   assert.equal(artifact.evidenceStrength, "denied");
+  assert.deepEqual(artifact.interop, {
+    mayBeStored: true,
+    mayBeSummarized: false,
+    mayOverrideDecision: false,
+  });
   assert.match(artifact.whyDenied.join("\n"), /unsupported-react-native-webview-boundary/);
   assert.equal("confidence" in artifact, false);
   assert.equal("confidenceScore" in artifact, false);
