@@ -188,6 +188,16 @@ function interactionSummary(domainPayload) {
   };
 }
 
+function locatedAnchorSummary(domainPayload) {
+  const locatedAnchors = domainPayload?.sourceAnchorBeta?.anchors?.locatedAnchors ?? [];
+  return {
+    count: locatedAnchors.length,
+    kinds: uniqueSorted(locatedAnchors.map((item) => item.kind).filter(Boolean)),
+    labels: uniqueSorted(locatedAnchors.map((item) => item.label).filter(Boolean)),
+    allLocated: locatedAnchors.length > 0 && locatedAnchors.every((item) => item.loc && Number.isInteger(item.loc.startLine) && Number.isInteger(item.loc.endLine)),
+  };
+}
+
 function measureRnFixture({ repoRoot, relativeFile, dist }) {
   const filePath = path.join(repoRoot, relativeFile);
   const preReadDecision = dist.preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: false });
@@ -216,12 +226,14 @@ function measureRnFixture({ repoRoot, relativeFile, dist }) {
       reuseFreshnessSource: preReadDomainPayload?.reuseContract?.freshnessSource ?? null,
       strictContractsPresent: hasStrictRnContracts(preReadDomainPayload),
       primitiveInteractions: preReadInteractions,
+      locatedAnchors: locatedAnchorSummary(preReadDomainPayload),
     },
     modelFacing: {
       domain: modelDomainPayload?.domain ?? null,
       claimBoundary: modelDomainPayload?.claimBoundary ?? null,
       strictContractsPresent: hasStrictRnContracts(modelDomainPayload),
       primitiveInteractions: modelInteractions,
+      locatedAnchors: locatedAnchorSummary(modelDomainPayload),
       concernProfileIds: toConcernProfileIds(modelPayload),
       visibleBehaviorConcernKinds: toVisibleBehaviorConcernKinds(modelPayload.behavior),
     },
@@ -231,6 +243,8 @@ function measureRnFixture({ repoRoot, relativeFile, dist }) {
       preReadInteractions.hasPressableAction &&
       modelInteractions.hasTextInputBinding &&
       modelInteractions.hasPressableAction &&
+      locatedAnchorSummary(preReadDomainPayload).allLocated &&
+      locatedAnchorSummary(modelDomainPayload).allLocated &&
       hasStrictRnContracts(preReadDomainPayload) &&
       hasStrictRnContracts(modelDomainPayload),
   };
@@ -290,6 +304,9 @@ export async function buildReactNativePayloadEvidence({
   );
   const readinessRows = rnFixtures.filter(
     (row) => row.preRead.primitiveInteractions.hasConstraintActionReadiness && row.modelFacing.primitiveInteractions.hasConstraintActionReadiness,
+  );
+  const locatedAnchorRows = rnFixtures.filter(
+    (row) => row.preRead.locatedAnchors.allLocated && row.modelFacing.locatedAnchors.allLocated,
   );
   const measuredByFile = new Map(rnFixtures.map((row) => [row.file, row]));
   const boundaryByFile = new Map(boundaries.map((row) => [row.file, row]));
@@ -387,6 +404,14 @@ export async function buildReactNativePayloadEvidence({
         directReadinessFixtures: readinessRows.map((row) => row.file),
         blocker: readinessRows.length > 0 ? null : "no measured RN fixture exposed constraintActionReadiness in both pre-read and model-facing payloads",
       },
+      locatedAnchorsVisible: {
+        claimable: locatedAnchorRows.length === rnFixtures.length,
+        fixtureCoverage: locatedAnchorRows.map((row) => row.file),
+        blocker:
+          locatedAnchorRows.length === rnFixtures.length
+            ? null
+            : "one or more measured RN fixtures did not expose fully located sourceAnchorBeta anchors in both pre-read and model-facing payloads",
+      },
       stagedRnSurfaceInventory: {
         claimable: true,
         stagedSlots: stagedRnSurfaceInventory,
@@ -466,6 +491,7 @@ ${evidence.claimBoundary}
 - Measured RN narrow input constraints visible: ${evidence.summary.inputConstraintsVisible.claimable ? "yes" : "no"}
 - RN direct state/action relation visible: ${evidence.summary.stateActionRelationsVisible.claimable ? "yes" : "no"}
 - Measured RN narrow constraint/action readiness visible: ${evidence.summary.constraintActionReadinessVisible.claimable ? "yes" : "no"}
+- RN sourceAnchorBeta located anchors visible: ${evidence.summary.locatedAnchorsVisible.claimable ? "yes" : "no"}
 - RN staged surface inventory visible: ${evidence.summary.stagedRnSurfaceInventory.claimable ? "yes" : "no"}
 - Broad React Native support claimable: no
 - Runtime reuse promotion claimable: no

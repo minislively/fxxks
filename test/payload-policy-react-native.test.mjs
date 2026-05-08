@@ -952,6 +952,7 @@ test("React Native F1 signal gate is the shared source of truth for policy and p
     primitives: ["Pressable", "Text", "TextInput", "View"],
     jsxProps: ["onChangeText", "onPress"],
     sourceFingerprintRequired: true,
+    locatedAnchors: [],
   });
 
   assert.deepEqual(payload?.reuseContract, {
