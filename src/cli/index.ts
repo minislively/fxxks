@@ -643,6 +643,7 @@ Everyday commands:
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
   ${displayCliName} inspect evidence <id> [--json]
+  ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
@@ -724,6 +725,29 @@ function parseInspectEvidenceArgs(args: string[]): { id: string; json: boolean }
 
   if (!id) {
     throw new Error("inspect evidence requires an artifact id");
+  }
+
+  return { id, json };
+}
+
+function parseInspectRankedBundleArgs(args: string[]): { id: string; json: boolean } {
+  let id: string | undefined;
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (!id) {
+      id = arg;
+      continue;
+    }
+    throw new Error(`Unexpected inspect ranked-bundle argument: ${arg}`);
+  }
+
+  if (!id) {
+    throw new Error("inspect ranked-bundle requires an artifact id");
   }
 
   return { id, json };
@@ -1214,18 +1238,29 @@ async function run(): Promise<void> {
       return;
     }
     case "inspect": {
-      if (arg1 !== "evidence") {
-        throw new Error("inspect expects 'evidence'");
+      if (arg1 === "evidence") {
+        const { id, json } = parseInspectEvidenceArgs(rest.slice(1));
+        const { readReactWebEvidenceArtifact, renderReactWebEvidenceArtifactMarkdown } = await import("../core/react-web-evidence-artifact.js");
+        const artifact = readReactWebEvidenceArtifact(process.cwd(), id);
+        if (json) {
+          print(artifact);
+        } else {
+          process.stdout.write(renderReactWebEvidenceArtifactMarkdown(artifact));
+        }
+        return;
       }
-      const { id, json } = parseInspectEvidenceArgs(rest.slice(1));
-      const { readReactWebEvidenceArtifact, renderReactWebEvidenceArtifactMarkdown } = await import("../core/react-web-evidence-artifact.js");
-      const artifact = readReactWebEvidenceArtifact(process.cwd(), id);
-      if (json) {
-        print(artifact);
-      } else {
-        process.stdout.write(renderReactWebEvidenceArtifactMarkdown(artifact));
+      if (arg1 === "ranked-bundle") {
+        const { id, json } = parseInspectRankedBundleArgs(rest.slice(1));
+        const { readReactWebRankedBundle, renderReactWebRankedBundleMarkdown } = await import("../core/react-web-ranked-bundle.js");
+        const bundle = readReactWebRankedBundle(process.cwd(), id);
+        if (json) {
+          print(bundle);
+        } else {
+          process.stdout.write(renderReactWebRankedBundleMarkdown(bundle));
+        }
+        return;
       }
-      return;
+      throw new Error("inspect expects 'evidence' or 'ranked-bundle'");
     }
     case "attach": {
       const runtime = arg1;
