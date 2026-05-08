@@ -38,6 +38,9 @@ export type WorktreeStatusSummary = {
   entries: WorktreeStatusEntry[];
   changedPaths: string[];
   trackedPaths: string[];
+  stagedPaths: string[];
+  unstagedPaths: string[];
+  partiallyStagedPaths: string[];
   untrackedPaths: string[];
   ignoredPaths: string[];
   conflictedPaths: string[];
@@ -120,6 +123,14 @@ function countChangeKinds(entries: WorktreeStatusEntry[]): Partial<Record<Worktr
   }, {});
 }
 
+function isTrackedStagedEntry(entry: WorktreeStatusEntry): boolean {
+  return entry.tracked && !entry.conflicted && entry.indexStatus !== " ";
+}
+
+function isTrackedUnstagedEntry(entry: WorktreeStatusEntry): boolean {
+  return entry.tracked && !entry.conflicted && entry.worktreeStatus !== " ";
+}
+
 function parseNulTerminatedPorcelain(output: string): WorktreeStatusEntry[] {
   const fields = output.split("\0").filter((field) => field.length > 0);
   const entries: WorktreeStatusEntry[] = [];
@@ -154,11 +165,17 @@ export function parseWorktreeStatus(output: string, options: ParseWorktreeStatus
 
 export function summarizeWorktreeStatus(entries: WorktreeStatusEntry[]): WorktreeStatusSummary {
   const changedEntries = entries.filter((entry) => entry.kind !== "ignored");
+  const trackedChangedEntries = changedEntries.filter((entry) => entry.tracked);
+  const stagedEntries = trackedChangedEntries.filter((entry) => isTrackedStagedEntry(entry));
+  const unstagedEntries = trackedChangedEntries.filter((entry) => isTrackedUnstagedEntry(entry));
   return {
     clean: changedEntries.length === 0,
     entries,
     changedPaths: changedEntries.map((entry) => entry.path),
-    trackedPaths: changedEntries.filter((entry) => entry.tracked).map((entry) => entry.path),
+    trackedPaths: trackedChangedEntries.map((entry) => entry.path),
+    stagedPaths: stagedEntries.map((entry) => entry.path),
+    unstagedPaths: unstagedEntries.map((entry) => entry.path),
+    partiallyStagedPaths: stagedEntries.filter((entry) => isTrackedUnstagedEntry(entry)).map((entry) => entry.path),
     untrackedPaths: entries.filter((entry) => entry.kind === "untracked").map((entry) => entry.path),
     ignoredPaths: entries.filter((entry) => entry.kind === "ignored").map((entry) => entry.path),
     conflictedPaths: entries.filter((entry) => entry.conflicted).map((entry) => entry.path),

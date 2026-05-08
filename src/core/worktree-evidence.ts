@@ -30,6 +30,9 @@ export type WorktreeSnapshot = {
   clean: boolean;
   changedPaths: string[];
   trackedPaths: string[];
+  stagedPaths: string[];
+  unstagedPaths: string[];
+  partiallyStagedPaths: string[];
   untrackedPaths: string[];
   ignoredPaths: string[];
   conflictedPaths: string[];
@@ -228,6 +231,9 @@ export function captureWorktreeSnapshot(cwd = process.cwd(), options: WorktreeEv
         clean: summary.clean,
         changedPaths: uniqueSorted(summary.changedPaths),
         trackedPaths: uniqueSorted(summary.trackedPaths),
+        stagedPaths: uniqueSorted(summary.stagedPaths),
+        unstagedPaths: uniqueSorted(summary.unstagedPaths),
+        partiallyStagedPaths: uniqueSorted(summary.partiallyStagedPaths),
         untrackedPaths: uniqueSorted(summary.untrackedPaths),
         ignoredPaths: uniqueSorted(summary.ignoredPaths),
         conflictedPaths: uniqueSorted(summary.conflictedPaths),
