@@ -1,0 +1,43 @@
+name: React Web Release Report
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  react-web-release-report:
+    name: Publish React Web release report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate React Web release report
+        run: >-
+          npm run evidence:react-web-release-report -- --run-id=release-${{ github.sha }}
+          --output=$RUNNER_TEMP/react-web-release-report.json
+          --markdown-output=$RUNNER_TEMP/react-web-release-report.md
+
+      - name: Publish step summary
+        run: cat "$RUNNER_TEMP/react-web-release-report.md" >> "$GITHUB_STEP_SUMMARY"
