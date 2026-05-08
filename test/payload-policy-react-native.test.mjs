@@ -73,6 +73,70 @@ test("React Native payload policy allows the measured primitive/input signal set
   });
 });
 
+test("React Native payload leakage guard allows only F1 and F13 pre-read payloads", () => {
+  const cases = [
+    ["F1", "rn-primitive-basic.tsx", "payload", undefined],
+    ["F13", "rn-primitive-inline-action.tsx", "payload", undefined],
+    ["F2", "rn-style-platform-navigation.tsx", "fallback", "unsupported-frontend-domain-profile"],
+    ["F9", "rn-interaction-gesture.tsx", "fallback", "unsupported-frontend-domain-profile"],
+    ["F10", "rn-image-scrollview.tsx", "fallback", "unsupported-frontend-domain-profile"],
+  ];
+
+  for (const [slot, fixture, expectedDecision, expectedReason] of cases) {
+    const filePath = fixturePath(fixture);
+    const domainDetection = detect(fixtureSource(fixture), filePath);
+    const policy = preRead.assessFrontendPayloadPolicy(domainDetection);
+    const decision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
+
+    assert.equal(domainDetection.classification, "react-native", slot);
+    assert.equal(policy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY, slot);
+    assert.equal(decision.decision, expectedDecision, slot);
+
+    if (expectedDecision === "payload") {
+      assert.equal(policy.allowed, true, slot);
+      assert.equal(decision.payload.domainPayload.domain, "react-native", slot);
+      assert.equal(decision.payload.domainPayload.policy, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY, slot);
+      assert.equal(decision.payload.domainPayload.claimBoundary, "rn-primitive-input-narrow-payload-only", slot);
+    } else {
+      assert.equal(policy.allowed, false, slot);
+      assert.deepEqual(decision.reasons, [expectedReason], slot);
+      assert.equal(decision.fallback.reason, expectedReason, slot);
+      assert.equal("payload" in decision, false, `${slot} must not carry pre-read payload`);
+      assert.equal("readiness" in decision, false, `${slot} must not expose payload readiness`);
+      assert.deepEqual(preRead.toFrontendPayloadBuildOptions(policy), {
+        includeDomainPayload: false,
+        domainPayloadPolicy: policy.name,
+      }, `${slot} denied RN policy must not request domain payload`);
+    }
+  }
+});
+
+test("React Native mixed WebView and TUI cases fail closed without RN payload leakage", () => {
+  const mixedCases = [
+    ["RN+WebView", "negative-rn-webview-boundary.tsx"],
+    ["RN+TUI", "tui-ink-rn-narrow-mixed.tsx"],
+  ];
+
+  for (const [label, fixture] of mixedCases) {
+    const filePath = fixturePath(fixture);
+    const domainDetection = detect(fixtureSource(fixture), filePath);
+    const policy = preRead.assessFrontendPayloadPolicy(domainDetection);
+    const decision = preRead.decidePreRead(filePath, repoRoot, "codex", { includeEditGuidance: true });
+
+    assert.equal(domainDetection.classification, "mixed", label);
+    assert.ok(domainDetection.signals.some((signal) => signal.startsWith("react-native:")), label);
+    assert.equal(policy.allowed, false, label);
+    assert.notEqual(policy.name, RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY, label);
+    assert.deepEqual(preRead.toFrontendPayloadBuildOptions(policy), {
+      includeDomainPayload: false,
+      domainPayloadPolicy: policy.name,
+    }, label);
+    assert.equal(decision.decision, "fallback", label);
+    assert.equal(decision.fallback.reason, preRead.REACT_NATIVE_WEBVIEW_BOUNDARY_REASON, label);
+    assert.equal("payload" in decision, false, `${label} must not carry pre-read payload`);
+    assert.equal("readiness" in decision, false, `${label} must not expose payload readiness`);
+  }
+});
 
 test("React Native F13 inline action fixture remains inside the narrow payload lane", () => {
   const filePath = fixturePath("rn-primitive-inline-action.tsx");

@@ -44,9 +44,11 @@ export function assessFrontendPayloadPolicy(
 export function toFrontendPayloadBuildOptions(
   policy: FrontendPayloadPolicyDecision | undefined,
 ): FrontendPayloadBuildOptions {
-  const isReactWebCurrentSupported = policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY;
+  const isAllowed = policy?.allowed === true;
+  const isReactWebCurrentSupported = isAllowed && policy?.name === REACT_WEB_CURRENT_SUPPORTED_PAYLOAD_POLICY;
+  const isReactNativeNarrowAllowed = isAllowed && policy?.name === RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY;
   return {
-    includeDomainPayload: isReactWebCurrentSupported || policy?.name === RN_PRIMITIVE_INPUT_NARROW_PAYLOAD_POLICY,
+    includeDomainPayload: isReactWebCurrentSupported || isReactNativeNarrowAllowed,
     ...(isReactWebCurrentSupported ? { includeReactWebContextMetadata: true } : {}),
     ...(policy?.name ? { domainPayloadPolicy: policy.name } : {}),
   };
