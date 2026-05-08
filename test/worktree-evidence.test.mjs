@@ -53,24 +53,65 @@ test("captureWorktreeSnapshot parses clean, untracked, conflicted, and rename ev
   assert.deepEqual(clean.blockers, []);
   assert.equal(clean.snapshot.clean, true);
   assert.deepEqual(clean.snapshot.changedPaths, []);
+  assert.deepEqual(clean.snapshot.stagedPaths, []);
+  assert.deepEqual(clean.snapshot.unstagedPaths, []);
+  assert.deepEqual(clean.snapshot.partiallyStagedPaths, []);
   assert.deepEqual(clean.snapshot.changeKindCounts, {});
 
   const dirty = captureWorktreeSnapshot("/tmp/project", {
-    runner: outputRunner(" M src/App.tsx\0?? scratch.log\0UU conflict.ts\0R  src/NewName.tsx\0src/OldName.tsx\0"),
+    runner: outputRunner(
+      "A  src/Staged.tsx\0 M src/App.tsx\0MM src/PartiallyStaged.tsx\0?? scratch.log\0UU conflict.ts\0R  src/NewName.tsx\0src/OldName.tsx\0",
+    ),
     now: () => "2026-04-23T00:00:01.000Z",
   });
   assert.deepEqual(dirty.blockers, []);
   assert.equal(dirty.snapshot.clean, false);
-  assert.deepEqual(dirty.snapshot.changedPaths, ["conflict.ts", "scratch.log", "src/App.tsx", "src/NewName.tsx"]);
-  assert.deepEqual(dirty.snapshot.trackedPaths, ["conflict.ts", "src/App.tsx", "src/NewName.tsx"]);
+  assert.deepEqual(dirty.snapshot.changedPaths, [
+    "conflict.ts",
+    "scratch.log",
+    "src/App.tsx",
+    "src/NewName.tsx",
+    "src/PartiallyStaged.tsx",
+    "src/Staged.tsx",
+  ]);
+  assert.deepEqual(dirty.snapshot.trackedPaths, [
+    "conflict.ts",
+    "src/App.tsx",
+    "src/NewName.tsx",
+    "src/PartiallyStaged.tsx",
+    "src/Staged.tsx",
+  ]);
+  assert.deepEqual(dirty.snapshot.stagedPaths, ["src/NewName.tsx", "src/PartiallyStaged.tsx", "src/Staged.tsx"]);
+  assert.deepEqual(dirty.snapshot.unstagedPaths, ["src/App.tsx", "src/PartiallyStaged.tsx"]);
+  assert.deepEqual(dirty.snapshot.partiallyStagedPaths, ["src/PartiallyStaged.tsx"]);
   assert.deepEqual(dirty.snapshot.untrackedPaths, ["scratch.log"]);
   assert.deepEqual(dirty.snapshot.conflictedPaths, ["conflict.ts"]);
   assert.deepEqual(dirty.snapshot.changeKindCounts, {
-    modified: 1,
+    added: 1,
+    modified: 2,
     untracked: 1,
     unmerged: 1,
     renamed: 1,
   });
+});
+
+test("currentWorktreeEvidenceStatus exposes parser-backed staged path summaries", () => {
+  const current = currentWorktreeEvidenceStatus("/tmp/project", {
+    runner: outputRunner("A  src/Staged.ts\0 M src/Unstaged.ts\0MM src/Partial.ts\0"),
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected ${args.join(" ")}`);
+    },
+    now: () => "2026-04-23T00:00:02.000Z",
+  });
+
+  assert.equal(current.snapshot.clean, false);
+  assert.deepEqual(current.snapshot.stagedPaths, ["src/Partial.ts", "src/Staged.ts"]);
+  assert.deepEqual(current.snapshot.unstagedPaths, ["src/Partial.ts", "src/Unstaged.ts"]);
+  assert.deepEqual(current.snapshot.partiallyStagedPaths, ["src/Partial.ts"]);
+  assert.equal(current.worktreeVerdict.kind, "dirty");
 });
 
 test("session evidence records baseline/latest and computes dirty deltas with a fake runner", () => {

@@ -72,6 +72,23 @@ test("summarizeWorktreeStatus separates tracked, untracked, ignored, and conflic
   });
 });
 
+test("summarizeWorktreeStatus exposes staged, unstaged, and partially staged tracked paths", () => {
+  const summary = summarizeWorktreeStatus(
+    parseWorktreeStatus("A  src/staged.ts\n M src/unstaged.ts\nMM src/partially-staged.ts\nUU src/conflict.ts\n?? scratch.log\n"),
+  );
+
+  assert.deepEqual(summary.trackedPaths, [
+    "src/staged.ts",
+    "src/unstaged.ts",
+    "src/partially-staged.ts",
+    "src/conflict.ts",
+  ]);
+  assert.deepEqual(summary.stagedPaths, ["src/staged.ts", "src/partially-staged.ts"]);
+  assert.deepEqual(summary.unstagedPaths, ["src/unstaged.ts", "src/partially-staged.ts"]);
+  assert.deepEqual(summary.partiallyStagedPaths, ["src/partially-staged.ts"]);
+  assert.deepEqual(summary.conflictedPaths, ["src/conflict.ts"]);
+});
+
 test("parseAndSummarizeWorktreeStatus treats empty or ignored-only output as clean", () => {
   assert.equal(parseAndSummarizeWorktreeStatus("\n").clean, true);
   assert.equal(parseAndSummarizeWorktreeStatus("!! dist/index.js\n").clean, true);
