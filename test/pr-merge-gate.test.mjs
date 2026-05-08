@@ -125,6 +125,28 @@ test("merge gate can disable linked issue enforcement explicitly", () => {
   assert.equal(result.ok, true);
 });
 
+test("merge gate skips linked issue requirement for docs/test-only changes when approval is otherwise disabled", () => {
+  const result = evaluatePullRequestMergeGate({
+    pullRequest: { title: "Tighten docs wording", body: "Refs #42", head: { sha: "head-sha" }, user: { login: "contributor" } },
+    changedFiles: ["docs/development-principles.md", "test/merge-gate-workflow.test.mjs"],
+    requireApproval: false,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.docsTestsOnly, true);
+});
+
+test("merge gate still requires linked issue when docs/test-only allowlist is exceeded", () => {
+  const result = evaluatePullRequestMergeGate({
+    pullRequest: { title: "Touch docs and source", body: "Refs #42", head: { sha: "head-sha" }, user: { login: "contributor" } },
+    changedFiles: ["docs/development-principles.md", "src/core/domain-detector.ts"],
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.docsTestsOnly, false);
+  assert.match(result.blockers.join("\n"), /closing issue/);
+});
+
 test("merge gate can disable approval enforcement explicitly", () => {
   const result = evaluatePullRequestMergeGate({
     pullRequest: { title: "Improve cache", body: "Fixes #42", head: { sha: "head-sha" }, user: { login: "contributor" } },
