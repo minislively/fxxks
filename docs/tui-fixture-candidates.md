@@ -120,7 +120,7 @@ The evidence matrix above is sufficient to discuss a future payload-design PRD, 
 
 ### Minimal payload candidate vocabulary
 
-The first safe TUI payload design target is a source-only metadata vocabulary. These names are allowed to appear in docs and future dry-run tests, but they are not model-facing payload fields yet:
+The first safe TUI payload design target is the source-only metadata vocabulary already exercised by the landed debug/test-owned dry-run appendix. These names may appear in docs and debug/test evidence, but they are not model-facing payload fields:
 
 | Candidate metadata field | Representative fixture evidence | Required boundary |
 | --- | --- | --- |
@@ -133,17 +133,19 @@ The first safe TUI payload design target is a source-only metadata vocabulary. T
 
 The vocabulary is deliberately fixture-backed. A later field should not be added until a fixture proves the source shape and a negative or mixed case keeps fallback/no-payload behavior safe.
 
-### Source-only dry-run implementation handoff
+### Landed source-only dry-run boundary
 
-A future dry-run PR may implement a non-emitting metadata projection for the vocabulary above, but only if it keeps the current denied lane intact:
+A landed debug/test-owned `inspect-domain --json` appendix may expose a non-emitting `tuiSourceMetadata` summary for files with actual TUI evidence. That landed step does not change the survey's role: this page remains a candidate/evidence-only survey, not a support contract, not payload approval, and not runtime/pre-read promotion.
 
-1. read source and produce debug/test evidence for candidate metadata fields;
-2. keep `assessTuiInkPayloadPolicy` denied with `allowed: false`;
-3. keep every current TUI fixture fallback/no-payload;
-4. keep mixed and non-Ink cases outside TUI payload authorization;
-5. avoid model-facing payload builders, runtime/pre-read injection, manifest changes, detector/registry promotion, and token/performance/support claims.
+The landed dry-run boundary must continue to keep:
 
-If any of those constraints is too narrow, the next artifact should be a new PRD/test-spec pair rather than an opportunistic source edit.
+1. `assessTuiInkPayloadPolicy` denied with `allowed: false`;
+2. every current TUI fixture fallback/no-payload;
+3. mixed and non-Ink cases outside TUI payload authorization;
+4. `tuiSourceMetadata` limited to debug/test-owned `inspect-domain --json` visibility rather than model-facing payload builders;
+5. detector, registry, manifest, pre-read, runtime, and cross-lane promotion work out of scope.
+
+The next approved artifact is a separate **PRD + test-spec pair** for serialized shared-policy planning. If a future step wants broader payload/schema/runtime support than the current `inspect-domain --json` appendix, it must stop here and plan before implementation.
 
 ## Candidate source notes
 
