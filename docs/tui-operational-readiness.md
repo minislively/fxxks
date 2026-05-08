@@ -54,6 +54,15 @@ Choose the smallest lane that matches the intended change:
 
 If a change does not fit one of these lanes, stop and write a new plan before editing.
 
+## Evidence reinforcement review checklist
+
+When the current lane is docs/tests-only evidence reinforcement, reviewers should verify:
+
+- the change only clarifies source evidence, denied policy, fallback reason, or stop rules;
+- positive Ink evidence remains paired with non-Ink or mixed fallback visibility so over-match risk stays visible;
+- README, roadmap, release, package, and runtime-facing wording stay candidate/evidence-only and are not widened from fixture-lane language;
+- any `allowed: true`, payload emission, manifest, detector, policy, pre-read, or runtime request stops the lane and returns to a serialized shared-policy plan.
+
 ## Promotion criteria before payload-design planning
 
 Before a TUI payload-design plan is useful, the repo should already have:

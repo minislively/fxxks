@@ -97,6 +97,15 @@ This matrix is the current review contract for TUI-related fixtures. It is inten
 
 If a future PR changes any row from fallback/no-payload to payload emission, it is no longer a TUI evidence matrix update and must go through a serialized shared-policy plan.
 
+## Evidence-only review checklist
+
+Before merging a docs/tests-only TUI fixture PR, reviewers should confirm:
+
+1. every positive Ink row still ends in `evidence-only`, denied policy, and fallback/no-payload;
+2. at least one non-Ink or mixed fallback row remains visible whenever positive Ink evidence expands, so over-match risk stays explicit;
+3. fixture-lane wording stays local to fixture docs/tests and must not be reused as README, roadmap, release-note, or package support wording;
+4. any request for `allowed: true`, payload emission, manifest edits, or shared detector/pre-read/runtime seams is redirected into a serialized shared-policy plan.
+
 ## Payload design readiness handoff
 
 The evidence matrix above is sufficient to discuss a future payload-design PRD, but it is not itself a payload contract. A payload-design handoff must first prove that the current evidence-only lane stays denied:
