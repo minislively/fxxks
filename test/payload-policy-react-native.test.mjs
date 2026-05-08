@@ -182,7 +182,7 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
   ]);
   assert.equal(
     payload?.sourceAnchorBeta.contract.nextImplementationStep,
-    "treat RN sourceAnchorBeta as closeout/frozen after located-anchor hardening until a new extract/compare/inspect-domain visibility plan is explicitly approved",
+    "keep RN sourceAnchorBeta visibility additive and local-proof-only across extract/compare/inspect-domain; require a new explicit plan before any further runtime-reuse or support widening",
   );
   assert.equal(payload?.sourceAnchorBeta.anchors.componentName, "InlineActionRow");
   assert.equal(payload?.sourceAnchorBeta.anchors.propsName, "InlineActionRowProps");
@@ -945,7 +945,7 @@ test("React Native F1 signal gate is the shared source of truth for policy and p
       "tui-ink",
     ],
     nextImplementationStep:
-      "treat RN sourceAnchorBeta as closeout/frozen after located-anchor hardening until a new extract/compare/inspect-domain visibility plan is explicitly approved",
+      "keep RN sourceAnchorBeta visibility additive and local-proof-only across extract/compare/inspect-domain; require a new explicit plan before any further runtime-reuse or support widening",
   });
   assert.deepEqual(payload?.sourceAnchorBeta.anchors, {
     componentName: "NativeInput",

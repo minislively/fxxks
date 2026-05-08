@@ -639,6 +639,29 @@ test("compare keeps tiny raw fallback from reporting false positive savings", ()
   assert.match(result.claimBoundary, /not provider usage\/billing tokens/);
 });
 
+test("compare exposes bounded RN located-anchor visibility only on RN JSON surfaces", () => {
+  const rn = run(["compare", "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx", "--json"]);
+  const web = run(["compare", "fixtures/compressed/FormSection.tsx", "--json"]);
+
+  assert.ok(rn.reactNativeSourceAnchorBetaSummary);
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.proofSurface, "compare");
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.schemaVersion, "source-backed-rn-located-anchor-visibility-only");
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.contractVersion, "rn-source-anchor-beta.v0");
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.scope, "local-proof-only");
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.runtimeReusePromotion, "not-promoted");
+  assert.deepEqual(rn.reactNativeSourceAnchorBetaSummary.allowedProofSurfaces, ["extract", "compare", "inspect-domain"]);
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.componentName, "SearchRow");
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.propsName, "SearchRowProps");
+  assert.ok(rn.reactNativeSourceAnchorBetaSummary.primitiveCount >= 4);
+  assert.ok(rn.reactNativeSourceAnchorBetaSummary.jsxPropCount >= 2);
+  assert.ok(rn.reactNativeSourceAnchorBetaSummary.locatedAnchorCount > 0);
+  assert.ok(rn.reactNativeSourceAnchorBetaSummary.locatedAnchorPreview.some((item) => item.kind === "rn-primitive-outline"));
+  assert.equal(rn.reactNativeSourceAnchorBetaSummary.claimBoundary, "source-backed-rn-located-anchor-visibility-only");
+  assert.equal("reactWebContextSummary" in rn, false);
+  assert.equal("reactNativeSourceAnchorBetaSummary" in web, false);
+  assert.doesNotMatch(JSON.stringify(rn.reactNativeSourceAnchorBetaSummary), /broad React Native support|runtime correctness|billing/i);
+});
+
 test("compare default output is a concise human verdict with json details opt-in", () => {
   const output = runText(["compare", "fixtures/compressed/FormSection.tsx"]);
   assert.match(output, /^fooks compare fixtures\/compressed\/FormSection\.tsx/m);
@@ -652,6 +675,14 @@ test("compare default output is a concise human verdict with json details opt-in
   assert.match(output, /Boundary: Local model-facing payload estimate only/);
   assert.match(output, /fooks compare <file> --json/);
   assert.doesNotMatch(output.trim(), /^\{/);
+});
+
+test("compare default output can mention bounded RN visibility without widening claims", () => {
+  const output = runText(["compare", "test/fixtures/frontend-domain-expectations/rn-primitive-basic.tsx"]);
+  assert.match(output, /RN visibility: \d+ local-proof-only located anchors across \d+ primitives \/ \d+ JSX props/);
+  assert.match(output, /additive compare summary only, not runtime or support proof/);
+  assert.doesNotMatch(output, /React Web context:/);
+  assert.doesNotMatch(output, /broad React Native support|runtime correctness|billing savings/i);
 });
 
 test("compare default output avoids reduction claims for no-savings files", () => {
