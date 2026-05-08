@@ -183,9 +183,18 @@ test("React Native F13 inline action fixture remains inside the narrow payload l
     "emit located RN sourceAnchorBeta anchors from existing component/props/hook/handler/primitive evidence before widening detector gates",
   );
   assert.equal(payload?.sourceAnchorBeta.anchors.componentName, "InlineActionRow");
+  assert.equal(payload?.sourceAnchorBeta.anchors.propsName, "InlineActionRowProps");
   assert.deepEqual(payload?.sourceAnchorBeta.anchors.primitives, ["Pressable", "Text", "TextInput", "View"]);
   assert.deepEqual(payload?.sourceAnchorBeta.anchors.jsxProps, ["onChangeText", "onPress"]);
   assert.equal(payload?.sourceAnchorBeta.anchors.sourceFingerprintRequired, true);
+  assert.deepEqual(payload?.sourceAnchorBeta.anchors.locatedAnchors, [
+    { kind: "component-name", label: "InlineActionRow", loc: { startLine: 9, endLine: 30 } },
+    { kind: "props-interface", label: "InlineActionRowProps", loc: { startLine: 3, endLine: 7 } },
+    { kind: "event-handlers", label: "onChangeText:onChangeText", loc: { startLine: 19, endLine: 19 } },
+    { kind: "event-handlers", label: "onPress:submitCurrentValue", loc: { startLine: 25, endLine: 25 } },
+    { kind: "rn-primitive-outline", label: "TextInput", loc: { startLine: 16, endLine: 24 } },
+    { kind: "rn-primitive-outline", label: "Pressable", loc: { startLine: 25, endLine: 25 } },
+  ]);
   assert.deepEqual(payload?.facts.primitiveInteractions?.inputBindings, [
     {
       primitive: "TextInput",
