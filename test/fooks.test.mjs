@@ -4778,6 +4778,8 @@ test("docs describe TUI/Ink fixture survey as future candidate evidence only", (
   assert.match(survey, /Command status\/progress UI/);
   assert.match(survey, /Negative\/fallback cases/);
   assert.match(survey, /No public TUI\/Ink support claim/);
+  assert.match(readme, /candidate \/ evidence-only lane/);
+  assert.match(roadmap, /Candidate \/ evidence-only future profile/);
   assert.match(survey, /No extractor, pre-read, setup, doctor, or runtime behavior change/);
   assert.match(survey, /No provider-token, billing, runtime-token, performance, or terminal correctness claim/);
   assert.match(survey, /No default TUI compact extraction or profile promotion/);
@@ -5549,7 +5551,7 @@ test("docs give first-run users a clear support and diagnosis path", () => {
   assert.match(combined, /domainDetection\.evidence/);
   assert.match(combined, /fooks setup --json/);
   assert.match(combined, /React \/ Next\.js/);
-  assert.match(combined, /Ink .*React CLI/s);
+  assert.match(combined, /TUI \/ React CLI .*candidate \/ evidence-only/s);
   assert.match(combined, /Pure (?:TypeScript\/JavaScript|`\\.ts` \/ `\\.js` library)/);
   assert.match(combined, /Codex-only setup can qualify/);
   assert.match(combined, /Claude\/opencode helper setup remains React `\.tsx` \/ `\.jsx` only/);
