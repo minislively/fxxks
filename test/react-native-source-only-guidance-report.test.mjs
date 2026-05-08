@@ -12,9 +12,9 @@ function readReport() {
 test("RN source-only guidance report locks the slot taxonomy boundary", () => {
   const report = readReport();
 
-  assert.match(report, /`F1` and `F13` are the only RN slots that may emit narrow payload evidence\./);
+  assert.match(report, /`F1`, `F13`, and `F14` are the only RN slots that may emit narrow payload evidence\./);
   assert.match(report, /`F2`, `F9`, and `F10` remain fallback\/readiness lanes with source-only concern metadata\./);
-  assert.match(report, /`F1` \/ `F13` primitive\/input[\s\S]*`rn-primitive-input-narrow-payload`/);
+  assert.match(report, /`F1` \/ `F13` \/ `F14` primitive\/input[\s\S]*`rn-primitive-input-narrow-payload`/);
   assert.match(report, /`F2` style\/platform\/navigation[\s\S]*Must not claim route existence, navigation success/);
   assert.match(report, /`F9` interaction\/list[\s\S]*Must not claim gesture correctness, runtime safety, list virtualization success/);
   assert.match(report, /`F10` media\/layout[\s\S]*Must not claim image loading correctness, layout correctness/);
@@ -34,7 +34,7 @@ test("RN source-only guidance report enumerates current forbidden claims", () =>
 test("RN source-only guidance report includes the reviewer checklist and contract pointers", () => {
   const report = readReport();
 
-  assert.match(report, /1\. `F1` \/ `F13` are still the only narrow payload-capable RN slots\./);
+  assert.match(report, /1\. `F1` \/ `F13` \/ `F14` are still the only narrow payload-capable RN slots\./);
   assert.match(report, /2\. `F2` \/ `F9` \/ `F10` are still described as fallback\/readiness lanes with source-only concern metadata\./);
   assert.match(report, /frontend-domain-contract/);
   assert.match(report, /frontend-domain-fixture-expectations/);

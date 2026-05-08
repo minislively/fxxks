@@ -24,7 +24,7 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.match(evidence.claimBoundary, /not edit routing/);
   assert.match(evidence.claimBoundary, /not provider billing or invoice savings/);
 
-  assert.equal(evidence.summary.fixtureCount, 2);
+  assert.equal(evidence.summary.fixtureCount, 3);
   assert.equal(evidence.summary.rnPayloadFactsVisible.claimable, true);
   assert.equal(evidence.summary.rnPayloadFactsVisible.blocker, null);
   assert.equal(evidence.summary.boundaryFallbacksPreserved.claimable, true);
@@ -38,7 +38,7 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.constraintActionReadinessVisible.claimable, true);
   assert.equal(evidence.summary.constraintActionReadinessVisible.relationKind, "constraintActionReadiness");
   assert.equal(evidence.summary.stagedRnSurfaceInventory.claimable, true);
-  assert.equal(evidence.summary.stagedRnSurfaceInventory.stagedSlots.length, 5);
+  assert.equal(evidence.summary.stagedRnSurfaceInventory.stagedSlots.length, 6);
   assert.deepEqual(
     evidence.summary.metadataAnchorsVisible.textInputFields.map((row) => row.field),
     RN_TEXT_INPUT_METADATA_FIELDS,
@@ -61,9 +61,13 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.equal(evidence.summary.providerBillingSavings.claimable, false);
 
   const stagedSlots = new Map(evidence.summary.stagedRnSurfaceInventory.stagedSlots.map((row) => [row.slot, row]));
-  assert.deepEqual([...stagedSlots.keys()], ["F1", "F13", "F2", "F9", "F10"]);
+  assert.deepEqual([...stagedSlots.keys()], ["F1", "F13", "F14", "F2", "F9", "F10"]);
   assert.deepEqual(stagedSlots.get("F1").concernProfileIds, ["rn-accessibility-test-anchor"]);
   assert.deepEqual(stagedSlots.get("F13").concernProfileIds, ["form-state", "rn-accessibility-test-anchor"]);
+  assert.deepEqual(stagedSlots.get("F14").concernProfileIds, ["rn-accessibility-test-anchor"]);
+  assert.deepEqual(stagedSlots.get("F14").visibleBehaviorConcernKinds, ["rnAccessibilityTestAnchors"]);
+  assert.equal(stagedSlots.get("F14").preReadDecision, "payload");
+  assert.equal(stagedSlots.get("F14").preReadExpectation, "rn-primitive-input-narrow-payload");
   assert.deepEqual(stagedSlots.get("F2").concernProfileIds, ["rn-list-rendering", "rn-navigation", "rn-style-platform"]);
   assert.deepEqual(stagedSlots.get("F2").visibleBehaviorConcernKinds, ["rnNavigationConcerns", "rnListRenderingConcerns", "rnStylePlatformConcerns"]);
   assert.equal(stagedSlots.get("F2").preReadDecision, "fallback");
@@ -136,6 +140,13 @@ test("React Native payload evidence exposes primitiveInteractions without wideni
   assert.deepEqual(inline.preRead.primitiveInteractions.constraintActionReadiness, inline.modelFacing.primitiveInteractions.constraintActionReadiness);
   assert.equal(inline.preRead.primitiveInteractions.constraintActionReadiness[0].relationKind, "constraintActionReadiness");
   assert.equal(inline.preRead.primitiveInteractions.constraintActionReadiness[0].disabledExpr, "isSubmitDisabled");
+
+  const accessibility = evidence.fixtures.find((row) => row.file.endsWith("rn-accessibility-test-anchor.tsx"));
+  assert.equal(accessibility.preRead.primitiveInteractions.inputBindings[0].accessibilityLabel, "Search input");
+  assert.equal(accessibility.preRead.primitiveInteractions.inputBindings[0].testID, "search-input");
+  assert.equal(accessibility.preRead.primitiveInteractions.actionBindings[0].accessibilityLabel, "Apply filters");
+  assert.equal(accessibility.preRead.primitiveInteractions.actionBindings[0].accessibilityRole, "button");
+  assert.equal(accessibility.preRead.primitiveInteractions.actionBindings[0].testID, "apply-filters");
 });
 
 test("React Native payload evidence keeps richer RN WebView and TUI boundaries fallback-only", async () => {
