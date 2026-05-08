@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import {
+  assertReactWebProfileSurfaceContract,
   buildReactWebProfileSurface,
   REACT_WEB_PROFILE_ARTIFACT_KEYS,
   renderReactWebProfileSurfaceMarkdown,
@@ -108,4 +109,42 @@ test("React Web profile surface command writes bounded JSON and Markdown reports
   assert.deepEqual(fileEvidence, stdoutEvidence);
   assert.match(markdown, /# React Web profile surface/);
   assert.match(markdown, /Top-level context reduction claim widened: no/);
+});
+
+
+test("React Web profile surface contract fails closed on artifact drift", () => {
+  assert.throws(
+    () =>
+      assertReactWebProfileSurfaceContract({
+        schemaVersion: "react-web-profile-surface.v1",
+        profile: "react-web",
+        artifacts: { context: {} },
+        summary: {
+          artifactCount: 1,
+          artifactKeys: ["context"],
+        },
+      }),
+    /artifact keys changed/,
+  );
+
+  assert.throws(
+    () =>
+      assertReactWebProfileSurfaceContract({
+        schemaVersion: "react-web-profile-surface.v1",
+        profile: "react-web",
+        artifacts: {
+          context: {},
+          reuse: {},
+          overCachingAudit: {},
+          stability: {},
+          mixedRouting: {},
+          knowledgeContext: {},
+        },
+        summary: {
+          artifactCount: 5,
+          artifactKeys: REACT_WEB_PROFILE_ARTIFACT_KEYS,
+        },
+      }),
+    /artifactCount changed/,
+  );
 });
