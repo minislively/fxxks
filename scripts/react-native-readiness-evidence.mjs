@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
 
-export const RN_READINESS_SLOT_ORDER = ["F1", "F13", "F2", "F9", "F10"];
+export const RN_READINESS_SLOT_ORDER = ["F1", "F13", "F14", "F2", "F9", "F10"];
 
 function readSelectedManifestRows(repoRoot) {
   const manifestPath = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "manifest.json");
