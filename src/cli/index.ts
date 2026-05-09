@@ -639,7 +639,7 @@ Everyday commands:
   ${displayCliName} doctor [codex|claude] [--json]
       Read-only local setup and runtime hook readiness diagnostics.
 
-  ${displayCliName} run <prompt>
+  ${displayCliName} run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
   ${displayCliName} inspect evidence <id> [--json]
@@ -1120,13 +1120,19 @@ async function run(): Promise<void> {
       return;
     }
     case "run": {
-      const { runTask } = await import("./run.js");
-      const prompt = rest.join(" ");
-      if (!prompt) {
-        console.error("Usage: fooks run <prompt>");
+      const { parseRunCliArgs, runTask } = await import("./run.js");
+      let options: ReturnType<typeof parseRunCliArgs>;
+      try {
+        options = parseRunCliArgs(rest);
+      } catch (error) {
+        console.error(`fooks run: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
-      const result = await runTask({ prompt });
+      if (!options.prompt) {
+        console.error("Usage: fooks run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>");
+        process.exit(1);
+      }
+      const result = await runTask(options);
       if (result.success) {
         console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, processed ${result.filesProcessed} files, estimated extraction opportunity ${result.reductionPercent}%`);
       } else {
