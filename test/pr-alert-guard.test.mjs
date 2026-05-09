@@ -186,3 +186,14 @@ test("PR alert guard treats already merged pruned dogfood runtime cleanup as no-
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("PR alert disambiguation docs reference an existing package script", () => {
+  const doc = fs.readFileSync(path.join(repoRoot, "docs", "pr-alert-disambiguation.md"), "utf8");
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  const referencedScripts = [...doc.matchAll(/npm run --silent ([^\s]+)/g)].map((match) => match[1]);
+
+  assert.deepEqual(referencedScripts, ["pr:alerts", "pr:alerts"]);
+  for (const script of referencedScripts) {
+    assert.ok(pkg.scripts[script], `docs reference missing npm script: ${script}`);
+  }
+});
