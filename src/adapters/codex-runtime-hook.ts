@@ -20,9 +20,9 @@ import {
   initializeSessionMetricSummarySafe,
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
-import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
-import { emitReactWebEvidenceArtifact } from "../core/react-web-evidence-artifact";
-import { buildReactWebActivationModeFromRuntimeDecision, summarizeReactWebActivationMode } from "../core/react-web-activation-mode";
+import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../reporting/worktree-evidence";
+import { emitReactWebEvidenceArtifact } from "../reporting/react-web-evidence-artifact";
+import { buildReactWebActivationModeFromRuntimeDecision, summarizeReactWebActivationMode } from "../reporting/react-web-activation-mode";
 
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);

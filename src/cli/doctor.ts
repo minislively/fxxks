@@ -8,10 +8,10 @@ import { runtimeManifestPath } from "../adapters/shared";
 import { CacheMonitor } from "../core/cache-monitor";
 import { adapterDir, canonicalProjectDataDir } from "../core/paths";
 import { discoverProjectFiles } from "../core/discover";
-import { readReactWebActivationMode, type ReactWebActivationModeResult, type ReactWebActivationPromotedTrigger, type ReactWebActivationVerdict } from "../core/react-web-activation-mode";
-import { readReactWebStatus } from "../core/react-web-status";
+import { readReactWebActivationMode, type ReactWebActivationModeResult, type ReactWebActivationPromotedTrigger, type ReactWebActivationVerdict } from "../reporting/react-web-activation-mode";
+import { readReactWebStatus } from "../reporting/react-web-status";
 import { discoverSetupEligibleSources } from "../core/setup-eligibility";
-import { currentWorktreeEvidenceStatus, WORKTREE_BRANCH_DIVERGENCE_SOURCE } from "../core/worktree-evidence";
+import { currentWorktreeEvidenceStatus, WORKTREE_BRANCH_DIVERGENCE_SOURCE } from "../reporting/worktree-evidence";
 
 export type DoctorTarget = "all" | "codex" | "claude";
 export type DoctorRuntime = "core" | "codex" | "claude";

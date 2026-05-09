@@ -1270,7 +1270,7 @@ async function run(): Promise<void> {
     case "inspect": {
       if (arg1 === "evidence") {
         const { id, json } = parseInspectEvidenceArgs(rest.slice(1));
-        const { readReactWebEvidenceArtifact, renderReactWebEvidenceArtifactMarkdown } = await import("../core/react-web-evidence-artifact.js");
+        const { readReactWebEvidenceArtifact, renderReactWebEvidenceArtifactMarkdown } = await import("../reporting/react-web-evidence-artifact.js");
         const artifact = readReactWebEvidenceArtifact(process.cwd(), id);
         if (json) {
           print(artifact);
@@ -1281,7 +1281,7 @@ async function run(): Promise<void> {
       }
       if (arg1 === "activation-mode") {
         const { id, json } = parseInspectActivationModeArgs(rest.slice(1));
-        const { readReactWebActivationMode, renderReactWebActivationModeMarkdown } = await import("../core/react-web-activation-mode.js");
+        const { readReactWebActivationMode, renderReactWebActivationModeMarkdown } = await import("../reporting/react-web-activation-mode.js");
         const activationMode = readReactWebActivationMode(process.cwd(), id);
         if (json) {
           print(activationMode);
@@ -1292,7 +1292,7 @@ async function run(): Promise<void> {
       }
       if (arg1 === "ranked-bundle") {
         const { id, json } = parseInspectRankedBundleArgs(rest.slice(1));
-        const { readReactWebRankedBundle, renderReactWebRankedBundleMarkdown } = await import("../core/react-web-ranked-bundle.js");
+        const { readReactWebRankedBundle, renderReactWebRankedBundleMarkdown } = await import("../reporting/react-web-ranked-bundle.js");
         const bundle = readReactWebRankedBundle(process.cwd(), id);
         if (json) {
           print(bundle);
@@ -1369,13 +1369,13 @@ async function run(): Promise<void> {
         return;
       }
       if (arg1 === "worktree") {
-        const { currentWorktreeEvidenceStatus } = await import("../core/worktree-evidence.js");
+        const { currentWorktreeEvidenceStatus } = await import("../reporting/worktree-evidence.js");
         print(currentWorktreeEvidenceStatus(process.cwd()));
         return;
       }
       if (arg1 === "react-web") {
         const { json } = parseStatusReactWebArgs(rest.slice(1));
-        const { readReactWebStatus, renderReactWebStatusText } = await import("../core/react-web-status.js");
+        const { readReactWebStatus, renderReactWebStatusText } = await import("../reporting/react-web-status.js");
         const status = readReactWebStatus(process.cwd());
         if (json) {
           print(status);
@@ -1386,7 +1386,7 @@ async function run(): Promise<void> {
       }
       if (arg1 === "artifacts") {
         parseStatusArtifactsArgs(rest.slice(1));
-        const { auditArtifacts } = await import("../core/artifact-audit.js");
+        const { auditArtifacts } = await import("../ops/artifact-audit.js");
         print(auditArtifacts(process.cwd()));
         return;
       }
@@ -1397,7 +1397,7 @@ async function run(): Promise<void> {
             throw new Error(`Unexpected status activity argument: ${arg}`);
           }
         }
-        const { readOperatorActivitySnapshot } = await import("../core/operator-activity.js");
+        const { readOperatorActivitySnapshot } = await import("../ops/operator-activity.js");
         print(readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: rest.includes("--include-remote-counts") }));
         return;
       }

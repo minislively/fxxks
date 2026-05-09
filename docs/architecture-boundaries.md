@@ -20,22 +20,27 @@ The strongest bounded product path remains Codex repeated same-file React Web `.
 | Runtime adapters | Codex, Claude, and opencode integration surfaces: hook presets, runtime hook payloads, session state, trust/readiness checks, and runtime-specific handoff files. | `src/adapters/codex-runtime-hook.ts`, `src/adapters/codex-native-hook.ts`, `src/adapters/codex-hook-preset.ts`, `src/adapters/claude-runtime-hook.ts`, `src/adapters/claude-hook-preset.ts`, `src/adapters/opencode-tool-preset.ts`. | Domain maturity decisions, broad support wording, benchmark conclusions, or PR/branch operations. |
 | Pure engine / extraction core | Source scanning, extraction, hashing, mode decisions, context selection, payload formatting, cache mechanics, and schema-level source facts. | `src/core/scan.ts`, `src/core/extract.ts`, `src/core/decide.ts`, `src/core/context-policy.ts`, `src/core/payload/model-facing.ts`, `src/core/payload/readiness.ts`, `src/core/schema.ts`, `src/core/cache.ts`. | Runtime-home writes, hook installation, release notes, issue/PR triage, or provider-invoice claims. |
 | Domain support boundaries | Domain classification, domain profiles, concern profiles, and payload-policy gates that decide whether source evidence may affect a model-facing packet. | `src/core/domain-detector.ts`, `src/core/domain-profiles/react-web.ts`, `src/core/domain-profiles/react-native.ts`, `src/core/domain-profiles/tui-ink.ts`, `src/core/domain-profiles/webview.ts`, `src/core/payload-policy/react-web.ts`, `src/core/payload-policy/react-native.ts`, `src/core/payload-policy/tui-ink.ts`, `src/core/payload-policy/webview.ts`, `src/core/concern-profiles/*`. | Claims that syntax evidence proves native, terminal, bridge, visual, accessibility, billing, or runtime correctness. |
-| Evidence / status / release reporting | Artifact reading/writing, freshness checks, local status summaries, release evidence reports, and claim-boundary report rendering. | `src/core/react-web-evidence-artifact.ts`, `src/core/react-web-status.ts`, `src/core/react-web-activation-mode.ts`, `src/core/react-web-ranked-bundle.ts`, `src/core/react-web-context-metadata.ts`, `src/core/worktree-evidence.ts`, `src/core/artifact-audit.ts`, `scripts/react-web-context-evidence.mjs`, `scripts/react-web-release-report-surface.mjs`, `scripts/release-benchmark-evidence.mjs`, `scripts/release-claim-guards.mjs`, `docs/benchmark-evidence.md`, `docs/release-readiness.md`. | Runtime permission to compact, domain support promotion, provider billing proof, or hook installation side effects. |
-| Ops / dogfood guard utilities | Repository maintenance, dogfood hygiene, CI/PR alert summaries, branch/worktree audit, and merge-cleanup classification. | `scripts/audit-remote-branches.mjs`, `scripts/guard-pr-alerts.mjs`, `scripts/triage-ci-alerts.mjs`, `scripts/classify-pr-merge-cleanup.mjs`, `scripts/validate-pr-merge-gate.mjs`, `docs/ci-alert-triage.md`, `docs/pr-alert-disambiguation.md`, `docs/remote-branch-audit.md`. | Product runtime behavior, support promotion, extraction policy, or user-facing setup semantics. |
+| Evidence / status / release reporting | Artifact reading/writing, freshness checks, local status summaries, release evidence reports, and claim-boundary report rendering. | `src/reporting/react-web-evidence-artifact.ts`, `src/reporting/react-web-status.ts`, `src/reporting/react-web-activation-mode.ts`, `src/reporting/react-web-ranked-bundle.ts`, `src/core/react-web-context-metadata.ts`, `src/reporting/worktree-evidence.ts`, `scripts/react-web-context-evidence.mjs`, `scripts/react-web-release-report-surface.mjs`, `scripts/release-benchmark-evidence.mjs`, `scripts/release-claim-guards.mjs`, `docs/benchmark-evidence.md`, `docs/release-readiness.md`. | Runtime permission to compact, domain support promotion, provider billing proof, or hook installation side effects. |
+| Ops / dogfood guard utilities | Repository maintenance, dogfood hygiene, CI/PR alert summaries, branch/worktree audit, and merge-cleanup classification. | `src/ops/artifact-audit.ts`, `src/ops/operator-activity.ts`, `scripts/audit-remote-branches.mjs`, `scripts/guard-pr-alerts.mjs`, `scripts/triage-ci-alerts.mjs`, `scripts/classify-pr-merge-cleanup.mjs`, `scripts/validate-pr-merge-gate.mjs`, `docs/ci-alert-triage.md`, `docs/pr-alert-disambiguation.md`, `docs/remote-branch-audit.md`. | Product runtime behavior, support promotion, extraction policy, or user-facing setup semantics. |
 
 ## Mixed-location rule
 
-Some files with evidence or status names currently live under `src/core/` because they share schemas, hashing, source fingerprints, and text rendering with the engine. That physical location does not make them runtime authority. Treat these files as reporting surfaces unless they are explicitly called by a payload-policy gate:
+Issue #676 physically separates the clearest reporting and ops implementations while retaining `src/core/*` compatibility shims. The shims preserve older deep imports; they do not make the moved surfaces runtime authority.
 
-- `src/core/react-web-evidence-artifact.ts`
-- `src/core/react-web-status.ts`
-- `src/core/react-web-activation-mode.ts`
-- `src/core/react-web-ranked-bundle.ts`
-- `src/core/worktree-evidence.ts`
-- `src/core/artifact-audit.ts`
-- `src/core/operator-activity.ts`
+Reporting/evidence/status implementations now live under `src/reporting/`:
 
-A future move into folders such as `src/reporting/` or `src/ops/` can be useful only when it has a reviewer-readable reason, stable import/export tests, and no CLI/runtime behavior change. Until then, boundary documentation and tests are the safer seam.
+- `src/reporting/react-web-evidence-artifact.ts`
+- `src/reporting/react-web-status.ts`
+- `src/reporting/react-web-activation-mode.ts`
+- `src/reporting/react-web-ranked-bundle.ts`
+- `src/reporting/worktree-evidence.ts`
+
+Ops/dogfood implementations now live under `src/ops/`:
+
+- `src/ops/artifact-audit.ts`
+- `src/ops/operator-activity.ts`
+
+Compatibility shims remain at the former `src/core/*` paths for import/export stability. Examples include `src/core/react-web-status.ts`, `src/core/react-web-evidence-artifact.ts`, `src/core/worktree-evidence.ts`, and `src/core/artifact-audit.ts`. That physical location does not make them runtime authority. Treat these files as reporting or ops surfaces unless they are explicitly called by a payload-policy gate. Future moves should still require a reviewer-readable reason, stable import/export tests, and no CLI/runtime behavior change.
 
 ## React Web first, other lanes bounded
 

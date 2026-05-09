@@ -34,9 +34,11 @@ const representativePaths = [
   "src/core/extract.ts",
   "src/core/domain-detector.ts",
   "src/core/payload-policy/react-web.ts",
+  "src/reporting/react-web-status.ts",
+  "src/reporting/react-web-evidence-artifact.ts",
+  "src/reporting/worktree-evidence.ts",
+  "src/ops/artifact-audit.ts",
   "src/core/react-web-status.ts",
-  "src/core/react-web-evidence-artifact.ts",
-  "src/core/worktree-evidence.ts",
   "src/core/artifact-audit.ts",
   "scripts/react-web-context-evidence.mjs",
   "scripts/release-claim-guards.mjs",
@@ -64,6 +66,7 @@ test("architecture boundary doc keeps evidence and ops out of runtime authority"
   const requiredBoundarySentences = [
     "Reporting surfaces summarize artifacts, freshness, claim boundaries, or release evidence. They do not authorize runtime compaction by themselves.",
     "They are not product architecture seams and must not be cited as runtime support.",
+    "Compatibility shims remain at the former `src/core/*` paths for import/export stability.",
     "That physical location does not make them runtime authority.",
   ];
 
