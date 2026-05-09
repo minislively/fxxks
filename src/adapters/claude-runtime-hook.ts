@@ -20,7 +20,7 @@ import {
   initializeSessionMetricSummarySafe,
   recordFooksSessionMetricEventSafe,
 } from "../core/session-metrics";
-import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../core/worktree-evidence";
+import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../reporting/worktree-evidence";
 
 export { CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS };
 

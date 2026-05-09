@@ -429,7 +429,7 @@ test("doctor warns for clean local tracking divergence but suppresses dirty dive
 
 test("worktree evidence implementation is read-only and keeps claim boundaries local", () => {
   const implementationFiles = [
-    path.join(repoRoot, "src", "core", "worktree-evidence.ts"),
+    path.join(repoRoot, "src", "reporting", "worktree-evidence.ts"),
     path.join(repoRoot, "src", "adapters", "codex-runtime-hook.ts"),
     path.join(repoRoot, "src", "adapters", "claude-runtime-hook.ts"),
   ];
