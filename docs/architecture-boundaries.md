@@ -23,6 +23,22 @@ The strongest bounded product path remains Codex repeated same-file React Web `.
 | Evidence / status / release reporting | Artifact reading/writing, freshness checks, local status summaries, release evidence reports, and claim-boundary report rendering. | `src/reporting/react-web-evidence-artifact.ts`, `src/reporting/react-web-status.ts`, `src/reporting/react-web-activation-mode.ts`, `src/reporting/react-web-ranked-bundle.ts`, `src/core/react-web-context-metadata.ts`, `src/reporting/worktree-evidence.ts`, `scripts/react-web-context-evidence.mjs`, `scripts/react-web-release-report-surface.mjs`, `scripts/release-benchmark-evidence.mjs`, `scripts/release-claim-guards.mjs`, `docs/benchmark-evidence.md`, `docs/release-readiness.md`. | Runtime permission to compact, domain support promotion, provider billing proof, or hook installation side effects. |
 | Ops / dogfood guard utilities | Repository maintenance, dogfood hygiene, CI/PR alert summaries, branch/worktree audit, and merge-cleanup classification. | `src/ops/artifact-audit.ts`, `src/ops/operator-activity.ts`, `scripts/audit-remote-branches.mjs`, `scripts/guard-pr-alerts.mjs`, `scripts/triage-ci-alerts.mjs`, `scripts/classify-pr-merge-cleanup.mjs`, `scripts/validate-pr-merge-gate.mjs`, `docs/ci-alert-triage.md`, `docs/pr-alert-disambiguation.md`, `docs/remote-branch-audit.md`. | Product runtime behavior, support promotion, extraction policy, or user-facing setup semantics. |
 
+## Domain-policy sublayers
+
+The domain-policy files stay in `src/core` because they are product decision layers consumed by extraction and runtime pre-read paths, not reporting or ops surfaces. Their names are intentionally narrower than a broad "frontend support" claim:
+
+| Sublayer | Current paths | Boundary reason |
+| --- | --- | --- |
+| Domain detection | `src/core/domain-detector.ts` | Reads source syntax and emits source-derived evidence plus a classification. It must not authorize compact reuse by itself. |
+| Domain profiles | `src/core/domain-profiles/*` | Defines lane maturity metadata such as current-supported, evidence-only, fallback, or deferred. Profiles describe support boundaries; they do not assemble model-facing payloads. |
+| Concern profiles | `src/core/concern-profiles/*` | Records cross-cutting concern evidence such as form state, routing, styling, and narrow RN concerns. Concern profiles are evidence-only and non-authorizing; they are never standalone domain evidence or payload permission. |
+| Payload policy | `src/core/payload-policy/*` | Converts domain detection/profile facts into an allow/deny decision and payload build options. This is the authorization seam for whether source evidence may affect a model-facing packet. |
+| Payload assembly | `src/core/payload/model-facing.ts` and `src/core/payload/domain-payload.ts` | Builds the packet from extraction facts and policy options. Assembly consumes policy; it must not invent a new support claim outside the policy gate. |
+
+The intended direction is detector/profile/concern evidence -> payload policy -> payload assembly -> runtime adapter. Runtime adapters may invoke this stack, but they do not bypass it. Reporting surfaces may summarize artifacts that come from this stack, but they do not become policy authority.
+
+Do not move or rename these domain-policy files unless the PR gives a reviewer-readable boundary reason, preserves deep-import/package-export compatibility where applicable, and includes tests proving public behavior and claim boundaries are unchanged. If the only benefit is readability, prefer this document and focused boundary tests over import churn.
+
 ## Mixed-location rule
 
 Issue #676 physically separates the clearest reporting and ops implementations while retaining `src/core/*` compatibility shims. The shims preserve older deep imports; they do not make the moved surfaces runtime authority.
