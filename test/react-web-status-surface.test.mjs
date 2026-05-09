@@ -50,6 +50,7 @@ test("status react-web reports blocked without failing when no latest evidence e
     profileGateReasons: [],
     globMatchVerdict: "unavailable",
     globMatchReasons: [],
+    promotedTrigger: null,
     deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
@@ -122,7 +123,7 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.match(cliText.stdout, /profile status: ready/);
   assert.match(cliText.stdout, /summarized=no/);
   assert.match(cliText.stdout, /profile-gate runtime gate: would-activate/);
-  assert.match(cliText.stdout, /glob-match advisory: would-activate/);
+  assert.match(cliText.stdout, /glob-match runtime gate: would-activate/);
 });
 
 test("status react-web reports blocked mixed-routing boundary from a deny artifact without failing", () => {
