@@ -73,7 +73,7 @@ const { handleClaudeRuntimeHook, CLAUDE_ADDITIONAL_CONTEXT_MAX_CHARS } = require
 const { readCodexTrustStatus } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-trust.js"));
 const { readClaudeTrustStatus } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-trust.js"));
 const { handleClaudeNativeHookPayload } = require(path.join(repoRoot, "dist", "adapters", "claude-native-hook.js"));
-const { detectRunner } = require(path.join(repoRoot, "dist", "cli", "run.js"));
+const { detectRunner, parseRunCliArgs } = require(path.join(repoRoot, "dist", "cli", "run.js"));
 const { discoverProjectFilesWithStats } = require(path.join(repoRoot, "dist", "core", "discover.js"));
 const ts = require("typescript");
 
@@ -389,6 +389,15 @@ test("detectRunner keeps codex as the compatibility fallback when no runner sign
   withEnv({ FOOKS_CODEX_HOME: codexHome, PATH: emptyBin }, () => {
     assert.equal(detectRunner(), "codex");
   });
+});
+
+test("run CLI parser keeps options separate from prompt text", () => {
+  assert.deepEqual(parseRunCliArgs(["--mode=raw", "--runner", "codex", "Please", "update", "src/components/FormSection.tsx"]), {
+    prompt: "Please update src/components/FormSection.tsx",
+    mode: "raw",
+    runner: "codex",
+  });
+  assert.throws(() => parseRunCliArgs(["--mode=unsafe", "Please", "update"]), /Unsupported run mode: unsafe/);
 });
 
 test("extract keeps small fixture raw", () => {
@@ -1932,6 +1941,21 @@ test("cli run keeps exact-file prompts to one light context file", () => {
   assert.match(context, /"contextMode":"light"/);
   assert.match(context, /## src\/components\/FormSection.tsx/);
   assert.doesNotMatch(context, /## src\/components\/SimpleButton.tsx/);
+});
+
+test("cli run parses run options without leaking them into the handoff prompt", () => {
+  const tempDir = makeTempProject();
+  const output = runText(["run", "--mode=raw", "--runner", "codex", "Please", "update", "src/components/FormSection.tsx"], tempDir);
+  assert.match(output, /Shared Handoff Context/);
+  assert.match(output, /Prompt: "Please update src\/components\/FormSection\.tsx"/);
+  assert.match(output, /estimated extraction opportunity 0%/);
+  assert.doesNotMatch(output, /--mode=raw/);
+  assert.doesNotMatch(output, /--runner/);
+
+  const context = fs.readFileSync(path.join(tempDir, ".fooks", "temp-context.md"), "utf8");
+  assert.match(context, /## src\/components\/FormSection\.tsx/);
+  assert.doesNotMatch(context, /--mode=raw/);
+  assert.doesNotMatch(context, /--runner/);
 });
 
 test("cli run gives direct no-op guidance for new or missing exact-file targets", () => {
