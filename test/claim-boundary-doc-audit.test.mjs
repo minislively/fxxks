@@ -301,6 +301,15 @@ test("current docs do not make schema-facing edit-guidance or fallback execution
   assert.deepEqual(findings, [], `forbidden schema-facing edit-guidance/fallback claims found:\n${findings.join("\n")}`);
 });
 
+test("setup docs preserve root-cwd maintenance session guard for main-sync flows", () => {
+  const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
+
+  assert.match(setup, /Root-cwd maintenance sessions need an extra operator guard/);
+  assert.match(setup, /main-sync, reset, or `fooks check` flow/);
+  assert.match(setup, /isolate that session into a disposable worktree or stop it before resetting\/syncing the root checkout/);
+  assert.match(setup, /not cleanup authority/);
+});
+
 test("claim-boundary doc audit preserves measured narrow evidence wording", () => {
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
   const contract = fs.readFileSync(path.join(repoRoot, "docs", "frontend-domain-contract.md"), "utf8");
