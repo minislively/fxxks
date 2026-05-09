@@ -783,6 +783,7 @@ test("codex runtime activates React Web payload semantics only for the React Web
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    promotedTrigger: "profile-gate",
     promoted: true,
     deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],

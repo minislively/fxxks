@@ -2197,6 +2197,68 @@ test("codex runtime hook no-ops missing exact-file targets without recording rep
   }
 });
 
+test("codex runtime hook promotes a unique basename React hint through the bounded glob-match runtime gate", () => {
+  const sessionId = `hook-file-hinted-glob-match-${Date.now()}`;
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "Please update FormSection.tsx",
+    },
+    repoRoot,
+  );
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "Again, update FormSection.tsx and keep the React context compact if safe",
+    },
+    repoRoot,
+  );
+
+  assert.equal(first.action, "record");
+  assert.equal(first.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(first.promptSpecificity, "file-hinted");
+  assert.equal(first.contextModeReason, "first-turn-file-hinted-record-only");
+
+  assert.equal(second.action, "inject");
+  assert.equal(second.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
+  assert.equal(second.promptSpecificity, "file-hinted");
+  assert.equal(second.contextModeReason, "repeated-file-hinted-react-web-payload");
+  assert.ok(second.reasons.includes("glob-match-runtime-target"));
+  assert.deepEqual(second.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "would-activate",
+    repeatedFilePositive: true,
+    profileGateVerdict: "deferred",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "freshness-current",
+      "missing-direct-file-evidence",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
+    globMatchVerdict: "would-activate",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
+    promotedTrigger: "glob-match",
+    promoted: true,
+    deferredTriggers: ["always-on", "model-decision"],
+    blockedReasons: [],
+  });
+});
+
 test("runtime hook reuses payload only on repeated same-file prompts in one session", () => {
   const sessionId = `hook-repeat-${Date.now()}`;
   const start = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
@@ -2270,6 +2332,7 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    promotedTrigger: "profile-gate",
     promoted: true,
     deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
@@ -2437,6 +2500,7 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    promotedTrigger: "profile-gate",
     promoted: true,
     deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
@@ -2528,6 +2592,7 @@ test("runtime hook fail-closes repeated React Web activation promotion when fres
       "react-web-domain-payload-present",
       "runtime-decision-fallback",
     ],
+    promotedTrigger: null,
     promoted: false,
     deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
@@ -2598,6 +2663,7 @@ test("runtime hook fail-closes repeated React Web activation promotion when prof
       "react-web-domain-payload-present",
       "runtime-decision-fallback",
     ],
+    promotedTrigger: null,
     promoted: false,
     deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],

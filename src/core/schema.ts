@@ -737,6 +737,7 @@ export type CodexRuntimeHookDecision = {
       profileGateReasons: string[];
       globMatchVerdict: "would-activate" | "deferred" | "blocked" | "unavailable";
       globMatchReasons: string[];
+      promotedTrigger?: "profile-gate" | "glob-match" | null;
       promoted: boolean;
       deferredTriggers: string[];
       blockedReasons: string[];
