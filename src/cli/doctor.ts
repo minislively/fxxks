@@ -8,6 +8,8 @@ import { runtimeManifestPath } from "../adapters/shared";
 import { CacheMonitor } from "../core/cache-monitor";
 import { adapterDir, canonicalProjectDataDir } from "../core/paths";
 import { discoverProjectFiles } from "../core/discover";
+import { readReactWebActivationMode, type ReactWebActivationModeResult, type ReactWebActivationVerdict } from "../core/react-web-activation-mode";
+import { readReactWebStatus } from "../core/react-web-status";
 import { discoverSetupEligibleSources } from "../core/setup-eligibility";
 import { currentWorktreeEvidenceStatus, WORKTREE_BRANCH_DIVERGENCE_SOURCE } from "../core/worktree-evidence";
 
@@ -31,6 +33,28 @@ export type DoctorReadiness = {
   nextAction: string;
 };
 
+export type DoctorReactWebActivationReadiness = {
+  available: boolean;
+  state: "ready" | "partial" | "blocked";
+  latestEvidenceId: string | null;
+  latestDecision: "use" | "fallback" | "deny" | null;
+  freshness: "current" | "stale" | "missing-source-file" | "unavailable";
+  claimBoundary: string;
+  repeatedFileRuntime: {
+    verdict: ReactWebActivationVerdict | "unavailable";
+    positive: boolean;
+    reasons: string[];
+  };
+  profileGateAdvisory: {
+    verdict: ReactWebActivationVerdict | "unavailable";
+    reasons: string[];
+  };
+  deferredTriggers: string[];
+  risks: string[];
+  nextAction: string;
+  readError?: string;
+};
+
 export type DoctorResult = {
   command: "doctor";
   target: DoctorTarget;
@@ -40,6 +64,7 @@ export type DoctorResult = {
   checks: DoctorCheck[];
   nextSteps: string[];
   claimBoundaries: string[];
+  reactWebActivation?: DoctorReactWebActivationReadiness;
 };
 
 export type DoctorOptions = {
@@ -562,6 +587,88 @@ function aggregateChecks(cwd: string, cliName: string): DoctorCheck[] {
   return checks;
 }
 
+function activationStateFor(verdict: ReactWebActivationVerdict | "unavailable", latestEvidenceId: string | null): DoctorReactWebActivationReadiness["state"] {
+  if (!latestEvidenceId || verdict === "blocked" || verdict === "unavailable") {
+    return "blocked";
+  }
+  if (verdict === "deferred") {
+    return "partial";
+  }
+  return "ready";
+}
+
+function activationNextAction(
+  state: DoctorReactWebActivationReadiness["state"],
+  latestEvidenceId: string | null,
+  activationMode: ReactWebActivationModeResult | null,
+): string {
+  if (!latestEvidenceId) {
+    return "Create one repeated same-file React Web Codex cycle, then rerun fooks doctor codex to inspect activation readiness.";
+  }
+  if (!activationMode) {
+    return "Inspect the latest React Web evidence artifact, then rerun fooks doctor codex.";
+  }
+  if (state === "ready") {
+    return "React Web repeated-file activation is ready on the bounded Codex lane; keep deferred triggers unchanged unless a later lane explicitly promotes them.";
+  }
+  if (activationMode.verdict === "blocked") {
+    return "Inspect the latest React Web evidence boundary blockers, fix the source-context issue if needed, and rerun fooks doctor codex.";
+  }
+  return "Review the deferred repeated-file/profile-gate reasons, address freshness or evidence gaps if appropriate, and rerun fooks doctor codex.";
+}
+
+function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationReadiness {
+  try {
+    const status = readReactWebStatus(cwd);
+    const activationMode = status.latestEvidenceId ? readReactWebActivationMode(cwd, "latest") : null;
+    const verdict = activationMode?.verdict ?? "unavailable";
+    const state = activationStateFor(verdict, status.latestEvidenceId);
+    return {
+      available: Boolean(activationMode),
+      state,
+      latestEvidenceId: status.latestEvidenceId,
+      latestDecision: status.latestDecision,
+      freshness: status.freshness.status,
+      claimBoundary: activationMode?.claimBoundary ?? status.claimBoundary,
+      repeatedFileRuntime: {
+        verdict,
+        positive: activationMode?.supportedTrigger.positive ?? false,
+        reasons: activationMode?.supportedTrigger.reasons ?? [],
+      },
+      profileGateAdvisory: {
+        verdict: activationMode?.profileGate.verdict ?? "unavailable",
+        reasons: activationMode?.profileGate.reasons ?? [],
+      },
+      deferredTriggers: activationMode?.deferredTriggers.map((item) => item.name) ?? [...status.activationMode.deferredTriggers],
+      risks: [...status.risks],
+      nextAction: activationNextAction(state, status.latestEvidenceId, activationMode),
+    };
+  } catch (error) {
+    const readError = error instanceof Error ? error.message : String(error);
+    return {
+      available: false,
+      state: "blocked",
+      latestEvidenceId: null,
+      latestDecision: null,
+      freshness: "unavailable",
+      claimBoundary: "Local React Web activation readiness only: doctor reports bounded readiness and advisory state from existing evidence/status surfaces without changing runtime behavior or widening support claims.",
+      repeatedFileRuntime: {
+        verdict: "unavailable",
+        positive: false,
+        reasons: ["activation-readiness-unavailable"],
+      },
+      profileGateAdvisory: {
+        verdict: "unavailable",
+        reasons: ["activation-readiness-unavailable"],
+      },
+      deferredTriggers: ["always-on", "glob-match", "model-decision"],
+      risks: [`unable to read React Web activation readiness: ${readError}`],
+      nextAction: "Repair the latest React Web evidence/status artifact read path, then rerun fooks doctor codex.",
+      readError,
+    };
+  }
+}
+
 function summaryFor(checks: DoctorCheck[]): DoctorResult["summary"] {
   return {
     pass: checks.filter((item) => item.status === "pass").length,
@@ -629,6 +736,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
       : aggregateChecks(cwd, cliName);
   const summary = summaryFor(checks);
   const nextSteps = unique(checks.filter((item) => item.status !== "pass").map((item) => item.fix));
+  const reactWebActivation = target === "claude" ? undefined : readReactWebActivationReadiness(cwd);
   return {
     command: "doctor",
     target,
@@ -638,6 +746,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
     checks,
     nextSteps,
     claimBoundaries: doctorClaimBoundaries(),
+    reactWebActivation,
   };
 }
 
@@ -660,6 +769,28 @@ export function formatDoctor(result: DoctorResult): string {
   }
   lines.push(`Next action: ${result.readiness.nextAction}`);
   lines.push("");
+  if (result.reactWebActivation) {
+    lines.push("React Web activation");
+    lines.push(`- state: ${result.reactWebActivation.state}`);
+    lines.push(`- latest evidence id: ${result.reactWebActivation.latestEvidenceId ?? "none"}`);
+    lines.push(`- repeated-file runtime: ${result.reactWebActivation.repeatedFileRuntime.verdict}`);
+    lines.push(`- profile-gate advisory: ${result.reactWebActivation.profileGateAdvisory.verdict}`);
+    lines.push(`- deferred triggers: ${result.reactWebActivation.deferredTriggers.join(", ")}`);
+    if (result.reactWebActivation.repeatedFileRuntime.reasons.length > 0) {
+      lines.push(`- repeated-file reasons: ${result.reactWebActivation.repeatedFileRuntime.reasons.join(", ")}`);
+    }
+    if (result.reactWebActivation.profileGateAdvisory.reasons.length > 0) {
+      lines.push(`- profile-gate reasons: ${result.reactWebActivation.profileGateAdvisory.reasons.join(", ")}`);
+    }
+    if (result.reactWebActivation.risks.length > 0) {
+      lines.push(`- risks: ${result.reactWebActivation.risks.join(", ")}`);
+    }
+    if (result.reactWebActivation.readError) {
+      lines.push(`- read error: ${result.reactWebActivation.readError}`);
+    }
+    lines.push(`- next activation action: ${result.reactWebActivation.nextAction}`);
+    lines.push("");
+  }
   lines.push("Checks");
   for (const check of result.checks) {
     lines.push(`${iconFor(check.status)} ${check.name}`);
