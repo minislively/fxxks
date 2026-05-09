@@ -2260,8 +2260,18 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    globMatchVerdict: "would-activate",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
   const runtimePayload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
@@ -2417,8 +2427,18 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    globMatchVerdict: "would-activate",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
 
@@ -2498,8 +2518,88 @@ test("runtime hook fail-closes repeated React Web activation promotion when fres
       "react-web-domain-payload-present",
       "runtime-decision-fallback",
     ],
+    globMatchVerdict: "deferred",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "evidence-strength-adjacent",
+      "file-path-glob-react-extension-match",
+      "missing-sourceFingerprint",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
     promoted: false,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
+    blockedReasons: [],
+  });
+});
+
+test("runtime hook fail-closes repeated React Web activation promotion when profile-gate planner policy is not compact-safe", () => {
+  const target = path.join("fixtures", "compressed", "FormSection.tsx");
+  const sessionId = `hook-react-web-profile-gate-fallback-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${target}`,
+    },
+    repoRoot,
+  );
+
+  const second = withPatchedCodexPreRead((decision) => {
+    if (decision?.decision === "payload" && decision.payload?.domainPayload?.domain === "react-web") {
+      return {
+        ...decision,
+        payload: {
+          ...decision.payload,
+          domainPayload: {
+            ...decision.payload.domainPayload,
+            plannerDecision: "fallback-only",
+          },
+        },
+      };
+    }
+    return decision;
+  }, () =>
+    handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      repoRoot,
+    ));
+
+  assert.equal(second.action, "fallback");
+  assert.equal(second.contextModeReason, "activation-mode-not-promoted");
+  assert.deepEqual(second.reasons, ["repeated-file", "activation-mode-not-promoted"]);
+  assert.deepEqual(second.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "deferred",
+    repeatedFilePositive: false,
+    profileGateVerdict: "deferred",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-file-evidence-present",
+      "evidence-strength-adjacent",
+      "freshness-current",
+      "planner-decision-not-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
+    globMatchVerdict: "deferred",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "evidence-strength-adjacent",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-not-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
+    promoted: false,
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
 });
