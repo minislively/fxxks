@@ -35,7 +35,7 @@ export {
   initializeWorktreeEvidenceSafe,
   readWorktreeEvidence,
   writeWorktreeEvidence,
-} from "./core/worktree-evidence";
+} from "./reporting/worktree-evidence";
 export type {
   GitPorcelainStatusCode,
   ParseWorktreeStatusOptions,
@@ -52,7 +52,7 @@ export type {
   WorktreeEvidenceResult,
   WorktreeSnapshot,
   WorktreeStatusRunner,
-} from "./core/worktree-evidence";
+} from "./reporting/worktree-evidence";
 
 export {
   ARTIFACT_AUDIT_CLAIM_BOUNDARY,
@@ -64,7 +64,7 @@ export {
   parseGitBranchList,
   parseGitWorktreePorcelain,
   parseTmuxPaneList,
-} from "./core/artifact-audit";
+} from "./ops/artifact-audit";
 export type {
   ArtifactAuditBranch,
   ArtifactAuditCommandRunner,
@@ -76,20 +76,20 @@ export type {
   ArtifactAuditStaleRuntimeCleanup,
   ArtifactAuditStatus,
   ArtifactAuditWorktree,
-} from "./core/artifact-audit";
+} from "./ops/artifact-audit";
 export {
   REACT_WEB_STATUS_CLAIM_BOUNDARY,
   REACT_WEB_STATUS_COMMAND,
   REACT_WEB_STATUS_SCHEMA_VERSION,
   readReactWebStatus,
   renderReactWebStatusText,
-} from "./core/react-web-status";
+} from "./reporting/react-web-status";
 export type {
   ReactWebBoundaryState,
   ReactWebFreshnessState,
   ReactWebProfileStatus,
   ReactWebStatusResult,
-} from "./core/react-web-status";
+} from "./reporting/react-web-status";
 export {
   REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS,
   REACT_WEB_ACTIVATION_MODE_CLAIM_BOUNDARY,
@@ -102,13 +102,13 @@ export {
   readReactWebActivationMode,
   renderReactWebActivationModeMarkdown,
   summarizeReactWebActivationMode,
-} from "./core/react-web-activation-mode";
+} from "./reporting/react-web-activation-mode";
 export type {
   ReactWebActivationDeferredTrigger,
   ReactWebActivationModeResult,
   ReactWebActivationModeSummary,
   ReactWebActivationVerdict,
-} from "./core/react-web-activation-mode";
+} from "./reporting/react-web-activation-mode";
 export {
   REACT_WEB_RANKED_BUNDLE_BUDGET_LIMIT,
   REACT_WEB_RANKED_BUNDLE_CLAIM_BOUNDARY,
@@ -119,7 +119,7 @@ export {
   readReactWebRankedBundle,
   renderReactWebRankedBundleMarkdown,
   summarizeReactWebRankedBundle,
-} from "./core/react-web-ranked-bundle";
+} from "./reporting/react-web-ranked-bundle";
 export type {
   ReactWebRankedBundleEntry,
   ReactWebRankedBundleEntryClass,
@@ -127,4 +127,4 @@ export type {
   ReactWebRankedBundleResult,
   ReactWebRankedBundleSummary,
   ReactWebRankedBundleVerdict,
-} from "./core/react-web-ranked-bundle";
+} from "./reporting/react-web-ranked-bundle";
