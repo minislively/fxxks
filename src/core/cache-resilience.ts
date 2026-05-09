@@ -89,6 +89,8 @@ export class CacheResilience {
     const indexPath = join(this.cacheDir, "index.json");
     const tempPath = `${indexPath}.tmp`;
     
+    mkdirSync(this.cacheDir, { recursive: true });
+
     // Atomic write: temp → rename
     writeFileSync(tempPath, JSON.stringify(index, null, 2));
     

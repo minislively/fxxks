@@ -42,6 +42,21 @@ test("CacheResilience: write and read valid cache", () => {
   fs.rmSync(cacheDir, { recursive: true });
 });
 
+test("CacheResilience: first write creates missing cache directory", () => {
+  const parentDir = makeTempCacheDir();
+  const cacheDir = path.join(parentDir, "missing-cache");
+  const resilience = new CacheResilience(cacheDir);
+
+  resilience.writeIndexSafe({
+    version: "1.0.0",
+    entries: { "test.ts": { hash: "xyz", timestamp: 12345, path: "/test.ts" } },
+  });
+
+  assert.equal(fs.existsSync(path.join(cacheDir, "index.json")), true);
+
+  fs.rmSync(parentDir, { recursive: true });
+});
+
 test("CacheResilience: corrupted cache returns null and regenerates", () => {
   const cacheDir = makeTempCacheDir();
   
