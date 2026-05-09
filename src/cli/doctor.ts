@@ -613,12 +613,12 @@ function activationNextAction(
     return "Inspect the latest React Web evidence artifact, then rerun fooks doctor codex.";
   }
   if (state === "ready") {
-    return "React Web repeated-file/profile-gate runtime activation is ready on the bounded Codex lane; keep glob-match advisory-only and leave deferred triggers unchanged unless a later lane explicitly promotes them.";
+    return "React Web repeated-file/profile-gate/glob-match runtime activation is ready on the bounded Codex lane; keep deferred triggers unchanged unless a later lane explicitly promotes them.";
   }
   if (activationMode.verdict === "blocked") {
     return "Inspect the latest React Web evidence boundary blockers, fix the source-context issue if needed, and rerun fooks doctor codex.";
   }
-  return "Review the deferred repeated-file/profile-gate/glob-match reasons, address freshness or evidence gaps if appropriate, and rerun fooks doctor codex.";
+  return "Review the deferred repeated-file/profile-gate/glob-match runtime reasons, address freshness or evidence gaps if appropriate, and rerun fooks doctor codex.";
 }
 
 function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationReadiness {
@@ -787,7 +787,7 @@ export function formatDoctor(result: DoctorResult): string {
     lines.push(`- latest evidence id: ${result.reactWebActivation.latestEvidenceId ?? "none"}`);
     lines.push(`- repeated-file runtime: ${result.reactWebActivation.repeatedFileRuntime.verdict}`);
     lines.push(`- profile-gate runtime gate: ${result.reactWebActivation.profileGateAdvisory.verdict}`);
-    lines.push(`- glob-match advisory: ${result.reactWebActivation.globMatchAdvisory.verdict}`);
+    lines.push(`- glob-match runtime gate: ${result.reactWebActivation.globMatchAdvisory.verdict}`);
     lines.push(`- deferred triggers: ${result.reactWebActivation.deferredTriggers.join(", ")}`);
     if (result.reactWebActivation.repeatedFileRuntime.reasons.length > 0) {
       lines.push(`- repeated-file reasons: ${result.reactWebActivation.repeatedFileRuntime.reasons.join(", ")}`);

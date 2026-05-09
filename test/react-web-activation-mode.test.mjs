@@ -145,6 +145,7 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
   assert.equal(parsed.verdict, "would-activate");
   assert.equal(parsed.profileGate.verdict, "would-activate");
   assert.equal(parsed.globMatch.verdict, "would-activate");
+  assert.equal(parsed.promotedTrigger, "profile-gate");
 });
 
 test("activation mode keeps non-repeated activation triggers explicitly deferred", () => {
@@ -171,6 +172,7 @@ test("activation mode keeps non-repeated activation triggers explicitly deferred
   assert.equal(activationMode.supportedTrigger.positive, false);
   assert.equal(activationMode.profileGate.verdict, "deferred");
   assert.equal(activationMode.globMatch.verdict, "deferred");
+  assert.equal(activationMode.globMatch.reasons.includes("freshness-stale"), true);
   assert.deepEqual(
     activationMode.deferredTriggers.map((item) => item.name),
     [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
@@ -204,6 +206,40 @@ test("activation mode requires bounded profile-gate evidence before reporting ru
   assert.equal(activationMode.verdict, "deferred");
   assert.ok(activationMode.profileGate.reasons.includes("evidence-strength-adjacent"));
   assert.ok(activationMode.globMatch.reasons.includes("evidence-strength-adjacent"));
+});
+
+test("activation mode allows glob-match runtime promotion without exact-file evidence", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-activation-glob-runtime-"));
+  fs.mkdirSync(path.join(tempDir, "src", "components"), { recursive: true });
+  const source = "export function FormSection() { return null; }\n";
+  fs.writeFileSync(path.join(tempDir, "src", "components", "FormSection.tsx"), source);
+
+  const currentFingerprint = {
+    fileHash: hashText(source),
+    lineCount: 2,
+  };
+
+  const activationMode = buildReactWebActivationMode(tempDir, makeArtifact({
+    filePath: "src/components/FormSection.tsx",
+    sourceFingerprint: currentFingerprint,
+    freshness: {
+      sourceFingerprint: currentFingerprint,
+      staleWhen: ["sourceFingerprint.fileHash changes"],
+    },
+    files: [
+      {
+        path: "src/components/FormSection.tsx",
+        symbols: ["FormSection"],
+        lineRanges: ["1-2"],
+        whySelected: ["file-hinted-glob-match-target"],
+      },
+    ],
+  }));
+
+  assert.equal(activationMode.supportedTrigger.positive, true);
+  assert.equal(activationMode.profileGate.verdict, "deferred");
+  assert.equal(activationMode.globMatch.verdict, "would-activate");
+  assert.equal(activationMode.verdict, "would-activate");
 });
 
 test("runtime activation promotion does not require patchTargets when repeated React Web evidence is fresh", () => {

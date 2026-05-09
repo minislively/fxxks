@@ -115,6 +115,8 @@ function buildWhySelected(runtimeDecision: CodexRuntimeHookDecision, payload: Mo
   }
   if (runtimeDecision.promptSpecificity === "exact-file") {
     reasons.push("exact-file-prompt-target");
+  } else if (runtimeDecision.promptSpecificity === "file-hinted") {
+    reasons.push("file-hinted-glob-match-target");
   }
   if (runtimeDecision.contextModeReason) {
     reasons.push(runtimeDecision.contextModeReason);
@@ -238,7 +240,7 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
   if (runtimeDecision.hookEventName !== "UserPromptSubmit") return null;
   if (runtimeDecision.action !== "inject" && runtimeDecision.action !== "fallback") return null;
   if (!runtimeDecision.debug?.repeatedFile) return null;
-  if (runtimeDecision.promptSpecificity !== "exact-file") return null;
+  if (runtimeDecision.promptSpecificity !== "exact-file" && runtimeDecision.promptSpecificity !== "file-hinted") return null;
 
   const payload = runtimeDecision.debug.decision?.payload;
   const classification = runtimeDecision.debug.decision?.debug?.domainDetection?.classification ?? payload?.domainPayload?.domain;

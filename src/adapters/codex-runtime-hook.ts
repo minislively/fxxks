@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { decidePreRead } from "./pre-read";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
+import { discoverProjectFiles } from "../core/discover";
 import { appendProjectKnowledgeBlock, resolveProjectKnowledgeContext } from "../core/project-knowledge";
 import { buildPreReadReuseStatus } from "./codex-runtime-status";
 import { clearCodexActiveFile, ensureFreshCodexContextForTarget, markCodexAttachPrepared, markCodexReady } from "./codex-runtime-trust";
@@ -64,12 +65,16 @@ function payloadContextModeReason(
   contextMode: ContextMode,
   payload: ModelFacingPayload,
   editGuidanceIncluded: boolean,
+  promptSpecificity: ReturnType<typeof resolvePromptFileContext>["policy"]["promptSpecificity"],
 ): string {
   if (editGuidanceIncluded) return `${phase}-exact-file-edit-guidance`;
-  if (contextMode === "light-minimal") return `${phase}-exact-file-tiny-raw-original`;
+  if (contextMode === "light-minimal") {
+    return promptSpecificity === "file-hinted" ? `${phase}-file-hinted-tiny-raw-original` : `${phase}-exact-file-tiny-raw-original`;
+  }
+  const targetPrefix = promptSpecificity === "file-hinted" ? "file-hinted" : "exact-file";
   return payload.domainPayload?.domain === "react-web"
-    ? `${phase}-exact-file-react-web-payload`
-    : `${phase}-exact-file-narrow-payload`;
+    ? `${phase}-${targetPrefix}-react-web-payload`
+    : `${phase}-${targetPrefix}-narrow-payload`;
 }
 
 function minimalRuntimeReactWebContext(reactWebContext: RuntimeReactWebContext): PackedRuntimeReactWebContext {
@@ -217,6 +222,57 @@ function buildAdditionalContext(
 
 function targetEstimatedBytes(cwd: string, filePath: string): number | undefined {
   return estimateFileBytes(path.join(cwd, filePath));
+}
+
+function resolveFileHintedGlobMatchContext(
+  prompt: string,
+  cwd: string,
+): { filePath?: string; source: "prompt-target" | "none"; policy: ReturnType<typeof resolvePromptFileContext>["policy"] } {
+  const promptContext = resolvePromptFileContext(prompt, cwd, "codex-ts-js-beta");
+  const policy = promptContext.policy;
+  const hintedTarget = policy.targets[0];
+
+  if (promptContext.filePath && (!hintedTarget || hintedTarget.exists)) {
+    return promptContext;
+  }
+
+  if (
+    policy.promptSpecificity !== "exact-file" ||
+    policy.targets.length !== 1 ||
+    !hintedTarget ||
+    hintedTarget.exists ||
+    path.basename(hintedTarget.filePath) !== hintedTarget.filePath
+  ) {
+    return promptContext;
+  }
+
+  const matches = discoverProjectFiles(cwd)
+    .filter((target) => target.kind === "component")
+    .map((target) => target.filePath)
+    .filter((filePath) => path.basename(filePath).toLowerCase() === hintedTarget.filePath.toLowerCase());
+
+  if (matches.length !== 1) {
+    return promptContext;
+  }
+
+  const matchedTarget = path.relative(cwd, matches[0]) || path.basename(matches[0]);
+  return {
+    filePath: matchedTarget,
+    source: "prompt-target",
+    policy: {
+      ...policy,
+      promptSpecificity: "file-hinted",
+      selectionSource: "keyword-discovery",
+      contextMode: "light",
+      contextModeReason: "file-hinted-glob-match-target",
+      contextBudget: {
+        maxFiles: 1,
+        selectedFiles: 1,
+        totalBytes: targetEstimatedBytes(cwd, matchedTarget) ?? 0,
+        skippedFiles: 0,
+      },
+    },
+  };
 }
 
 export function isEditIntentPrompt(prompt: string): boolean {
@@ -430,7 +486,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   }
 
   const prompt = input.prompt ?? "";
-  const promptContext = resolvePromptFileContext(prompt, cwd, "codex-ts-js-beta");
+  const promptContext = resolveFileHintedGlobMatchContext(prompt, cwd);
   const target = promptContext.filePath;
   const policy = promptContext.policy;
   const escapeHatchUsed = hasFullReadEscapeHatch(prompt);
@@ -516,7 +572,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       reasons: ["first-seen-file", "context-mode:no-op"],
       statePath,
       contextMode: "no-op",
-      contextModeReason: "first-turn-exact-file-record-only",
+      contextModeReason: policy.promptSpecificity === "file-hinted" ? "first-turn-file-hinted-record-only" : "first-turn-exact-file-record-only",
       contextBudget: { ...policy.contextBudget, selectedFiles: 0, totalBytes: 0, skippedFiles: policy.contextBudget.selectedFiles },
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
@@ -596,13 +652,14 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       filePath: target,
       reasons: [
         "repeated-file",
+        ...(policy.promptSpecificity === "file-hinted" ? ["glob-match-runtime-target"] : []),
         ...(freshness.refreshed ? ["refreshed-before-attach"] : []),
         ...(editGuidanceIncluded ? ["edit-guidance-opt-in"] : []),
       ],
       statePath,
       additionalContext,
       contextMode,
-      contextModeReason: payloadContextModeReason("repeated", contextMode, decision.payload, editGuidanceIncluded),
+      contextModeReason: payloadContextModeReason("repeated", contextMode, decision.payload, editGuidanceIncluded, policy.promptSpecificity),
       contextBudget: policy.contextBudget,
       promptSpecificity: policy.promptSpecificity,
       contextPolicyVersion: policy.contextPolicyVersion,
@@ -618,7 +675,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
     if (decision.payload.domainPayload?.domain === "react-web" && !decision.payload.useOriginal) {
       const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
-      if (!activationMode || activationMode.profileGate.verdict !== "would-activate") {
+      const promoted =
+        activationMode?.profileGate.verdict === "would-activate" || activationMode?.globMatch.verdict === "would-activate";
+      if (!activationMode || !promoted) {
         const activationFallback = attachReactWebActivationDebug(
           fallbackDecision(
             hookEventName,
