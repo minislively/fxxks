@@ -20,14 +20,14 @@ const {
   REACT_WEB_EVIDENCE_ARTIFACT_PRODUCER,
   REACT_WEB_EVIDENCE_ARTIFACT_PROFILE,
   REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
-} = require(path.join(repoRoot, "dist", "core", "react-web-evidence-artifact.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "react-web-evidence-artifact.js"));
 const {
   REACT_WEB_RANKED_BUNDLE_BUDGET_LIMIT,
   REACT_WEB_RANKED_BUNDLE_SCHEMA_VERSION,
   buildReactWebRankedBundle,
   readReactWebRankedBundle,
   renderReactWebRankedBundleMarkdown,
-} = require(path.join(repoRoot, "dist", "core", "react-web-ranked-bundle.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "react-web-ranked-bundle.js"));
 
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
 

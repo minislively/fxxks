@@ -19,7 +19,7 @@ const {
   buildReactWebActivationModeFromRuntimeDecision,
   readReactWebActivationMode,
   renderReactWebActivationModeMarkdown,
-} = require(path.join(repoRoot, "dist", "core", "react-web-activation-mode.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "react-web-activation-mode.js"));
 const {
   REACT_WEB_EVIDENCE_ARTIFACT_CLAIM_BOUNDARY,
   REACT_WEB_EVIDENCE_ARTIFACT_COMPRESSION_POLICY,
@@ -28,7 +28,7 @@ const {
   REACT_WEB_EVIDENCE_ARTIFACT_PRODUCER,
   REACT_WEB_EVIDENCE_ARTIFACT_PROFILE,
   REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
-} = require(path.join(repoRoot, "dist", "core", "react-web-evidence-artifact.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "react-web-evidence-artifact.js"));
 const { hashText } = require(path.join(repoRoot, "dist", "core", "hash.js"));
 
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");

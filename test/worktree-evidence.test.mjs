@@ -23,7 +23,7 @@ const {
   finalizeWorktreeEvidenceSafe,
   initializeWorktreeEvidenceSafe,
   readWorktreeEvidence,
-} = require(path.join(repoRoot, "dist", "core", "worktree-evidence.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "worktree-evidence.js"));
 const { sessionWorktreeEvidencePath } = require(path.join(repoRoot, "dist", "core", "paths.js"));
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const { handleClaudeRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "claude-runtime-hook.js"));
