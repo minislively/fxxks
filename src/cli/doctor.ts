@@ -49,6 +49,10 @@ export type DoctorReactWebActivationReadiness = {
     verdict: ReactWebActivationVerdict | "unavailable";
     reasons: string[];
   };
+  globMatchAdvisory: {
+    verdict: ReactWebActivationVerdict | "unavailable";
+    reasons: string[];
+  };
   deferredTriggers: string[];
   risks: string[];
   nextAction: string;
@@ -609,12 +613,12 @@ function activationNextAction(
     return "Inspect the latest React Web evidence artifact, then rerun fooks doctor codex.";
   }
   if (state === "ready") {
-    return "React Web repeated-file activation is ready on the bounded Codex lane; keep deferred triggers unchanged unless a later lane explicitly promotes them.";
+    return "React Web repeated-file/profile-gate runtime activation is ready on the bounded Codex lane; keep glob-match advisory-only and leave deferred triggers unchanged unless a later lane explicitly promotes them.";
   }
   if (activationMode.verdict === "blocked") {
     return "Inspect the latest React Web evidence boundary blockers, fix the source-context issue if needed, and rerun fooks doctor codex.";
   }
-  return "Review the deferred repeated-file/profile-gate reasons, address freshness or evidence gaps if appropriate, and rerun fooks doctor codex.";
+  return "Review the deferred repeated-file/profile-gate/glob-match reasons, address freshness or evidence gaps if appropriate, and rerun fooks doctor codex.";
 }
 
 function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationReadiness {
@@ -639,6 +643,10 @@ function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationR
         verdict: activationMode?.profileGate.verdict ?? "unavailable",
         reasons: activationMode?.profileGate.reasons ?? [],
       },
+      globMatchAdvisory: {
+        verdict: activationMode?.globMatch.verdict ?? "unavailable",
+        reasons: activationMode?.globMatch.reasons ?? [],
+      },
       deferredTriggers: activationMode?.deferredTriggers.map((item) => item.name) ?? [...status.activationMode.deferredTriggers],
       risks: [...status.risks],
       nextAction: activationNextAction(state, status.latestEvidenceId, activationMode),
@@ -661,7 +669,11 @@ function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationR
         verdict: "unavailable",
         reasons: ["activation-readiness-unavailable"],
       },
-      deferredTriggers: ["always-on", "glob-match", "model-decision"],
+      globMatchAdvisory: {
+        verdict: "unavailable",
+        reasons: ["activation-readiness-unavailable"],
+      },
+      deferredTriggers: ["always-on", "model-decision"],
       risks: [`unable to read React Web activation readiness: ${readError}`],
       nextAction: "Repair the latest React Web evidence/status artifact read path, then rerun fooks doctor codex.",
       readError,
@@ -775,12 +787,16 @@ export function formatDoctor(result: DoctorResult): string {
     lines.push(`- latest evidence id: ${result.reactWebActivation.latestEvidenceId ?? "none"}`);
     lines.push(`- repeated-file runtime: ${result.reactWebActivation.repeatedFileRuntime.verdict}`);
     lines.push(`- profile-gate runtime gate: ${result.reactWebActivation.profileGateAdvisory.verdict}`);
+    lines.push(`- glob-match advisory: ${result.reactWebActivation.globMatchAdvisory.verdict}`);
     lines.push(`- deferred triggers: ${result.reactWebActivation.deferredTriggers.join(", ")}`);
     if (result.reactWebActivation.repeatedFileRuntime.reasons.length > 0) {
       lines.push(`- repeated-file reasons: ${result.reactWebActivation.repeatedFileRuntime.reasons.join(", ")}`);
     }
     if (result.reactWebActivation.profileGateAdvisory.reasons.length > 0) {
       lines.push(`- profile-gate reasons: ${result.reactWebActivation.profileGateAdvisory.reasons.join(", ")}`);
+    }
+    if (result.reactWebActivation.globMatchAdvisory.reasons.length > 0) {
+      lines.push(`- glob-match reasons: ${result.reactWebActivation.globMatchAdvisory.reasons.join(", ")}`);
     }
     if (result.reactWebActivation.risks.length > 0) {
       lines.push(`- risks: ${result.reactWebActivation.risks.join(", ")}`);

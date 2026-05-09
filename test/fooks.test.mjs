@@ -2260,8 +2260,18 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    globMatchVerdict: "would-activate",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
   const runtimePayload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
@@ -2417,8 +2427,18 @@ test("runtime hook gates edit guidance to repeated exact-file edit intent prompt
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    globMatchVerdict: "would-activate",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
 
@@ -2498,8 +2518,18 @@ test("runtime hook fail-closes repeated React Web activation promotion when fres
       "react-web-domain-payload-present",
       "runtime-decision-fallback",
     ],
+    globMatchVerdict: "deferred",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "evidence-strength-adjacent",
+      "file-path-glob-react-extension-match",
+      "missing-sourceFingerprint",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
     promoted: false,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
 });
@@ -2558,8 +2588,18 @@ test("runtime hook fail-closes repeated React Web activation promotion when prof
       "react-web-domain-payload-present",
       "runtime-decision-fallback",
     ],
+    globMatchVerdict: "deferred",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "evidence-strength-adjacent",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-not-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
     promoted: false,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
 });
