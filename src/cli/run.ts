@@ -27,6 +27,49 @@ export interface RunResult {
   error?: string;
 }
 
+export function parseRunCliArgs(args: string[]): RunOptions {
+  let mode: RunOptions["mode"];
+  let runner: RunOptions["runner"];
+  const promptParts: string[] = [];
+
+  const readOptionValue = (arg: string, index: number): { value: string; consumed: number } => {
+    const equalsIndex = arg.indexOf("=");
+    if (equalsIndex >= 0) {
+      return { value: arg.slice(equalsIndex + 1), consumed: 0 };
+    }
+    const value = args[index + 1];
+    if (!value) {
+      throw new Error(`Missing value for ${arg}`);
+    }
+    return { value, consumed: 1 };
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--mode" || arg.startsWith("--mode=")) {
+      const { value, consumed } = readOptionValue(arg, index);
+      if (value !== "auto" && value !== "raw" && value !== "hybrid" && value !== "compressed") {
+        throw new Error(`Unsupported run mode: ${value}`);
+      }
+      mode = value;
+      index += consumed;
+      continue;
+    }
+    if (arg === "--runner" || arg.startsWith("--runner=")) {
+      const { value, consumed } = readOptionValue(arg, index);
+      if (value !== "auto" && value !== "codex" && value !== "claude") {
+        throw new Error(`Unsupported run runner: ${value}`);
+      }
+      runner = value;
+      index += consumed;
+      continue;
+    }
+    promptParts.push(arg);
+  }
+
+  return { prompt: promptParts.join(" "), mode, runner };
+}
+
 function shellQuote(value: string): string {
   return JSON.stringify(value);
 }
@@ -98,12 +141,16 @@ export async function runTask(options: RunOptions): Promise<RunResult> {
     for (const filePath of relevantFiles) {
       try {
         // Try compressed -> hybrid -> raw
-        let result = await tryExtract(filePath, "compressed");
+        const extractionModes: ("raw" | "hybrid" | "compressed")[] =
+          options.mode && options.mode !== "auto"
+            ? [options.mode]
+            : ["compressed", "hybrid", "raw"];
+        let result = await tryExtract(filePath, extractionModes[0]);
         if (!result.success) {
-          result = await tryExtract(filePath, "hybrid");
+          result = await tryExtract(filePath, extractionModes[1] ?? extractionModes[0]);
         }
         if (!result.success) {
-          result = await tryExtract(filePath, "raw");
+          result = await tryExtract(filePath, extractionModes[2] ?? extractionModes[0]);
         }
         
         if (result.success) {
@@ -162,9 +209,10 @@ async function tryExtract(filePath: string, mode: "raw" | "hybrid" | "compressed
   try {
     const result = extractFile(filePath);
     const metrics = decideMode(result);
+    const effectiveMode = mode === "raw" || mode === "hybrid" || mode === "compressed" ? mode : metrics.mode;
     
     // Use decideMode result to determine if extraction helped
-    const tokensSaved = metrics.useOriginal ? 0 : result.meta.rawSizeBytes * 0.5; // Estimated 50% for compressed/hybrid
+    const tokensSaved = effectiveMode === "raw" || metrics.useOriginal ? 0 : result.meta.rawSizeBytes * 0.5; // Estimated 50% for compressed/hybrid
     
     return {
       success: true,
@@ -195,13 +243,19 @@ export function detectRunner(): "codex" {
 // CLI entry - run if executed directly
 const isDirectExecution = process.argv[1]?.endsWith("run.js");
 if (isDirectExecution) {
-  const prompt = process.argv[2];
-  if (!prompt) {
-    console.error("Usage: fooks run <prompt>");
+  let options: RunOptions;
+  try {
+    options = parseRunCliArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error(`fooks run: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  if (!options.prompt) {
+    console.error("Usage: fooks run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>");
     process.exit(1);
   }
   
-  runTask({ prompt }).then(result => {
+  runTask(options).then(result => {
     if (result.success) {
       console.log(`✓ Done: ${(result.durationMs / 1000).toFixed(1)}s, processed ${result.filesProcessed} files, estimated extraction opportunity ${result.reductionPercent}%`);
     } else {
