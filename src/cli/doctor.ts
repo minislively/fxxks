@@ -8,7 +8,7 @@ import { runtimeManifestPath } from "../adapters/shared";
 import { CacheMonitor } from "../core/cache-monitor";
 import { adapterDir, canonicalProjectDataDir } from "../core/paths";
 import { discoverProjectFiles } from "../core/discover";
-import { readReactWebActivationMode, type ReactWebActivationModeResult, type ReactWebActivationVerdict } from "../core/react-web-activation-mode";
+import { readReactWebActivationMode, type ReactWebActivationModeResult, type ReactWebActivationPromotedTrigger, type ReactWebActivationVerdict } from "../core/react-web-activation-mode";
 import { readReactWebStatus } from "../core/react-web-status";
 import { discoverSetupEligibleSources } from "../core/setup-eligibility";
 import { currentWorktreeEvidenceStatus, WORKTREE_BRANCH_DIVERGENCE_SOURCE } from "../core/worktree-evidence";
@@ -53,6 +53,7 @@ export type DoctorReactWebActivationReadiness = {
     verdict: ReactWebActivationVerdict | "unavailable";
     reasons: string[];
   };
+  promotedTrigger: ReactWebActivationPromotedTrigger | null;
   deferredTriggers: string[];
   risks: string[];
   nextAction: string;
@@ -647,6 +648,7 @@ function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationR
         verdict: activationMode?.globMatch.verdict ?? "unavailable",
         reasons: activationMode?.globMatch.reasons ?? [],
       },
+      promotedTrigger: activationMode?.promotedTrigger ?? null,
       deferredTriggers: activationMode?.deferredTriggers.map((item) => item.name) ?? [...status.activationMode.deferredTriggers],
       risks: [...status.risks],
       nextAction: activationNextAction(state, status.latestEvidenceId, activationMode),
@@ -673,6 +675,7 @@ function readReactWebActivationReadiness(cwd: string): DoctorReactWebActivationR
         verdict: "unavailable",
         reasons: ["activation-readiness-unavailable"],
       },
+      promotedTrigger: null,
       deferredTriggers: ["always-on", "model-decision"],
       risks: [`unable to read React Web activation readiness: ${readError}`],
       nextAction: "Repair the latest React Web evidence/status artifact read path, then rerun fooks doctor codex.",
@@ -786,6 +789,7 @@ export function formatDoctor(result: DoctorResult): string {
     lines.push(`- state: ${result.reactWebActivation.state}`);
     lines.push(`- latest evidence id: ${result.reactWebActivation.latestEvidenceId ?? "none"}`);
     lines.push(`- repeated-file runtime: ${result.reactWebActivation.repeatedFileRuntime.verdict}`);
+    lines.push(`- promoted trigger: ${result.reactWebActivation.promotedTrigger ?? "none"}`);
     lines.push(`- profile-gate runtime gate: ${result.reactWebActivation.profileGateAdvisory.verdict}`);
     lines.push(`- glob-match runtime gate: ${result.reactWebActivation.globMatchAdvisory.verdict}`);
     lines.push(`- deferred triggers: ${result.reactWebActivation.deferredTriggers.join(", ")}`);
