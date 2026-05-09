@@ -59,6 +59,24 @@ export type ArtifactAuditStaleRuntimeCleanup = {
   manualCleanupCommands: string[];
 };
 
+export type ArtifactAuditArchiveEvidence = {
+  sourcePath: string;
+  matchType: "branch-inspected" | "remote-branch" | "title";
+  matchedRef: string;
+  lineNumber: number;
+};
+
+export type ArtifactAuditStaleClosedArtifactWorktree = {
+  path: string;
+  branch: string;
+  head?: string;
+  status: "staleClosedArtifact";
+  reasons: string[];
+  archiveEvidence: ArtifactAuditArchiveEvidence;
+  activeSessionEvidence: "no tmux panes mapped to this worktree";
+  manualCleanupCommands: [];
+};
+
 export type ArtifactAuditResult = {
   schemaVersion: typeof ARTIFACT_AUDIT_SCHEMA_VERSION;
   command: typeof ARTIFACT_AUDIT_COMMAND;
@@ -69,6 +87,7 @@ export type ArtifactAuditResult = {
   blockers: string[];
   sessions: ArtifactAuditSession[];
   staleRuntimeCleanups: ArtifactAuditStaleRuntimeCleanup[];
+  staleClosedArtifactWorktrees: ArtifactAuditStaleClosedArtifactWorktree[];
   worktrees: ArtifactAuditWorktree[];
   branches: ArtifactAuditBranch[];
   manualCleanupCommands: string[];
@@ -77,6 +96,7 @@ export type ArtifactAuditResult = {
 export type ArtifactAuditOptions = {
   runner?: ArtifactAuditCommandRunner;
   pathExists?: ArtifactAuditPathExists;
+  archiveDocsDir?: string;
   now?: () => string;
 };
 
@@ -157,6 +177,93 @@ function stalePanePaths(panes: ArtifactAuditSessionPane[]): string[] {
       .map((pane) => panePathWithoutDeletedMarker(pane.path))
       .filter(Boolean),
   );
+}
+
+function normalizeArchivedBranchRef(ref: string): string {
+  const trimmed = ref.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("refs/remotes/origin/")) return trimmed.slice("refs/remotes/origin/".length);
+  if (trimmed.startsWith("origin/")) return trimmed.slice("origin/".length);
+  if (trimmed.startsWith("refs/remotes/")) return "";
+  return normalizeBranch(trimmed) ?? trimmed;
+}
+
+function archiveEvidenceForRef(ref: string, evidence: ArtifactAuditArchiveEvidence): { branch: string; evidence: ArtifactAuditArchiveEvidence } | undefined {
+  const branch = normalizeArchivedBranchRef(ref);
+  return branch ? { branch, evidence } : undefined;
+}
+
+function archiveDocCandidates(archiveDocsDir: string): string[] {
+  try {
+    if (!fs.existsSync(archiveDocsDir)) return [];
+    return fs.readdirSync(archiveDocsDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((name) => /branch-archive.*\.md$|branch.*archive.*\.md$/iu.test(name))
+      .sort((left, right) => left.localeCompare(right))
+      .map((name) => path.join(archiveDocsDir, name));
+  } catch {
+    return [];
+  }
+}
+
+function addArchiveEvidence(index: Map<string, ArtifactAuditArchiveEvidence>, ref: string, evidence: ArtifactAuditArchiveEvidence): void {
+  const parsed = archiveEvidenceForRef(ref, evidence);
+  if (parsed && !index.has(parsed.branch)) {
+    index.set(parsed.branch, parsed.evidence);
+  }
+}
+
+function buildArchiveIndex(archiveDocsDir: string, cwd: string): Map<string, ArtifactAuditArchiveEvidence> {
+  const index = new Map<string, ArtifactAuditArchiveEvidence>();
+  for (const archiveDoc of archiveDocCandidates(archiveDocsDir)) {
+    const archiveRelativeToCwd = path.relative(cwd, archiveDoc);
+    const sourcePath = archiveRelativeToCwd && !archiveRelativeToCwd.startsWith("..") && !path.isAbsolute(archiveRelativeToCwd)
+      ? archiveRelativeToCwd
+      : path.join(path.basename(archiveDocsDir), path.basename(archiveDoc));
+    let content = "";
+    try {
+      content = fs.readFileSync(archiveDoc, "utf8");
+    } catch {
+      continue;
+    }
+    const lines = content.split(/\r?\n/u);
+
+    for (const [lineIndex, line] of lines.entries()) {
+      const inspectedMatch = line.match(/^\s*Branch inspected:\s*`([^`]+)`/iu);
+      if (inspectedMatch) {
+        addArchiveEvidence(index, inspectedMatch[1], {
+          sourcePath,
+          matchType: "branch-inspected",
+          matchedRef: inspectedMatch[1],
+          lineNumber: lineIndex + 1,
+        });
+      }
+
+      const remoteBranchMatch = line.match(/^\s*(?:[-*]\s*)?Remote branch:\s*`([^`]+)`/iu);
+      if (remoteBranchMatch) {
+        addArchiveEvidence(index, remoteBranchMatch[1], {
+          sourcePath,
+          matchType: "remote-branch",
+          matchedRef: remoteBranchMatch[1],
+          lineNumber: lineIndex + 1,
+        });
+      }
+    }
+
+    const titleIndex = lines.findIndex((line) => /^#\s+/u.test(line));
+    const title = titleIndex >= 0 ? lines[titleIndex] : "";
+    if (!/archive/iu.test(title)) continue;
+    for (const titleRef of [...title.matchAll(/`([^`]+)`/gu)].map((match) => match[1])) {
+      addArchiveEvidence(index, titleRef, {
+        sourcePath,
+        matchType: "title",
+        matchedRef: titleRef,
+        lineNumber: titleIndex + 1,
+      });
+    }
+  }
+  return index;
 }
 
 export function defaultArtifactAuditCommandRunner(command: string, args: string[], cwd: string): string {
@@ -243,7 +350,9 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
   const baseRef = resolveBaseRef(runner, cwd, blockers);
   const branchOutput = readOptional(runner, "git", ["branch", "--format=%(refname:short)"], cwd, blockers, "git branch list");
   const mergedOutput = baseRef ? readOptional(runner, "git", ["branch", "--merged", baseRef], cwd, blockers, `git branch --merged ${baseRef}`) : "";
+  const blockersBeforeTmux = blockers.length;
   const tmuxOutput = readOptional(runner, "tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"], cwd, blockers, "tmux pane list");
+  const tmuxAvailable = blockers.length === blockersBeforeTmux;
 
   const parsedWorktrees = parseGitWorktreePorcelain(worktreeOutput);
   const allBranches = parseGitBranchList(branchOutput);
@@ -329,7 +438,8 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
 
   const worktreeByPath = worktrees.filter((worktree) => worktree.exists).sort((left, right) => right.path.length - left.path.length);
   const panesBySession = new Map<string, ArtifactAuditSessionPane[]>();
-  for (const pane of parseTmuxPaneList(tmuxOutput)) {
+  const parsedPanes = parseTmuxPaneList(tmuxOutput);
+  for (const pane of parsedPanes) {
     const cleanPanePath = panePathWithoutDeletedMarker(pane.path);
     const deleted = panePathDeleted(pane.path);
     const exists = !deleted && pathExists(cleanPanePath);
@@ -399,6 +509,30 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
       manualCleanupCommands: session.manualCleanupCommands,
     }));
 
+  const paneWorktreePaths = new Set(
+    sessions.flatMap((session) => session.panes.map((pane) => pane.worktreePath).filter((worktreePath): worktreePath is string => Boolean(worktreePath))),
+  );
+  const archiveDocsDir = options.archiveDocsDir ?? path.join(currentWorktree?.path ?? cwd, "docs");
+  const archiveIndex = buildArchiveIndex(archiveDocsDir, currentWorktree?.path ?? cwd);
+  const staleClosedArtifactWorktrees: ArtifactAuditStaleClosedArtifactWorktree[] = tmuxAvailable
+    ? worktrees
+      .filter((worktree) => worktree.branch && !worktree.current && worktree.exists && !paneWorktreePaths.has(worktree.path) && archiveIndex.has(worktree.branch))
+      .map((worktree) => ({
+        path: worktree.path,
+        branch: worktree.branch as string,
+        head: worktree.head,
+        status: "staleClosedArtifact",
+        reasons: uniqueSorted([
+          "branch has local branch-archive evidence",
+          "worktree is not the current working directory",
+          "no tmux panes map to this worktree",
+        ]),
+        archiveEvidence: archiveIndex.get(worktree.branch as string) as ArtifactAuditArchiveEvidence,
+        activeSessionEvidence: "no tmux panes mapped to this worktree",
+        manualCleanupCommands: [],
+      }))
+    : [];
+
   const manualCleanupCommands = uniqueSorted([
     ...sessions.flatMap((session) => session.manualCleanupCommands),
     ...worktrees.flatMap((worktree) => worktree.manualCleanupCommands),
@@ -415,6 +549,7 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
     blockers: uniqueSorted(blockers),
     sessions,
     staleRuntimeCleanups,
+    staleClosedArtifactWorktrees,
     worktrees,
     branches,
     manualCleanupCommands,
