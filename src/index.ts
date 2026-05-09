@@ -66,6 +66,7 @@ export {
   parseTmuxPaneList,
 } from "./ops/artifact-audit";
 export type {
+  ArtifactAuditArchiveEvidence,
   ArtifactAuditBranch,
   ArtifactAuditCommandRunner,
   ArtifactAuditOptions,
@@ -73,6 +74,7 @@ export type {
   ArtifactAuditResult,
   ArtifactAuditSession,
   ArtifactAuditSessionPane,
+  ArtifactAuditStaleClosedArtifactWorktree,
   ArtifactAuditStaleRuntimeCleanup,
   ArtifactAuditStatus,
   ArtifactAuditWorktree,

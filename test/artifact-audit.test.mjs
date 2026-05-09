@@ -184,6 +184,108 @@ test("artifact audit makes stale worktree inventory actionable even when tmux is
   assert.deepEqual(result.manualCleanupCommands, [`git worktree remove '${staleWorktree}'`]);
 });
 
+test("artifact audit distinguishes stale closed-artifact worktrees from active OMX work", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-closed-artifact-docs-"));
+  const docsDir = path.join(tempDir, "docs");
+  fs.mkdirSync(docsDir);
+  fs.writeFileSync(
+    path.join(docsDir, "closed-artifact-branch-archive-681.md"),
+    [
+      "# Archive: `fooks-closed-artifact` stale branch (#681)",
+      "",
+      "## Bounded evidence",
+      "- Remote branch: `origin/fooks-closed-artifact`",
+      "",
+    ].join("\n"),
+  );
+
+  const cwd = "/repo/fooks";
+  const closedArtifactWorktree = "/home/bellman/Workspace/fooks.omx-worktrees/fooks-closed-artifact";
+  const activeWorktree = "/home/bellman/Workspace/fooks.omx-worktrees/fooks-active-omx";
+  const result = auditArtifacts(cwd, {
+    archiveDocsDir: docsDir,
+    pathExists: (target) => target === cwd || target === closedArtifactWorktree || target === activeWorktree,
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        `worktree ${closedArtifactWorktree}`,
+        "HEAD 222",
+        "branch refs/heads/fooks-closed-artifact",
+        "",
+        `worktree ${activeWorktree}`,
+        "HEAD 333",
+        "branch refs/heads/fooks-active-omx",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch --format=%(refname:short)": "main\nfooks-closed-artifact\nfooks-active-omx\n",
+      "git branch --merged origin/main": "main\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": `fooks-active\t${activeWorktree}\n`,
+    }),
+  });
+
+  assert.deepEqual(result.staleClosedArtifactWorktrees, [
+    {
+      path: closedArtifactWorktree,
+      branch: "fooks-closed-artifact",
+      head: "222",
+      status: "staleClosedArtifact",
+      reasons: [
+        "branch has local branch-archive evidence",
+        "no tmux panes map to this worktree",
+        "worktree is not the current working directory",
+      ],
+      archiveEvidence: {
+        sourcePath: path.join("docs", "closed-artifact-branch-archive-681.md"),
+        matchType: "remote-branch",
+        matchedRef: "origin/fooks-closed-artifact",
+        lineNumber: 4,
+      },
+      activeSessionEvidence: "no tmux panes mapped to this worktree",
+      manualCleanupCommands: [],
+    },
+  ]);
+  assert.equal(result.worktrees.find((item) => item.path === closedArtifactWorktree)?.status, "activeOrUnknown");
+  assert.equal(result.sessions.find((item) => item.session === "fooks-active")?.status, "activeOrUnknown");
+  assert.deepEqual(result.manualCleanupCommands, []);
+});
+
+test("artifact audit does not infer stale closed-artifact worktrees when tmux is unavailable", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-closed-artifact-no-tmux-"));
+  const docsDir = path.join(tempDir, "docs");
+  fs.mkdirSync(docsDir);
+  fs.writeFileSync(path.join(docsDir, "closed-artifact-branch-archive-682.md"), "Branch inspected: `origin/fooks-closed-artifact`\n");
+
+  const cwd = "/repo/fooks";
+  const closedArtifactWorktree = "/home/bellman/Workspace/fooks.omx-worktrees/fooks-closed-artifact";
+  const result = auditArtifacts(cwd, {
+    archiveDocsDir: docsDir,
+    pathExists: (target) => target === cwd || target === closedArtifactWorktree,
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        `worktree ${closedArtifactWorktree}`,
+        "HEAD 222",
+        "branch refs/heads/fooks-closed-artifact",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch --format=%(refname:short)": "main\nfooks-closed-artifact\n",
+      "git branch --merged origin/main": "main\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": new Error("tmux not installed"),
+    }),
+  });
+
+  assert.deepEqual(result.staleClosedArtifactWorktrees, []);
+  assert.ok(result.blockers.some((blocker) => blocker.includes("tmux pane list unavailable")));
+});
+
 test("artifact audit marks stale runtime tmux sessions with deleted panes as cleanup candidates", () => {
   const cwd = "/repo/fooks";
   const staleRuntimeWorktree = "/repo/fooks/fooks.omx-worktrees/fooks-codex-exec-test";
