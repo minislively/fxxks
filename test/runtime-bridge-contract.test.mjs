@@ -773,8 +773,18 @@ test("codex runtime activates React Web payload semantics only for the React Web
       "react-web-domain-payload-present",
       "runtime-decision-use",
     ],
+    globMatchVerdict: "would-activate",
+    globMatchReasons: [
+      "current-supported-lane-claim",
+      "direct-evidence-strength",
+      "file-path-glob-react-extension-match",
+      "freshness-current",
+      "planner-decision-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-use",
+    ],
     promoted: true,
-    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    deferredTriggers: ["always-on", "model-decision"],
     blockedReasons: [],
   });
 

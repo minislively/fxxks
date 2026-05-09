@@ -124,6 +124,8 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
   assert.equal(activationMode.supportedTrigger.positive, true);
   assert.equal(activationMode.profileGate.name, "profile-gate");
   assert.equal(activationMode.profileGate.verdict, "would-activate");
+  assert.equal(activationMode.globMatch.name, "glob-match");
+  assert.equal(activationMode.globMatch.verdict, "would-activate");
   assert.deepEqual(
     activationMode.deferredTriggers.map((item) => item.name),
     [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
@@ -142,6 +144,7 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
   assert.equal(parsed.artifactId, ref.id);
   assert.equal(parsed.verdict, "would-activate");
   assert.equal(parsed.profileGate.verdict, "would-activate");
+  assert.equal(parsed.globMatch.verdict, "would-activate");
 });
 
 test("activation mode keeps non-repeated activation triggers explicitly deferred", () => {
@@ -167,6 +170,7 @@ test("activation mode keeps non-repeated activation triggers explicitly deferred
   assert.equal(activationMode.verdict, "deferred");
   assert.equal(activationMode.supportedTrigger.positive, false);
   assert.equal(activationMode.profileGate.verdict, "deferred");
+  assert.equal(activationMode.globMatch.verdict, "deferred");
   assert.deepEqual(
     activationMode.deferredTriggers.map((item) => item.name),
     [...REACT_WEB_ACTIVATION_DEFERRED_TRIGGERS],
@@ -196,8 +200,10 @@ test("activation mode requires bounded profile-gate evidence before reporting ru
 
   assert.equal(activationMode.supportedTrigger.positive, true);
   assert.equal(activationMode.profileGate.verdict, "deferred");
+  assert.equal(activationMode.globMatch.verdict, "deferred");
   assert.equal(activationMode.verdict, "deferred");
   assert.ok(activationMode.profileGate.reasons.includes("evidence-strength-adjacent"));
+  assert.ok(activationMode.globMatch.reasons.includes("evidence-strength-adjacent"));
 });
 
 test("runtime activation promotion does not require patchTargets when repeated React Web evidence is fresh", () => {
@@ -252,6 +258,7 @@ test("runtime activation promotion does not require patchTargets when repeated R
   assert.equal(activationMode?.verdict, "would-activate");
   assert.equal(activationMode?.supportedTrigger.positive, true);
   assert.equal(activationMode?.profileGate.verdict, "would-activate");
+  assert.equal(activationMode?.globMatch.verdict, "would-activate");
 });
 
 test("activation mode fail-closes deny boundary artifacts instead of widening support", () => {
@@ -275,5 +282,6 @@ test("activation mode fail-closes deny boundary artifacts instead of widening su
   assert.equal(activationMode.verdict, "blocked");
   assert.equal(activationMode.supportedTrigger.positive, false);
   assert.equal(activationMode.profileGate.verdict, "blocked");
+  assert.equal(activationMode.globMatch.verdict, "blocked");
   assert.ok(activationMode.blockedReasons.includes("unsupported-react-native-webview-boundary"));
 });
