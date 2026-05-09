@@ -618,7 +618,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
     if (decision.payload.domainPayload?.domain === "react-web" && !decision.payload.useOriginal) {
       const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
-      if (!activationMode || activationMode.verdict !== "would-activate") {
+      if (!activationMode || activationMode.profileGate.verdict !== "would-activate") {
         const activationFallback = attachReactWebActivationDebug(
           fallbackDecision(
             hookEventName,

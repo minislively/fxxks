@@ -173,6 +173,33 @@ test("activation mode keeps non-repeated activation triggers explicitly deferred
   );
 });
 
+test("activation mode requires bounded profile-gate evidence before reporting runtime promotion", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-activation-profile-gate-"));
+  fs.mkdirSync(path.join(tempDir, "src", "components"), { recursive: true });
+  const source = "export function FormSection() { return null; }\n";
+  fs.writeFileSync(path.join(tempDir, "src", "components", "FormSection.tsx"), source);
+
+  const currentFingerprint = {
+    fileHash: hashText(source),
+    lineCount: 2,
+  };
+
+  const activationMode = buildReactWebActivationMode(tempDir, makeArtifact({
+    filePath: "src/components/FormSection.tsx",
+    sourceFingerprint: currentFingerprint,
+    freshness: {
+      sourceFingerprint: currentFingerprint,
+      staleWhen: ["sourceFingerprint.fileHash changes"],
+    },
+    evidenceStrength: "adjacent",
+  }));
+
+  assert.equal(activationMode.supportedTrigger.positive, true);
+  assert.equal(activationMode.profileGate.verdict, "deferred");
+  assert.equal(activationMode.verdict, "deferred");
+  assert.ok(activationMode.profileGate.reasons.includes("evidence-strength-adjacent"));
+});
+
 test("runtime activation promotion does not require patchTargets when repeated React Web evidence is fresh", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-activation-runtime-candidate-"));
   fs.mkdirSync(path.join(tempDir, "src", "components"), { recursive: true });

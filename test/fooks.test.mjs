@@ -2504,6 +2504,66 @@ test("runtime hook fail-closes repeated React Web activation promotion when fres
   });
 });
 
+test("runtime hook fail-closes repeated React Web activation promotion when profile-gate planner policy is not compact-safe", () => {
+  const target = path.join("fixtures", "compressed", "FormSection.tsx");
+  const sessionId = `hook-react-web-profile-gate-fallback-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${target}`,
+    },
+    repoRoot,
+  );
+
+  const second = withPatchedCodexPreRead((decision) => {
+    if (decision?.decision === "payload" && decision.payload?.domainPayload?.domain === "react-web") {
+      return {
+        ...decision,
+        payload: {
+          ...decision.payload,
+          domainPayload: {
+            ...decision.payload.domainPayload,
+            plannerDecision: "fallback-only",
+          },
+        },
+      };
+    }
+    return decision;
+  }, () =>
+    handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      repoRoot,
+    ));
+
+  assert.equal(second.action, "fallback");
+  assert.equal(second.contextModeReason, "activation-mode-not-promoted");
+  assert.deepEqual(second.reasons, ["repeated-file", "activation-mode-not-promoted"]);
+  assert.deepEqual(second.debug.reactWebActivationMode, {
+    available: true,
+    verdict: "deferred",
+    repeatedFilePositive: false,
+    profileGateVerdict: "deferred",
+    profileGateReasons: [
+      "current-supported-lane-claim",
+      "direct-file-evidence-present",
+      "evidence-strength-adjacent",
+      "freshness-current",
+      "planner-decision-not-compact-safe",
+      "react-web-domain-payload-present",
+      "runtime-decision-fallback",
+    ],
+    promoted: false,
+    deferredTriggers: ["always-on", "glob-match", "model-decision"],
+    blockedReasons: [],
+  });
+});
+
 test("bare status reports fast estimated session savings without exposing session contribution internals", () => {
   const tempDir = makeTempProject();
   const empty = run(["status"], tempDir);

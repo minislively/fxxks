@@ -306,7 +306,7 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
     `- project-knowledge boundary: ${status.boundaryStatus.projectKnowledge.status}`,
     `- freshness: ${status.freshness.status}`,
     `- activation mode: ${status.activationMode.verdict} (repeated-file positive=${status.activationMode.repeatedFilePositive ? "yes" : "no"})`,
-    `- profile-gate advisory: ${status.activationMode.profileGateVerdict} (${profileGateReasons})`,
+    `- profile-gate runtime gate: ${status.activationMode.profileGateVerdict} (${profileGateReasons})`,
     `- ranked bundle: ${status.rankedBundle.verdict} (${status.rankedBundle.selectedCount}/${status.rankedBundle.budgetLimit ?? 0} selected, ${status.rankedBundle.deferredCount} deferred)`,
     "",
     "## Risks",
