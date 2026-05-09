@@ -118,7 +118,7 @@ test("status react-web reports ready from a current repeated same-file use artif
   assert.match(cliText.stdout, /React Web status/);
   assert.match(cliText.stdout, /profile status: ready/);
   assert.match(cliText.stdout, /summarized=no/);
-  assert.match(cliText.stdout, /profile-gate advisory: would-activate/);
+  assert.match(cliText.stdout, /profile-gate runtime gate: would-activate/);
 });
 
 test("status react-web reports blocked mixed-routing boundary from a deny artifact without failing", () => {

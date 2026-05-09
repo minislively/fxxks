@@ -10,9 +10,9 @@ import {
 
 export const REACT_WEB_ACTIVATION_MODE_SCHEMA_VERSION = "react-web-activation-mode.v1";
 export const REACT_WEB_ACTIVATION_MODE_COMMAND = "inspect activation-mode";
-export const REACT_WEB_ACTIVATION_MODE_MODE = "repeated-file-runtime+profile-gate-advisory";
+export const REACT_WEB_ACTIVATION_MODE_MODE = "repeated-file-runtime+profile-gate-runtime";
 export const REACT_WEB_ACTIVATION_MODE_CLAIM_BOUNDARY =
-  "Local React Web activation contract only: reports when bounded repeated-file React Web evidence qualifies for activation and when the bounded profile-gate policy would activate in advisory mode. This surface does not widen support claims, does not enable always-on or model-driven activation, does not auto-promote profile-gate runtime behavior, and does not promote RN/TUI/WebView or generic context-manager behavior.";
+  "Local React Web activation contract only: reports when bounded repeated-file React Web evidence qualifies for activation and when the bounded profile-gate policy qualifies for runtime promotion. This surface does not widen support claims, does not enable always-on or model-driven activation, does not promote triggers beyond the bounded Codex React Web lane, and does not promote RN/TUI/WebView or generic context-manager behavior.";
 
 export const REACT_WEB_ACTIVATION_SUPPORTED_TRIGGER = "repeated-file";
 export const REACT_WEB_ACTIVATION_PROFILE_GATE_TRIGGER = "profile-gate";
@@ -63,6 +63,12 @@ export type ReactWebActivationModeSummary = {
   deferredTriggers: ReactWebActivationDeferredTrigger[];
   blockedReasons: string[];
 };
+
+function profileGatePromotable(activationMode: {
+  profileGate: { verdict: ReactWebActivationVerdict };
+}): boolean {
+  return activationMode.profileGate.verdict === "would-activate";
+}
 
 function uniqueSorted(values: Iterable<string>): string[] {
   return [...new Set([...values].filter(Boolean))].sort((left, right) => left.localeCompare(right));
@@ -222,7 +228,7 @@ export function buildReactWebActivationMode(cwd: string, artifact: ReactWebEvide
   const verdict: ReactWebActivationVerdict =
     blockedReasons.length > 0 || artifact.decision === "deny"
       ? "blocked"
-      : positive
+      : profileGatePromotable({ profileGate })
         ? "would-activate"
         : "deferred";
 
@@ -304,5 +310,5 @@ export function renderReactWebActivationModeMarkdown(activationMode: ReactWebAct
     : "- none";
   const profileGateReasons = activationMode.profileGate.reasons.map((reason) => `- ${reason}`).join("\n");
 
-  return `# React Web activation mode\n\n${activationMode.claimBoundary}\n\n## Summary\n\n- artifact id: ${activationMode.artifactId}\n- file: ${activationMode.filePath}\n- mode: ${activationMode.mode}\n- verdict: ${activationMode.verdict}\n- runtime decision: ${activationMode.runtimeDecision}\n- evidence strength: ${activationMode.evidenceStrength}\n- repeated-file positive: ${activationMode.supportedTrigger.positive ? "yes" : "no"}\n- profile-gate verdict: ${activationMode.profileGate.verdict}\n\n## Supported trigger\n\n- ${activationMode.supportedTrigger.name}\n${reasons}\n\n## Advisory profile-gate\n\n- ${activationMode.profileGate.name}\n${profileGateReasons}\n\n## Deferred triggers\n\n${deferred}\n\n## Blocked reasons\n\n${blockedReasons}\n`;
+  return `# React Web activation mode\n\n${activationMode.claimBoundary}\n\n## Summary\n\n- artifact id: ${activationMode.artifactId}\n- file: ${activationMode.filePath}\n- mode: ${activationMode.mode}\n- verdict: ${activationMode.verdict}\n- runtime decision: ${activationMode.runtimeDecision}\n- evidence strength: ${activationMode.evidenceStrength}\n- repeated-file positive: ${activationMode.supportedTrigger.positive ? "yes" : "no"}\n- profile-gate verdict: ${activationMode.profileGate.verdict}\n\n## Supported trigger\n\n- ${activationMode.supportedTrigger.name}\n${reasons}\n\n## Profile-gate runtime gate\n\n- ${activationMode.profileGate.name}\n${profileGateReasons}\n\n## Deferred triggers\n\n${deferred}\n\n## Blocked reasons\n\n${blockedReasons}\n`;
 }

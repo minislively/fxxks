@@ -774,7 +774,7 @@ export function formatDoctor(result: DoctorResult): string {
     lines.push(`- state: ${result.reactWebActivation.state}`);
     lines.push(`- latest evidence id: ${result.reactWebActivation.latestEvidenceId ?? "none"}`);
     lines.push(`- repeated-file runtime: ${result.reactWebActivation.repeatedFileRuntime.verdict}`);
-    lines.push(`- profile-gate advisory: ${result.reactWebActivation.profileGateAdvisory.verdict}`);
+    lines.push(`- profile-gate runtime gate: ${result.reactWebActivation.profileGateAdvisory.verdict}`);
     lines.push(`- deferred triggers: ${result.reactWebActivation.deferredTriggers.join(", ")}`);
     if (result.reactWebActivation.repeatedFileRuntime.reasons.length > 0) {
       lines.push(`- repeated-file reasons: ${result.reactWebActivation.repeatedFileRuntime.reasons.join(", ")}`);

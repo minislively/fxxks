@@ -68,7 +68,7 @@ test("doctor codex reports ready React Web activation readiness from a current r
   assert.equal(cliText.status, 0, cliText.stderr);
   assert.match(cliText.stdout, /React Web activation/);
   assert.match(cliText.stdout, /repeated-file runtime: would-activate/);
-  assert.match(cliText.stdout, /profile-gate advisory: would-activate/);
+  assert.match(cliText.stdout, /profile-gate runtime gate: would-activate/);
 });
 
 test("doctor codex reports partial React Web activation readiness when freshness goes stale", () => {
