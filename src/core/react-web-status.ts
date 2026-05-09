@@ -289,6 +289,9 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
   const profileGateReasons = status.activationMode.profileGateReasons.length > 0
     ? status.activationMode.profileGateReasons.join(", ")
     : "none";
+  const globMatchReasons = status.activationMode.globMatchReasons.length > 0
+    ? status.activationMode.globMatchReasons.join(", ")
+    : "none";
   return [
     "# React Web status",
     "",
@@ -307,6 +310,7 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
     `- freshness: ${status.freshness.status}`,
     `- activation mode: ${status.activationMode.verdict} (repeated-file positive=${status.activationMode.repeatedFilePositive ? "yes" : "no"})`,
     `- profile-gate runtime gate: ${status.activationMode.profileGateVerdict} (${profileGateReasons})`,
+    `- glob-match advisory: ${status.activationMode.globMatchVerdict} (${globMatchReasons})`,
     `- ranked bundle: ${status.rankedBundle.verdict} (${status.rankedBundle.selectedCount}/${status.rankedBundle.budgetLimit ?? 0} selected, ${status.rankedBundle.deferredCount} deferred)`,
     "",
     "## Risks",

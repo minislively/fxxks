@@ -38,7 +38,8 @@ test("doctor codex reports blocked React Web activation readiness without latest
   assert.equal(result.reactWebActivation.state, "blocked");
   assert.equal(result.reactWebActivation.latestEvidenceId, null);
   assert.equal(result.reactWebActivation.repeatedFileRuntime.verdict, "unavailable");
-  assert.deepEqual(result.reactWebActivation.deferredTriggers, ["always-on", "glob-match", "model-decision"]);
+  assert.equal(result.reactWebActivation.globMatchAdvisory.verdict, "unavailable");
+  assert.deepEqual(result.reactWebActivation.deferredTriggers, ["always-on", "model-decision"]);
   assert.match(result.reactWebActivation.nextAction, /Create one repeated same-file React Web Codex cycle/);
 });
 
@@ -60,6 +61,7 @@ test("doctor codex reports ready React Web activation readiness from a current r
   assert.equal(result.reactWebActivation.repeatedFileRuntime.verdict, "would-activate");
   assert.equal(result.reactWebActivation.repeatedFileRuntime.positive, true);
   assert.equal(result.reactWebActivation.profileGateAdvisory.verdict, "would-activate");
+  assert.equal(result.reactWebActivation.globMatchAdvisory.verdict, "would-activate");
 
   const cliText = spawnSync(process.execPath, [cliPath, "doctor", "codex"], {
     cwd: tempDir,
@@ -69,6 +71,7 @@ test("doctor codex reports ready React Web activation readiness from a current r
   assert.match(cliText.stdout, /React Web activation/);
   assert.match(cliText.stdout, /repeated-file runtime: would-activate/);
   assert.match(cliText.stdout, /profile-gate runtime gate: would-activate/);
+  assert.match(cliText.stdout, /glob-match advisory: would-activate/);
 });
 
 test("doctor codex reports partial React Web activation readiness when freshness goes stale", () => {
@@ -88,6 +91,7 @@ test("doctor codex reports partial React Web activation readiness when freshness
   assert.equal(result.reactWebActivation.state, "partial");
   assert.equal(result.reactWebActivation.repeatedFileRuntime.verdict, "deferred");
   assert.equal(result.reactWebActivation.profileGateAdvisory.verdict, "deferred");
+  assert.equal(result.reactWebActivation.globMatchAdvisory.verdict, "deferred");
   assert.ok(result.reactWebActivation.risks.some((risk) => /stale/.test(risk)));
 });
 
