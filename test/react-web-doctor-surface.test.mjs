@@ -13,7 +13,7 @@ const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const { runDoctor } = require(path.join(repoRoot, "dist", "cli", "doctor.js"));
-const { reactWebEvidenceArtifactsDir } = require(path.join(repoRoot, "dist", "core", "react-web-evidence-artifact.js"));
+const { reactWebEvidenceArtifactsDir } = require(path.join(repoRoot, "dist", "reporting", "react-web-evidence-artifact.js"));
 
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
 

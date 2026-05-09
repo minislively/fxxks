@@ -19,7 +19,7 @@ const {
   parseGitBranchList,
   parseGitWorktreePorcelain,
   parseTmuxPaneList,
-} = require(path.join(repoRoot, "dist", "core", "artifact-audit.js"));
+} = require(path.join(repoRoot, "dist", "ops", "artifact-audit.js"));
 
 function makeRunner(outputs, calls = []) {
   return (command, args, cwd) => {

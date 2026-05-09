@@ -21,7 +21,7 @@ const {
   OPERATOR_ACTIVITY_TMUX_COMMAND,
   parseOperatorActivityTmuxPanes,
   readOperatorActivitySnapshot,
-} = require(path.join(repoRoot, "dist", "core", "operator-activity.js"));
+} = require(path.join(repoRoot, "dist", "ops", "operator-activity.js"));
 
 function run(args, cwd, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
