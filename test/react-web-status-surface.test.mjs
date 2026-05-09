@@ -16,8 +16,8 @@ const {
   REACT_WEB_STATUS_COMMAND,
   REACT_WEB_STATUS_CLAIM_BOUNDARY,
   readReactWebStatus,
-} = require(path.join(repoRoot, "dist", "core", "react-web-status.js"));
-const { reactWebEvidenceArtifactsDir } = require(path.join(repoRoot, "dist", "core", "react-web-evidence-artifact.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "react-web-status.js"));
+const { reactWebEvidenceArtifactsDir } = require(path.join(repoRoot, "dist", "reporting", "react-web-evidence-artifact.js"));
 
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
 

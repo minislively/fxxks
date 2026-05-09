@@ -16,7 +16,7 @@ const {
   REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
   readReactWebEvidenceArtifact,
   renderReactWebEvidenceArtifactMarkdown,
-} = require(path.join(repoRoot, "dist", "core", "react-web-evidence-artifact.js"));
+} = require(path.join(repoRoot, "dist", "reporting", "react-web-evidence-artifact.js"));
 
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
 
