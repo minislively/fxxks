@@ -145,6 +145,45 @@ test("artifact audit reports conservative candidates and only manual cleanup com
   assert.ok(calls.every(([command, args]) => command !== "git" || !["fetch", "prune", "worktree remove", "branch -d"].includes(args.join(" "))));
 });
 
+test("artifact audit makes stale worktree inventory actionable even when tmux is empty", () => {
+  const cwd = "/repo/fooks";
+  const staleWorktree = "/repo/fooks.omx-worktrees/fooks-issue-670-stale-worktree-inventory";
+  const result = auditArtifacts(cwd, {
+    pathExists: (target) => target === cwd || target === staleWorktree,
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        `worktree ${staleWorktree}`,
+        "HEAD 222",
+        "branch refs/heads/fooks-issue-670-stale-worktree-inventory",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch --format=%(refname:short)": "main\nfooks-issue-670-stale-worktree-inventory\n",
+      "git branch --merged origin/main": "main\nfooks-issue-670-stale-worktree-inventory\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": "",
+    }),
+  });
+
+  assert.deepEqual(result.sessions, []);
+  assert.deepEqual(result.staleRuntimeCleanups, []);
+
+  const staleEntry = result.worktrees.find((item) => item.path === staleWorktree);
+  assert.equal(staleEntry?.status, "likelyMerged");
+  assert.deepEqual(staleEntry?.reasons, ["branch is merged into origin/main"]);
+  assert.deepEqual(staleEntry?.manualCleanupCommands, [`git worktree remove '${staleWorktree}'`]);
+
+  const staleBranch = result.branches.find((item) => item.branch === "fooks-issue-670-stale-worktree-inventory");
+  assert.equal(staleBranch?.status, "likelyMerged");
+  assert.deepEqual(staleBranch?.manualCleanupCommands, []);
+  assert.ok(staleBranch?.reasons.includes("branch is checked out in a candidate worktree; remove the worktree before deleting the branch"));
+
+  assert.deepEqual(result.manualCleanupCommands, [`git worktree remove '${staleWorktree}'`]);
+});
+
 test("artifact audit marks stale runtime tmux sessions with deleted panes as cleanup candidates", () => {
   const cwd = "/repo/fooks";
   const staleRuntimeWorktree = "/repo/fooks/fooks.omx-worktrees/fooks-codex-exec-test";
