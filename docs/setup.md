@@ -101,6 +101,8 @@ Bare `fooks status` is local telemetry only. It reads `.fooks/sessions` summarie
 
 `fooks status artifacts` is also read-only. It audits local fooks-scoped tmux panes, git worktrees, and branches against `origin/main` when available, falling back to `main`. It reports conservative statuses (`activeOrUnknown`, `likelyMerged`, `missingPath`, `candidateCleanup`) and a claim boundary that local evidence does not prove inactivity. The command never deletes anything and never runs cleanup commands. If JSON includes `manualCleanupCommands`, copy them only after verifying the PR merged and the session/worktree is inactive. Missing worktree paths only suggest `git worktree prune --dry-run`; inspect that output before deciding whether to run any real cleanup manually. If stale tmux panes still point at deleted worktree paths, `staleRuntimeCleanups` documents the safe manual order: verify inactivity, stop the tmux/OMX/Codex session, then run git worktree prune/remove follow-up only after the runtime is stopped.
 
+Root-cwd maintenance sessions need an extra operator guard before any local main-sync, reset, or `fooks check` flow runs from the repository root. If `tmux list-panes -a -F '#{session_name}\t#{pane_current_path}'` shows a fooks/OMX maintenance session whose pane is the root checkout, isolate that session into a disposable worktree or stop it before resetting/syncing the root checkout. Do not treat `fooks status activity` or `fooks status artifacts` as permission to reset a root checkout that still has a live maintenance pane; they are read-only evidence surfaces, not cleanup authority.
+
 ## 4. Compare one frontend file locally
 
 Before opening a runtime, you can inspect the local file-level estimate for a supported frontend file:
