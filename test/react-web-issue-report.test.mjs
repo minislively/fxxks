@@ -89,6 +89,21 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.ok(issue.suggestedFixIntent.length > 0);
     assert.equal(issue.suggestedAction, issue.suggestedFixIntent);
     assert.match(issue.skipReason, /human review|accessible-name copy/);
+
+    assert.ok(Array.isArray(issue.relatedContext));
+    assert.ok(issue.relatedContext.length > 0);
+    assert.ok(issue.relatedContext.length <= 3);
+    const requiredContextKeys = Object.keys(issue.relatedContext[0])
+      .filter((key) => ["kind", "reason", "confidence", "source", "action"].includes(key))
+      .sort();
+    assert.deepEqual(requiredContextKeys, ["action", "confidence", "kind", "reason", "source"]);
+    assert.equal(issue.relatedContext[0].kind, "same-file-pattern");
+    assert.equal(issue.relatedContext[0].action, "inspect-first");
+    assert.equal(issue.relatedContext[0].source, "label-preview");
+    assert.equal(issue.relatedContext[0].filePath, issue.whereToLook.filePath);
+    assert.equal(issue.relatedContext[0].line, issue.whereToLook.line);
+    assert.ok(issue.relatedContext.some((entry) => entry.kind === "test-candidate"));
+    assert.doesNotMatch(JSON.stringify(issue.relatedContext), /must-edit|auto-apply/i);
     assert.equal(issue.preview, undefined);
   }
 });
@@ -108,6 +123,9 @@ test("React Web issue report turns nearby native associations into safe preview 
     ["medium", "manual-review", "unsafe-to-auto-apply", false],
   ]);
   assert.match(report.issues[0].preview.text, /htmlFor="email"/);
+  assert.ok(report.issues.every((issue) => issue.relatedContext.length > 0));
+  assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 3));
+  assert.ok(report.issues.every((issue) => issue.relatedContext[0].action === "inspect-first"));
   assert.match(report.issues[1].skipReason, /not high-confidence deterministic evidence/);
 });
 
@@ -179,6 +197,9 @@ test("React Web issue report avoids unsafe htmlFor inference and keeps fallback 
   assert.ok(report.issues.every((issue) => issue.autoFixSafety === "unsafe-to-auto-apply"));
   assert.ok(report.issues.every((issue) => issue.skipReason));
   assert.ok(report.issues.every((issue) => issue.preview === undefined));
+  assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 3));
+  assert.ok(report.issues.every((issue) => issue.relatedContext.every((entry) => entry.action === "inspect-first")));
+  assert.doesNotMatch(JSON.stringify(report.issues.flatMap((issue) => issue.relatedContext)), /must-edit|auto-apply/i);
   assert.doesNotMatch(JSON.stringify(report), /htmlFor=/);
 });
 
@@ -193,6 +214,9 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /- fixability: safe-preview/);
   assert.match(cli.stdout, /- auto-fix safety: not-auto-applied/);
   assert.match(cli.stdout, /- suggested action:/);
+  assert.match(cli.stdout, /- inspect first:/);
+  assert.match(cli.stdout, /same-file-pattern/);
+  assert.match(cli.stdout, /test-candidate/);
   assert.match(cli.stdout, /```diff/);
   assert.doesNotMatch(cli.stdout, /Auto-apply: yes/);
 });
