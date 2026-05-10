@@ -3820,6 +3820,8 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks inspect evidence <id> \[--json\]/);
   assert.match(help, /fooks inspect activation-mode <id> \[--json\]/);
   assert.match(help, /fooks inspect ranked-bundle <id> \[--json\]/);
+  assert.match(help, /fooks inspect react-web-label-preview <file> \[--json\]/);
+  assert.match(help, /fooks inspect react-web-issues <file> \[--json\]/);
   assert.match(help, /fooks inspect-domain <file> \[--json\]/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /fooks status react-web \[--json\]/);
