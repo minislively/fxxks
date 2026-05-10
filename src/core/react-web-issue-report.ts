@@ -4,6 +4,11 @@ import {
   type ReactWebLabelPatchPreview,
   type ReactWebLabelPatchPreviewFinding,
 } from "./react-web-label-preview";
+import {
+  buildReactWebIssueRelatedContext,
+  getReactWebIssueContextMetadata,
+  type ReactWebIssueRelatedContext,
+} from "./react-web-issue-related-context";
 
 export const REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION = "react-web-issue-report.v1" as const;
 export const REACT_WEB_ISSUE_REPORT_COMMAND = "inspect react-web-issues" as const;
@@ -37,6 +42,7 @@ export type ReactWebIssueCard = {
     endLine: number;
     context: string;
   };
+  relatedContext: ReactWebIssueRelatedContext[];
   confidence: ReactWebIssueConfidence;
   fixability: ReactWebIssueFixability;
   autoFixSafety: ReactWebIssueAutoFixSafety;
@@ -141,7 +147,12 @@ function skipReasonFor(finding: ReactWebLabelPatchPreviewFinding): string {
   return "Preview skipped because generated accessible-name copy would require human review.";
 }
 
-function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFinding, index: number): ReactWebIssueCard {
+function issueCardFor(
+  filePath: string,
+  finding: ReactWebLabelPatchPreviewFinding,
+  index: number,
+  relatedContext: ReactWebIssueRelatedContext[],
+): ReactWebIssueCard {
   const isSafePreview = hasSafePreviewEvidence(finding);
   const preview = isSafePreview && finding.suggestedPatch.readOnly
     ? {
@@ -171,6 +182,7 @@ function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFindin
       endLine: finding.loc.endLine,
       context: finding.context,
     },
+    relatedContext,
     confidence: finding.confidence,
     fixability: fixabilityFor(finding),
     autoFixSafety: autoFixSafetyFor(finding),
@@ -184,7 +196,17 @@ function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFindin
 
 export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()): ReactWebIssueReport {
   const preview = buildReactWebLabelPatchPreview(filePath, cwd);
-  const issues = preview.findings.map((finding, index) => issueCardFor(preview.filePath, finding, index));
+  const contextMetadata = preview.inScope && preview.findings.length > 0
+    ? getReactWebIssueContextMetadata(preview.filePath, cwd)
+    : undefined;
+  const issues = preview.findings.map((finding, index) =>
+    issueCardFor(
+      preview.filePath,
+      finding,
+      index,
+      buildReactWebIssueRelatedContext(preview.filePath, finding, contextMetadata),
+    ),
+  );
   return {
     schemaVersion: REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
     command: REACT_WEB_ISSUE_REPORT_COMMAND,
@@ -241,6 +263,14 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
       `- context: ${issue.evidence.context}`,
     );
+    if (issue.relatedContext.length > 0) {
+      lines.push("- inspect first:");
+      for (const item of issue.relatedContext) {
+        const location = item.filePath ? ` ${item.filePath}${item.line ? `:${item.line}${item.endLine && item.endLine !== item.line ? `-${item.endLine}` : ""}` : ""}` : "";
+        const context = item.context ? ` — ${item.context}` : "";
+        lines.push(`  - ${item.kind} (${item.confidence}, ${item.source}): ${item.reason}${location}${context}`);
+      }
+    }
     if (issue.preview) {
       lines.push("", "```diff", issue.preview.text, "```");
     }
