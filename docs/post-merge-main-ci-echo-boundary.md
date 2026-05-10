@@ -13,6 +13,11 @@ new recovery, cleanup, or implementation lane from the success echo alone.
 
 ## Evidence surfaces
 
+- `fooks check --json` exposes the operator/check projection. The idle case is
+  `verdict: "idleRequiresActiveArtifact"` with
+  `requiredActiveArtifact.required: true`; the acceptable active artifacts are
+  an open GitHub issue, an open GitHub pull request, or a mapped fooks tmux
+  session.
 - `fooks status activity --include-remote-counts --json` exposes
   `currentRunEvidence`. The non-active echo case is only
   `classification: "mainEchoNonActive"` with `mainEchoEvidence: true` and
