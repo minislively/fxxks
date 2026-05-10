@@ -26,6 +26,13 @@ const {
   readOperatorActivitySnapshot,
 } = require(path.join(repoRoot, "dist", "ops", "operator-activity.js"));
 
+const {
+  OPERATOR_CHECK_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_COMMAND,
+  OPERATOR_CHECK_SOURCE,
+  readOperatorCheckSnapshot,
+} = require(path.join(repoRoot, "dist", "ops", "operator-check.js"));
+
 function run(args, cwd, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
 }
@@ -236,6 +243,94 @@ test("operator activity marks clean current main with zero counts and no session
   assert.deepEqual(snapshot.currentRunEvidence.blockers, []);
 });
 
+test("operator check forces a concrete active artifact when post-merge main echo is idle", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-10T03:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.schemaVersion, 1);
+  assert.equal(snapshot.command, OPERATOR_CHECK_COMMAND);
+  assert.equal(snapshot.claimBoundary, OPERATOR_CHECK_CLAIM_BOUNDARY);
+  assert.equal(snapshot.readOnly, true);
+  assert.equal(snapshot.source, OPERATOR_CHECK_SOURCE);
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.postMergeMainEchoBoundary.explicit, true);
+  assert.equal(snapshot.postMergeMainEchoBoundary.currentRunClassification, "mainEchoNonActive");
+  assert.equal(snapshot.postMergeMainEchoBoundary.mainEchoEvidence, true);
+  assert.equal(snapshot.postMergeMainEchoBoundary.activeWorkEvidence, false);
+  assert.equal(snapshot.postMergeMainEchoBoundary.echoOnly, true);
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.deepEqual(snapshot.requiredActiveArtifact.acceptableArtifacts, [
+    "open GitHub issue",
+    "open GitHub pull request",
+    "mapped fooks tmux session",
+  ]);
+  assert.match(snapshot.requiredActiveArtifact.message, /No concrete active issue, PR, or mapped fooks session/);
+  assert.equal(snapshot.activity.optionalCounts.enabled, true);
+  assert.equal(snapshot.activity.currentRunEvidence.mainEchoEvidence, true);
+  assert.deepEqual(snapshot.blockers, []);
+});
+
+test("operator check treats issue, PR, or mapped session as the concrete active boundary", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-10T03:10:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "dogfood/issue-705-post-merge-echo-idle-boundary\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return `fooks-705\t${tempDir}\tzsh\n`;
+      if (command === "gh" && args[0] === "issue") return "[{\"number\":705}]";
+      if (command === "gh" && args[0] === "pr") return "[{\"number\":706}]";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/dogfood/issue-705-post-merge-echo-idle-boundary", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "dogfood/issue-705-post-merge-echo-idle-boundary\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.verdict, "activeArtifactPresent");
+  assert.equal(snapshot.requiredActiveArtifact.required, false);
+  assert.deepEqual(snapshot.activeArtifacts, [
+    { kind: "issue", count: 1, source: OPERATOR_ACTIVITY_REMOTE_SOURCE },
+    { kind: "pullRequest", count: 1, source: OPERATOR_ACTIVITY_REMOTE_SOURCE },
+    { kind: "session", count: 1, source: OPERATOR_ACTIVITY_TMUX_COMMAND },
+  ]);
+  assert.equal(snapshot.postMergeMainEchoBoundary.echoOnly, false);
+});
+
 
 test("operator activity exposes bounded stale legacy closed worktree evidence for zero-count reminders", () => {
   const tempDir = makeTempProject();
@@ -444,6 +539,12 @@ test("status activity CLI route preserves existing status contracts", () => {
   const tempDir = makeTempProject();
   const before = fs.readdirSync(tempDir).sort();
 
+  const check = run(["check"], tempDir);
+  assert.equal(check.command, OPERATOR_CHECK_COMMAND);
+  assert.equal(check.readOnly, true);
+  assert.equal(check.activity.optionalCounts.enabled, true);
+  assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
+
   const activity = run(["status", "activity"], tempDir);
   assert.equal(activity.command, OPERATOR_ACTIVITY_COMMAND);
   assert.equal(activity.optionalCounts.enabled, false);
@@ -468,9 +569,18 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.equal("optionalCounts" in artifacts, false);
 
   const help = runText(["--help"], tempDir);
+  assert.match(help, /fooks check \[--json\]/);
   assert.match(help, /fooks status activity \[--include-remote-counts\]/);
 
   let output = "";
+  try {
+    runText(["check", "--unexpected"], tempDir);
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  assert.match(output, /Unexpected check argument/);
+
+  output = "";
   try {
     runText(["status", "activity", "--unexpected"], tempDir);
   } catch (error) {

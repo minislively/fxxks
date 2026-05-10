@@ -626,7 +626,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|run|scan|extract|compare|decide|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|run|scan|extract|compare|decide|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -638,6 +638,9 @@ Everyday commands:
 
   ${displayCliName} doctor [codex|claude] [--json]
       Read-only local setup and runtime hook readiness diagnostics.
+
+  ${displayCliName} check [--json]
+      Read-only operator/check artifact for post-merge main echo versus active issue/PR/session evidence.
 
   ${displayCliName} run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
@@ -1368,6 +1371,17 @@ async function run(): Promise<void> {
         return;
       }
       throw new Error("install expects 'codex-hooks', 'claude-hooks', or 'opencode-tool'");
+    }
+    case "check": {
+      const allowed = new Set(["--json"]);
+      for (const arg of rest) {
+        if (!allowed.has(arg)) {
+          throw new Error(`Unexpected check argument: ${arg}`);
+        }
+      }
+      const { readOperatorCheckSnapshot } = await import("../ops/operator-check.js");
+      print(readOperatorCheckSnapshot(process.cwd()));
+      return;
     }
     case "status": {
       if (!arg1) {
