@@ -79,13 +79,17 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.ok(issue.problem.length > 0);
     assert.ok(issue.whyItMatters.length > 0);
     assert.equal(issue.evidence.filePath, "test/fixtures/react-web-label-preview/missing-labels.tsx");
+    assert.equal(issue.whereToLook.filePath, "test/fixtures/react-web-label-preview/missing-labels.tsx");
+    assert.ok(issue.whereToLook.line > 0);
+    assert.ok(issue.whereToLook.context.length > 0);
     assert.ok(issue.evidence.line > 0);
     assert.ok(issue.evidence.context.length > 0);
     assert.ok(issue.evidence.sourceSignals.length > 0);
     assert.ok(issue.safetyRationale.length > 0);
     assert.ok(issue.suggestedFixIntent.length > 0);
-    assert.equal(issue.preview.readOnly, true);
-    assert.match(issue.preview.text, /aria-label="TODO:/);
+    assert.equal(issue.suggestedAction, issue.suggestedFixIntent);
+    assert.match(issue.skipReason, /human review|correct user-facing label text/);
+    assert.equal(issue.preview, undefined);
   }
 });
 
@@ -110,7 +114,7 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
       file: fixtures.missing,
       expectedCards: 5,
       acceptedCards: 5,
-      suggestionPlausibility: "TODO accessible-name previews are plausible but require human copy review.",
+      suggestionPlausibility: "TODO accessible-name suggestions are plausible but require human copy review, so no preview is emitted.",
     },
     {
       name: "label-association-candidates.tsx",
@@ -161,7 +165,7 @@ test("React Web issue report avoids unsafe htmlFor inference and keeps fallback 
     report,
     preview,
     acceptedCards: report.summary.issueCount,
-    suggestionPlausibility: "Unsafe nearby association is rejected; fallback aria-label TODO previews remain read-only/manual-review.",
+    suggestionPlausibility: "Unsafe nearby association is rejected; fallback aria-label TODO suggestions remain manual-review without preview.",
   });
 
   assert.equal(matrix.verdict, "pass");
@@ -169,6 +173,8 @@ test("React Web issue report avoids unsafe htmlFor inference and keeps fallback 
   assert.ok(report.summary.manualReviewCount > 0);
   assert.ok(report.issues.every((issue) => issue.fixability === "manual-review"));
   assert.ok(report.issues.every((issue) => issue.autoFixSafety === "unsafe-to-auto-apply"));
+  assert.ok(report.issues.every((issue) => issue.skipReason));
+  assert.ok(report.issues.every((issue) => issue.preview === undefined));
   assert.doesNotMatch(JSON.stringify(report), /htmlFor=/);
 });
 
@@ -179,9 +185,10 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /Read-only React Web issue report/);
   assert.match(cli.stdout, /## Issue 1:/);
   assert.match(cli.stdout, /- why:/);
-  assert.match(cli.stdout, /- file\/line:/);
+  assert.match(cli.stdout, /- where to look:/);
   assert.match(cli.stdout, /- fixability: safe-preview/);
   assert.match(cli.stdout, /- auto-fix safety: not-auto-applied/);
+  assert.match(cli.stdout, /- suggested action:/);
   assert.match(cli.stdout, /```diff/);
   assert.doesNotMatch(cli.stdout, /Auto-apply: yes/);
 });

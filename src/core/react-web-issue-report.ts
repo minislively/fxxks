@@ -31,11 +31,19 @@ export type ReactWebIssueCard = {
     sourceSignals: string[];
     element: ReactWebLabelPatchPreviewFinding["element"];
   };
+  whereToLook: {
+    filePath: string;
+    line: number;
+    endLine: number;
+    context: string;
+  };
   confidence: ReactWebIssueConfidence;
   fixability: ReactWebIssueFixability;
   autoFixSafety: ReactWebIssueAutoFixSafety;
   safetyRationale: string;
   suggestedFixIntent: string;
+  suggestedAction: string;
+  skipReason?: string;
   preview?: {
     type: "unified-diff-fragment";
     readOnly: true;
@@ -120,13 +128,16 @@ function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
 }
 
 function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFinding, index: number): ReactWebIssueCard {
-  const preview = finding.suggestedPatch.readOnly
+  const isSafePreview = fixabilityFor(finding) === "safe-preview";
+  const preview = isSafePreview && finding.suggestedPatch.readOnly
     ? {
         type: finding.suggestedPatch.type,
         readOnly: true as const,
         text: finding.suggestedPatch.preview,
       }
     : undefined;
+  const suggestedAction = suggestedFixIntentFor(finding);
+  const safetyRationale = safetyRationaleFor(finding);
   return {
     id: `react-web-label-${index + 1}`,
     kind: issueKindFor(finding),
@@ -140,11 +151,19 @@ function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFindin
       sourceSignals: finding.evidence,
       element: finding.element,
     },
+    whereToLook: {
+      filePath,
+      line: finding.loc.startLine,
+      endLine: finding.loc.endLine,
+      context: finding.context,
+    },
     confidence: finding.confidence,
     fixability: fixabilityFor(finding),
     autoFixSafety: autoFixSafetyFor(finding),
-    safetyRationale: safetyRationaleFor(finding),
-    suggestedFixIntent: suggestedFixIntentFor(finding),
+    safetyRationale,
+    suggestedFixIntent: suggestedAction,
+    suggestedAction,
+    ...(!isSafePreview ? { skipReason: safetyRationale } : {}),
     ...(preview ? { preview } : {}),
   };
 }
@@ -197,13 +216,14 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       "",
       `## Issue ${index + 1}: ${issue.problem}`,
       `- why: ${issue.whyItMatters}`,
-      `- file/line: ${issue.evidence.filePath}:${issue.evidence.line}`,
+      `- where to look: ${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
       `- element: ${issue.evidence.element}`,
       `- confidence: ${issue.confidence}`,
       `- fixability: ${issue.fixability}`,
       `- auto-fix safety: ${issue.autoFixSafety}`,
       `- safety rationale: ${issue.safetyRationale}`,
-      `- suggested fix: ${issue.suggestedFixIntent}`,
+      ...(issue.skipReason ? [`- skip reason: ${issue.skipReason}`] : []),
+      `- suggested action: ${issue.suggestedAction}`,
       `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
       `- context: ${issue.evidence.context}`,
     );

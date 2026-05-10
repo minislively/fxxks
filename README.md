@@ -1,6 +1,10 @@
 # fooks
 
-Stop paying the frontend context tax twice.
+Frontend change intelligence for React work.
+
+fooks helps frontend teams reduce the cost of feature work, migrations, refactors, and tests by mapping relevant React Web context, surfacing actionable issues, and suggesting safe previews when confidence is high.
+
+First wedge: a React Web form/a11y issue report that produces actionable issue cards and read-only safe preview candidates for deterministic native label/control associations. Ambiguous or risky cases stay as manual-review cards with skip reasons.
 
 Smaller model-facing context for repeated same-file work in Codex.
 
@@ -18,6 +22,15 @@ fooks compare src/components/Button.tsx
 
 Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
 
+To inspect the first frontend-change-intelligence wedge directly:
+
+```bash
+fooks inspect react-web-issues src/components/Form.tsx
+fooks inspect react-web-issues src/components/Form.tsx --json
+```
+
+The React Web issue report is read-only. It emits issue cards with `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`; only deterministic high-confidence native label/control associations receive preview candidates, while ambiguous or risky findings receive manual-review skip reasons.
+
 Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
 
 - Public npm package: `fxxk-frontend-hooks`
@@ -25,9 +38,10 @@ Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also 
 
 ## 30-second version
 
-Use fooks when you are iterating on the same large supported file in Codex and want to avoid repeatedly sending the full file context.
+Use fooks when you want less wasted frontend change work: actionable React Web issue cards before editing, conservative safe previews when confidence is high, and smaller model-facing context for repeated same-file Codex work.
 
 - **Best today:** Codex + repeated same-file `.tsx` / `.jsx` work.
+- **First frontend-change-intelligence wedge:** `fooks inspect react-web-issues <file> [--json]` reports narrow React Web form/a11y issue cards with safe previews only for deterministic native label/control associations.
 - **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
 - **Roadmap asks, not current support:** React Native/WebView, TUI / React CLI promotion beyond candidate / evidence-only status, Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
 - **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
