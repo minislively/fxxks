@@ -16,6 +16,8 @@ const require = createRequire(import.meta.url);
 const {
   OPERATOR_ACTIVITY_CLAIM_BOUNDARY,
   OPERATOR_ACTIVITY_COMMAND,
+  OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE,
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
   OPERATOR_ACTIVITY_REMOTE_SOURCE,
   OPERATOR_ACTIVITY_TMUX_COMMAND,
@@ -146,9 +148,92 @@ test("idle activity snapshot remains zero and read-only with opt-in remote count
     openPullRequests: 0,
     blockers: [],
   });
+  assert.deepEqual(snapshot.currentRunEvidence, {
+    available: true,
+    source: OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+    classification: "activeOrUnknown",
+    mainEchoEvidence: false,
+    activeWorkEvidence: false,
+    remoteCountsRequired: true,
+    evidence: {
+      branch: "dogfood/issue-428-idle-activity-snapshot",
+      upstream: "origin/main",
+      clean: true,
+      ahead: 0,
+      behind: 0,
+      fooksSessionCount: 0,
+      openIssues: 0,
+      openPullRequests: 0,
+      legacyStaleClosedArtifactWorktreeCount: 0,
+    },
+    reasons: [
+      "current branch is dogfood/issue-428-idle-activity-snapshot, not main",
+      "current worktree is clean",
+      "local tracking divergence is zero",
+      "no fooks-like tmux sessions are mapped to this snapshot",
+      "open issue and pull request counts are both zero",
+    ],
+    blockers: [],
+  });
   assert.deepEqual(snapshot.blockers, []);
   assert.equal(commandCalls.filter((call) => call.startsWith("gh ")).length, 2);
   assert.equal(gitCalls.some((call) => call.includes("fetch")), false);
+});
+
+test("operator activity marks clean current main with zero counts and no sessions as non-active main echo evidence", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-10T02:30:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "git" && args.join(" ") === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && args.join(" ") === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && args.join(" ") === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && args.join(" ") === "branch --merged origin/main") return "main\n";
+      throw new Error(`unexpected command ${command} ${args.join(" ")}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.currentRunEvidence.available, true);
+  assert.equal(snapshot.currentRunEvidence.source, OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE);
+  assert.equal(snapshot.currentRunEvidence.claimBoundary, OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY);
+  assert.equal(snapshot.currentRunEvidence.classification, "mainEchoNonActive");
+  assert.equal(snapshot.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.currentRunEvidence.activeWorkEvidence, false);
+  assert.equal(snapshot.currentRunEvidence.remoteCountsRequired, true);
+  assert.deepEqual(snapshot.currentRunEvidence.evidence, {
+    branch: "main",
+    upstream: "origin/main",
+    clean: true,
+    ahead: 0,
+    behind: 0,
+    fooksSessionCount: 0,
+    openIssues: 0,
+    openPullRequests: 0,
+    legacyStaleClosedArtifactWorktreeCount: 0,
+  });
+  assert.deepEqual(snapshot.currentRunEvidence.reasons, [
+    "current branch is main",
+    "current worktree is clean",
+    "local tracking divergence is zero",
+    "no fooks-like tmux sessions are mapped to this snapshot",
+    "open issue and pull request counts are both zero",
+  ]);
+  assert.deepEqual(snapshot.currentRunEvidence.blockers, []);
 });
 
 
@@ -220,6 +305,15 @@ test("operator activity exposes bounded stale legacy closed worktree evidence fo
   assert.equal(snapshot.legacyWorktreeEvidence.omittedEntryCount, 0);
   assert.equal(snapshot.legacyWorktreeEvidence.cleanupCommandsIncluded, false);
   assert.deepEqual(snapshot.legacyWorktreeEvidence.blockers, []);
+  assert.equal(snapshot.currentRunEvidence.classification, "mainEchoNonActive");
+  assert.equal(snapshot.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.currentRunEvidence.activeWorkEvidence, false);
+  assert.equal(snapshot.currentRunEvidence.evidence.legacyStaleClosedArtifactWorktreeCount, 1);
+  assert.ok(
+    snapshot.currentRunEvidence.reasons.includes(
+      "legacy closed-artifact worktree evidence is separated from active current-run evidence",
+    ),
+  );
   assert.deepEqual(snapshot.legacyWorktreeEvidence.entries, [
     {
       path: staleWorktree,

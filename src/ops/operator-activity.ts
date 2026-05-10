@@ -25,6 +25,9 @@ export const OPERATOR_ACTIVITY_REMOTE_SOURCE = "GitHub CLI gh issue/pr list; exp
 export const DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS = 1000;
 export const DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS = 1500;
 export const OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT = 5;
+export const OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE = "status activity current-run dogfood reminder";
+export const OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY =
+  "Current-run operator reminder evidence only; read-only, bounded to this snapshot, and not cleanup authority or runtime/provider behavior.";
 
 export type OperatorActivityCommandRunner = (command: string, args: string[], cwd: string, timeoutMs: number) => string;
 export type OperatorActivityPathExists = (targetPath: string) => boolean;
@@ -119,6 +122,31 @@ export type OperatorActivityRemoteCounts =
       blockers: string[];
     };
 
+export type OperatorActivityCurrentRunClassification = "mainEchoNonActive" | "activeOrUnknown";
+
+export type OperatorActivityCurrentRunEvidence = {
+  available: boolean;
+  source: typeof OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE;
+  claimBoundary: typeof OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY;
+  classification: OperatorActivityCurrentRunClassification;
+  mainEchoEvidence: boolean;
+  activeWorkEvidence: boolean;
+  remoteCountsRequired: true;
+  evidence: {
+    branch?: string;
+    upstream?: string;
+    clean: boolean | null;
+    ahead?: number;
+    behind?: number;
+    fooksSessionCount: number;
+    openIssues?: number;
+    openPullRequests?: number;
+    legacyStaleClosedArtifactWorktreeCount: number;
+  };
+  reasons: string[];
+  blockers: string[];
+};
+
 export type OperatorActivitySnapshot = {
   schemaVersion: typeof OPERATOR_ACTIVITY_SCHEMA_VERSION;
   command: typeof OPERATOR_ACTIVITY_COMMAND;
@@ -130,6 +158,7 @@ export type OperatorActivitySnapshot = {
   tmux: OperatorActivityTmux;
   optionalCounts: OperatorActivityRemoteCounts;
   legacyWorktreeEvidence: OperatorActivityLegacyWorktreeEvidence;
+  currentRunEvidence: OperatorActivityCurrentRunEvidence;
   blockers: string[];
 };
 
@@ -409,6 +438,75 @@ function readRemoteCounts(cwd: string, options: OperatorActivityOptions): Operat
   };
 }
 
+function buildCurrentRunEvidence(
+  worktree: OperatorActivityWorktree,
+  tmux: OperatorActivityTmux,
+  optionalCounts: OperatorActivityRemoteCounts,
+  legacyWorktreeEvidence: OperatorActivityLegacyWorktreeEvidence,
+): OperatorActivityCurrentRunEvidence {
+  const blockers: string[] = [];
+  const reasons: string[] = [];
+  const fooksSessionCount = tmux.sessions.length;
+  const remoteCountsAvailable = optionalCounts.enabled && optionalCounts.openIssues !== undefined && optionalCounts.openPullRequests !== undefined;
+  const openIssues = optionalCounts.enabled ? optionalCounts.openIssues : undefined;
+  const openPullRequests = optionalCounts.enabled ? optionalCounts.openPullRequests : undefined;
+  const clean = worktree.clean === true;
+  const onMain = worktree.branch === "main";
+  const localDivergenceKnown = worktree.ahead !== undefined && worktree.behind !== undefined;
+  const noLocalDivergence = localDivergenceKnown && worktree.ahead === 0 && worktree.behind === 0;
+  const noSessions = fooksSessionCount === 0;
+  const zeroRemoteCounts = remoteCountsAvailable && openIssues === 0 && openPullRequests === 0;
+
+  if (!optionalCounts.enabled) {
+    blockers.push("remote issue/PR counts disabled; pass --include-remote-counts to prove zero open issue/PR reminder evidence");
+  } else if (!remoteCountsAvailable) {
+    blockers.push("remote issue/PR counts unavailable; cannot prove zero open issue/PR reminder evidence");
+  }
+  if (!tmux.available) blockers.push("tmux session evidence unavailable; cannot prove zero local fooks sessions");
+
+  if (onMain) reasons.push("current branch is main");
+  else reasons.push(worktree.branch ? `current branch is ${worktree.branch}, not main` : "current branch is unknown");
+  if (clean) reasons.push("current worktree is clean");
+  else reasons.push("current worktree is not clean or cleanliness is unknown");
+  if (noLocalDivergence) reasons.push("local tracking divergence is zero");
+  else reasons.push(localDivergenceKnown ? "local tracking divergence is non-zero" : "local tracking divergence is unavailable");
+  if (noSessions) reasons.push("no fooks-like tmux sessions are mapped to this snapshot");
+  else reasons.push(`${fooksSessionCount} fooks-like tmux session(s) are mapped to this snapshot`);
+  if (zeroRemoteCounts) reasons.push("open issue and pull request counts are both zero");
+  if (legacyWorktreeEvidence.staleClosedArtifactWorktreeCount > 0) {
+    reasons.push("legacy closed-artifact worktree evidence is separated from active current-run evidence");
+  }
+
+  const mainEchoEvidence = blockers.length === 0 && onMain && clean && noLocalDivergence && noSessions && zeroRemoteCounts;
+  const activeWorkEvidence =
+    worktree.clean === false ||
+    fooksSessionCount > 0 ||
+    (optionalCounts.enabled && ((openIssues ?? 0) > 0 || (openPullRequests ?? 0) > 0));
+
+  return {
+    available: blockers.length === 0,
+    source: OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+    classification: mainEchoEvidence ? "mainEchoNonActive" : "activeOrUnknown",
+    mainEchoEvidence,
+    activeWorkEvidence,
+    remoteCountsRequired: true,
+    evidence: {
+      branch: worktree.branch,
+      upstream: worktree.upstream,
+      clean: worktree.clean,
+      ahead: worktree.ahead,
+      behind: worktree.behind,
+      fooksSessionCount,
+      openIssues,
+      openPullRequests,
+      legacyStaleClosedArtifactWorktreeCount: legacyWorktreeEvidence.staleClosedArtifactWorktreeCount,
+    },
+    reasons,
+    blockers: uniqueSorted(blockers),
+  };
+}
+
 export function readOperatorActivitySnapshot(cwd = process.cwd(), options: OperatorActivityOptions = {}): OperatorActivitySnapshot {
   const generatedAt = options.now?.() ?? nowIso();
   const worktreeStatus = currentWorktreeEvidenceStatus(cwd, { ...options, now: () => generatedAt });
@@ -416,6 +514,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
   const tmux = readTmuxActivity(cwd, options);
   const optionalCounts = readRemoteCounts(cwd, options);
   const legacyWorktreeEvidence = readLegacyWorktreeEvidence(cwd, options, generatedAt);
+  const currentRunEvidence = buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence);
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
 
   return {
@@ -429,6 +528,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     tmux,
     optionalCounts,
     legacyWorktreeEvidence,
+    currentRunEvidence,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
   };
 }
