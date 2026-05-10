@@ -8,7 +8,7 @@ export const REACT_WEB_LABEL_PATCH_PREVIEW_SCHEMA_VERSION = "react-web-label-pat
 export const REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY =
   "Read-only React Web JSX label preview only: detects a narrow set of native interactive elements with missing or ambiguous accessible-label evidence and suggests deterministic patch fragments without editing files or claiming full accessibility coverage." as const;
 
-type ReactWebLabelFindingKind = "missing-accessible-label" | "ambiguous-accessible-label";
+type ReactWebLabelFindingKind = "missing-accessible-label" | "ambiguous-accessible-label" | "unassociated-nearby-label";
 type ReactWebLabelConfidence = "high" | "medium";
 type ReactWebInteractiveElement = "button" | "input" | "select" | "textarea";
 
@@ -23,7 +23,7 @@ export type ReactWebLabelPatchPreviewFinding = {
   suggestedPatch: {
     type: "unified-diff-fragment";
     readOnly: true;
-    attribute: "aria-label";
+    attribute: "aria-label" | "htmlFor" | "id/htmlFor";
     insertion: string;
     preview: string;
   };
@@ -43,6 +43,7 @@ export type ReactWebLabelPatchPreview = {
     findingCount: number;
     missingCount: number;
     ambiguousCount: number;
+    associationCount: number;
   };
   findings: ReactWebLabelPatchPreviewFinding[];
 };
@@ -51,6 +52,14 @@ type JsxInteractiveNode = ts.JsxOpeningElement | ts.JsxSelfClosingElement;
 
 type AttributeSnapshot = {
   values: Map<string, string>;
+};
+
+type NearbyLabelAssociationCandidate = {
+  labelNode: ts.JsxOpeningElement;
+  labelText: string;
+  controlId: string;
+  controlNeedsId: boolean;
+  evidence: string[];
 };
 
 const INTERACTIVE_TAGS = new Set<ReactWebInteractiveElement>(["button", "input", "select", "textarea"]);
@@ -74,7 +83,7 @@ function jsxAttributeText(initializer: ts.JsxAttribute["initializer"]): string |
   return compactText(initializer.getText());
 }
 
-function attributesOf(node: JsxInteractiveNode): AttributeSnapshot {
+function attributesOf(node: JsxInteractiveNode | ts.JsxOpeningElement): AttributeSnapshot {
   const values = new Map<string, string>();
   for (const property of node.attributes.properties) {
     if (!ts.isJsxAttribute(property)) continue;
@@ -83,6 +92,15 @@ function attributesOf(node: JsxInteractiveNode): AttributeSnapshot {
     if (value) values.set(name, value);
   }
   return { values };
+}
+
+function stringLiteralAttributeValue(node: JsxInteractiveNode | ts.JsxOpeningElement, attrName: string): string | undefined {
+  for (const property of node.attributes.properties) {
+    if (!ts.isJsxAttribute(property) || property.name.getText() !== attrName) continue;
+    if (property.initializer && ts.isStringLiteral(property.initializer)) return property.initializer.text.trim() || undefined;
+    return undefined;
+  }
+  return undefined;
 }
 
 function tagNameOf(node: JsxInteractiveNode | ts.JsxOpeningElement): string {
@@ -183,6 +201,124 @@ function patchPreviewFor(options: {
   ].join("\n");
 }
 
+
+function countLiteralAttributeValues(sourceFile: ts.SourceFile, attrName: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const value = stringLiteralAttributeValue(node, attrName);
+      if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return counts;
+}
+
+function labelContainsNativeControl(labelElement: ts.JsxElement): boolean {
+  let contains = false;
+  const visit = (node: ts.Node): void => {
+    if (contains) return;
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node !== labelElement.openingElement) {
+      if (INTERACTIVE_TAGS.has(tagNameOf(node).toLowerCase() as ReactWebInteractiveElement)) contains = true;
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(labelElement, visit);
+  return contains;
+}
+
+function directElementChildren(parent: ts.JsxElement): Array<ts.JsxElement | ts.JsxSelfClosingElement> {
+  return parent.children.filter((child): child is ts.JsxElement | ts.JsxSelfClosingElement => ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child));
+}
+
+function openingOfElement(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.JsxOpeningElement | ts.JsxSelfClosingElement {
+  return ts.isJsxElement(node) ? node.openingElement : node;
+}
+
+function stableIdFromName(name: string | undefined): string | undefined {
+  if (!name) return undefined;
+  const normalized = name.trim();
+  return /^[A-Za-z][A-Za-z0-9_-]{1,63}$/.test(normalized) ? normalized : undefined;
+}
+
+function findNearbyLabelAssociationCandidate(options: {
+  node: JsxInteractiveNode;
+  attrs: AttributeSnapshot;
+  literalIds: Set<string>;
+  literalIdCounts: Map<string, number>;
+  controlNameCounts: Map<string, number>;
+}): NearbyLabelAssociationCandidate | undefined {
+  const { node, attrs, literalIds, literalIdCounts, controlNameCounts } = options;
+  const controlElement = ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent) ? node.parent : node;
+  const container = controlElement.parent;
+  if (!ts.isJsxElement(container)) return undefined;
+  if (isWrappedByLabel(node)) return undefined;
+
+  const siblings = directElementChildren(container);
+  const controlIndex = siblings.findIndex((sibling) => sibling === controlElement || openingOfElement(sibling) === node);
+  if (controlIndex < 0) return undefined;
+
+  const previousSibling = siblings[controlIndex - 1];
+  const nextSibling = siblings[controlIndex + 1];
+  const previousLabel = previousSibling && ts.isJsxElement(previousSibling) && tagNameOf(previousSibling.openingElement).toLowerCase() === "label" ? previousSibling : undefined;
+  const nextLabel = nextSibling && ts.isJsxElement(nextSibling) && tagNameOf(nextSibling.openingElement).toLowerCase() === "label" ? nextSibling : undefined;
+  const labelElement = previousLabel ?? nextLabel;
+  if (!labelElement) return undefined;
+  const labelAttrs = attributesOf(labelElement.openingElement).values;
+  if (hasNonEmptyAttr(labelAttrs, "htmlFor", "aria-label", "aria-labelledby", "title")) return undefined;
+  if (labelContainsNativeControl(labelElement)) return undefined;
+
+  const labelText = jsxVisibleText(labelElement);
+  if (!labelText) return undefined;
+
+  const existingId = stringLiteralAttributeValue(node, "id");
+  if (existingId) {
+    if ((literalIdCounts.get(existingId) ?? 0) !== 1) return undefined;
+    return {
+      labelNode: labelElement.openingElement,
+      labelText,
+      controlId: existingId,
+      controlNeedsId: false,
+      evidence: ["jsx.label.nearby-text", "jsx.control.id"],
+    };
+  }
+
+  const name = stringLiteralAttributeValue(node, "name");
+  const stableId = stableIdFromName(name);
+  if (!stableId || literalIds.has(stableId) || (name && (controlNameCounts.get(name) ?? 0) !== 1)) return undefined;
+  return {
+    labelNode: labelElement.openingElement,
+    labelText,
+    controlId: stableId,
+    controlNeedsId: true,
+    evidence: ["jsx.label.nearby-text", "jsx.control.name.stable-unique"],
+  };
+}
+
+function patchPreviewWithInsertions(options: {
+  relativePath: string;
+  sourceFile: ts.SourceFile;
+  sourceText: string;
+  insertions: Array<{ node: JsxInteractiveNode | ts.JsxOpeningElement; insertion: string; loc: SourceRange }>;
+}): string {
+  const hunks: string[] = [`--- a/${options.relativePath}`, `+++ b/${options.relativePath}`];
+  const sorted = [...options.insertions].sort((left, right) => left.node.getStart(options.sourceFile) - right.node.getStart(options.sourceFile));
+  for (const insertion of sorted) {
+    const node = insertion.node;
+    const start = node.getStart(options.sourceFile);
+    const end = node.getEnd();
+    const selfClosingInsertAt = ts.isJsxSelfClosingElement(node) ? (options.sourceText[end - 3] === " " ? end - 3 : end - 2) : undefined;
+    const insertAt = selfClosingInsertAt ?? end - 1;
+    const before = options.sourceText.slice(start, insertAt);
+    const after = options.sourceText.slice(insertAt, end);
+    const original = compactText(options.sourceText.slice(start, end), 160);
+    const updated = compactText(`${before}${insertion.insertion}${after}`, 180);
+    hunks.push(`@@ -${insertion.loc.startLine},1 +${insertion.loc.startLine},1 @@`, `-${original}`, `+${updated}`);
+  }
+  return hunks.join("\n");
+}
+
 function classifyLabelEvidence(options: {
   node: JsxInteractiveNode;
   tag: ReactWebInteractiveElement;
@@ -261,7 +397,7 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
       ...base,
       inScope: false,
       skippedReason: `domain-classification:${detection.classification}`,
-      summary: { findingCount: 0, missingCount: 0, ambiguousCount: 0 },
+      summary: { findingCount: 0, missingCount: 0, ambiguousCount: 0, associationCount: 0 },
       findings: [],
     };
   }
@@ -269,6 +405,9 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
   const sourceFile = ts.createSourceFile(fullPath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const lines = sourceText.split(/\r?\n/);
   const labelledIds = collectHtmlForIds(sourceFile);
+  const literalIdCounts = countLiteralAttributeValues(sourceFile, "id");
+  const literalIds = new Set(literalIdCounts.keys());
+  const controlNameCounts = countLiteralAttributeValues(sourceFile, "name");
   const findings: ReactWebLabelPatchPreviewFinding[] = [];
 
   const visit = (node: ts.Node): void => {
@@ -280,24 +419,55 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
         const labelEvidence = classifyLabelEvidence({ node, tag: element, attrs, labelledIds });
         if (labelEvidence && !labelEvidence.labelled) {
           const loc = sourceRangeOf(sourceFile, node);
-          const label = suggestedLabelFor(element, attrs.values, labelEvidence.kind);
-          const insertion = ` aria-label="${escapeAttribute(label)}"`;
-          findings.push({
-            kind: labelEvidence.kind,
-            element,
-            loc,
-            context: lineContext(lines, loc),
-            confidence: labelEvidence.confidence,
-            reason: labelEvidence.reason,
-            evidence: labelEvidence.evidence,
-            suggestedPatch: {
-              type: "unified-diff-fragment",
-              readOnly: true,
-              attribute: "aria-label",
-              insertion,
-              preview: patchPreviewFor({ relativePath, sourceFile, sourceText, node, loc, insertion }),
-            },
-          });
+          const association = findNearbyLabelAssociationCandidate({ node, attrs, literalIds, literalIdCounts, controlNameCounts });
+          if (association) {
+            const labelLoc = sourceRangeOf(sourceFile, association.labelNode);
+            const labelInsertion = ` htmlFor="${escapeAttribute(association.controlId)}"`;
+            const controlInsertion = ` id="${escapeAttribute(association.controlId)}"`;
+            const insertions = association.controlNeedsId
+              ? [
+                  { node: association.labelNode, insertion: labelInsertion, loc: labelLoc },
+                  { node, insertion: controlInsertion, loc },
+                ]
+              : [{ node: association.labelNode, insertion: labelInsertion, loc: labelLoc }];
+            findings.push({
+              kind: "unassociated-nearby-label",
+              element,
+              loc,
+              context: lineContext(lines, loc),
+              confidence: association.controlNeedsId ? "medium" : "high",
+              reason: association.controlNeedsId
+                ? `Nearby label text "${association.labelText}" is adjacent to this native ${element}, and the control has a unique stable name that can be mirrored as an id for an explicit htmlFor association.`
+                : `Nearby label text "${association.labelText}" is adjacent to this native ${element}, and the control already has a stable id that can be referenced by htmlFor.`,
+              evidence: [...labelEvidence.evidence, ...association.evidence],
+              suggestedPatch: {
+                type: "unified-diff-fragment",
+                readOnly: true,
+                attribute: association.controlNeedsId ? "id/htmlFor" : "htmlFor",
+                insertion: association.controlNeedsId ? `${controlInsertion}; ${labelInsertion}` : labelInsertion,
+                preview: patchPreviewWithInsertions({ relativePath, sourceFile, sourceText, insertions }),
+              },
+            });
+          } else {
+            const label = suggestedLabelFor(element, attrs.values, labelEvidence.kind);
+            const insertion = ` aria-label="${escapeAttribute(label)}"`;
+            findings.push({
+              kind: labelEvidence.kind,
+              element,
+              loc,
+              context: lineContext(lines, loc),
+              confidence: labelEvidence.confidence,
+              reason: labelEvidence.reason,
+              evidence: labelEvidence.evidence,
+              suggestedPatch: {
+                type: "unified-diff-fragment",
+                readOnly: true,
+                attribute: "aria-label",
+                insertion,
+                preview: patchPreviewFor({ relativePath, sourceFile, sourceText, node, loc, insertion }),
+              },
+            });
+          }
         }
       }
     }
@@ -312,6 +482,7 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
       findingCount: findings.length,
       missingCount: findings.filter((finding) => finding.kind === "missing-accessible-label").length,
       ambiguousCount: findings.filter((finding) => finding.kind === "ambiguous-accessible-label").length,
+      associationCount: findings.filter((finding) => finding.kind === "unassociated-nearby-label").length,
     },
     findings,
   };
@@ -326,7 +497,7 @@ export function renderReactWebLabelPatchPreviewText(preview: ReactWebLabelPatchP
     `File: ${preview.filePath}`,
     `Read-only: ${preview.readOnly ? "yes" : "no"}`,
     `In scope: ${preview.inScope ? "yes" : "no"}`,
-    `Findings: ${preview.summary.findingCount} (missing: ${preview.summary.missingCount}, ambiguous: ${preview.summary.ambiguousCount})`,
+    `Findings: ${preview.summary.findingCount} (missing: ${preview.summary.missingCount}, ambiguous: ${preview.summary.ambiguousCount}, associations: ${preview.summary.associationCount})`,
   ];
   if (preview.skippedReason) lines.push(`Skipped: ${preview.skippedReason}`);
   if (preview.findings.length === 0) return `${lines.join("\n")}\n`;

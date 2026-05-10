@@ -8,6 +8,8 @@ const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
 const positiveFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-labels.tsx");
 const negativeFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "labelled-controls.tsx");
 const rnFixture = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx");
+const associationFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-candidates.tsx");
+const unsafeAssociationFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx");
 
 function runPreview(file, ...args) {
   return spawnSync(process.execPath, [cliPath, "inspect", "react-web-label-preview", file, ...args], {
@@ -31,6 +33,7 @@ test("React Web label preview reports deterministic read-only patches for missin
   assert.equal(preview.summary.findingCount, 5);
   assert.equal(preview.summary.missingCount, 3);
   assert.equal(preview.summary.ambiguousCount, 2);
+  assert.equal(preview.summary.associationCount, 0);
 
   assert.deepEqual(preview.findings.map((finding) => [finding.kind, finding.element, finding.confidence]), [
     ["missing-accessible-label", "button", "high"],
@@ -57,8 +60,42 @@ test("React Web label preview stays quiet when native controls have narrow label
   const preview = JSON.parse(cli.stdout);
 
   assert.equal(preview.inScope, true);
-  assert.deepEqual(preview.summary, { findingCount: 0, missingCount: 0, ambiguousCount: 0 });
+  assert.deepEqual(preview.summary, { findingCount: 0, missingCount: 0, ambiguousCount: 0, associationCount: 0 });
   assert.deepEqual(preview.findings, []);
+});
+
+test("React Web label preview suggests conservative nearby label associations", () => {
+  const cli = runPreview(associationFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  assert.equal(preview.summary.findingCount, 3);
+  assert.equal(preview.summary.associationCount, 3);
+  assert.equal(preview.summary.missingCount, 0);
+  assert.equal(preview.summary.ambiguousCount, 0);
+  assert.deepEqual(preview.findings.map((finding) => [finding.kind, finding.element, finding.confidence, finding.suggestedPatch.attribute]), [
+    ["unassociated-nearby-label", "input", "high", "htmlFor"],
+    ["unassociated-nearby-label", "select", "medium", "id/htmlFor"],
+    ["unassociated-nearby-label", "textarea", "medium", "id/htmlFor"],
+  ]);
+  assert.match(preview.findings[0].suggestedPatch.preview, /<label htmlFor="email">/);
+  assert.match(preview.findings[1].suggestedPatch.preview, /<label htmlFor="department">/);
+  assert.match(preview.findings[1].suggestedPatch.preview, /<select name="department" id="department">/);
+  assert.match(preview.findings[2].suggestedPatch.preview, /<textarea name="notes" id="notes" \/>/);
+  assert.ok(preview.findings.every((finding) => finding.suggestedPatch.readOnly === true));
+});
+
+test("React Web label preview avoids unsafe nearby label associations", () => {
+  const cli = runPreview(unsafeAssociationFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  assert.equal(preview.summary.associationCount, 0);
+  assert.ok(preview.summary.missingCount > 0);
+  assert.ok(preview.findings.every((finding) => finding.suggestedPatch.attribute === "aria-label"));
+  assert.doesNotMatch(cli.stdout, /htmlFor=/);
 });
 
 test("React Web label preview text mode is explicit about read-only patch previews", () => {
