@@ -1,0 +1,216 @@
+import {
+  buildReactWebLabelPatchPreview,
+  REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY,
+  type ReactWebLabelPatchPreview,
+  type ReactWebLabelPatchPreviewFinding,
+} from "./react-web-label-preview";
+
+export const REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION = "react-web-issue-report.v1" as const;
+export const REACT_WEB_ISSUE_REPORT_COMMAND = "inspect react-web-issues" as const;
+export const REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY =
+  "Read-only React Web issue report for a narrow native JSX label/accessibility subset only: adapts label-preview findings into actionable issue cards, never edits files, does not auto-apply patches, does not claim broad accessibility coverage, and does not infer custom-component semantics." as const;
+
+type ReactWebIssueConfidence = "high" | "medium";
+type ReactWebIssueFixability = "safe-preview" | "manual-review";
+type ReactWebIssueAutoFixSafety = "not-auto-applied" | "unsafe-to-auto-apply";
+type ReactWebIssueKind =
+  | "react-web.missing-accessible-label"
+  | "react-web.ambiguous-accessible-label"
+  | "react-web.unassociated-nearby-label";
+
+export type ReactWebIssueCard = {
+  id: string;
+  kind: ReactWebIssueKind;
+  problem: string;
+  whyItMatters: string;
+  evidence: {
+    filePath: string;
+    line: number;
+    endLine: number;
+    context: string;
+    sourceSignals: string[];
+    element: ReactWebLabelPatchPreviewFinding["element"];
+  };
+  confidence: ReactWebIssueConfidence;
+  fixability: ReactWebIssueFixability;
+  autoFixSafety: ReactWebIssueAutoFixSafety;
+  safetyRationale: string;
+  suggestedFixIntent: string;
+  preview?: {
+    type: "unified-diff-fragment";
+    readOnly: true;
+    text: string;
+  };
+};
+
+export type ReactWebIssueReport = {
+  schemaVersion: typeof REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION;
+  command: typeof REACT_WEB_ISSUE_REPORT_COMMAND;
+  profile: "react-web";
+  filePath: string;
+  readOnly: true;
+  autoApply: false;
+  claimBoundary: typeof REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY;
+  sourcePreview: {
+    schemaVersion: ReactWebLabelPatchPreview["schemaVersion"];
+    claimBoundary: typeof REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY;
+    findingCount: number;
+  };
+  inScope: boolean;
+  skippedReason?: string;
+  summary: {
+    issueCount: number;
+    safePreviewCount: number;
+    manualReviewCount: number;
+    unsafeToAutoApplyCount: number;
+  };
+  issues: ReactWebIssueCard[];
+};
+
+function issueKindFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueKind {
+  return `react-web.${finding.kind}` as ReactWebIssueKind;
+}
+
+function problemFor(finding: ReactWebLabelPatchPreviewFinding): string {
+  switch (finding.kind) {
+    case "missing-accessible-label":
+      return `Native ${finding.element} lacks recognized accessible-label evidence.`;
+    case "ambiguous-accessible-label":
+      return `Native ${finding.element} only has ambiguous accessible-label evidence.`;
+    case "unassociated-nearby-label":
+      return `Nearby label text is not explicitly associated with this native ${finding.element}.`;
+  }
+}
+
+function whyItMattersFor(finding: ReactWebLabelPatchPreviewFinding): string {
+  switch (finding.kind) {
+    case "missing-accessible-label":
+      return "Users of assistive technology may not get a meaningful control name, making the control hard to understand or operate.";
+    case "ambiguous-accessible-label":
+      return "Placeholder-only labeling can disappear during input and is weaker than an explicit accessible name.";
+    case "unassociated-nearby-label":
+      return "Visible label text may not be programmatically connected to the native form control.";
+  }
+}
+
+function suggestedFixIntentFor(finding: ReactWebLabelPatchPreviewFinding): string {
+  switch (finding.kind) {
+    case "missing-accessible-label":
+      return "Add an explicit accessible label with human-reviewed copy for the native control.";
+    case "ambiguous-accessible-label":
+      return "Replace placeholder-only labeling with explicit label evidence or human-reviewed aria-label copy.";
+    case "unassociated-nearby-label":
+      return "Connect the nearby native label/control pair with htmlFor/id when the preview evidence remains valid.";
+  }
+}
+
+function fixabilityFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueFixability {
+  return finding.kind === "unassociated-nearby-label" ? "safe-preview" : "manual-review";
+}
+
+function autoFixSafetyFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueAutoFixSafety {
+  return finding.kind === "unassociated-nearby-label" ? "not-auto-applied" : "unsafe-to-auto-apply";
+}
+
+function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
+  if (finding.kind === "unassociated-nearby-label") {
+    return "The report can preview a deterministic native htmlFor/id association from existing JSX evidence, but fooks remains read-only and does not apply it.";
+  }
+  return "The preview uses TODO accessible-name copy because correct user-facing label text requires human review; fooks reports the issue but does not auto-apply it.";
+}
+
+function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFinding, index: number): ReactWebIssueCard {
+  const preview = finding.suggestedPatch.readOnly
+    ? {
+        type: finding.suggestedPatch.type,
+        readOnly: true as const,
+        text: finding.suggestedPatch.preview,
+      }
+    : undefined;
+  return {
+    id: `react-web-label-${index + 1}`,
+    kind: issueKindFor(finding),
+    problem: problemFor(finding),
+    whyItMatters: whyItMattersFor(finding),
+    evidence: {
+      filePath,
+      line: finding.loc.startLine,
+      endLine: finding.loc.endLine,
+      context: finding.context,
+      sourceSignals: finding.evidence,
+      element: finding.element,
+    },
+    confidence: finding.confidence,
+    fixability: fixabilityFor(finding),
+    autoFixSafety: autoFixSafetyFor(finding),
+    safetyRationale: safetyRationaleFor(finding),
+    suggestedFixIntent: suggestedFixIntentFor(finding),
+    ...(preview ? { preview } : {}),
+  };
+}
+
+export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()): ReactWebIssueReport {
+  const preview = buildReactWebLabelPatchPreview(filePath, cwd);
+  const issues = preview.findings.map((finding, index) => issueCardFor(preview.filePath, finding, index));
+  return {
+    schemaVersion: REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
+    command: REACT_WEB_ISSUE_REPORT_COMMAND,
+    profile: "react-web",
+    filePath: preview.filePath,
+    readOnly: true,
+    autoApply: false,
+    claimBoundary: REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY,
+    sourcePreview: {
+      schemaVersion: preview.schemaVersion,
+      claimBoundary: preview.claimBoundary,
+      findingCount: preview.summary.findingCount,
+    },
+    inScope: preview.inScope,
+    ...(preview.skippedReason ? { skippedReason: preview.skippedReason } : {}),
+    summary: {
+      issueCount: issues.length,
+      safePreviewCount: issues.filter((issue) => issue.fixability === "safe-preview").length,
+      manualReviewCount: issues.filter((issue) => issue.fixability === "manual-review").length,
+      unsafeToAutoApplyCount: issues.filter((issue) => issue.autoFixSafety === "unsafe-to-auto-apply").length,
+    },
+    issues,
+  };
+}
+
+export function renderReactWebIssueReportText(report: ReactWebIssueReport): string {
+  const lines = [
+    "# React Web issue report",
+    "",
+    report.claimBoundary,
+    "",
+    `File: ${report.filePath}`,
+    `Read-only: ${report.readOnly ? "yes" : "no"}`,
+    `Auto-apply: ${report.autoApply ? "yes" : "no"}`,
+    `In scope: ${report.inScope ? "yes" : "no"}`,
+    `Issues: ${report.summary.issueCount} (safe preview: ${report.summary.safePreviewCount}, manual review: ${report.summary.manualReviewCount}, unsafe to auto-apply: ${report.summary.unsafeToAutoApplyCount})`,
+  ];
+  if (report.skippedReason) lines.push(`Skipped: ${report.skippedReason}`);
+  if (report.issues.length === 0) return `${lines.join("\n")}\n`;
+
+  report.issues.forEach((issue, index) => {
+    lines.push(
+      "",
+      `## Issue ${index + 1}: ${issue.problem}`,
+      `- why: ${issue.whyItMatters}`,
+      `- file/line: ${issue.evidence.filePath}:${issue.evidence.line}`,
+      `- element: ${issue.evidence.element}`,
+      `- confidence: ${issue.confidence}`,
+      `- fixability: ${issue.fixability}`,
+      `- auto-fix safety: ${issue.autoFixSafety}`,
+      `- safety rationale: ${issue.safetyRationale}`,
+      `- suggested fix: ${issue.suggestedFixIntent}`,
+      `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
+      `- context: ${issue.evidence.context}`,
+    );
+    if (issue.preview) {
+      lines.push("", "```diff", issue.preview.text, "```");
+    }
+  });
+
+  return `${lines.join("\n")}\n`;
+}
