@@ -31,11 +31,19 @@ export type ReactWebIssueCard = {
     sourceSignals: string[];
     element: ReactWebLabelPatchPreviewFinding["element"];
   };
+  whereToLook: {
+    filePath: string;
+    line: number;
+    endLine: number;
+    context: string;
+  };
   confidence: ReactWebIssueConfidence;
   fixability: ReactWebIssueFixability;
   autoFixSafety: ReactWebIssueAutoFixSafety;
   safetyRationale: string;
   suggestedFixIntent: string;
+  suggestedAction: string;
+  skipReason?: string;
   preview?: {
     type: "unified-diff-fragment";
     readOnly: true;
@@ -104,29 +112,46 @@ function suggestedFixIntentFor(finding: ReactWebLabelPatchPreviewFinding): strin
   }
 }
 
+function hasSafePreviewEvidence(finding: ReactWebLabelPatchPreviewFinding): boolean {
+  return finding.kind === "unassociated-nearby-label" && finding.confidence === "high";
+}
+
 function fixabilityFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueFixability {
-  return finding.kind === "unassociated-nearby-label" ? "safe-preview" : "manual-review";
+  return hasSafePreviewEvidence(finding) ? "safe-preview" : "manual-review";
 }
 
 function autoFixSafetyFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueAutoFixSafety {
-  return finding.kind === "unassociated-nearby-label" ? "not-auto-applied" : "unsafe-to-auto-apply";
+  return hasSafePreviewEvidence(finding) ? "not-auto-applied" : "unsafe-to-auto-apply";
 }
 
 function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
-  if (finding.kind === "unassociated-nearby-label") {
-    return "The report can preview a deterministic native htmlFor/id association from existing JSX evidence, but fooks remains read-only and does not apply it.";
+  if (hasSafePreviewEvidence(finding)) {
+    return "The report can preview a high-confidence deterministic native htmlFor/id association from existing JSX evidence, but fooks remains read-only and does not apply it.";
   }
-  return "The preview uses TODO accessible-name copy because correct user-facing label text requires human review; fooks reports the issue but does not auto-apply it.";
+  if (finding.kind === "unassociated-nearby-label") {
+    return "Nearby label/control evidence is not high-confidence enough for a safe preview, so fooks reports it for manual review and does not auto-apply it.";
+  }
+  return "Correct user-facing accessible-name copy requires human review, so fooks reports the issue and does not auto-apply it.";
+}
+
+function skipReasonFor(finding: ReactWebLabelPatchPreviewFinding): string {
+  if (finding.kind === "unassociated-nearby-label") {
+    return "Preview skipped because the nearby label/control association is not high-confidence deterministic evidence.";
+  }
+  return "Preview skipped because generated accessible-name copy would require human review.";
 }
 
 function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFinding, index: number): ReactWebIssueCard {
-  const preview = finding.suggestedPatch.readOnly
+  const isSafePreview = hasSafePreviewEvidence(finding);
+  const preview = isSafePreview && finding.suggestedPatch.readOnly
     ? {
         type: finding.suggestedPatch.type,
         readOnly: true as const,
         text: finding.suggestedPatch.preview,
       }
     : undefined;
+  const suggestedAction = suggestedFixIntentFor(finding);
+  const safetyRationale = safetyRationaleFor(finding);
   return {
     id: `react-web-label-${index + 1}`,
     kind: issueKindFor(finding),
@@ -140,11 +165,19 @@ function issueCardFor(filePath: string, finding: ReactWebLabelPatchPreviewFindin
       sourceSignals: finding.evidence,
       element: finding.element,
     },
+    whereToLook: {
+      filePath,
+      line: finding.loc.startLine,
+      endLine: finding.loc.endLine,
+      context: finding.context,
+    },
     confidence: finding.confidence,
     fixability: fixabilityFor(finding),
     autoFixSafety: autoFixSafetyFor(finding),
-    safetyRationale: safetyRationaleFor(finding),
-    suggestedFixIntent: suggestedFixIntentFor(finding),
+    safetyRationale,
+    suggestedFixIntent: suggestedAction,
+    suggestedAction,
+    ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
   };
 }
@@ -197,13 +230,14 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       "",
       `## Issue ${index + 1}: ${issue.problem}`,
       `- why: ${issue.whyItMatters}`,
-      `- file/line: ${issue.evidence.filePath}:${issue.evidence.line}`,
+      `- where to look: ${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
       `- element: ${issue.evidence.element}`,
       `- confidence: ${issue.confidence}`,
       `- fixability: ${issue.fixability}`,
       `- auto-fix safety: ${issue.autoFixSafety}`,
       `- safety rationale: ${issue.safetyRationale}`,
-      `- suggested fix: ${issue.suggestedFixIntent}`,
+      ...(issue.skipReason ? [`- skip reason: ${issue.skipReason}`] : []),
+      `- suggested action: ${issue.suggestedAction}`,
       `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
       `- context: ${issue.evidence.context}`,
     );
