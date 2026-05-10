@@ -1,10 +1,10 @@
 # fooks
 
-Stop paying the frontend context tax twice.
+Frontend change intelligence for lower-cost frontend work.
 
-Smaller model-facing context for repeated same-file work in Codex.
+`fooks` helps agents spend less time and context rediscovering the same React Web facts before feature work, migrations, refactors, and tests. The first wedge is React Web: source-fact extraction, evidence gates, and actionable CLI reports point out narrow form/accessibility issues and, when confidence is high, show read-only patch previews a human or agent can review.
 
-`fooks` reduces model-facing input for supported repeated frontend same-file work. In the strongest path, a Codex user mentions the same React `.tsx` / `.jsx` file more than once in one repo: the first eligible mention records compact context, and later same-file prompts may reuse a compact model-facing payload when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
+Context reduction and caching remain supporting mechanisms. In the strongest current path, a Codex user mentions the same React `.tsx` / `.jsx` file more than once in one repo: the first eligible mention records compact context, and later same-file prompts may reuse a compact model-facing payload when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
 
 First-minute path:
 
@@ -13,33 +13,37 @@ npm install -g fxxk-frontend-hooks
 cd your-supported-project
 fooks setup
 fooks doctor
+fooks inspect react-web-issues src/components/Form.tsx
 fooks compare src/components/Button.tsx
 ```
 
-Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
+Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, `fooks inspect react-web-issues` renders actionable React Web issue cards, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
 
-Best fit: repeated same-file React `.tsx` / `.jsx` work in Codex. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
+Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibility facts can reduce frontend change cost. The current CLI surface is advisory and read-only: it reports narrow native-control label/accessibility findings and shows patch previews only when confidence is high enough for review, not automatic application. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence and actionable report output, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
 
 - Public npm package: `fxxk-frontend-hooks`
 - CLI command: `fooks`
 
 ## 30-second version
 
-Use fooks when you are iterating on the same large supported file in Codex and want to avoid repeatedly sending the full file context.
+Use fooks when you want frontend change intelligence for a supported React Web file: source-derived context that lowers the cost of repeated feature work, migrations, refactors, and tests, plus a CLI report that turns narrow form/accessibility findings into reviewable issue cards.
 
-- **Best today:** Codex + repeated same-file `.tsx` / `.jsx` work.
+- **Product direction:** frontend work cost reduction through source facts, evidence gates, actionable reports, and bounded preview guidance.
+- **First wedge:** React Web `.tsx` / `.jsx`; repeated same-file Codex context reuse is the strongest current workflow.
+- **First surface/problem:** `fooks inspect react-web-issues <file>` reports narrow native-control form/accessibility issues, with read-only patch previews only when confidence is high.
+- **Supporting mechanism:** context reduction and caching help avoid rediscovering the same source facts, but they are not the whole product positioning.
 - **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
 - **Roadmap asks, not current support:** React Native/WebView, TUI / React CLI promotion beyond candidate / evidence-only status, Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
-- **Local proof:** `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
+- **Local proof:** `fooks inspect react-web-issues` shows actionable React Web issue cards, and `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
 - **Benchmark impact:** the latest launch-grade evidence is estimate-scoped API cost, not billing proof: the corrected 2026-04-22 Codex OAuth campaign accepted 15/15 matched pairs and reduced median estimated OpenAI API cost by 4.171% under recorded pricing assumptions; larger Next.js and Tailwind profiles reported 26.492% and 38.238% median estimated API-cost reductions.
 - **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
 - **Usage-log boundary:** fooks is not a `ccusage` replacement and does not parse private usage logs by default; see [`docs/usage-log-boundary.md`](docs/usage-log-boundary.md).
 
 ## Quick start and local proof
 
-The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks compare <supported-file>` for a human local source-vs-payload summary.
+The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards. `fooks compare <supported-file>` is supporting local source-vs-payload evidence, not the whole product proof.
 
-`fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks compare` now defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local byte counts, exclusions, and claim boundary text.
+`fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks inspect react-web-issues` is the first actionable report surface for narrow native-control form/accessibility findings. `fooks compare` defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local byte counts, exclusions, and claim boundary text.
 
 If you run `fooks doctor` from a source checkout, new git worktree, or freshly cloned project before `fooks setup`, an `unhealthy` result usually means the project-local adapter/runtime manifests have not been activated yet. That is expected for an unprepared checkout; run `fooks setup`, then rerun `fooks doctor` to verify the dogfood state you will actually use.
 
@@ -48,16 +52,16 @@ If you run `fooks doctor` from a source checkout, new git worktree, or freshly c
 1. Install the package: `npm install -g fxxk-frontend-hooks`.
 2. Confirm the command resolves to the package you expect: `which fooks` and `fooks --help`.
 3. Activate only the repo you are inside: `fooks setup`. The default output should be a short `ready`, `partial`, or `blocked` summary, not a debug JSON wall.
-4. Diagnose locally: `fooks doctor` for readiness, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file>` for one-file payload proof; add `--json` only when you need exact local byte counts, exclusions, and claim boundary text.
+4. Diagnose locally: `fooks doctor` for readiness, `fooks inspect react-web-issues <file>` for the first actionable React Web form/accessibility report, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file>` for supporting one-file payload proof; add `--json` only when you need exact local byte counts, exclusions, and claim boundary text.
 5. Use `fooks setup --json` only when you need support/debug paths, runtime manifests, or issue-report evidence.
 
 ## Strongest path / beta path / not today
 
 | Strongest path today | Narrow beta path | Not today |
 | --- | --- | --- |
-| Repeated same-file React `.tsx` / `.jsx` work in Codex for the current measured web/component lane. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
-| Project setup that prepares Codex hooks plus narrower Claude/opencode helper paths when available. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | A claim that Claude or opencode has Codex-equivalent automatic runtime-token behavior or read-interception parity. |
-| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status`. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider usage/billing-token telemetry, provider tokenizer behavior, provider invoice/dashboard/charged-cost proof, or a `ccusage` replacement. |
+| React Web `.tsx` / `.jsx` change intelligence for source-derived form/accessibility context, actionable issue reports, and repeated same-file Codex work. | Experimental Codex-first same-file `.ts` / `.js` module work when module signals are strong enough. | Universal file-read interception for every language, framework, runtime, or file type. |
+| `fooks inspect react-web-issues <file>` for read-only issue cards and high-confidence patch previews over native JSX controls. | Codex-only TS/JS setup can qualify when a strong beta module exists, but Claude/opencode helper setup is still React-only. | Automatic file edits, broad accessibility audits, or inference over unsupported custom components. |
+| Local model-facing payload estimates with `fooks compare` and local session estimates with `fooks status` support the change-intelligence workflow. | TS/JS beta stays same-file only and does not imply semantic/framework understanding. | Provider usage/billing-token telemetry, provider tokenizer behavior, provider invoice/dashboard/charged-cost proof, or a `ccusage` replacement. |
 
 TUI / React CLI TSX remains a candidate / evidence-only lane. Ink-style syntax can appear in local compare evidence, but that does **not** mean TUI support, terminal correctness, or default compact payload reuse is available today.
 
@@ -120,10 +124,12 @@ By default, `fooks setup` prints a short readiness summary so the command does n
 
 ## What gets optimized
 
-Current automatic optimization is intentionally narrow:
+Current automatic optimization is intentionally narrow and supports the broader change-intelligence direction:
 
+- Wedge: React Web source facts for `.tsx` / `.jsx`; experimental Codex-first `.ts` / `.js` same-file beta
+- First report surface: `fooks inspect react-web-issues <file>` for actionable, read-only native-control form/accessibility issue cards
+- Preview posture: patch previews are review aids for high-confidence findings, not automatic edits
 - Runtime: Codex hooks
-- Files: strongest path `.tsx` / `.jsx`; experimental Codex-first `.ts` / `.js` same-file beta
 - Pattern: repeated same-file work in one Codex session
 - First mention: record only
 - Later same-file mentions: reuse a compact fooks payload when safe
@@ -238,6 +244,7 @@ fooks status claude  # check Claude project-local context hook / handoff health
 fooks status cache   # check local fooks cache health
 fooks status artifacts # read-only fooks tmux/worktree/branch artifact audit
 fooks status activity  # compact read-only operator activity snapshot
+fooks inspect react-web-issues src/components/Form.tsx  # actionable read-only React Web issue report
 fooks compare src/components/Button.tsx --json  # local original-vs-fooks payload estimate
 ```
 
@@ -294,6 +301,7 @@ fooks doctor codex
 fooks status codex
 fooks status claude
 fooks status cache
+fooks inspect react-web-issues src/components/Form.tsx
 fooks status artifacts
 ```
 
@@ -317,6 +325,7 @@ npm test
 
 Useful public docs:
 
+- Architecture boundaries for source facts, evidence gates, and reporting-vs-authorization separation: [`docs/architecture-boundaries.md`](docs/architecture-boundaries.md)
 - Setup details: [`docs/setup.md`](docs/setup.md)
 - opencode support boundary: [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
