@@ -18,6 +18,7 @@ const fixtures = {
   labelled: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "labelled-controls.tsx"),
   association: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-candidates.tsx"),
   unsafeAssociation: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx"),
+  relatedContext: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "related-context-form.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
 };
@@ -92,17 +93,16 @@ test("React Web issue report emits actionable issue cards over label preview fin
 
     assert.ok(Array.isArray(issue.relatedContext));
     assert.ok(issue.relatedContext.length > 0);
-    assert.ok(issue.relatedContext.length <= 3);
+    assert.ok(issue.relatedContext.length <= 5);
     const requiredContextKeys = Object.keys(issue.relatedContext[0])
-      .filter((key) => ["kind", "reason", "confidence", "source", "action"].includes(key))
+      .filter((key) => ["kind", "file", "reason", "confidence", "source", "action"].includes(key))
       .sort();
-    assert.deepEqual(requiredContextKeys, ["action", "confidence", "kind", "reason", "source"]);
+    assert.deepEqual(requiredContextKeys, ["action", "confidence", "file", "kind", "reason", "source"]);
     assert.equal(issue.relatedContext[0].kind, "same-file-pattern");
     assert.equal(issue.relatedContext[0].action, "inspect-first");
     assert.equal(issue.relatedContext[0].source, "label-preview");
-    assert.equal(issue.relatedContext[0].filePath, issue.whereToLook.filePath);
+    assert.equal(issue.relatedContext[0].file, issue.whereToLook.filePath);
     assert.equal(issue.relatedContext[0].line, issue.whereToLook.line);
-    assert.ok(issue.relatedContext.some((entry) => entry.kind === "test-candidate"));
     assert.doesNotMatch(JSON.stringify(issue.relatedContext), /must-edit|auto-apply/i);
     assert.equal(issue.preview, undefined);
   }
@@ -124,9 +124,46 @@ test("React Web issue report turns nearby native associations into safe preview 
   ]);
   assert.match(report.issues[0].preview.text, /htmlFor="email"/);
   assert.ok(report.issues.every((issue) => issue.relatedContext.length > 0));
-  assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 3));
+  assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 5));
   assert.ok(report.issues.every((issue) => issue.relatedContext[0].action === "inspect-first"));
   assert.match(report.issues[1].skipReason, /not high-confidence deterministic evidence/);
+});
+
+test("React Web issue report recommends bounded local related context from imports, siblings, tests, and same-file patterns", () => {
+  const report = parseIssues(fixtures.relatedContext);
+
+  assert.equal(report.summary.issueCount, 2);
+  for (const issue of report.issues) {
+    assert.ok(issue.relatedContext.length >= 2);
+    assert.ok(issue.relatedContext.length <= 5);
+    assert.ok(issue.relatedContext.every((entry) => typeof entry.file === "string" && entry.file.length > 0));
+    assert.ok(issue.relatedContext.every((entry) => typeof entry.reason === "string" && entry.reason.length > 0));
+    assert.ok(issue.relatedContext.every((entry) => ["high", "medium", "low"].includes(entry.confidence)));
+    assert.ok(issue.relatedContext.every((entry) => entry.action === "inspect-first"));
+  }
+
+  const entries = report.issues[0].relatedContext;
+  assert.deepEqual(entries.map((entry) => entry.kind), [
+    "same-file-pattern",
+    "imported-local-component",
+    "imported-local-component",
+    "nearby-test",
+    "same-directory-source",
+  ]);
+  assert.ok(entries.some((entry) => entry.file.endsWith("/FormField.tsx") && entry.confidence === "medium"));
+  assert.ok(entries.some((entry) => entry.file.endsWith("/Input.tsx") && entry.confidence === "medium"));
+  assert.ok(entries.some((entry) => entry.kind === "nearby-test" && entry.file.endsWith("/related-context-form.test.tsx") && entry.confidence === "medium"));
+  assert.ok(entries.some((entry) => entry.kind === "same-directory-source" && entry.confidence === "low"));
+
+  const buttonEntries = report.issues[1].relatedContext;
+  assert.ok(buttonEntries.some((entry) => entry.kind === "same-file-pattern" && entry.file.endsWith("/related-context-form.tsx")));
+  assert.doesNotMatch(JSON.stringify(report.issues.flatMap((issue) => issue.relatedContext)), /must-edit|auto-apply/i);
+});
+
+test("React Web issue report includes nearby same-basename tests when not displaced by stronger local source evidence", () => {
+  const report = parseIssues(fixtures.relatedContext);
+  const allEntries = report.issues.flatMap((issue) => issue.relatedContext);
+  assert.ok(allEntries.some((entry) => entry.kind === "nearby-test" && entry.file.endsWith("/related-context-form.test.tsx")));
 });
 
 test("React Web issue report fixture usefulness gate records accepted cards, noise, plausibility, and parity", () => {
@@ -197,7 +234,7 @@ test("React Web issue report avoids unsafe htmlFor inference and keeps fallback 
   assert.ok(report.issues.every((issue) => issue.autoFixSafety === "unsafe-to-auto-apply"));
   assert.ok(report.issues.every((issue) => issue.skipReason));
   assert.ok(report.issues.every((issue) => issue.preview === undefined));
-  assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 3));
+  assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 5));
   assert.ok(report.issues.every((issue) => issue.relatedContext.every((entry) => entry.action === "inspect-first")));
   assert.doesNotMatch(JSON.stringify(report.issues.flatMap((issue) => issue.relatedContext)), /must-edit|auto-apply/i);
   assert.doesNotMatch(JSON.stringify(report), /htmlFor=/);
@@ -216,7 +253,6 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /- suggested action:/);
   assert.match(cli.stdout, /- inspect first:/);
   assert.match(cli.stdout, /same-file-pattern/);
-  assert.match(cli.stdout, /test-candidate/);
   assert.match(cli.stdout, /```diff/);
   assert.doesNotMatch(cli.stdout, /Auto-apply: yes/);
 });
