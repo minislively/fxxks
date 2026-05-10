@@ -16,6 +16,10 @@ function assertDocIncludes(text) {
 
 test("post-merge main CI echo boundary doc names the read-only operator surfaces", () => {
   for (const required of [
+    "fooks check --json",
+    'verdict: "idleRequiresActiveArtifact"',
+    "requiredActiveArtifact.required: true",
+    "open GitHub issue, an open GitHub pull request, or a mapped fooks tmux session",
     "fooks status activity --include-remote-counts --json",
     "currentRunEvidence",
     'classification: "mainEchoNonActive"',

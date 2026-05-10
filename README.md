@@ -123,6 +123,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 | `npm install -g fxxk-frontend-hooks` | global CLI install | Makes the `fooks` command available in the npm global prefix / PATH. It does not activate a project. |
 | `fooks setup` | current project + runtime homes | Creates project-local `.fooks/` state, may add project-local `.opencode/` helper files, and may update runtime-home files such as Codex hooks/manifests or Claude handoff manifests. |
 | `fooks doctor` | current project + runtime-home inspection | Reads local setup and hook-readiness artifacts without writing files; it is not live provider health, billing-token, cost, or `ccusage` proof. |
+| `fooks check` | current project + local git/tmux/GitHub CLI inspection | Read-only operator/check artifact for post-merge main echoes; it requires a concrete open issue, open PR, or mapped fooks session before idle echoes can be treated as active work. |
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
 | `fooks status artifacts` | current project + local git/tmux inspection | Read-only audit of fooks-scoped tmux sessions, git worktrees, and branches that may be merged into the selected base; it does not prove inactivity and never deletes artifacts. |
 | `fooks status activity` | current project + local git/tmux inspection | Compact read-only operator snapshot for dogfood nudges, including bounded current-run and stale closed-artifact worktree evidence; remote issue/PR counts require explicit `--include-remote-counts`. |
@@ -245,6 +246,7 @@ fooks setup          # one-time readiness: Codex hooks + Claude context hooks + 
 fooks doctor         # read-only local setup and hook-readiness diagnostics
 fooks doctor codex   # focus on Codex setup/hook readiness
 fooks doctor claude  # focus on Claude project-local context-hook readiness
+fooks check           # read-only post-merge echo vs active artifact boundary
 fooks status          # local estimated context-size telemetry for this repo
 fooks status codex   # check Codex attach/hook state
 fooks status claude  # check Claude project-local context hook / handoff health
@@ -263,6 +265,8 @@ fooks scan
 ```
 
 `fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement.
+
+`fooks check` is a narrow read-only operator/check projection over `fooks status activity --include-remote-counts`. It makes the post-merge `main` echo versus active work boundary explicit: when there is no open issue, no open PR, and no mapped fooks tmux session, the JSON returns `verdict: "idleRequiresActiveArtifact"` and `requiredActiveArtifact.required: true` instead of inventing active work from a successful main CI/release echo.
 
 `fooks status activity` is a compact read-only dogfood operator snapshot. It preserves the existing bare status, worktree, and artifacts contracts, reports current local worktree branch/divergence and dirty-path delta, lists fooks-like tmux sessions when available, and includes bounded `currentRunEvidence` plus `legacyWorktreeEvidence`. `currentRunEvidence` is the current-run reminder artifact for clean post-merge main echoes: when the branch is `main`, the worktree is clean, local divergence is zero, fooks-like tmux sessions are zero, and opt-in remote issue/PR counts are both zero, it classifies the snapshot as `mainEchoNonActive` instead of active fooks development. `legacyWorktreeEvidence` is projected from `status artifacts` `staleClosedArtifactWorktrees`; it reports counts plus a capped list of old closed-artifact worktrees with local branch-archive evidence and no mapped tmux pane, sets `cleanupCommandsIncluded: false`, and does not include runtime cleanup order or cleanup commands. It does not call GitHub by default; pass `--include-remote-counts` to opt in to non-blocking `gh` open issue/PR counts.
 
