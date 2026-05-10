@@ -6,7 +6,6 @@ import {
 } from "./react-web-label-preview";
 import {
   buildReactWebIssueRelatedContext,
-  getReactWebIssueContextMetadata,
   type ReactWebIssueRelatedContext,
 } from "./react-web-issue-related-context";
 
@@ -196,15 +195,12 @@ function issueCardFor(
 
 export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()): ReactWebIssueReport {
   const preview = buildReactWebLabelPatchPreview(filePath, cwd);
-  const contextMetadata = preview.inScope && preview.findings.length > 0
-    ? getReactWebIssueContextMetadata(preview.filePath, cwd)
-    : undefined;
   const issues = preview.findings.map((finding, index) =>
     issueCardFor(
       preview.filePath,
       finding,
       index,
-      buildReactWebIssueRelatedContext(preview.filePath, finding, contextMetadata),
+      buildReactWebIssueRelatedContext(preview.filePath, finding, cwd),
     ),
   );
   return {
@@ -266,7 +262,7 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
     if (issue.relatedContext.length > 0) {
       lines.push("- inspect first:");
       for (const item of issue.relatedContext) {
-        const location = item.filePath ? ` ${item.filePath}${item.line ? `:${item.line}${item.endLine && item.endLine !== item.line ? `-${item.endLine}` : ""}` : ""}` : "";
+        const location = ` ${item.file}${item.line ? `:${item.line}${item.endLine && item.endLine !== item.line ? `-${item.endLine}` : ""}` : ""}`;
         const context = item.context ? ` — ${item.context}` : "";
         lines.push(`  - ${item.kind} (${item.confidence}, ${item.source}): ${item.reason}${location}${context}`);
       }
