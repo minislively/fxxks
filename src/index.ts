@@ -130,3 +130,12 @@ export type {
   ReactWebRankedBundleSummary,
   ReactWebRankedBundleVerdict,
 } from "./reporting/react-web-ranked-bundle";
+
+export {
+  REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY,
+  REACT_WEB_ISSUE_REPORT_COMMAND,
+  REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
+  buildReactWebIssueReport,
+  renderReactWebIssueReportText,
+} from "./core/react-web-issue-report";
+export type { ReactWebIssueCard, ReactWebIssueReport } from "./core/react-web-issue-report";
