@@ -645,6 +645,7 @@ Everyday commands:
   ${displayCliName} inspect evidence <id> [--json]
   ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
+  ${displayCliName} inspect react-web-label-preview <file> [--json]
   ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
@@ -1301,7 +1302,18 @@ async function run(): Promise<void> {
         }
         return;
       }
-      throw new Error("inspect expects 'evidence', 'activation-mode', or 'ranked-bundle'");
+      if (arg1 === "react-web-label-preview") {
+        const { filePath: file, json } = parseCompareArgs(rest.slice(1));
+        const { buildReactWebLabelPatchPreview, renderReactWebLabelPatchPreviewText } = await import("../core/react-web-label-preview.js");
+        const preview = buildReactWebLabelPatchPreview(file, process.cwd());
+        if (json) {
+          print(preview);
+        } else {
+          process.stdout.write(renderReactWebLabelPatchPreviewText(preview));
+        }
+        return;
+      }
+      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', or 'react-web-label-preview'");
     }
     case "attach": {
       const runtime = arg1;
