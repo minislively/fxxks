@@ -5028,9 +5028,12 @@ test("docs describe local compare estimates without billing-cost claims", () => 
 ${setup}
 ${release}`;
 
-  assert.match(readme, /Smaller model-facing context for repeated same-file work in Codex\./);
+  assert.match(readme, /Frontend change intelligence for lower-cost frontend work\./);
+  assert.match(readme, /Context reduction and caching remain supporting mechanisms\./);
+  assert.match(readme, /fooks inspect react-web-issues/);
+  assert.match(readme, /fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards[\s\S]*`fooks compare <supported-file>` is supporting local source-vs-payload evidence/);
   assert.match(readme, /Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization\./);
-  assert.match(readme, /First-minute path:[\s\S]*fooks compare src\/components\/Button\.tsx[\s\S]*Then open Codex/);
+  assert.match(readme, /First-minute path:[\s\S]*fooks inspect react-web-issues src\/components\/Form\.tsx[\s\S]*fooks compare src\/components\/Button\.tsx[\s\S]*Then open Codex/);
   assert.doesNotMatch(readme, /First-minute path:[\s\S]*fooks compare src\/components\/Button\.tsx --json[\s\S]*Then open Codex/);
   assert.match(readme, /add `--json` for exact local byte counts, exclusions, and claim boundary text/);
   assert.match(combined, /fooks compare src\/components\/Button\.tsx/);
