@@ -19,6 +19,7 @@ const {
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
   OPERATOR_ACTIVITY_REMOTE_SOURCE,
   OPERATOR_ACTIVITY_TMUX_COMMAND,
+  OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT,
   parseOperatorActivityTmuxPanes,
   readOperatorActivitySnapshot,
 } = require(path.join(repoRoot, "dist", "ops", "operator-activity.js"));
@@ -148,6 +149,137 @@ test("idle activity snapshot remains zero and read-only with opt-in remote count
   assert.deepEqual(snapshot.blockers, []);
   assert.equal(commandCalls.filter((call) => call.startsWith("gh ")).length, 2);
   assert.equal(gitCalls.some((call) => call.includes("fetch")), false);
+});
+
+
+test("operator activity exposes bounded stale legacy closed worktree evidence for zero-count reminders", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tempDir, "docs", "closed-artifact-branch-archive-685.md"),
+    [
+      "# Archive: `fooks-closed-artifact-685` stale branch (#685)",
+      "",
+      "## Bounded evidence",
+      "- Remote branch: `origin/fooks-closed-artifact-685`",
+      "",
+    ].join("\n"),
+  );
+
+  const staleWorktree = path.join(path.dirname(tempDir), "fooks.omx-worktrees", "fooks-closed-artifact-685");
+  const calls = [];
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-10T01:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          "HEAD 111",
+          "branch refs/heads/main",
+          "",
+          `worktree ${staleWorktree}`,
+          "HEAD 222",
+          "branch refs/heads/fooks-closed-artifact-685",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\nfooks-closed-artifact-685\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir || targetPath === staleWorktree || targetPath === path.join(tempDir, "docs"),
+  });
+
+  assert.deepEqual(snapshot.optionalCounts, {
+    enabled: true,
+    source: OPERATOR_ACTIVITY_REMOTE_SOURCE,
+    openIssues: 0,
+    openPullRequests: 0,
+    blockers: [],
+  });
+  assert.equal(snapshot.tmux.available, true);
+  assert.deepEqual(snapshot.tmux.sessions, []);
+  assert.equal(snapshot.legacyWorktreeEvidence.available, true);
+  assert.equal(snapshot.legacyWorktreeEvidence.source, "status artifacts");
+  assert.equal(snapshot.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount, 1);
+  assert.equal(snapshot.legacyWorktreeEvidence.entryLimit, OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT);
+  assert.equal(snapshot.legacyWorktreeEvidence.omittedEntryCount, 0);
+  assert.equal(snapshot.legacyWorktreeEvidence.cleanupCommandsIncluded, false);
+  assert.deepEqual(snapshot.legacyWorktreeEvidence.blockers, []);
+  assert.deepEqual(snapshot.legacyWorktreeEvidence.entries, [
+    {
+      path: staleWorktree,
+      branch: "fooks-closed-artifact-685",
+      head: "222",
+      status: "staleClosedArtifact",
+      reasons: [
+        "branch has local branch-archive evidence",
+        "no tmux panes map to this worktree",
+        "worktree is not the current working directory",
+      ],
+      archiveEvidence: {
+        sourcePath: path.join("docs", "closed-artifact-branch-archive-685.md"),
+        matchType: "remote-branch",
+        matchedRef: "origin/fooks-closed-artifact-685",
+        lineNumber: 4,
+      },
+      activeSessionEvidence: "no tmux panes mapped to this worktree",
+    },
+  ]);
+
+  const legacyJson = JSON.stringify(snapshot.legacyWorktreeEvidence);
+  assert.equal(legacyJson.includes("manualCleanupCommands"), false);
+  assert.equal(legacyJson.includes("cleanupOrder"), false);
+  assert.equal(legacyJson.includes("staleRuntimeCleanups"), false);
+  assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|kill-session/.test(call)), false);
+});
+
+test("operator activity keeps legacy worktree inference conservative when tmux is unavailable", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, "docs", "closed-artifact-branch-archive-685.md"), "Branch inspected: `origin/fooks-closed-artifact-685`\n");
+  const staleWorktree = path.join(path.dirname(tempDir), "fooks.omx-worktrees", "fooks-closed-artifact-685");
+
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/main", "", `worktree ${staleWorktree}`, "HEAD 222", "branch refs/heads/fooks-closed-artifact-685", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\nfooks-closed-artifact-685\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "tmux") throw new Error("tmux missing");
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir || targetPath === staleWorktree,
+  });
+
+  assert.equal(snapshot.legacyWorktreeEvidence.available, true);
+  assert.equal(snapshot.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount, 0);
+  assert.deepEqual(snapshot.legacyWorktreeEvidence.entries, []);
+  assert.match(snapshot.legacyWorktreeEvidence.blockers.join("\n"), /tmux pane list unavailable: tmux missing/);
 });
 
 test("operator activity classifies stale deleted tmux worktree panes with manual cleanup guidance", () => {

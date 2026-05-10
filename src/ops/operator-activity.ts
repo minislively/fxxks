@@ -2,6 +2,13 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  ARTIFACT_AUDIT_CLAIM_BOUNDARY,
+  ARTIFACT_AUDIT_COMMAND,
+  DEFAULT_ARTIFACT_AUDIT_TIMEOUT_MS,
+  auditArtifacts,
+  type ArtifactAuditArchiveEvidence,
+} from "./artifact-audit";
+import {
   currentWorktreeEvidenceStatus,
   type WorktreeCurrentStatus,
   type WorktreeEvidenceOptions,
@@ -17,6 +24,7 @@ export const OPERATOR_ACTIVITY_TMUX_COMMAND = "tmux list-panes -a -F #{session_n
 export const OPERATOR_ACTIVITY_REMOTE_SOURCE = "GitHub CLI gh issue/pr list; explicit opt-in only";
 export const DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS = 1000;
 export const DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS = 1500;
+export const OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT = 5;
 
 export type OperatorActivityCommandRunner = (command: string, args: string[], cwd: string, timeoutMs: number) => string;
 export type OperatorActivityPathExists = (targetPath: string) => boolean;
@@ -76,6 +84,28 @@ export type OperatorActivityTmux = {
   blockers: string[];
 };
 
+export type OperatorActivityLegacyWorktreeEntry = {
+  path: string;
+  branch: string;
+  head?: string;
+  status: "staleClosedArtifact";
+  reasons: string[];
+  archiveEvidence: ArtifactAuditArchiveEvidence;
+  activeSessionEvidence: "no tmux panes mapped to this worktree";
+};
+
+export type OperatorActivityLegacyWorktreeEvidence = {
+  available: boolean;
+  source: typeof ARTIFACT_AUDIT_COMMAND;
+  claimBoundary: typeof ARTIFACT_AUDIT_CLAIM_BOUNDARY;
+  staleClosedArtifactWorktreeCount: number;
+  entries: OperatorActivityLegacyWorktreeEntry[];
+  entryLimit: typeof OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT;
+  omittedEntryCount: number;
+  cleanupCommandsIncluded: false;
+  blockers: string[];
+};
+
 export type OperatorActivityRemoteCounts =
   | {
       enabled: false;
@@ -99,6 +129,7 @@ export type OperatorActivitySnapshot = {
   worktree: OperatorActivityWorktree;
   tmux: OperatorActivityTmux;
   optionalCounts: OperatorActivityRemoteCounts;
+  legacyWorktreeEvidence: OperatorActivityLegacyWorktreeEvidence;
   blockers: string[];
 };
 
@@ -284,6 +315,56 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
   };
 }
 
+function artifactAuditUnavailable(blockers: string[]): boolean {
+  return blockers.some((blocker) => blocker.startsWith("git worktree list unavailable"));
+}
+
+function readLegacyWorktreeEvidence(cwd: string, options: OperatorActivityOptions, generatedAt: string): OperatorActivityLegacyWorktreeEvidence {
+  const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
+  const pathExists = options.pathExists ?? fs.existsSync;
+
+  try {
+    const audit = auditArtifacts(cwd, {
+      runner: (command, args, auditCwd) => runner(command, args, auditCwd, DEFAULT_ARTIFACT_AUDIT_TIMEOUT_MS),
+      pathExists,
+      now: () => generatedAt,
+    });
+    const entries = audit.staleClosedArtifactWorktrees.slice(0, OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT).map((worktree) => ({
+      path: worktree.path,
+      branch: worktree.branch,
+      head: worktree.head,
+      status: worktree.status,
+      reasons: worktree.reasons,
+      archiveEvidence: worktree.archiveEvidence,
+      activeSessionEvidence: worktree.activeSessionEvidence,
+    }));
+
+    return {
+      available: !artifactAuditUnavailable(audit.blockers),
+      source: ARTIFACT_AUDIT_COMMAND,
+      claimBoundary: ARTIFACT_AUDIT_CLAIM_BOUNDARY,
+      staleClosedArtifactWorktreeCount: audit.staleClosedArtifactWorktrees.length,
+      entries,
+      entryLimit: OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT,
+      omittedEntryCount: Math.max(0, audit.staleClosedArtifactWorktrees.length - entries.length),
+      cleanupCommandsIncluded: false,
+      blockers: audit.blockers,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      source: ARTIFACT_AUDIT_COMMAND,
+      claimBoundary: ARTIFACT_AUDIT_CLAIM_BOUNDARY,
+      staleClosedArtifactWorktreeCount: 0,
+      entries: [],
+      entryLimit: OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT,
+      omittedEntryCount: 0,
+      cleanupCommandsIncluded: false,
+      blockers: [`artifact audit unavailable: ${errorDetail(error)}`],
+    };
+  }
+}
+
 function parseGhJsonCount(output: string): number | undefined {
   try {
     const parsed = JSON.parse(output) as unknown;
@@ -334,6 +415,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
   const worktree = buildWorktreeSnapshot(worktreeStatus);
   const tmux = readTmuxActivity(cwd, options);
   const optionalCounts = readRemoteCounts(cwd, options);
+  const legacyWorktreeEvidence = readLegacyWorktreeEvidence(cwd, options, generatedAt);
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
 
   return {
@@ -346,6 +428,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     worktree,
     tmux,
     optionalCounts,
+    legacyWorktreeEvidence,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
   };
 }
