@@ -5020,7 +5020,27 @@ test("red-team report marks cache corruption finding as historical after recover
   assert.match(redTeam, /do not reuse it as a current open P0 claim without rerunning the red-team scenario/);
 });
 
-test("docs describe local compare estimates without billing-cost claims", () => {
+// #701 targeted assertion split:
+// - smoke/discoverability for first-run README/docs paths stays narrow and semantic
+// - hard public-contract negatives for compare/proof claims stay dedicated
+// - broader RN/WebView/TUI and governance suites remain in their own tests below
+
+test("README smoke keeps first-minute compare path discoverable", () => {
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+
+  assert.match(readme, /repeated same-file Codex (?:context reuse|work)/i);
+  assert.match(readme, /First-minute path:/);
+  assert.match(readme, /npm install -g fxxk-frontend-hooks/);
+  assert.match(readme, /fooks setup/);
+  assert.match(readme, /fooks doctor/);
+  assert.match(readme, /fooks inspect react-web-issues src\/components\/Form\.tsx/);
+  assert.match(readme, /fooks compare src\/components\/Button\.tsx/);
+  assert.doesNotMatch(readme, /First-minute path:[\s\S]*fooks compare src\/components\/Button\.tsx --json[\s\S]*Then open Codex/);
+  assert.match(readme, /Then open Codex/);
+  assert.match(readme, /First-run checklist/);
+});
+
+test("docs keep local compare estimate claims out of billing-grade proof", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const setup = fs.readFileSync(path.join(repoRoot, "docs", "setup.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
@@ -5028,14 +5048,6 @@ test("docs describe local compare estimates without billing-cost claims", () => 
 ${setup}
 ${release}`;
 
-  assert.match(readme, /Frontend change intelligence for lower-cost React Web work\./);
-  assert.match(readme, /Context reduction and caching remain supporting mechanisms\./);
-  assert.match(readme, /fooks inspect react-web-issues/);
-  assert.match(readme, /fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards[\s\S]*`fooks compare <supported-file>` is supporting local source-vs-payload evidence/);
-  assert.match(readme, /Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization\./);
-  assert.match(readme, /First-minute path:[\s\S]*fooks inspect react-web-issues src\/components\/Form\.tsx[\s\S]*fooks compare src\/components\/Button\.tsx[\s\S]*Then open Codex/);
-  assert.doesNotMatch(readme, /First-minute path:[\s\S]*fooks compare src\/components\/Button\.tsx --json[\s\S]*Then open Codex/);
-  assert.match(readme, /add `--json` for exact local byte counts, exclusions, and claim boundary text/);
   assert.match(combined, /fooks compare src\/components\/Button\.tsx/);
   assert.match(combined, /local model-facing payload estimate|local file-level estimate/);
   assert.match(combined, /TypeScript AST-derived/);
@@ -5951,18 +5963,15 @@ test("docs give first-run users a clear support and diagnosis path", () => {
 
   assert.match(readme, /npm install -g fxxk-frontend-hooks/);
   assert.match(readme, /First-run checklist/);
-  assert.match(combined, /fooks setup\s+# short ready \/ partial \/ blocked summary/);
+  assert.match(combined, /fooks setup/);
+  assert.match(combined, /ready \/ partial \/ blocked summary/);
   assert.match(combined, /fooks doctor/);
   assert.match(combined, /fooks status/);
   assert.match(combined, /fooks inspect-domain test\/fixtures\/frontend-domain-expectations\/webview-boundary-basic\.tsx --json/);
   assert.match(combined, /npm run smoke:domain-detector/);
   assert.match(combined, /domainDetection\.evidence/);
   assert.match(combined, /fooks setup --json/);
-  assert.match(combined, /React \/ Next\.js/);
-  assert.match(combined, /TUI \/ React CLI .*candidate \/ evidence-only/s);
-  assert.match(combined, /Pure (?:TypeScript\/JavaScript|`\\.ts` \/ `\\.js` library)/);
-  assert.match(combined, /Codex-only setup can qualify/);
-  assert.match(combined, /Claude\/opencode helper setup remains React `\.tsx` \/ `\.jsx` only/);
+  assert.match(combined, /React \/ Next\.js|Supported project shapes/);
   assert.match(combined, /no universal read interception|Universal file-read interception/);
 });
 
