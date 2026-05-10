@@ -5028,7 +5028,7 @@ test("docs describe local compare estimates without billing-cost claims", () => 
 ${setup}
 ${release}`;
 
-  assert.match(readme, /Frontend change intelligence for lower-cost frontend work\./);
+  assert.match(readme, /Frontend change intelligence for lower-cost React Web work\./);
   assert.match(readme, /Context reduction and caching remain supporting mechanisms\./);
   assert.match(readme, /fooks inspect react-web-issues/);
   assert.match(readme, /fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards[\s\S]*`fooks compare <supported-file>` is supporting local source-vs-payload evidence/);

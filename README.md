@@ -1,8 +1,8 @@
 # fooks
 
-Frontend change intelligence for lower-cost frontend work.
+Frontend change intelligence for lower-cost React Web work.
 
-`fooks` helps agents spend less time and context rediscovering the same React Web facts before feature work, migrations, refactors, and tests. The first wedge is React Web: source-fact extraction, evidence gates, and actionable CLI reports point out narrow form/accessibility issues and, when confidence is high, show read-only patch previews a human or agent can review.
+`fooks` helps agents spend less time and context rediscovering the same React Web facts before feature work, migrations, refactors, and tests. The first wedge is React Web: source-fact extraction, evidence gates, and actionable issue cards point out narrow form/accessibility issues and, when confidence is high, show read-only safe preview candidates a human or agent can review. Ambiguous or risky cases stay as manual-review cards with skip reasons.
 
 Context reduction and caching remain supporting mechanisms. In the strongest current path, a Codex user mentions the same React `.tsx` / `.jsx` file more than once in one repo: the first eligible mention records compact context, and later same-file prompts may reuse a compact model-facing payload when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
 
@@ -19,18 +19,25 @@ fooks compare src/components/Button.tsx
 
 Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, `fooks inspect react-web-issues` renders actionable React Web issue cards, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
 
-Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibility facts can reduce frontend change cost. The current CLI surface is advisory and read-only: it reports narrow native-control label/accessibility findings and shows patch previews only when confidence is high enough for review, not automatic application. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence and actionable report output, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
+To inspect the first frontend-change-intelligence wedge directly:
+
+```bash
+fooks inspect react-web-issues src/components/Form.tsx
+fooks inspect react-web-issues src/components/Form.tsx --json
+```
+
+Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibility facts can reduce frontend change cost. The current CLI surface is advisory and read-only: it emits issue cards with `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`; only deterministic high-confidence native label/control associations receive preview candidates, while ambiguous or risky findings receive manual-review skip reasons. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence and actionable report output, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
 
 - Public npm package: `fxxk-frontend-hooks`
 - CLI command: `fooks`
 
 ## 30-second version
 
-Use fooks when you want frontend change intelligence for a supported React Web file: source-derived context that lowers the cost of repeated feature work, migrations, refactors, and tests, plus a CLI report that turns narrow form/accessibility findings into reviewable issue cards.
+Use fooks when you want frontend change intelligence for a supported React Web file: source-derived context that lowers the cost of repeated feature work, migrations, refactors, and tests, actionable issue cards before editing, conservative safe previews when confidence is high, and smaller model-facing context for repeated same-file Codex work.
 
 - **Product direction:** frontend work cost reduction through source facts, evidence gates, actionable reports, and bounded preview guidance.
 - **First wedge:** React Web `.tsx` / `.jsx`; repeated same-file Codex context reuse is the strongest current workflow.
-- **First surface/problem:** `fooks inspect react-web-issues <file>` reports narrow native-control form/accessibility issues, with read-only patch previews only when confidence is high.
+- **First surface/problem:** `fooks inspect react-web-issues <file> [--json]` reports narrow native-control form/accessibility issue cards, with read-only safe previews only for deterministic native label/control associations.
 - **Supporting mechanism:** context reduction and caching help avoid rediscovering the same source facts, but they are not the whole product positioning.
 - **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
 - **Roadmap asks, not current support:** React Native/WebView, TUI / React CLI promotion beyond candidate / evidence-only status, Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
