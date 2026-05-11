@@ -385,3 +385,45 @@ test("React Web issue report text mode prints per-card manual-review fix-shape g
   assert.match(cli.stdout, /- inspect first for fix shape:/);
   assert.doesNotMatch(cli.stdout, /must-edit|Auto-apply: yes|Controller/);
 });
+
+test("React Web issue report text mode adds compact first-minute summary before detailed cards", () => {
+  const cli = runIssues(fixtures.formControls);
+  assert.equal(cli.status, 0, cli.stderr);
+
+  const summaryIndex = cli.stdout.indexOf("## First-minute summary");
+  const issueIndex = cli.stdout.indexOf("## Issue 1:");
+  assert.ok(summaryIndex > 0, "expected compact first-minute summary");
+  assert.ok(issueIndex > summaryIndex, "compact summary should appear before detailed issue cards");
+
+  assert.match(cli.stdout, /Compact read-only triage from existing ranked issue evidence/);
+  assert.match(cli.stdout, /inspect before editing and keep human review/);
+  assert.match(
+    cli.stdout,
+    /- react-web-label-1: human-reviewed-native-control-name; first inspect: Inspect fixtures\/compressed\/FormControls\.tsx:23-23 \(input\) before editing\./,
+  );
+  assert.match(
+    cli.stdout,
+    /- react-web-label-4: human-reviewed-native-control-name; first inspect: Inspect fixtures\/compressed\/FormControls\.tsx:32-32 \(input\) before editing\./,
+  );
+  assert.match(
+    cli.stdout,
+    /- react-web-label-5: human-reviewed-native-control-name; first inspect: Inspect fixtures\/compressed\/FormControls\.tsx:34-34 \(input\) before editing\./,
+  );
+  const compactBlock = cli.stdout.slice(summaryIndex, issueIndex);
+  assert.doesNotMatch(compactBlock, /must-edit|Auto-apply: yes|generated accessible-name copy/);
+});
+
+test("React Web issue report compact first-minute summary stays text-only", () => {
+  const cli = runIssues(fixtures.formControls, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.doesNotMatch(cli.stdout, /First-minute summary/);
+
+  const report = JSON.parse(cli.stdout);
+  assert.equal(report.schemaVersion, "react-web-issue-report.v1");
+  assert.equal(report.firstMinuteSummary, undefined);
+  assert.deepEqual(report.triageRollup.topIssueIds, [
+    "react-web-label-1",
+    "react-web-label-4",
+    "react-web-label-5",
+  ]);
+});
