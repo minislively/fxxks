@@ -8,6 +8,8 @@ import {
 import {
   ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY,
   ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND,
+  ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE,
+  ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL,
   ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE,
   triageOrphanLocalWorktrees,
   type OrphanLocalWorktreeEntry,
@@ -20,6 +22,10 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
+export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
+export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
+  "Read-only issue #726 operator queue for orphan local-ahead sibling worktrees; lists salvage-review evidence only and does not delete, push, fetch, mutate, or generate cleanup commands for orphan branches.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -58,12 +64,43 @@ export type OperatorCheckActiveWorkReceiptIdentifiers = {
     category: OrphanLocalWorktreeEntry["category"];
     activeTmuxPaneCount: number;
     aheadOfBase?: number;
+    behindBase?: number;
     dirty: OrphanLocalWorktreeEntry["dirty"];
     remoteBranchExists: OrphanLocalWorktreeEntry["remoteBranchExists"];
     openPullRequestState: OrphanLocalWorktreeEntry["openPullRequest"]["state"];
     closedPullRequestState: OrphanLocalWorktreeEntry["closedPullRequest"]["state"];
     localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
   };
+};
+
+export type OperatorCheckSalvageReviewQueueItem = {
+  branch?: string;
+  head?: string;
+  category: "salvage-review";
+  evidence: {
+    baseRef?: string;
+    aheadOfBase?: number;
+    behindBase?: number;
+    diff: OrphanLocalWorktreeEntry["diffEvidence"];
+    dirty: OrphanLocalWorktreeEntry["dirty"];
+    changedPathCount?: number;
+    remoteBranchExists: false | "unknown";
+    openPullRequestState: OrphanLocalWorktreeEntry["openPullRequest"]["state"];
+    closedPullRequestState: OrphanLocalWorktreeEntry["closedPullRequest"]["state"];
+  };
+  reasons: string[];
+  localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+};
+
+export type OperatorCheckSalvageReviewQueue = {
+  schemaVersion: typeof OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION;
+  issue: typeof ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE;
+  issueUrl: typeof ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY;
+  readOnly: true;
+  itemCount: number;
+  items: OperatorCheckSalvageReviewQueueItem[];
 };
 
 export type OperatorCheckActiveWorkReceipt = {
@@ -85,6 +122,7 @@ export type OperatorCheckActiveWorkReceipts = {
   identifiers: Omit<OperatorCheckActiveWorkReceiptIdentifiers, "session">;
   receipts: OperatorCheckActiveWorkReceipt[];
   reportLine: string;
+  salvageReviewQueue: OperatorCheckSalvageReviewQueue;
   blockers: string[];
 };
 
@@ -178,7 +216,12 @@ function withRepoBlockers(blockers: string[], repoBlockers: string[]): string[] 
   return uniqueSorted([...blockers, ...repoBlockers]);
 }
 
-function receiptReportLine(receipts: OperatorCheckActiveWorkReceipt[], classification: OperatorCheckActiveWorkReceiptClassification, blockers: string[]): string {
+function receiptReportLine(
+  receipts: OperatorCheckActiveWorkReceipt[],
+  classification: OperatorCheckActiveWorkReceiptClassification,
+  blockers: string[],
+  salvageReviewQueueItemCount = 0,
+): string {
   const active = receipts.filter((receipt) => receipt.classification === "active").length;
   const stale = receipts.filter((receipt) => receipt.classification === "closedOrStale").length;
   const mainEcho = receipts.some((receipt) => receipt.classification === "mainEcho");
@@ -187,6 +230,7 @@ function receiptReportLine(receipts: OperatorCheckActiveWorkReceipt[], classific
   parts.push(`active=${active}`);
   parts.push(`closedOrStale=${stale}`);
   if (mainEcho) parts.push("mainEcho=1");
+  if (salvageReviewQueueItemCount > 0) parts.push(`salvageReviewQueue=${salvageReviewQueueItemCount}`);
   if (blocked) parts.push(`blockers=${blocked}`);
   return parts.join("; ");
 }
@@ -223,7 +267,7 @@ function siblingWorktreeReceipts(
   baseIdentifiers: Omit<OperatorCheckActiveWorkReceiptIdentifiers, "session" | "siblingWorktree">,
   baseBlockers: string[],
   options: OperatorActivityOptions,
-): { receipts: OperatorCheckActiveWorkReceipt[]; blockers: string[] } {
+): { receipts: OperatorCheckActiveWorkReceipt[]; salvageReviewQueue: OperatorCheckSalvageReviewQueue; blockers: string[] } {
   try {
     const triage = triageOrphanLocalWorktrees(cwd, {
       runner: options.commandRunner
@@ -248,6 +292,7 @@ function siblingWorktreeReceipts(
             category: entry.category,
             activeTmuxPaneCount: entry.activeTmuxPaneCount,
             aheadOfBase: entry.aheadOfBase,
+            behindBase: entry.behindBase,
             dirty: entry.dirty,
             remoteBranchExists: entry.remoteBranchExists,
             openPullRequestState: entry.openPullRequest.state,
@@ -259,11 +304,47 @@ function siblingWorktreeReceipts(
         reasons: siblingWorktreeReceiptReasons(entry),
         blockers: withRepoBlockers(triage.blockers, baseBlockers),
       }));
-    return { receipts, blockers: triage.blockers };
+    return { receipts, salvageReviewQueue: buildSalvageReviewQueue(triage.entries), blockers: triage.blockers };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return { receipts: [], blockers: [`sibling worktree adoption receipt unavailable: ${detail}`] };
+    return { receipts: [], salvageReviewQueue: buildSalvageReviewQueue([]), blockers: [`sibling worktree adoption receipt unavailable: ${detail}`] };
   }
+}
+
+function buildSalvageReviewQueue(entries: OrphanLocalWorktreeEntry[]): OperatorCheckSalvageReviewQueue {
+  const items = entries
+    .filter((entry) => !entry.current)
+    .filter((entry) => entry.category === "salvage-review")
+    .filter((entry) => entry.remoteBranchExists === false || entry.remoteBranchExists === "unknown")
+    .map((entry) => ({
+      branch: entry.branch,
+      head: entry.head,
+      category: "salvage-review" as const,
+      evidence: {
+        baseRef: entry.baseRef,
+        aheadOfBase: entry.aheadOfBase,
+        behindBase: entry.behindBase,
+        diff: entry.diffEvidence,
+        dirty: entry.dirty,
+        changedPathCount: entry.changedPathCount,
+        remoteBranchExists: entry.remoteBranchExists as false | "unknown",
+        openPullRequestState: entry.openPullRequest.state,
+        closedPullRequestState: entry.closedPullRequest.state,
+      },
+      reasons: siblingWorktreeReceiptReasons(entry),
+      localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically" as const,
+    }));
+
+  return {
+    schemaVersion: OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION,
+    issue: ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE,
+    issueUrl: ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL,
+    source: OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE,
+    claimBoundary: OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY,
+    readOnly: true,
+    itemCount: items.length,
+    items,
+  };
 }
 
 function buildActiveWorkReceipts(
@@ -374,7 +455,8 @@ function buildActiveWorkReceipts(
     classification,
     identifiers: baseIdentifiers,
     receipts,
-    reportLine: receiptReportLine(receipts, classification, blockers),
+    reportLine: receiptReportLine(receipts, classification, blockers, siblingReceipts.salvageReviewQueue.itemCount),
+    salvageReviewQueue: siblingReceipts.salvageReviewQueue,
     blockers,
   };
 }
