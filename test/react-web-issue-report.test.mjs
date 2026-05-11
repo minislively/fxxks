@@ -11,6 +11,7 @@ const { buildReactWebLabelPatchPreview } = require(path.join(repoRoot, "dist", "
 const {
   REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY,
   buildReactWebIssueReport,
+  buildReactWebIssueReportSummaryJson,
 } = require(path.join(repoRoot, "dist", "core", "react-web-issue-report.js"));
 
 const fixtures = {
@@ -35,6 +36,12 @@ function parseIssues(file) {
   const cli = runIssues(file, "--json");
   assert.equal(cli.status, 0, cli.stderr);
   return JSON.parse(cli.stdout);
+}
+
+function hasNestedKey(value, key) {
+  if (!value || typeof value !== "object") return false;
+  if (Object.hasOwn(value, key)) return true;
+  return Object.values(value).some((entry) => hasNestedKey(entry, key));
 }
 
 function matrixEntry({ fixture, expectedCards, report, preview, acceptedCards, rejectedCards = 0, noiseNotes = [], suggestionPlausibility }) {
@@ -469,4 +476,89 @@ test("React Web issue report JSON includes machine-readable first-minute summary
     ],
   );
   assert.doesNotMatch(JSON.stringify(report.firstMinuteSummary), /must-edit|Auto-apply: yes|Controller/i);
+});
+
+
+test("React Web issue report summary JSON is compact first-minute data without detailed issue cards", () => {
+  const fullCli = runIssues(fixtures.formControls, "--json");
+  const summaryCli = runIssues(fixtures.formControls, "--summary-json");
+  assert.equal(fullCli.status, 0, fullCli.stderr);
+  assert.equal(summaryCli.status, 0, summaryCli.stderr);
+  assert.ok(summaryCli.stdout.length < fullCli.stdout.length, `summary ${summaryCli.stdout.length} should be smaller than full ${fullCli.stdout.length}`);
+
+  const fullReport = JSON.parse(fullCli.stdout);
+  const summary = JSON.parse(summaryCli.stdout);
+  const projected = buildReactWebIssueReportSummaryJson(fullReport);
+
+  assert.equal(fullReport.schemaVersion, "react-web-issue-report.v1");
+  assert.ok(Array.isArray(fullReport.issues));
+  assert.ok(fullReport.issues.length > 0);
+  assert.equal(summary.schemaVersion, "react-web-issue-report-summary.v1");
+  assert.equal(summary.sourceReportSchemaVersion, fullReport.schemaVersion);
+  assert.equal(summary.command, "inspect react-web-issues");
+  assert.equal(summary.projection, "summary-json");
+  assert.equal(summary.profile, "react-web");
+  assert.equal(summary.filePath, fullReport.filePath);
+  assert.equal(summary.readOnly, true);
+  assert.equal(summary.autoApply, false);
+  assert.equal(summary.claimBoundary, REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY);
+  assert.match(summary.claimBoundary, /Read-only React Web issue report/);
+  assert.match(summary.claimBoundary, /does not auto-apply patches/);
+  assert.match(summary.claimBoundary, /does not infer custom-component semantics/);
+  assert.deepEqual(summary.summary, fullReport.summary);
+  assert.deepEqual(summary.triageTopIds, {
+    rankedIssueIds: fullReport.triageRollup.rankedIssueIds,
+    topIssueIds: fullReport.triageRollup.topIssueIds,
+    topManualReviewIssueIds: fullReport.triageRollup.topManualReviewIssueIds,
+    safePreviewIssueIds: fullReport.triageRollup.safePreviewIssueIds,
+    manualReviewIssueIds: fullReport.triageRollup.manualReviewIssueIds,
+  });
+  assert.deepEqual(summary.firstMinuteSummary, fullReport.firstMinuteSummary);
+  assert.deepEqual(summary, projected);
+
+  assert.deepEqual(summary.triageTopIds.topIssueIds, [
+    "react-web-label-1",
+    "react-web-label-4",
+    "react-web-label-5",
+  ]);
+  assert.deepEqual(summary.firstMinuteSummary.sourceTopIssueIds, summary.triageTopIds.topIssueIds);
+  assert.deepEqual(Object.hasOwn(summary, "issues"), false);
+
+  const compactText = JSON.stringify(summary);
+  for (const detailedCardKey of ["issues", "relatedContext", "preview", "evidence", "sourceSignals", "suggestedAction", "whereToLook", "whyItMatters", "problem"]) {
+    assert.equal(hasNestedKey(summary, detailedCardKey), false, `summary-json should not include detailed key ${detailedCardKey}`);
+  }
+  assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|Controller/i);
+});
+
+test("React Web issue report summary JSON preserves skip boundaries without detailed cards", () => {
+  const rnCli = runIssues(fixtures.rn, "--summary-json");
+  assert.equal(rnCli.status, 0, rnCli.stderr);
+  const summary = JSON.parse(rnCli.stdout);
+
+  assert.equal(summary.inScope, false);
+  assert.match(summary.skippedReason, /^domain-classification:react-native/);
+  assert.equal(summary.readOnly, true);
+  assert.equal(summary.autoApply, false);
+  assert.deepEqual(summary.summary, {
+    issueCount: 0,
+    safePreviewCount: 0,
+    manualReviewCount: 0,
+    unsafeToAutoApplyCount: 0,
+  });
+  assert.deepEqual(summary.triageTopIds, {
+    rankedIssueIds: [],
+    topIssueIds: [],
+    topManualReviewIssueIds: [],
+    safePreviewIssueIds: [],
+    manualReviewIssueIds: [],
+  });
+  assert.deepEqual(summary.firstMinuteSummary, { sourceTopIssueIds: [], items: [] });
+  assert.deepEqual(Object.hasOwn(summary, "issues"), false);
+});
+
+test("React Web issue report rejects conflicting JSON output flags", () => {
+  const cli = runIssues(fixtures.formControls, "--json", "--summary-json");
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /either --json or --summary-json, not both/);
 });
