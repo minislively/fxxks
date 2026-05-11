@@ -158,6 +158,29 @@ export type ReactWebIssueReport = {
   issues: ReactWebIssueCard[];
 };
 
+export type ReactWebIssueReportSummaryJson = {
+  schemaVersion: "react-web-issue-report-summary.v1";
+  sourceReportSchemaVersion: typeof REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION;
+  command: typeof REACT_WEB_ISSUE_REPORT_COMMAND;
+  projection: "summary-json";
+  profile: "react-web";
+  filePath: string;
+  readOnly: true;
+  autoApply: false;
+  claimBoundary: typeof REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY;
+  inScope: boolean;
+  skippedReason?: string;
+  summary: ReactWebIssueReport["summary"];
+  triageTopIds: {
+    rankedIssueIds: string[];
+    topIssueIds: string[];
+    topManualReviewIssueIds: string[];
+    safePreviewIssueIds: string[];
+    manualReviewIssueIds: string[];
+  };
+  firstMinuteSummary: ReactWebIssueFirstMinuteSummary;
+};
+
 function issueKindFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueKind {
   return `react-web.${finding.kind}` as ReactWebIssueKind;
 }
@@ -635,6 +658,31 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
     triageRollup,
     firstMinuteSummary: buildFirstMinuteSummary(triageRollup, issues),
     issues,
+  };
+}
+
+export function buildReactWebIssueReportSummaryJson(report: ReactWebIssueReport): ReactWebIssueReportSummaryJson {
+  return {
+    schemaVersion: "react-web-issue-report-summary.v1",
+    sourceReportSchemaVersion: report.schemaVersion,
+    command: report.command,
+    projection: "summary-json",
+    profile: report.profile,
+    filePath: report.filePath,
+    readOnly: report.readOnly,
+    autoApply: report.autoApply,
+    claimBoundary: report.claimBoundary,
+    inScope: report.inScope,
+    ...(report.skippedReason ? { skippedReason: report.skippedReason } : {}),
+    summary: report.summary,
+    triageTopIds: {
+      rankedIssueIds: report.triageRollup.rankedIssueIds,
+      topIssueIds: report.triageRollup.topIssueIds,
+      topManualReviewIssueIds: report.triageRollup.topManualReviewIssueIds,
+      safePreviewIssueIds: report.triageRollup.safePreviewIssueIds,
+      manualReviewIssueIds: report.triageRollup.manualReviewIssueIds,
+    },
+    firstMinuteSummary: report.firstMinuteSummary,
   };
 }
 

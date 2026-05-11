@@ -649,7 +649,7 @@ Everyday commands:
   ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect react-web-label-preview <file> [--json]
-  ${displayCliName} inspect react-web-issues <file> [--json]
+  ${displayCliName} inspect react-web-issues <file> [--json|--summary-json]
   ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
@@ -712,6 +712,34 @@ function parseCompareArgs(args: string[]): { filePath: string; json: boolean } {
   }
 
   return { filePath: requireFilePath(filePath), json };
+}
+
+function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode: "text" | "json" | "summary-json" } {
+  let filePath: string | undefined;
+  let json = false;
+  let summaryJson = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--summary-json") {
+      summaryJson = true;
+      continue;
+    }
+    if (!filePath) {
+      filePath = arg;
+      continue;
+    }
+    throw new Error(`Unexpected react-web-issues argument: ${arg}`);
+  }
+
+  if (json && summaryJson) {
+    throw new Error("inspect react-web-issues accepts either --json or --summary-json, not both");
+  }
+
+  return { filePath: requireFilePath(filePath), outputMode: summaryJson ? "summary-json" : json ? "json" : "text" };
 }
 
 function parseInspectEvidenceArgs(args: string[]): { id: string; json: boolean } {
@@ -1319,10 +1347,12 @@ async function run(): Promise<void> {
         return;
       }
       if (arg1 === "react-web-issues") {
-        const { filePath: file, json } = parseCompareArgs(rest.slice(1));
-        const { buildReactWebIssueReport, renderReactWebIssueReportText } = await import("../core/react-web-issue-report.js");
+        const { filePath: file, outputMode } = parseReactWebIssuesArgs(rest.slice(1));
+        const { buildReactWebIssueReport, buildReactWebIssueReportSummaryJson, renderReactWebIssueReportText } = await import("../core/react-web-issue-report.js");
         const report = buildReactWebIssueReport(file, process.cwd());
-        if (json) {
+        if (outputMode === "summary-json") {
+          print(buildReactWebIssueReportSummaryJson(report));
+        } else if (outputMode === "json") {
           print(report);
         } else {
           process.stdout.write(renderReactWebIssueReportText(report));
