@@ -61,6 +61,7 @@ export type OperatorCheckActiveWorkReceiptIdentifiers = {
     dirty: OrphanLocalWorktreeEntry["dirty"];
     remoteBranchExists: OrphanLocalWorktreeEntry["remoteBranchExists"];
     openPullRequestState: OrphanLocalWorktreeEntry["openPullRequest"]["state"];
+    closedPullRequestState: OrphanLocalWorktreeEntry["closedPullRequest"]["state"];
     localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
   };
 };
@@ -202,11 +203,14 @@ function overallReceiptClassification(
 }
 
 function siblingWorktreeReceiptClassification(entry: OrphanLocalWorktreeEntry): OperatorCheckActiveWorkReceiptClassification {
+  if (entry.category === "manual-review-noise") return "closedOrStale";
   return entry.category === "keep" ? "active" : "closedOrStale";
 }
 
 function siblingWorktreeReceiptReasons(entry: OrphanLocalWorktreeEntry): string[] {
-  const categoryReason = entry.category === "salvage-review"
+  const categoryReason = entry.category === "manual-review-noise"
+    ? `closed-PR remote worktree residue is non-active manual-review noise; do not adopt as active solely from remote/pr counts (#723; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
+    : entry.category === "salvage-review"
     ? `local-ahead orphan or uncertain local state: preserve local-only commits before adoption or cleanup (${OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE}; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
     : entry.category === "safe-cleanup"
       ? `stale worktree residue candidate; no active adoption without manual confirmation (${OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE}; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
@@ -247,6 +251,7 @@ function siblingWorktreeReceipts(
             dirty: entry.dirty,
             remoteBranchExists: entry.remoteBranchExists,
             openPullRequestState: entry.openPullRequest.state,
+            closedPullRequestState: entry.closedPullRequest.state,
             localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically" as const,
           },
         },

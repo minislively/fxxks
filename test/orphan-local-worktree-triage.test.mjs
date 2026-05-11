@@ -140,6 +140,62 @@ test("orphan local worktree triage classifies safe cleanup, salvage review, and 
   assert.equal(calls.some(([command, args]) => command === "git" && ["fetch", "worktree remove", "branch -d"].includes(args.join(" "))), false);
 });
 
+test("orphan local worktree triage classifies closed-PR remote branches as manual-review noise", () => {
+  const cwd = "/work/fooks.omx-worktrees/current";
+  const closedPrRemote = "/work/fooks.omx-worktrees/fooks-issue-631-rn-compare-inspect-visibility";
+  const calls = [];
+  const result = triageOrphanLocalWorktrees(cwd, {
+    now: () => "2026-05-11T00:00:00.000Z",
+    pathExists: (target) => [cwd, closedPrRemote].includes(target),
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        `worktree ${closedPrRemote}`,
+        "HEAD 222",
+        "branch refs/heads/fooks-issue-631-rn-compare-inspect-visibility",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch -r --format=%(refname:short)": "origin/main\norigin/fooks-issue-631-rn-compare-inspect-visibility\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": "",
+      [`${cwd} :: git status --porcelain=v1 -z`]: "",
+      [`${closedPrRemote} :: git status --porcelain=v1 -z`]: "",
+      [`${cwd} :: git rev-list --count origin/main..HEAD`]: "0\n",
+      [`${closedPrRemote} :: git rev-list --count origin/main..HEAD`]: "12\n",
+      "gh pr list --state open --json number,url,headRefName --limit 200": "[]",
+      "gh pr list --state closed --json number,url,headRefName,state,closedAt --limit 200": JSON.stringify([
+        {
+          number: 634,
+          url: "https://github.com/minislively/fooks/pull/634",
+          headRefName: "fooks-issue-631-rn-compare-inspect-visibility",
+          state: "CLOSED",
+          closedAt: "2026-05-01T00:00:00Z",
+        },
+      ]),
+    }, calls),
+  });
+
+  const entry = result.entries.find((item) => item.branch === "fooks-issue-631-rn-compare-inspect-visibility");
+  assert.equal(entry?.category, "manual-review-noise");
+  assert.equal(entry?.remoteBranchExists, true);
+  assert.equal(entry?.openPullRequest.state, "none");
+  assert.equal(entry?.closedPullRequest.state, "closed");
+  assert.match(entry?.reasons.join("\n") ?? "", /closed pull request evidence.*#634/);
+  assert.match(entry?.manualReviewCommands.join("\n") ?? "", /do not count this closed-PR remote worktree as active adoption evidence/i);
+  assert.deepEqual(entry?.manualCleanupCommands, []);
+  assert.deepEqual(result.categories["manual-review-noise"].map((item) => item.branch), ["fooks-issue-631-rn-compare-inspect-visibility"]);
+
+  const decision = result.decisionTable.find((item) => item.branch === "fooks-issue-631-rn-compare-inspect-visibility");
+  assert.equal(decision?.decision, "manual-review-blocked");
+  assert.match(decision?.decisionLabel ?? "", /NON-ACTIVE closed-PR remote worktree noise/);
+  assert.equal(decision?.deleteCommand, "none from this artifact");
+  assert.match(decision?.evidenceSummary ?? "", /remote:true; open-pr:none; closed-pr:#634/);
+  assert.equal(calls.some(([command, args]) => command === "git" && ["fetch", "worktree remove", "branch -d"].includes(args.join(" "))), false);
+});
+
 test("status orphan-worktrees emits parseable JSON", () => {
   const stdout = execFileSync(process.execPath, [cli, "status", "orphan-worktrees", "--json"], {
     cwd: repoRoot,
