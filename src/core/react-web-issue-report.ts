@@ -105,6 +105,23 @@ export type ReactWebIssueCard = {
   };
 };
 
+export type ReactWebIssueFirstMinuteSummaryItem = {
+  issueId: string;
+  fixShape: ReactWebIssueFixShape;
+  firstInspectStep: string;
+  inspectFirst: string[];
+  fixShapeGuidance: {
+    claimBoundary: ReactWebIssueFixShapeGuidance["claimBoundary"];
+    humanReviewRequired: true;
+    autoApply: false;
+  };
+};
+
+export type ReactWebIssueFirstMinuteSummary = {
+  sourceTopIssueIds: string[];
+  items: ReactWebIssueFirstMinuteSummaryItem[];
+};
+
 export type ReactWebIssueReport = {
   schemaVersion: typeof REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION;
   command: typeof REACT_WEB_ISSUE_REPORT_COMMAND;
@@ -137,6 +154,7 @@ export type ReactWebIssueReport = {
     safePreviewIssueIds: string[];
     manualReviewIssueIds: string[];
   };
+  firstMinuteSummary: ReactWebIssueFirstMinuteSummary;
   issues: ReactWebIssueCard[];
 };
 
@@ -553,6 +571,35 @@ function buildTriageRollup(issues: ReactWebIssueCard[]): ReactWebIssueReport["tr
   };
 }
 
+function firstInspectStepFor(issue: ReactWebIssueCard): string {
+  return issue.fixShapeGuidance.inspectFirst[0] ?? `${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`;
+}
+
+function buildFirstMinuteSummary(
+  triageRollup: ReactWebIssueReport["triageRollup"],
+  issues: ReactWebIssueCard[],
+): ReactWebIssueFirstMinuteSummary {
+  const issuesById = new Map(issues.map((issue) => [issue.id, issue]));
+  const items = triageRollup.topIssueIds
+    .map((id) => issuesById.get(id))
+    .filter((issue): issue is ReactWebIssueCard => Boolean(issue))
+    .map((issue) => ({
+      issueId: issue.id,
+      fixShape: issue.fixShapeGuidance.shape,
+      firstInspectStep: firstInspectStepFor(issue),
+      inspectFirst: [...issue.fixShapeGuidance.inspectFirst],
+      fixShapeGuidance: {
+        claimBoundary: issue.fixShapeGuidance.claimBoundary,
+        humanReviewRequired: issue.fixShapeGuidance.humanReviewRequired,
+        autoApply: issue.fixShapeGuidance.autoApply,
+      },
+    }));
+  return {
+    sourceTopIssueIds: [...triageRollup.topIssueIds],
+    items,
+  };
+}
+
 export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()): ReactWebIssueReport {
   const preview = buildReactWebLabelPatchPreview(filePath, cwd);
   const issues = withTriageRanks(preview.findings.map((finding, index) =>
@@ -563,6 +610,7 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
       buildReactWebIssueRelatedContext(preview.filePath, finding, cwd),
     ),
   ));
+  const triageRollup = buildTriageRollup(issues);
   return {
     schemaVersion: REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
     command: REACT_WEB_ISSUE_REPORT_COMMAND,
@@ -584,7 +632,8 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
       manualReviewCount: issues.filter((issue) => issue.fixability === "manual-review").length,
       unsafeToAutoApplyCount: issues.filter((issue) => issue.autoFixSafety === "unsafe-to-auto-apply").length,
     },
-    triageRollup: buildTriageRollup(issues),
+    triageRollup,
+    firstMinuteSummary: buildFirstMinuteSummary(triageRollup, issues),
     issues,
   };
 }

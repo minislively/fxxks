@@ -313,11 +313,13 @@ test("React Web issue report preserves skip and no unsupported custom-component 
   assert.equal(rnReport.inScope, false);
   assert.match(rnReport.skippedReason, /^domain-classification:react-native/);
   assert.deepEqual(rnReport.issues, []);
+  assert.deepEqual(rnReport.firstMinuteSummary, { sourceTopIssueIds: [], items: [] });
 
   const customReport = parseIssues(fixtures.customComponent);
   assert.equal(customReport.inScope, true);
   assert.equal(customReport.summary.issueCount, 0);
   assert.deepEqual(customReport.issues, []);
+  assert.deepEqual(customReport.firstMinuteSummary, { sourceTopIssueIds: [], items: [] });
 });
 
 test("React Web issue report avoids unsafe htmlFor inference and keeps fallback previews read-only", () => {
@@ -413,17 +415,58 @@ test("React Web issue report text mode adds compact first-minute summary before 
   assert.doesNotMatch(compactBlock, /must-edit|Auto-apply: yes|generated accessible-name copy/);
 });
 
-test("React Web issue report compact first-minute summary stays text-only", () => {
+test("React Web issue report JSON includes machine-readable first-minute summary projection", () => {
   const cli = runIssues(fixtures.formControls, "--json");
   assert.equal(cli.status, 0, cli.stderr);
   assert.doesNotMatch(cli.stdout, /First-minute summary/);
 
   const report = JSON.parse(cli.stdout);
   assert.equal(report.schemaVersion, "react-web-issue-report.v1");
-  assert.equal(report.firstMinuteSummary, undefined);
   assert.deepEqual(report.triageRollup.topIssueIds, [
     "react-web-label-1",
     "react-web-label-4",
     "react-web-label-5",
   ]);
+  assert.deepEqual(report.firstMinuteSummary.sourceTopIssueIds, report.triageRollup.topIssueIds);
+  assert.deepEqual(
+    report.firstMinuteSummary.items.map((item) => item.issueId),
+    report.triageRollup.topIssueIds,
+  );
+
+  const byId = Object.fromEntries(report.issues.map((issue) => [issue.id, issue]));
+  for (const item of report.firstMinuteSummary.items) {
+    const issue = byId[item.issueId];
+    assert.ok(issue, `expected first-minute item to reference an existing issue: ${item.issueId}`);
+    assert.equal(item.fixShape, issue.fixShapeGuidance.shape);
+    assert.equal(
+      item.firstInspectStep,
+      issue.fixShapeGuidance.inspectFirst[0] ?? `${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
+    );
+    assert.deepEqual(item.inspectFirst, issue.fixShapeGuidance.inspectFirst);
+    assert.equal(item.fixShapeGuidance.claimBoundary, issue.fixShapeGuidance.claimBoundary);
+    assert.equal(item.fixShapeGuidance.humanReviewRequired, true);
+    assert.equal(item.fixShapeGuidance.autoApply, false);
+  }
+
+  assert.deepEqual(
+    report.firstMinuteSummary.items.map((item) => [item.issueId, item.fixShape, item.firstInspectStep]),
+    [
+      [
+        "react-web-label-1",
+        "human-reviewed-native-control-name",
+        "Inspect fixtures/compressed/FormControls.tsx:23-23 (input) before editing.",
+      ],
+      [
+        "react-web-label-4",
+        "human-reviewed-native-control-name",
+        "Inspect fixtures/compressed/FormControls.tsx:32-32 (input) before editing.",
+      ],
+      [
+        "react-web-label-5",
+        "human-reviewed-native-control-name",
+        "Inspect fixtures/compressed/FormControls.tsx:34-34 (input) before editing.",
+      ],
+    ],
+  );
+  assert.doesNotMatch(JSON.stringify(report.firstMinuteSummary), /must-edit|Auto-apply: yes|Controller/i);
 });
