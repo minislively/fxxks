@@ -186,4 +186,12 @@ export {
   buildReactWebIssueReport,
   renderReactWebIssueReportText,
 } from "./core/react-web-issue-report";
-export type { ReactWebIssueCard, ReactWebIssueReport } from "./core/react-web-issue-report";
+export type {
+  ReactWebIssueCard,
+  ReactWebIssuePriority,
+  ReactWebIssueReport,
+  ReactWebIssueTriageBucket,
+  ReactWebIssueTriage,
+  ReactWebIssueTriageEvidence,
+  ReactWebRelatedContextQuality,
+} from "./core/react-web-issue-report";

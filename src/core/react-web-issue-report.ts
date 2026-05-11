@@ -17,10 +17,32 @@ export const REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY =
 type ReactWebIssueConfidence = "high" | "medium";
 type ReactWebIssueFixability = "safe-preview" | "manual-review";
 type ReactWebIssueAutoFixSafety = "not-auto-applied" | "unsafe-to-auto-apply";
+export type ReactWebIssuePriority = "high" | "medium" | "low";
+export type ReactWebIssueTriageBucket = "safe-preview" | "high-confidence-manual-review" | "manual-review";
+export type ReactWebRelatedContextQuality = "same-file-only" | "local-supporting-context" | "thin-local-context";
 type ReactWebIssueKind =
   | "react-web.missing-accessible-label"
   | "react-web.ambiguous-accessible-label"
   | "react-web.unassociated-nearby-label";
+
+export type ReactWebIssueTriageEvidence = {
+  safePreviewAvailable: boolean;
+  confidence: ReactWebIssueConfidence;
+  nativeElement: ReactWebLabelPatchPreviewFinding["element"];
+  sameFileContextAvailable: boolean;
+  relatedContextCount: number;
+  relatedContextSources: ReactWebIssueRelatedContext["source"][];
+  relatedContextQuality: ReactWebRelatedContextQuality;
+  score: number;
+  reasons: string[];
+};
+
+export type ReactWebIssueTriage = {
+  rank: number;
+  priority: ReactWebIssuePriority;
+  bucket: ReactWebIssueTriageBucket;
+  evidence: ReactWebIssueTriageEvidence;
+};
 
 export type ReactWebIssueCard = {
   id: string;
@@ -48,6 +70,7 @@ export type ReactWebIssueCard = {
   safetyRationale: string;
   suggestedFixIntent: string;
   suggestedAction: string;
+  triage: ReactWebIssueTriage;
   skipReason?: string;
   preview?: {
     type: "unified-diff-fragment";
@@ -76,6 +99,17 @@ export type ReactWebIssueReport = {
     safePreviewCount: number;
     manualReviewCount: number;
     unsafeToAutoApplyCount: number;
+  };
+  triageRollup: {
+    claimBoundary: string;
+    criteria: string[];
+    priorityCounts: Record<ReactWebIssuePriority, number>;
+    bucketCounts: Record<ReactWebIssueTriageBucket, number>;
+    rankedIssueIds: string[];
+    topIssueIds: string[];
+    topManualReviewIssueIds: string[];
+    safePreviewIssueIds: string[];
+    manualReviewIssueIds: string[];
   };
   issues: ReactWebIssueCard[];
 };
@@ -146,6 +180,101 @@ function skipReasonFor(finding: ReactWebLabelPatchPreviewFinding): string {
   return "Preview skipped because generated accessible-name copy would require human review.";
 }
 
+function uniqueRelatedContextSources(
+  relatedContext: ReactWebIssueRelatedContext[],
+): ReactWebIssueRelatedContext["source"][] {
+  return [...new Set(relatedContext.map((item) => item.source))].sort();
+}
+
+function relatedContextQualityFor(relatedContext: ReactWebIssueRelatedContext[]): ReactWebRelatedContextQuality {
+  const sources = new Set(relatedContext.map((item) => item.source));
+  if (sources.has("local-import") || sources.has("nearby-test")) {
+    return "local-supporting-context";
+  }
+  if (sources.has("label-preview")) return "same-file-only";
+  return "thin-local-context";
+}
+
+function nativeElementWeight(element: ReactWebLabelPatchPreviewFinding["element"]): number {
+  switch (element) {
+    case "input":
+    case "select":
+    case "textarea":
+      return 2;
+    case "button":
+      return 1;
+  }
+}
+
+function triageBucketFor(issue: Pick<ReactWebIssueCard, "confidence" | "fixability">): ReactWebIssueTriageBucket {
+  if (issue.fixability === "safe-preview") return "safe-preview";
+  return issue.confidence === "high" ? "high-confidence-manual-review" : "manual-review";
+}
+
+function priorityFor(score: number): ReactWebIssuePriority {
+  if (score >= 7) return "high";
+  if (score >= 4) return "medium";
+  return "low";
+}
+
+function triageEvidenceFor(issue: Omit<ReactWebIssueCard, "triage">): ReactWebIssueTriageEvidence {
+  const safePreviewAvailable = issue.fixability === "safe-preview" && Boolean(issue.preview);
+  const sameFileContextAvailable = issue.relatedContext.some(
+    (item) => item.kind === "same-file-pattern" && item.source === "label-preview",
+  );
+  const relatedContextSources = uniqueRelatedContextSources(issue.relatedContext);
+  const relatedContextQuality = relatedContextQualityFor(issue.relatedContext);
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (safePreviewAvailable) {
+    score += 4;
+    reasons.push("safe read-only preview is available");
+  }
+  if (issue.confidence === "high") {
+    score += 3;
+    reasons.push("label-preview confidence is high");
+  } else {
+    score += 1;
+    reasons.push("label-preview confidence is medium");
+  }
+
+  const elementWeight = nativeElementWeight(issue.evidence.element);
+  score += elementWeight;
+  reasons.push(`native ${issue.evidence.element} element weight +${elementWeight}`);
+
+  if (sameFileContextAvailable) {
+    score += 1;
+    reasons.push("same-file JSX context is available");
+  }
+
+  if (relatedContextQuality === "local-supporting-context") {
+    score += 2;
+    reasons.push("related local source context is available");
+  } else if (relatedContextQuality === "same-file-only") {
+    score += 1;
+    reasons.push("related context is same-file only");
+  } else {
+    reasons.push("related context is thin");
+  }
+  if (issue.relatedContext.length >= 3) {
+    score += 1;
+    reasons.push("related context has at least three local anchors");
+  }
+
+  return {
+    safePreviewAvailable,
+    confidence: issue.confidence,
+    nativeElement: issue.evidence.element,
+    sameFileContextAvailable,
+    relatedContextCount: issue.relatedContext.length,
+    relatedContextSources,
+    relatedContextQuality,
+    score,
+    reasons,
+  };
+}
+
 function issueCardFor(
   filePath: string,
   finding: ReactWebLabelPatchPreviewFinding,
@@ -162,7 +291,7 @@ function issueCardFor(
     : undefined;
   const suggestedAction = suggestedFixIntentFor(finding);
   const safetyRationale = safetyRationaleFor(finding);
-  return {
+  const issueWithoutTriage = {
     id: `react-web-label-${index + 1}`,
     kind: issueKindFor(finding),
     problem: problemFor(finding),
@@ -191,18 +320,88 @@ function issueCardFor(
     ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
   };
+  const evidence = triageEvidenceFor(issueWithoutTriage);
+  return {
+    ...issueWithoutTriage,
+    triage: {
+      rank: index + 1,
+      priority: priorityFor(evidence.score),
+      bucket: triageBucketFor(issueWithoutTriage),
+      evidence,
+    },
+  };
+}
+
+function compareIssuePriority(a: ReactWebIssueCard, b: ReactWebIssueCard): number {
+  return (
+    b.triage.evidence.score - a.triage.evidence.score ||
+    Number(b.triage.evidence.safePreviewAvailable) - Number(a.triage.evidence.safePreviewAvailable) ||
+    (b.confidence === "high" ? 1 : 0) - (a.confidence === "high" ? 1 : 0) ||
+    nativeElementWeight(b.evidence.element) - nativeElementWeight(a.evidence.element) ||
+    b.triage.evidence.relatedContextCount - a.triage.evidence.relatedContextCount ||
+    a.whereToLook.line - b.whereToLook.line
+  );
+}
+
+function withTriageRanks(issues: ReactWebIssueCard[]): ReactWebIssueCard[] {
+  const ranks = new Map<string, number>();
+  [...issues].sort(compareIssuePriority).forEach((issue, index) => ranks.set(issue.id, index + 1));
+  return issues.map((issue) => ({
+    ...issue,
+    triage: {
+      ...issue.triage,
+      rank: ranks.get(issue.id) ?? issue.triage.rank,
+    },
+  }));
+}
+
+function buildTriageRollup(issues: ReactWebIssueCard[]): ReactWebIssueReport["triageRollup"] {
+  const ranked = [...issues].sort(compareIssuePriority);
+  return {
+    claimBoundary:
+      "Conservative local triage only: ranks issue cards from existing report evidence and does not edit files, auto-apply patches, infer custom-component semantics, or claim a broad accessibility audit.",
+    criteria: [
+      "safe preview availability",
+      "label-preview confidence",
+      "native element type",
+      "same-file JSX context",
+      "related-context count and source quality",
+    ],
+    priorityCounts: {
+      high: issues.filter((issue) => issue.triage.priority === "high").length,
+      medium: issues.filter((issue) => issue.triage.priority === "medium").length,
+      low: issues.filter((issue) => issue.triage.priority === "low").length,
+    },
+    bucketCounts: {
+      "safe-preview": issues.filter((issue) => issue.triage.bucket === "safe-preview").length,
+      "high-confidence-manual-review": issues.filter((issue) => issue.triage.bucket === "high-confidence-manual-review").length,
+      "manual-review": issues.filter((issue) => issue.triage.bucket === "manual-review").length,
+    },
+    rankedIssueIds: ranked.map((issue) => issue.id),
+    topIssueIds: ranked.slice(0, 3).map((issue) => issue.id),
+    topManualReviewIssueIds: ranked
+      .filter((issue) => issue.fixability === "manual-review")
+      .slice(0, 3)
+      .map((issue) => issue.id),
+    safePreviewIssueIds: ranked
+      .filter((issue) => issue.fixability === "safe-preview")
+      .map((issue) => issue.id),
+    manualReviewIssueIds: ranked
+      .filter((issue) => issue.fixability === "manual-review")
+      .map((issue) => issue.id),
+  };
 }
 
 export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()): ReactWebIssueReport {
   const preview = buildReactWebLabelPatchPreview(filePath, cwd);
-  const issues = preview.findings.map((finding, index) =>
+  const issues = withTriageRanks(preview.findings.map((finding, index) =>
     issueCardFor(
       preview.filePath,
       finding,
       index,
       buildReactWebIssueRelatedContext(preview.filePath, finding, cwd),
     ),
-  );
+  ));
   return {
     schemaVersion: REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
     command: REACT_WEB_ISSUE_REPORT_COMMAND,
@@ -224,6 +423,7 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
       manualReviewCount: issues.filter((issue) => issue.fixability === "manual-review").length,
       unsafeToAutoApplyCount: issues.filter((issue) => issue.autoFixSafety === "unsafe-to-auto-apply").length,
     },
+    triageRollup: buildTriageRollup(issues),
     issues,
   };
 }
@@ -243,10 +443,23 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
   if (report.skippedReason) lines.push(`Skipped: ${report.skippedReason}`);
   if (report.issues.length === 0) return `${lines.join("\n")}\n`;
 
+  lines.push(
+    "",
+    "## Triage rollup",
+    report.triageRollup.claimBoundary,
+    `- priority counts: high ${report.triageRollup.priorityCounts.high}, medium ${report.triageRollup.priorityCounts.medium}, low ${report.triageRollup.priorityCounts.low}`,
+    `- buckets: safe preview ${report.triageRollup.bucketCounts["safe-preview"]}, high-confidence manual review ${report.triageRollup.bucketCounts["high-confidence-manual-review"]}, manual review ${report.triageRollup.bucketCounts["manual-review"]}`,
+    `- ranked issue ids: ${report.triageRollup.rankedIssueIds.join(", ") || "none"}`,
+    `- top manual-review ids: ${report.triageRollup.topManualReviewIssueIds.join(", ") || "none"}`,
+    `- criteria: ${report.triageRollup.criteria.join("; ")}`,
+  );
+
   report.issues.forEach((issue, index) => {
     lines.push(
       "",
       `## Issue ${index + 1}: ${issue.problem}`,
+      `- triage: rank ${issue.triage.rank}, ${issue.triage.priority} priority, ${issue.triage.bucket}, score ${issue.triage.evidence.score}`,
+      `- triage evidence: safe preview ${issue.triage.evidence.safePreviewAvailable ? "yes" : "no"}, same-file context ${issue.triage.evidence.sameFileContextAvailable ? "yes" : "no"}, related context ${issue.triage.evidence.relatedContextCount} (${issue.triage.evidence.relatedContextQuality})`,
       `- why: ${issue.whyItMatters}`,
       `- where to look: ${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
       `- element: ${issue.evidence.element}`,
