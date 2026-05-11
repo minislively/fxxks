@@ -65,6 +65,29 @@ export {
   parseGitWorktreePorcelain,
   parseTmuxPaneList,
 } from "./ops/artifact-audit";
+export {
+  OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION,
+  OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE,
+  OPERATOR_CHECK_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_COMMAND,
+  OPERATOR_CHECK_SCHEMA_VERSION,
+  OPERATOR_CHECK_SOURCE,
+  readOperatorCheckSnapshot,
+} from "./ops/operator-check";
+export type {
+  OperatorCheckActiveArtifact,
+  OperatorCheckActiveArtifactKind,
+  OperatorCheckActiveWorkReceipt,
+  OperatorCheckActiveWorkReceiptClassification,
+  OperatorCheckActiveWorkReceiptIdentifiers,
+  OperatorCheckActiveWorkReceiptKind,
+  OperatorCheckActiveWorkReceipts,
+  OperatorCheckRequiredActiveArtifact,
+  OperatorCheckSnapshot,
+  OperatorCheckVerdict,
+} from "./ops/operator-check";
+
 export type {
   ArtifactAuditArchiveEvidence,
   ArtifactAuditBranch,
