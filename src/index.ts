@@ -79,6 +79,29 @@ export type {
   ArtifactAuditStatus,
   ArtifactAuditWorktree,
 } from "./ops/artifact-audit";
+
+export {
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE_URL,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_SCHEMA_VERSION,
+  defaultOrphanLocalWorktreeCommandRunner,
+  parseOrphanLocalWorktreePorcelain,
+  parseOrphanLocalWorktreeRemoteBranches,
+  parseOrphanLocalWorktreeTmuxPanes,
+  triageOrphanLocalWorktrees,
+} from "./ops/orphan-local-worktree-triage";
+export type {
+  OrphanLocalWorktreeCategory,
+  OrphanLocalWorktreeCommandRunner,
+  OrphanLocalWorktreeEntry,
+  OrphanLocalWorktreePathExists,
+  OrphanLocalWorktreePullRequestEvidence,
+  OrphanLocalWorktreeTriageOptions,
+  OrphanLocalWorktreeTriageResult,
+} from "./ops/orphan-local-worktree-triage";
 export {
   REACT_WEB_STATUS_CLAIM_BOUNDARY,
   REACT_WEB_STATUS_COMMAND,
