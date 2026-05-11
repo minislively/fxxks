@@ -253,7 +253,9 @@ function siblingWorktreeReceiptClassification(entry: OrphanLocalWorktreeEntry): 
 
 function siblingWorktreeReceiptReasons(entry: OrphanLocalWorktreeEntry): string[] {
   const categoryReason = entry.category === "manual-review-noise"
-    ? `closed-PR remote worktree residue is non-active manual-review noise; do not adopt as active solely from remote/pr counts (#723; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
+    ? entry.branch
+      ? `closed-PR remote worktree residue is non-active manual-review noise; do not adopt as active solely from remote/pr counts (#723; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
+      : `detached PR review worktree leftover is non-active cleanup-review noise; do not adopt as active without a fresh issue, PR, or mapped session, and do not auto-delete, push, or mutate local-only commits (#733; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
     : entry.category === "salvage-review"
     ? `local-ahead orphan or uncertain local state: preserve local-only commits before adoption or cleanup (${OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE}; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
     : entry.category === "safe-cleanup"
