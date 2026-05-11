@@ -197,6 +197,41 @@ test("React Web issue report JSON includes conservative priority rollup for firs
   assert.equal(byId["react-web-label-1"].triage.evidence.safePreviewAvailable, false);
   assert.equal(byId["react-web-label-1"].triage.evidence.sameFileContextAvailable, true);
   assert.ok(byId["react-web-label-1"].triage.evidence.reasons.some((reason) => /same-file JSX context/.test(reason)));
+  assert.equal(byId["react-web-label-1"].fixShapeGuidance.shape, "human-reviewed-native-control-name");
+  assert.match(byId["react-web-label-1"].fixShapeGuidance.claimBoundary, /Local fix-shape guidance only/);
+  assert.match(byId["react-web-label-1"].fixShapeGuidance.claimBoundary, /does not generate accessible-name copy/);
+  assert.equal(byId["react-web-label-1"].fixShapeGuidance.humanReviewRequired, true);
+  assert.equal(byId["react-web-label-1"].fixShapeGuidance.autoApply, false);
+  assert.deepEqual(byId["react-web-label-1"].fixShapeGuidance.localEvidence.attributes, [
+    "name=email",
+    "onChange",
+    "required",
+    "type=email",
+  ]);
+  assert.deepEqual(byId["react-web-label-2"].fixShapeGuidance.localEvidence.attributes, [
+    "className",
+    "defaultValue",
+    "name=role",
+  ]);
+  assert.deepEqual(byId["react-web-label-3"].fixShapeGuidance.localEvidence.attributes, [
+    "className",
+    "defaultValue",
+    "disabled",
+    "name=notes",
+  ]);
+  assert.deepEqual(byId["react-web-label-4"].fixShapeGuidance.localEvidence.attributes, [
+    "className",
+    "spread:field",
+    "type=text",
+  ]);
+  assert.deepEqual(byId["react-web-label-5"].fixShapeGuidance.localEvidence.attributes, [
+    "className",
+    "spread:register(\"email\")",
+  ]);
+  assert.ok(Object.values(byId).every((issue) => issue.fixShapeGuidance.localEvidence.sameFileContextAvailable));
+  assert.ok(Object.values(byId).every((issue) => !issue.fixShapeGuidance.localEvidence.safePreviewAvailable));
+  assert.ok(Object.values(byId).every((issue) => issue.fixShapeGuidance.inspectFirst.some((item) => /Select the final label\/name text manually/.test(item))));
+  assert.doesNotMatch(JSON.stringify(report.issues.map((issue) => issue.fixShapeGuidance)), /must-edit|auto-apply|Controller/i);
   assert.doesNotMatch(JSON.stringify(report.triageRollup), /must-edit/i);
 });
 
@@ -329,8 +364,24 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /- fixability: safe-preview/);
   assert.match(cli.stdout, /- auto-fix safety: not-auto-applied/);
   assert.match(cli.stdout, /- suggested action:/);
+  assert.match(cli.stdout, /- fix shape: safe-preview-htmlFor-association/);
+  assert.match(cli.stdout, /- inspect first for fix shape:/);
+  assert.match(cli.stdout, /Review the safe preview diff as a candidate shape; fooks still does not apply it/);
   assert.match(cli.stdout, /- inspect first:/);
   assert.match(cli.stdout, /same-file-pattern/);
   assert.match(cli.stdout, /```diff/);
   assert.doesNotMatch(cli.stdout, /Auto-apply: yes/);
+});
+
+test("React Web issue report text mode prints per-card manual-review fix-shape guidance", () => {
+  const cli = runIssues(fixtures.formControls);
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.match(cli.stdout, /- top manual-review ids: react-web-label-1, react-web-label-4, react-web-label-5/);
+  assert.match(cli.stdout, /- fix shape: human-reviewed-native-control-name/);
+  assert.match(cli.stdout, /Use existing attribute evidence as hints only: name=email, onChange, required, type=email/);
+  assert.match(cli.stdout, /Use existing attribute evidence as hints only: className, spread:field, type=text/);
+  assert.match(cli.stdout, /Use existing attribute evidence as hints only: className, spread:register\("email"\)/);
+  assert.match(cli.stdout, /Select the final label\/name text manually; fooks does not generate accessible-name copy/);
+  assert.match(cli.stdout, /- inspect first for fix shape:/);
+  assert.doesNotMatch(cli.stdout, /must-edit|Auto-apply: yes|Controller/);
 });
