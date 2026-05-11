@@ -615,6 +615,23 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
     `- criteria: ${report.triageRollup.criteria.join("; ")}`,
   );
 
+  const issuesById = new Map(report.issues.map((issue) => [issue.id, issue]));
+  const compactIssues = report.triageRollup.topIssueIds
+    .map((id) => issuesById.get(id))
+    .filter((issue): issue is ReactWebIssueCard => Boolean(issue));
+  if (compactIssues.length > 0) {
+    lines.push(
+      "",
+      "## First-minute summary",
+      "- Compact read-only triage from existing ranked issue evidence; inspect before editing and keep human review for final label/name decisions.",
+    );
+    for (const issue of compactIssues) {
+      lines.push(
+        `- ${issue.id}: ${issue.fixShapeGuidance.shape}; first inspect: ${issue.fixShapeGuidance.inspectFirst[0] ?? `${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`}`,
+      );
+    }
+  }
+
   report.issues.forEach((issue, index) => {
     lines.push(
       "",
