@@ -259,6 +259,7 @@ test("operator check forces a concrete active artifact when post-merge main echo
       if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
       if (command === "gh" && args[0] === "issue") return "[]";
       if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
       if (command === "git" && joined === "worktree list --porcelain") {
         return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/main", ""].join("\n");
       }
@@ -291,6 +292,11 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.match(snapshot.requiredActiveArtifact.message, /No concrete active issue, PR, or mapped fooks session/);
   assert.equal(snapshot.activity.optionalCounts.enabled, true);
   assert.equal(snapshot.activity.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
+  assert.equal(snapshot.activeWorkReceipts.receipts.length, 1);
+  assert.equal(snapshot.activeWorkReceipts.receipts[0].kind, "branch");
+  assert.equal(snapshot.activeWorkReceipts.receipts[0].classification, "mainEcho");
+  assert.match(snapshot.activeWorkReceipts.reportLine, /mainEcho=1/);
   assert.deepEqual(snapshot.blockers, []);
 });
 
@@ -310,6 +316,7 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
       if (command === "tmux") return `fooks-705\t${tempDir}\tzsh\n`;
       if (command === "gh" && args[0] === "issue") return "[{\"number\":705}]";
       if (command === "gh" && args[0] === "pr") return "[{\"number\":706}]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
       if (command === "git" && joined === "worktree list --porcelain") {
         return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/dogfood/issue-705-post-merge-echo-idle-boundary", ""].join("\n");
       }
@@ -329,6 +336,29 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
     { kind: "session", count: 1, source: OPERATOR_ACTIVITY_TMUX_COMMAND },
   ]);
   assert.equal(snapshot.postMergeMainEchoBoundary.echoOnly, false);
+
+  assert.equal(snapshot.activeWorkReceipts.schemaVersion, 1);
+  assert.equal(snapshot.activeWorkReceipts.readOnly, true);
+  assert.equal(snapshot.activeWorkReceipts.identifiers.repo, "github.com/minislively/fooks");
+  assert.equal(snapshot.activeWorkReceipts.identifiers.repoSource, "git remote.origin.url");
+  assert.equal(snapshot.activeWorkReceipts.classification, "active");
+  assert.match(snapshot.activeWorkReceipts.reportLine, /fooks active-work receipt: active; active=4/);
+  const receiptsByKind = new Map(snapshot.activeWorkReceipts.receipts.map((receipt) => [receipt.kind, receipt]));
+  assert.deepEqual(receiptsByKind.get("issue"), {
+    kind: "issue",
+    classification: "active",
+    identifiers: snapshot.activeWorkReceipts.identifiers,
+    count: 1,
+    source: OPERATOR_ACTIVITY_REMOTE_SOURCE,
+    reasons: ["aggregate open issue count is greater than zero"],
+    blockers: [],
+  });
+  assert.equal(receiptsByKind.get("pullRequest")?.count, 1);
+  assert.equal(receiptsByKind.get("branch")?.classification, "active");
+  const sessionReceipt = receiptsByKind.get("session");
+  assert.equal(sessionReceipt?.classification, "active");
+  assert.deepEqual(sessionReceipt?.identifiers.session, { name: "fooks-705", paneCount: 1 });
+  assert.equal("number" in receiptsByKind.get("issue"), false);
 });
 
 
@@ -533,6 +563,66 @@ test("operator activity treats tmux and opt-in GitHub count failures as non-fata
   assert.match(snapshot.optionalCounts.blockers.join("\n"), /gh unavailable/);
   assert.match(snapshot.blockers.join("\n"), /tmux missing/);
   assert.match(snapshot.blockers.join("\n"), /gh unavailable/);
+});
+
+test("operator check receipt classifies stale session and legacy closed branch without unsafe cleanup details", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, "docs", "closed-artifact-branch-archive-714.md"), "Branch inspected: `origin/fooks-issue-714-old`\n");
+  const staleWorktree = path.join(path.dirname(tempDir), "fooks.omx-worktrees", "fooks-issue-714-old");
+  const deletedPanePath = path.join(path.dirname(tempDir), "fooks.omx-worktrees", "fooks-issue-714-deleted");
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-10T04:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          "HEAD 111",
+          "branch refs/heads/main",
+          "",
+          `worktree ${staleWorktree}`,
+          "HEAD 222",
+          "branch refs/heads/fooks-issue-714-old",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\nfooks-issue-714-old\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "tmux") return `fooks-issue-714-deleted\t${deletedPanePath} (deleted)\tzsh\n`;
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir || targetPath === staleWorktree,
+  });
+
+  assert.equal(snapshot.activeWorkReceipts.classification, "closedOrStale");
+  const staleSession = snapshot.activeWorkReceipts.receipts.find((receipt) => receipt.kind === "session");
+  assert.equal(staleSession?.classification, "closedOrStale");
+  assert.deepEqual(staleSession?.identifiers.session, { name: "fooks-issue-714-deleted", paneCount: 1 });
+  const closedBranch = snapshot.activeWorkReceipts.receipts.find(
+    (receipt) => receipt.kind === "branch" && receipt.identifiers.worktree.branch === "fooks-issue-714-old",
+  );
+  assert.equal(closedBranch?.classification, "closedOrStale");
+
+  const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
+  assert.equal(receiptJson.includes(staleWorktree), false);
+  assert.equal(receiptJson.includes(deletedPanePath), false);
+  assert.equal(receiptJson.includes("tmux kill-session"), false);
+  assert.equal(receiptJson.includes("manualCleanupCommands"), false);
+  assert.equal(receiptJson.includes("cleanupOrder"), false);
+  assert.equal(snapshot.activeWorkReceipts.reportLine.includes(staleWorktree), false);
+  assert.equal(snapshot.activeWorkReceipts.reportLine.includes("kill-session"), false);
 });
 
 test("status activity CLI route preserves existing status contracts", () => {
