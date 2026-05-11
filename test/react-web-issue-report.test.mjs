@@ -19,6 +19,7 @@ const fixtures = {
   association: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-candidates.tsx"),
   unsafeAssociation: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx"),
   relatedContext: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "related-context-form.tsx"),
+  formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
 };
@@ -90,6 +91,15 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.ok(issue.suggestedFixIntent.length > 0);
     assert.equal(issue.suggestedAction, issue.suggestedFixIntent);
     assert.match(issue.skipReason, /human review|accessible-name copy/);
+    assert.ok(issue.triage.rank > 0);
+    assert.ok(["high", "medium", "low"].includes(issue.triage.priority));
+    assert.ok(["safe-preview", "high-confidence-manual-review", "manual-review"].includes(issue.triage.bucket));
+    assert.equal(issue.triage.evidence.safePreviewAvailable, false);
+    assert.equal(issue.triage.evidence.confidence, issue.confidence);
+    assert.equal(issue.triage.evidence.nativeElement, issue.evidence.element);
+    assert.equal(issue.triage.evidence.sameFileContextAvailable, true);
+    assert.equal(issue.triage.evidence.relatedContextCount, issue.relatedContext.length);
+    assert.ok(issue.triage.evidence.reasons.length > 0);
 
     assert.ok(Array.isArray(issue.relatedContext));
     assert.ok(issue.relatedContext.length > 0);
@@ -122,11 +132,72 @@ test("React Web issue report turns nearby native associations into safe preview 
     ["medium", "manual-review", "unsafe-to-auto-apply", false],
     ["medium", "manual-review", "unsafe-to-auto-apply", false],
   ]);
+  assert.deepEqual(report.triageRollup.safePreviewIssueIds, ["react-web-label-1"]);
+  assert.deepEqual(report.triageRollup.bucketCounts, {
+    "safe-preview": 1,
+    "high-confidence-manual-review": 0,
+    "manual-review": 2,
+  });
+  assert.equal(report.issues[0].triage.evidence.safePreviewAvailable, true);
+  assert.equal(report.issues[0].triage.bucket, "safe-preview");
+  assert.equal(report.issues[0].triage.rank, 1);
   assert.match(report.issues[0].preview.text, /htmlFor="email"/);
   assert.ok(report.issues.every((issue) => issue.relatedContext.length > 0));
   assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 5));
   assert.ok(report.issues.every((issue) => issue.relatedContext[0].action === "inspect-first"));
   assert.match(report.issues[1].skipReason, /not high-confidence deterministic evidence/);
+});
+
+test("React Web issue report JSON includes conservative priority rollup for first-minute compressed fixture", () => {
+  const report = parseIssues(fixtures.formControls);
+
+  assert.equal(report.summary.issueCount, 5);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.manualReviewCount, 5);
+  assert.match(report.triageRollup.claimBoundary, /Conservative local triage only/);
+  assert.match(report.triageRollup.claimBoundary, /does not edit files/);
+  assert.match(report.triageRollup.claimBoundary, /does not.*infer custom-component semantics/);
+  assert.deepEqual(report.triageRollup.criteria, [
+    "safe preview availability",
+    "label-preview confidence",
+    "native element type",
+    "same-file JSX context",
+    "related-context count and source quality",
+  ]);
+  assert.deepEqual(report.triageRollup.bucketCounts, {
+    "safe-preview": 0,
+    "high-confidence-manual-review": 5,
+    "manual-review": 0,
+  });
+  assert.deepEqual(report.triageRollup.priorityCounts, { high: 5, medium: 0, low: 0 });
+  assert.deepEqual(report.triageRollup.rankedIssueIds, [
+    "react-web-label-1",
+    "react-web-label-4",
+    "react-web-label-5",
+    "react-web-label-2",
+    "react-web-label-3",
+  ]);
+  assert.deepEqual(report.triageRollup.topManualReviewIssueIds, [
+    "react-web-label-1",
+    "react-web-label-4",
+    "react-web-label-5",
+  ]);
+  assert.deepEqual(report.triageRollup.safePreviewIssueIds, []);
+  assert.deepEqual(report.triageRollup.manualReviewIssueIds, report.triageRollup.rankedIssueIds);
+
+  const byId = Object.fromEntries(report.issues.map((issue) => [issue.id, issue]));
+  assert.equal(byId["react-web-label-1"].triage.rank, 1);
+  assert.equal(byId["react-web-label-2"].triage.rank, 4);
+  assert.equal(byId["react-web-label-3"].triage.rank, 5);
+  assert.equal(byId["react-web-label-1"].triage.evidence.relatedContextQuality, "same-file-only");
+  assert.deepEqual(byId["react-web-label-1"].triage.evidence.relatedContextSources, [
+    "label-preview",
+    "same-directory",
+  ]);
+  assert.equal(byId["react-web-label-1"].triage.evidence.safePreviewAvailable, false);
+  assert.equal(byId["react-web-label-1"].triage.evidence.sameFileContextAvailable, true);
+  assert.ok(byId["react-web-label-1"].triage.evidence.reasons.some((reason) => /same-file JSX context/.test(reason)));
+  assert.doesNotMatch(JSON.stringify(report.triageRollup), /must-edit/i);
 });
 
 test("React Web issue report recommends bounded local related context from imports, siblings, tests, and same-file patterns", () => {
@@ -245,7 +316,14 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /# React Web issue report/);
   assert.match(cli.stdout, /Read-only React Web issue report/);
+  assert.match(cli.stdout, /## Triage rollup/);
+  assert.match(cli.stdout, /- priority counts:/);
+  assert.match(cli.stdout, /- ranked issue ids:/);
+  assert.match(cli.stdout, /- top manual-review ids:/);
+  assert.match(cli.stdout, /- criteria: safe preview availability; label-preview confidence; native element type; same-file JSX context; related-context count and source quality/);
   assert.match(cli.stdout, /## Issue 1:/);
+  assert.match(cli.stdout, /- triage: rank 1, high priority, safe-preview, score \d+/);
+  assert.match(cli.stdout, /- triage evidence: safe preview yes, same-file context yes, related context \d+ \(/);
   assert.match(cli.stdout, /- why:/);
   assert.match(cli.stdout, /- where to look:/);
   assert.match(cli.stdout, /- fixability: safe-preview/);
