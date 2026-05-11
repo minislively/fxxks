@@ -553,6 +553,90 @@ test("operator check receipt marks closed-PR remote worktree residue as non-acti
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
 
+test("operator check receipt marks detached PR review worktree leftovers as non-active cleanup-review noise", () => {
+  const tempDir = makeTempProject();
+  const siblingRoot = path.dirname(tempDir);
+  const reviewLeftover = path.join(siblingRoot, "fooks-pr-728-review");
+  const calls = [];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-11T12:30:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args, cwd) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          "HEAD 111",
+          "branch refs/heads/main",
+          "",
+          `worktree ${reviewLeftover}`,
+          "HEAD dcb590c",
+          "detached",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") {
+        return cwd === reviewLeftover ? "3 files changed, 15 insertions(+), 2 deletions(-)\n" : "";
+      }
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") {
+        return cwd === reviewLeftover ? "0 5\n" : "0 0\n";
+      }
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") {
+        return JSON.stringify([
+          {
+            number: 728,
+            url: "https://github.com/minislively/fooks/pull/728",
+            headRefName: "dogfood/issue-728-review",
+            state: "MERGED",
+            closedAt: "2026-05-10T00:00:00Z",
+          },
+        ]);
+      }
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => [tempDir, reviewLeftover].includes(targetPath),
+  });
+
+  assert.equal(snapshot.activeWorkReceipts.classification, "closedOrStale");
+  const receipt = snapshot.activeWorkReceipts.receipts.find(
+    (item) => item.kind === "worktree" && item.identifiers.worktree.head === "dcb590c",
+  );
+  assert.equal(receipt?.classification, "closedOrStale");
+  assert.equal(receipt?.identifiers.worktree.branch, undefined);
+  assert.equal(receipt?.identifiers.siblingWorktree?.category, "manual-review-noise");
+  assert.equal(receipt?.identifiers.siblingWorktree?.remoteBranchExists, "unknown");
+  assert.equal(receipt?.identifiers.siblingWorktree?.openPullRequestState, "none");
+  assert.equal(receipt?.identifiers.siblingWorktree?.closedPullRequestState, "closed");
+  assert.equal(receipt?.identifiers.siblingWorktree?.activeTmuxPaneCount, 0);
+  assert.equal(receipt?.identifiers.siblingWorktree?.aheadOfBase, 5);
+  assert.match(receipt?.reasons.join("\n") ?? "", /#733/);
+  assert.match(receipt?.reasons.join("\n") ?? "", /detached fooks PR review worktree leftover/);
+  assert.match(receipt?.reasons.join("\n") ?? "", /do not auto-delete, push, or mutate/i);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /closedOrStale=1/);
+  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.itemCount, 0);
+
+  const receiptJson = JSON.stringify([receipt, snapshot.activeWorkReceipts.salvageReviewQueue]);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(receiptJson), false);
+  assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push/.test(call)), false);
+});
+
 test("operator activity exposes bounded stale legacy closed worktree evidence for zero-count reminders", () => {
   const tempDir = makeTempProject();
   fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });

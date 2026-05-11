@@ -208,6 +208,113 @@ test("orphan local worktree triage classifies closed-PR remote branches as manua
   assert.equal(calls.some(([command, args]) => command === "git" && ["fetch", "worktree remove", "branch -d"].includes(args.join(" "))), false);
 });
 
+test("orphan local worktree triage classifies detached PR review leftovers as non-active cleanup-review noise", () => {
+  const cwd = "/work/fooks.omx-worktrees/current";
+  const reviewLeftover = "/work/fooks.omx-worktrees/fooks-pr-727-review";
+  const calls = [];
+  const result = triageOrphanLocalWorktrees(cwd, {
+    now: () => "2026-05-11T12:00:00.000Z",
+    pathExists: (target) => [cwd, reviewLeftover].includes(target),
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        `worktree ${reviewLeftover}`,
+        "HEAD 74afe67",
+        "detached",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch -r --format=%(refname:short)": "origin/main\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": "",
+      [`${cwd} :: git status --porcelain=v1 -z`]: "",
+      [`${reviewLeftover} :: git status --porcelain=v1 -z`]: "",
+      [`${cwd} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${reviewLeftover} :: git rev-list --left-right --count origin/main...HEAD`]: "0 7\n",
+      [`${cwd} :: git diff --shortstat origin/main...HEAD`]: "",
+      [`${reviewLeftover} :: git diff --shortstat origin/main...HEAD`]: "4 files changed, 20 insertions(+), 3 deletions(-)\n",
+      "gh pr list --state open --json number,url,headRefName --limit 200": "[]",
+      "gh pr list --state closed --json number,url,headRefName,state,closedAt --limit 200": JSON.stringify([
+        {
+          number: 727,
+          url: "https://github.com/minislively/fooks/pull/727",
+          headRefName: "dogfood/issue-727-review",
+          state: "MERGED",
+          closedAt: "2026-05-10T00:00:00Z",
+        },
+      ]),
+    }, calls),
+  });
+
+  const entry = result.entries.find((item) => item.path === reviewLeftover);
+  assert.equal(entry?.category, "manual-review-noise");
+  assert.equal(entry?.branch, undefined);
+  assert.equal(entry?.head, "74afe67");
+  assert.equal(entry?.remoteBranchExists, "unknown");
+  assert.equal(entry?.openPullRequest.state, "none");
+  assert.equal(entry?.closedPullRequest.state, "closed");
+  assert.equal(entry?.activeTmuxPaneCount, 0);
+  assert.equal(entry?.aheadOfBase, 7);
+  assert.match(entry?.reasons.join("\n") ?? "", /detached fooks PR review worktree leftover/);
+  assert.match(entry?.manualReviewCommands.join("\n") ?? "", /do not count this detached PR review leftover as active work/i);
+  assert.match(entry?.manualReviewCommands.join("\n") ?? "", /do not auto-delete, push, or mutate/i);
+  assert.deepEqual(entry?.manualCleanupCommands, []);
+  assert.equal(result.categories["manual-review-noise"].some((item) => item.path === reviewLeftover), true);
+  assert.equal(result.categories["salvage-review"].some((item) => item.path === reviewLeftover), false);
+
+  const decision = result.decisionTable.find((item) => item.path === reviewLeftover);
+  assert.equal(decision?.decision, "manual-review-blocked");
+  assert.match(decision?.decisionLabel ?? "", /NON-ACTIVE detached PR review worktree noise/);
+  assert.equal(decision?.deleteCommand, "none from this artifact");
+  assert.match(decision?.evidenceSummary ?? "", /ahead:7/);
+  assert.match(decision?.evidenceSummary ?? "", /tmux-panes:0/);
+  assert.equal(calls.some(([command, args]) => command === "git" && /fetch|worktree remove|branch -d|push/.test(args.join(" "))), false);
+});
+
+test("orphan local worktree triage keeps detached PR review worktrees when matching PR is open", () => {
+  const cwd = "/work/fooks.omx-worktrees/current";
+  const reviewWorktree = "/work/fooks.omx-worktrees/fooks-pr-728-review";
+  const result = triageOrphanLocalWorktrees(cwd, {
+    now: () => "2026-05-11T12:10:00.000Z",
+    pathExists: (target) => [cwd, reviewWorktree].includes(target),
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        `worktree ${reviewWorktree}`,
+        "HEAD dcb590c",
+        "detached",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch -r --format=%(refname:short)": "origin/main\n",
+      "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": "",
+      [`${cwd} :: git status --porcelain=v1 -z`]: "",
+      [`${reviewWorktree} :: git status --porcelain=v1 -z`]: "",
+      [`${cwd} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${reviewWorktree} :: git rev-list --left-right --count origin/main...HEAD`]: "0 5\n",
+      [`${cwd} :: git diff --shortstat origin/main...HEAD`]: "",
+      [`${reviewWorktree} :: git diff --shortstat origin/main...HEAD`]: "3 files changed, 15 insertions(+), 2 deletions(-)\n",
+      "gh pr list --state open --json number,url,headRefName --limit 200": JSON.stringify([
+        { number: 728, url: "https://github.com/minislively/fooks/pull/728", headRefName: "dogfood/issue-728-review" },
+      ]),
+      "gh pr list --state closed --json number,url,headRefName,state,closedAt --limit 200": "[]",
+    }),
+  });
+
+  const entry = result.entries.find((item) => item.path === reviewWorktree);
+  assert.equal(entry?.category, "keep");
+  assert.equal(entry?.openPullRequest.state, "open");
+  assert.match(entry?.reasons.join("\n") ?? "", /an open pull request exists/);
+  const decision = result.decisionTable.find((item) => item.path === reviewWorktree);
+  assert.equal(decision?.decision, "keep-active-evidence");
+  assert.match(decision?.decisionLabel ?? "", /KEEP/);
+});
+
 test("status orphan-worktrees emits parseable JSON", () => {
   const stdout = execFileSync(process.execPath, [cli, "status", "orphan-worktrees", "--json"], {
     cwd: repoRoot,

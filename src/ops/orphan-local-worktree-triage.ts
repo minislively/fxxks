@@ -159,6 +159,17 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+function isDetachedReviewWorktreePath(worktreePath: string): boolean {
+  return /^fooks-pr-\d+-review$/u.test(path.basename(safeResolve(worktreePath)));
+}
+
+function detachedReviewWorktreePullRequestNumber(worktreePath: string): number | undefined {
+  const match = path.basename(safeResolve(worktreePath)).match(/^fooks-pr-(\d+)-review$/u);
+  if (!match) return undefined;
+  const pullRequestNumber = Number.parseInt(match[1] ?? "", 10);
+  return Number.isFinite(pullRequestNumber) ? pullRequestNumber : undefined;
+}
+
 function parseCount(output: string): number | undefined {
   const parsed = Number.parseInt(output.trim(), 10);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -272,9 +283,22 @@ function readClosedPullRequestIndex(
   }
 }
 
-function openPullRequestEvidence(branch: string | undefined, pullRequestIndex: ReturnType<typeof readOpenPullRequestIndex>): OrphanLocalWorktreePullRequestEvidence {
-  if (!branch) return { state: "unknown", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE, reason: "branch unknown" };
+function openPullRequestEvidence(
+  branch: string | undefined,
+  worktreePath: string,
+  pullRequestIndex: ReturnType<typeof readOpenPullRequestIndex>,
+): OrphanLocalWorktreePullRequestEvidence {
   if (pullRequestIndex.blocker) return { state: "unknown", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE, reason: pullRequestIndex.blocker };
+  const detachedReviewPullRequestNumber = branch ? undefined : detachedReviewWorktreePullRequestNumber(worktreePath);
+  if (detachedReviewPullRequestNumber !== undefined) {
+    const pullRequests = [...pullRequestIndex.pullRequestsByHead.values()]
+      .flat()
+      .filter((pullRequest) => pullRequest.number === detachedReviewPullRequestNumber);
+    return pullRequests.length > 0
+      ? { state: "open", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE, pullRequests }
+      : { state: "none", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE };
+  }
+  if (!branch) return { state: "unknown", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE, reason: "branch unknown" };
   const pullRequests = pullRequestIndex.pullRequestsByHead.get(branch) ?? [];
   return pullRequests.length > 0
     ? { state: "open", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE, pullRequests }
@@ -283,10 +307,20 @@ function openPullRequestEvidence(branch: string | undefined, pullRequestIndex: R
 
 function closedPullRequestEvidence(
   branch: string | undefined,
+  worktreePath: string,
   pullRequestIndex: ReturnType<typeof readClosedPullRequestIndex>,
 ): OrphanLocalWorktreeClosedPullRequestEvidence {
-  if (!branch) return { state: "unknown", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE, reason: "branch unknown" };
   if (pullRequestIndex.blocker) return { state: "unknown", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE, reason: pullRequestIndex.blocker };
+  const detachedReviewPullRequestNumber = branch ? undefined : detachedReviewWorktreePullRequestNumber(worktreePath);
+  if (detachedReviewPullRequestNumber !== undefined) {
+    const pullRequests = [...pullRequestIndex.pullRequestsByHead.values()]
+      .flat()
+      .filter((pullRequest) => pullRequest.number === detachedReviewPullRequestNumber);
+    return pullRequests.length > 0
+      ? { state: "closed", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE, pullRequests }
+      : { state: "none", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE };
+  }
+  if (!branch) return { state: "unknown", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE, reason: "branch unknown" };
   const pullRequests = pullRequestIndex.pullRequestsByHead.get(branch) ?? [];
   return pullRequests.length > 0
     ? { state: "closed", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE, pullRequests }
@@ -400,15 +434,23 @@ function decisionForEntry(entry: OrphanLocalWorktreeEntry): Pick<OrphanLocalWork
   }
 
   if (entry.category === "manual-review-noise") {
+    const detachedReviewWorktree = !entry.branch && isDetachedReviewWorktreePath(entry.path);
     return {
       decision: "manual-review-blocked",
-      decisionLabel: "NON-ACTIVE closed-PR remote worktree noise; manual review only",
+      decisionLabel: detachedReviewWorktree
+        ? "NON-ACTIVE detached PR review worktree noise; manual review only"
+        : "NON-ACTIVE closed-PR remote worktree noise; manual review only",
       salvageCommand: concreteSalvageCommand(entry),
       deleteCommand: "none from this artifact",
     };
   }
 
-  if (entry.dirty === "unknown" || entry.remoteBranchExists === "unknown" || entry.openPullRequest.state === "unknown" || !entry.exists) {
+  if (
+    entry.dirty === "unknown" ||
+    (entry.remoteBranchExists === "unknown" && entry.openPullRequest.state !== "open") ||
+    entry.openPullRequest.state === "unknown" ||
+    !entry.exists
+  ) {
     return {
       decision: "manual-review-blocked",
       decisionLabel: "MANUAL REVIEW BLOCKED by incomplete local evidence",
@@ -441,6 +483,7 @@ function buildDecisionTable(entries: OrphanLocalWorktreeEntry[]): OrphanLocalWor
 }
 
 function classifyEntry(input: {
+  path: string;
   current: boolean;
   exists: boolean;
   branch?: string;
@@ -455,10 +498,12 @@ function classifyEntry(input: {
   const reasons: string[] = [];
   const manualCleanupCommands: string[] = [];
   const manualReviewCommands: string[] = [];
+  const detachedReviewWorktree = !input.branch && isDetachedReviewWorktreePath(input.path);
 
   if (input.current) reasons.push("worktree is the current working directory");
   if (!input.exists) reasons.push("worktree path is missing from the filesystem");
-  if (!input.branch) reasons.push("worktree is detached or branch is unknown");
+  if (detachedReviewWorktree) reasons.push("detached fooks PR review worktree leftover naming was detected");
+  else if (!input.branch) reasons.push("worktree is detached or branch is unknown");
   if (input.activeTmuxPaneCount > 0) reasons.push("one or more tmux panes are mapped inside this worktree");
   if (input.remoteBranchExists === true) reasons.push("a local remote-tracking branch exists for this branch");
   if (input.remoteBranchExists === false) reasons.push("no local remote-tracking branch exists for this branch");
@@ -483,15 +528,28 @@ function classifyEntry(input: {
     input.remoteBranchExists === true &&
     input.openPullRequest.state !== "open" &&
     input.closedPullRequest.state === "closed";
+  const detachedReviewResidue =
+    detachedReviewWorktree &&
+    !input.current &&
+    input.exists &&
+    input.activeTmuxPaneCount === 0 &&
+    input.openPullRequest.state !== "open";
   const protectedByActiveEvidence =
     input.current ||
     input.activeTmuxPaneCount > 0 ||
     (input.remoteBranchExists === true && !closedPrRemoteResidue) ||
     input.openPullRequest.state === "open" ||
-    !input.branch;
+    (!input.branch && !detachedReviewResidue);
   if (protectedByActiveEvidence) {
     manualReviewCommands.push("inspect active worktree/PR/remote evidence before cleanup");
     return { category: "keep", reasons: uniqueSorted(reasons), manualCleanupCommands, manualReviewCommands: uniqueSorted(manualReviewCommands) };
+  }
+
+  if (detachedReviewResidue) {
+    manualReviewCommands.push("inspect detached review worktree commits before any manual cleanup decision");
+    manualReviewCommands.push("do not count this detached PR review leftover as active work without a fresh open issue, PR, or mapped session");
+    manualReviewCommands.push("do not auto-delete, push, or mutate local-only detached review commits from this artifact");
+    return { category: "manual-review-noise", reasons: uniqueSorted(reasons), manualCleanupCommands, manualReviewCommands: uniqueSorted(manualReviewCommands) };
   }
 
   if (closedPrRemoteResidue) {
@@ -553,10 +611,11 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
     const diffEvidence = exists ? diffEvidenceAgainstBase(runner, worktree.path, baseRef) : { source: "git diff --shortstat <base>...HEAD", changed: "unknown" as const, summary: "worktree path is missing" };
     const branch = worktree.branch;
     const remoteBranchExists = branch ? remoteBranches.has(branch) : "unknown";
-    const openPullRequest = openPullRequestEvidence(branch, pullRequestIndex);
-    const closedPullRequest = closedPullRequestEvidence(branch, closedPullRequestIndex);
+    const openPullRequest = openPullRequestEvidence(branch, worktree.path, pullRequestIndex);
+    const closedPullRequest = closedPullRequestEvidence(branch, worktree.path, closedPullRequestIndex);
     const activeTmuxPaneCount = panes.filter((pane) => exists && isInsidePath(pane.path, worktree.path)).length;
     const classified = classifyEntry({
+      path: worktree.path,
       current,
       exists,
       branch,
