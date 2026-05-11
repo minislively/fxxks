@@ -26,6 +26,12 @@ export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
   "Read-only issue #726 operator queue for orphan local-ahead sibling worktrees; lists salvage-review evidence only and does not delete, push, fetch, mutate, or generate cleanup commands for orphan branches.";
+export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE = "#736";
+export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
+export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
+export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
+  "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -34,6 +40,11 @@ export type OperatorCheckVerdict = "activeArtifactPresent" | "idleRequiresActive
 export type OperatorCheckActiveArtifactKind = "issue" | "pullRequest" | "session";
 export type OperatorCheckActiveWorkReceiptKind = "issue" | "pullRequest" | "branch" | "session" | "worktree";
 export type OperatorCheckActiveWorkReceiptClassification = "active" | "closedOrStale" | "mainEcho" | "blocked";
+export type OperatorCheckStaleResidueLedgerCategory = "safe-cleanup" | "salvage-review" | "manual-review-noise";
+export type OperatorCheckStaleResidueLedgerNextReviewAction =
+  | "review-closed-or-merged-evidence-before-manual-cleanup"
+  | "preserve-local-only-commits-before-adoption-or-cleanup"
+  | "confirm-closed-pr-or-detached-review-context-before-ignoring";
 
 export type OperatorCheckActiveArtifact = {
   kind: OperatorCheckActiveArtifactKind;
@@ -103,6 +114,25 @@ export type OperatorCheckSalvageReviewQueue = {
   items: OperatorCheckSalvageReviewQueueItem[];
 };
 
+export type OperatorCheckStaleResidueLedgerClass = {
+  category: OperatorCheckStaleResidueLedgerCategory;
+  count: number;
+  nextReviewAction: OperatorCheckStaleResidueLedgerNextReviewAction;
+};
+
+export type OperatorCheckStaleResidueLedger = {
+  schemaVersion: typeof OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY;
+  readOnly: true;
+  totalCount: number;
+  counts: Record<OperatorCheckStaleResidueLedgerCategory, number>;
+  classes: OperatorCheckStaleResidueLedgerClass[];
+  localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -123,6 +153,7 @@ export type OperatorCheckActiveWorkReceipts = {
   receipts: OperatorCheckActiveWorkReceipt[];
   reportLine: string;
   salvageReviewQueue: OperatorCheckSalvageReviewQueue;
+  staleResidueLedger: OperatorCheckStaleResidueLedger;
   blockers: string[];
 };
 
@@ -221,6 +252,7 @@ function receiptReportLine(
   classification: OperatorCheckActiveWorkReceiptClassification,
   blockers: string[],
   salvageReviewQueueItemCount = 0,
+  staleResidueLedgerCount = 0,
 ): string {
   const active = receipts.filter((receipt) => receipt.classification === "active").length;
   const stale = receipts.filter((receipt) => receipt.classification === "closedOrStale").length;
@@ -231,6 +263,7 @@ function receiptReportLine(
   parts.push(`closedOrStale=${stale}`);
   if (mainEcho) parts.push("mainEcho=1");
   if (salvageReviewQueueItemCount > 0) parts.push(`salvageReviewQueue=${salvageReviewQueueItemCount}`);
+  if (staleResidueLedgerCount > 0) parts.push(`staleResidueLedger=${staleResidueLedgerCount}`);
   if (blocked) parts.push(`blockers=${blocked}`);
   return parts.join("; ");
 }
@@ -269,7 +302,12 @@ function siblingWorktreeReceipts(
   baseIdentifiers: Omit<OperatorCheckActiveWorkReceiptIdentifiers, "session" | "siblingWorktree">,
   baseBlockers: string[],
   options: OperatorActivityOptions,
-): { receipts: OperatorCheckActiveWorkReceipt[]; salvageReviewQueue: OperatorCheckSalvageReviewQueue; blockers: string[] } {
+): {
+  receipts: OperatorCheckActiveWorkReceipt[];
+  salvageReviewQueue: OperatorCheckSalvageReviewQueue;
+  staleResidueLedger: OperatorCheckStaleResidueLedger;
+  blockers: string[];
+} {
   try {
     const triage = triageOrphanLocalWorktrees(cwd, {
       runner: options.commandRunner
@@ -306,11 +344,70 @@ function siblingWorktreeReceipts(
         reasons: siblingWorktreeReceiptReasons(entry),
         blockers: withRepoBlockers(triage.blockers, baseBlockers),
       }));
-    return { receipts, salvageReviewQueue: buildSalvageReviewQueue(triage.entries), blockers: triage.blockers };
+    return {
+      receipts,
+      salvageReviewQueue: buildSalvageReviewQueue(triage.entries),
+      staleResidueLedger: buildStaleResidueLedger(triage.entries),
+      blockers: triage.blockers,
+    };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return { receipts: [], salvageReviewQueue: buildSalvageReviewQueue([]), blockers: [`sibling worktree adoption receipt unavailable: ${detail}`] };
+    return {
+      receipts: [],
+      salvageReviewQueue: buildSalvageReviewQueue([]),
+      staleResidueLedger: buildStaleResidueLedger([]),
+      blockers: [`sibling worktree adoption receipt unavailable: ${detail}`],
+    };
   }
+}
+
+const STALE_RESIDUE_LEDGER_CLASSES: OperatorCheckStaleResidueLedgerClass[] = [
+  {
+    category: "safe-cleanup",
+    count: 0,
+    nextReviewAction: "review-closed-or-merged-evidence-before-manual-cleanup",
+  },
+  {
+    category: "salvage-review",
+    count: 0,
+    nextReviewAction: "preserve-local-only-commits-before-adoption-or-cleanup",
+  },
+  {
+    category: "manual-review-noise",
+    count: 0,
+    nextReviewAction: "confirm-closed-pr-or-detached-review-context-before-ignoring",
+  },
+];
+
+function isStaleResidueLedgerCategory(category: OrphanLocalWorktreeEntry["category"]): category is OperatorCheckStaleResidueLedgerCategory {
+  return category === "safe-cleanup" || category === "salvage-review" || category === "manual-review-noise";
+}
+
+function buildStaleResidueLedger(entries: OrphanLocalWorktreeEntry[]): OperatorCheckStaleResidueLedger {
+  const counts: Record<OperatorCheckStaleResidueLedgerCategory, number> = {
+    "safe-cleanup": 0,
+    "salvage-review": 0,
+    "manual-review-noise": 0,
+  };
+  for (const entry of entries) {
+    if (!entry.current && isStaleResidueLedgerCategory(entry.category)) counts[entry.category] += 1;
+  }
+  const classes = STALE_RESIDUE_LEDGER_CLASSES.map((row) => ({
+    ...row,
+    count: counts[row.category],
+  }));
+  return {
+    schemaVersion: OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE,
+    issueUrl: OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL,
+    source: OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE,
+    claimBoundary: OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY,
+    readOnly: true,
+    totalCount: classes.reduce((sum, row) => sum + row.count, 0),
+    counts,
+    classes,
+    localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically",
+  };
 }
 
 function buildSalvageReviewQueue(entries: OrphanLocalWorktreeEntry[]): OperatorCheckSalvageReviewQueue {
@@ -457,8 +554,15 @@ function buildActiveWorkReceipts(
     classification,
     identifiers: baseIdentifiers,
     receipts,
-    reportLine: receiptReportLine(receipts, classification, blockers, siblingReceipts.salvageReviewQueue.itemCount),
+    reportLine: receiptReportLine(
+      receipts,
+      classification,
+      blockers,
+      siblingReceipts.salvageReviewQueue.itemCount,
+      siblingReceipts.staleResidueLedger.totalCount,
+    ),
     salvageReviewQueue: siblingReceipts.salvageReviewQueue,
+    staleResidueLedger: siblingReceipts.staleResidueLedger,
     blockers,
   };
 }
