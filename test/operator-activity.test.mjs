@@ -302,6 +302,13 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.equal(snapshot.activeWorkReceipts.receipts[0].kind, "branch");
   assert.equal(snapshot.activeWorkReceipts.receipts[0].classification, "mainEcho");
   assert.match(snapshot.activeWorkReceipts.reportLine, /mainEcho=1/);
+  assert.equal(snapshot.activeWorkReceipts.reportLine.includes("staleResidueLedger="), false);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.counts, {
+    "safe-cleanup": 0,
+    "salvage-review": 0,
+    "manual-review-noise": 0,
+  });
+  assert.equal(snapshot.activeWorkReceipts.staleResidueLedger.totalCount, 0);
   assert.deepEqual(snapshot.blockers, []);
 });
 
@@ -440,6 +447,24 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   const worktreeReceipts = snapshot.activeWorkReceipts.receipts.filter((receipt) => receipt.kind === "worktree");
   assert.equal(snapshot.activeWorkReceipts.readOnly, true);
   assert.equal(worktreeReceipts.length, 3);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueLedger.issue, "#736");
+  assert.equal(snapshot.activeWorkReceipts.staleResidueLedger.readOnly, true);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueLedger.totalCount, 2);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.counts, {
+    "safe-cleanup": 1,
+    "salvage-review": 1,
+    "manual-review-noise": 0,
+  });
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.classes.map((row) => row.nextReviewAction), [
+    "review-closed-or-merged-evidence-before-manual-cleanup",
+    "preserve-local-only-commits-before-adoption-or-cleanup",
+    "confirm-closed-pr-or-detached-review-context-before-ignoring",
+  ]);
+  assert.equal(
+    snapshot.activeWorkReceipts.staleResidueLedger.localOnlyCommitPolicy,
+    "do-not-delete-local-only-commits-automatically",
+  );
+  assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=2/);
   const byBranch = new Map(worktreeReceipts.map((receipt) => [receipt.identifiers.worktree.branch, receipt]));
 
   const safe = byBranch.get("dogfood/old-clean-residue");
@@ -475,7 +500,11 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   assert.equal(remote?.identifiers.siblingWorktree?.category, "keep");
   assert.equal(remote?.identifiers.siblingWorktree?.remoteBranchExists, true);
 
-  const receiptJson = JSON.stringify([worktreeReceipts, snapshot.activeWorkReceipts.salvageReviewQueue]);
+  const receiptJson = JSON.stringify([
+    worktreeReceipts,
+    snapshot.activeWorkReceipts.salvageReviewQueue,
+    snapshot.activeWorkReceipts.staleResidueLedger,
+  ]);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(receiptJson), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
@@ -549,6 +578,12 @@ test("operator check receipt marks closed-PR remote worktree residue as non-acti
   assert.match(receipt?.reasons.join("\n") ?? "", /#723/);
   assert.match(receipt?.reasons.join("\n") ?? "", /closed pull request evidence.*#634/);
   assert.match(snapshot.activeWorkReceipts.reportLine, /closedOrStale=1/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=1/);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.counts, {
+    "safe-cleanup": 0,
+    "salvage-review": 0,
+    "manual-review-noise": 1,
+  });
   assert.equal(snapshot.activeWorkReceipts.reportLine.includes(closedPrWorktree), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
@@ -630,10 +665,130 @@ test("operator check receipt marks detached PR review worktree leftovers as non-
   assert.match(receipt?.reasons.join("\n") ?? "", /detached fooks PR review worktree leftover/);
   assert.match(receipt?.reasons.join("\n") ?? "", /do not auto-delete, push, or mutate/i);
   assert.match(snapshot.activeWorkReceipts.reportLine, /closedOrStale=1/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=1/);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.counts, {
+    "safe-cleanup": 0,
+    "salvage-review": 0,
+    "manual-review-noise": 1,
+  });
   assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.itemCount, 0);
 
-  const receiptJson = JSON.stringify([receipt, snapshot.activeWorkReceipts.salvageReviewQueue]);
+  const receiptJson = JSON.stringify([
+    receipt,
+    snapshot.activeWorkReceipts.salvageReviewQueue,
+    snapshot.activeWorkReceipts.staleResidueLedger,
+  ]);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(receiptJson), false);
+  assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push/.test(call)), false);
+});
+
+test("operator check stale residue ledger aggregates manual-review-noise and excludes keep entries", () => {
+  const tempDir = makeTempProject();
+  const siblingRoot = path.dirname(tempDir);
+  const closedPrWorktree = path.join(siblingRoot, "fooks-issue-631-rn-compare-inspect-visibility");
+  const reviewLeftover = path.join(siblingRoot, "fooks-pr-728-review");
+  const keepWorktree = path.join(siblingRoot, "remote-active");
+  const calls = [];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-11T13:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args, cwd) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          "HEAD 111",
+          "branch refs/heads/main",
+          "",
+          `worktree ${closedPrWorktree}`,
+          "HEAD 222",
+          "branch refs/heads/fooks-issue-631-rn-compare-inspect-visibility",
+          "",
+          `worktree ${reviewLeftover}`,
+          "HEAD dcb590c",
+          "detached",
+          "",
+          `worktree ${keepWorktree}`,
+          "HEAD 444",
+          "branch refs/heads/dogfood/remote-active",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") {
+        return "main\nfooks-issue-631-rn-compare-inspect-visibility\ndogfood/remote-active\n";
+      }
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") {
+        return "origin/main\norigin/fooks-issue-631-rn-compare-inspect-visibility\norigin/dogfood/remote-active\n";
+      }
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") {
+        if (cwd === reviewLeftover) return "3 files changed, 15 insertions(+), 2 deletions(-)\n";
+        if (cwd === keepWorktree) return "1 file changed, 1 insertion(+)\n";
+        return "";
+      }
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") {
+        if (cwd === closedPrWorktree) return "0 48\n";
+        if (cwd === reviewLeftover) return "0 5\n";
+        if (cwd === keepWorktree) return "0 1\n";
+        return "0 0\n";
+      }
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") {
+        return JSON.stringify([
+          {
+            number: 634,
+            url: "https://github.com/minislively/fooks/pull/634",
+            headRefName: "fooks-issue-631-rn-compare-inspect-visibility",
+            state: "CLOSED",
+            closedAt: "2026-05-01T00:00:00Z",
+          },
+          {
+            number: 728,
+            url: "https://github.com/minislively/fooks/pull/728",
+            headRefName: "dogfood/issue-728-review",
+            state: "MERGED",
+            closedAt: "2026-05-10T00:00:00Z",
+          },
+        ]);
+      }
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => [tempDir, closedPrWorktree, reviewLeftover, keepWorktree].includes(targetPath),
+  });
+
+  const ledger = snapshot.activeWorkReceipts.staleResidueLedger;
+  assert.equal(ledger.totalCount, 2);
+  assert.deepEqual(ledger.counts, {
+    "safe-cleanup": 0,
+    "salvage-review": 0,
+    "manual-review-noise": 2,
+  });
+  assert.deepEqual(ledger.classes.map((row) => row.category), [
+    "safe-cleanup",
+    "salvage-review",
+    "manual-review-noise",
+  ]);
+  assert.equal(ledger.classes[2].nextReviewAction, "confirm-closed-pr-or-detached-review-context-before-ignoring");
+  assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=2/);
+
+  const worktreeReceipts = snapshot.activeWorkReceipts.receipts.filter((receipt) => receipt.kind === "worktree");
+  assert.equal(worktreeReceipts.filter((receipt) => receipt.identifiers.siblingWorktree?.category === "manual-review-noise").length, 2);
+  assert.equal(worktreeReceipts.filter((receipt) => receipt.identifiers.siblingWorktree?.category === "keep").length, 1);
+  assert.equal(JSON.stringify(ledger).includes(keepWorktree), false);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(JSON.stringify(ledger)), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push/.test(call)), false);
 });
 
