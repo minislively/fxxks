@@ -44,6 +44,31 @@ export type ReactWebIssueTriage = {
   evidence: ReactWebIssueTriageEvidence;
 };
 
+type ReactWebIssueFixShape =
+  | "safe-preview-htmlFor-association"
+  | "human-reviewed-label-association"
+  | "human-reviewed-placeholder-replacement"
+  | "human-reviewed-button-name"
+  | "human-reviewed-native-control-name"
+  | "human-reviewed-accessible-name";
+
+export type ReactWebIssueFixShapeGuidance = {
+  claimBoundary: string;
+  shape: ReactWebIssueFixShape;
+  summary: string;
+  inspectFirst: string[];
+  localEvidence: {
+    element: ReactWebLabelPatchPreviewFinding["element"];
+    attributes: string[];
+    sameFileContextAvailable: boolean;
+    safePreviewAvailable: boolean;
+    relatedContextCount: number;
+    relatedContextSources: ReactWebIssueRelatedContext["source"][];
+  };
+  humanReviewRequired: true;
+  autoApply: false;
+};
+
 export type ReactWebIssueCard = {
   id: string;
   kind: ReactWebIssueKind;
@@ -70,6 +95,7 @@ export type ReactWebIssueCard = {
   safetyRationale: string;
   suggestedFixIntent: string;
   suggestedAction: string;
+  fixShapeGuidance: ReactWebIssueFixShapeGuidance;
   triage: ReactWebIssueTriage;
   skipReason?: string;
   preview?: {
@@ -275,6 +301,134 @@ function triageEvidenceFor(issue: Omit<ReactWebIssueCard, "triage">): ReactWebIs
   };
 }
 
+function contextAttributeSignals(context: string, element: ReactWebLabelPatchPreviewFinding["element"]): string[] {
+  const elementStart = context.lastIndexOf(`<${element}`);
+  const attributeContext = elementStart >= 0 ? context.slice(elementStart) : context;
+  const signals = new Set<string>();
+  const attrPattern = /\s([A-Za-z_:][\w:.-]*)(?:=(?:"([^"]*)"|'([^']*)'|\{([^}]*)\}))?/g;
+  let match: RegExpExecArray | null;
+  while ((match = attrPattern.exec(attributeContext))) {
+    const name = match[1];
+    if (name.startsWith("/")) continue;
+    const value = (match[2] ?? match[3] ?? match[4] ?? "").trim();
+    if (value && /^(name|type|id|htmlFor|aria-labelledby|placeholder)$/u.test(name)) {
+      signals.add(`${name}=${value}`);
+      continue;
+    }
+    signals.add(name);
+  }
+
+  const spreadPattern = /\{\s*\.\.\.\s*([^}]+?)\s*\}/g;
+  while ((match = spreadPattern.exec(attributeContext))) {
+    signals.add(`spread:${match[1].trim()}`);
+  }
+
+  return [...signals].sort();
+}
+
+function hasAttributeSignal(attributes: string[], name: string): boolean {
+  return attributes.some((attribute) => attribute === name || attribute.startsWith(`${name}=`));
+}
+
+function fixShapeFor(options: {
+  finding: ReactWebLabelPatchPreviewFinding;
+  attributes: string[];
+  previewAvailable: boolean;
+}): ReactWebIssueFixShape {
+  if (options.previewAvailable) return "safe-preview-htmlFor-association";
+  if (options.finding.kind === "unassociated-nearby-label") return "human-reviewed-label-association";
+  if (options.finding.kind === "ambiguous-accessible-label" && hasAttributeSignal(options.attributes, "placeholder")) {
+    return "human-reviewed-placeholder-replacement";
+  }
+  if (options.finding.element === "button") return "human-reviewed-button-name";
+  if (
+    hasAttributeSignal(options.attributes, "name") ||
+    hasAttributeSignal(options.attributes, "type") ||
+    options.attributes.some((attribute) => attribute.startsWith("spread:"))
+  ) {
+    return "human-reviewed-native-control-name";
+  }
+  return "human-reviewed-accessible-name";
+}
+
+function fixShapeSummaryFor(shape: ReactWebIssueFixShape, element: ReactWebLabelPatchPreviewFinding["element"]): string {
+  switch (shape) {
+    case "safe-preview-htmlFor-association":
+      return `Inspect the read-only htmlFor/id association preview for this native ${element}; use only after human review.`;
+    case "human-reviewed-label-association":
+      return `Inspect nearby same-file label/control JSX and choose a human-reviewed association shape for this native ${element}.`;
+    case "human-reviewed-placeholder-replacement":
+      return `Replace placeholder-only evidence with a human-reviewed label shape for this native ${element}; do not reuse placeholder text automatically.`;
+    case "human-reviewed-button-name":
+      return "Choose a human-reviewed accessible-name shape for this native button from visible content, nearby text, or explicit label evidence.";
+    case "human-reviewed-native-control-name":
+      return `Use local native ${element} attributes as hints for a human-reviewed accessible-name shape; do not generate copy automatically.`;
+    case "human-reviewed-accessible-name":
+      return `Choose a human-reviewed accessible-name shape for this native ${element} from local JSX context.`;
+  }
+}
+
+function fixShapeInspectFirstFor(options: {
+  filePath: string;
+  finding: ReactWebLabelPatchPreviewFinding;
+  attributes: string[];
+  previewAvailable: boolean;
+  relatedContext: ReactWebIssueRelatedContext[];
+}): string[] {
+  const steps = [
+    `Inspect ${options.filePath}:${options.finding.loc.startLine}-${options.finding.loc.endLine} (${options.finding.element}) before editing.`,
+  ];
+  if (options.attributes.length > 0) {
+    steps.push(`Use existing attribute evidence as hints only: ${options.attributes.slice(0, 6).join(", ")}.`);
+  }
+  if (options.previewAvailable) {
+    steps.push("Review the safe preview diff as a candidate shape; fooks still does not apply it.");
+  } else {
+    steps.push("Select the final label/name text manually; fooks does not generate accessible-name copy.");
+  }
+  for (const item of options.relatedContext.slice(0, 2)) {
+    const location = `${item.file}${item.line ? `:${item.line}${item.endLine && item.endLine !== item.line ? `-${item.endLine}` : ""}` : ""}`;
+    steps.push(`Inspect related ${item.kind} (${item.source}) at ${location}.`);
+  }
+  return steps;
+}
+
+function fixShapeGuidanceFor(options: {
+  filePath: string;
+  finding: ReactWebLabelPatchPreviewFinding;
+  previewAvailable: boolean;
+  relatedContext: ReactWebIssueRelatedContext[];
+}): ReactWebIssueFixShapeGuidance {
+  const attributes = contextAttributeSignals(options.finding.context, options.finding.element);
+  const sameFileContextAvailable = options.relatedContext.some(
+    (item) => item.kind === "same-file-pattern" && item.source === "label-preview",
+  );
+  const shape = fixShapeFor({ finding: options.finding, attributes, previewAvailable: options.previewAvailable });
+  return {
+    claimBoundary:
+      "Local fix-shape guidance only: uses native element, same-file JSX attributes/context, safe-preview presence, and related-context entries; it is read-only, requires human review, and does not generate accessible-name copy or infer custom-component semantics.",
+    shape,
+    summary: fixShapeSummaryFor(shape, options.finding.element),
+    inspectFirst: fixShapeInspectFirstFor({
+      filePath: options.filePath,
+      finding: options.finding,
+      attributes,
+      previewAvailable: options.previewAvailable,
+      relatedContext: options.relatedContext,
+    }),
+    localEvidence: {
+      element: options.finding.element,
+      attributes,
+      sameFileContextAvailable,
+      safePreviewAvailable: options.previewAvailable,
+      relatedContextCount: options.relatedContext.length,
+      relatedContextSources: uniqueRelatedContextSources(options.relatedContext),
+    },
+    humanReviewRequired: true,
+    autoApply: false,
+  };
+}
+
 function issueCardFor(
   filePath: string,
   finding: ReactWebLabelPatchPreviewFinding,
@@ -291,6 +445,12 @@ function issueCardFor(
     : undefined;
   const suggestedAction = suggestedFixIntentFor(finding);
   const safetyRationale = safetyRationaleFor(finding);
+  const fixShapeGuidance = fixShapeGuidanceFor({
+    filePath,
+    finding,
+    previewAvailable: Boolean(preview),
+    relatedContext,
+  });
   const issueWithoutTriage = {
     id: `react-web-label-${index + 1}`,
     kind: issueKindFor(finding),
@@ -317,6 +477,7 @@ function issueCardFor(
     safetyRationale,
     suggestedFixIntent: suggestedAction,
     suggestedAction,
+    fixShapeGuidance,
     ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
   };
@@ -469,9 +630,16 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       `- safety rationale: ${issue.safetyRationale}`,
       ...(issue.skipReason ? [`- skip reason: ${issue.skipReason}`] : []),
       `- suggested action: ${issue.suggestedAction}`,
+      `- fix shape: ${issue.fixShapeGuidance.shape} — ${issue.fixShapeGuidance.summary}`,
       `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
       `- context: ${issue.evidence.context}`,
     );
+    if (issue.fixShapeGuidance.inspectFirst.length > 0) {
+      lines.push("- inspect first for fix shape:");
+      for (const item of issue.fixShapeGuidance.inspectFirst) {
+        lines.push(`  - ${item}`);
+      }
+    }
     if (issue.relatedContext.length > 0) {
       lines.push("- inspect first:");
       for (const item of issue.relatedContext) {
