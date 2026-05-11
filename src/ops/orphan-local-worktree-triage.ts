@@ -7,6 +7,8 @@ export const ORPHAN_LOCAL_WORKTREE_TRIAGE_SCHEMA_VERSION = 2;
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND = "status orphan-worktrees";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE = "#711";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE_URL = "https://github.com/minislively/fooks/issues/711";
+export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE = "#726";
+export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL = "https://github.com/minislively/fooks/issues/726";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY =
   "Read-only issue #711 local sibling worktree salvage/delete decision artifact; does not fetch, delete branches/worktrees, open PRs, auto-delete local-only commits, or change runtime/provider/merge-gate policy.";
 export const DEFAULT_ORPHAN_LOCAL_WORKTREE_TRIAGE_TIMEOUT_MS = 3000;
@@ -52,6 +54,12 @@ export type OrphanLocalWorktreeDecisionRow = {
   localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
 };
 
+export type OrphanLocalWorktreeDiffEvidence = {
+  source: string;
+  changed: boolean | "unknown";
+  summary: string;
+};
+
 export type OrphanLocalWorktreeEntry = {
   path: string;
   branch?: string;
@@ -63,7 +71,9 @@ export type OrphanLocalWorktreeEntry = {
   dirty: boolean | "unknown";
   changedPathCount?: number;
   aheadOfBase?: number;
+  behindBase?: number;
   baseRef?: string;
+  diffEvidence: OrphanLocalWorktreeDiffEvidence;
   remoteBranchExists: boolean | "unknown";
   remoteBranchRef?: string;
   openPullRequest: OrphanLocalWorktreePullRequestEvidence;
@@ -292,14 +302,40 @@ function worktreeStatus(runner: OrphanLocalWorktreeCommandRunner, worktreePath: 
   }
 }
 
-function aheadOfBase(runner: OrphanLocalWorktreeCommandRunner, worktreePath: string, baseRef: string | undefined): { ahead?: number; blocker?: string } {
+function divergenceFromBase(
+  runner: OrphanLocalWorktreeCommandRunner,
+  worktreePath: string,
+  baseRef: string | undefined,
+): { ahead?: number; behind?: number; blocker?: string } {
   if (!baseRef) return {};
   try {
-    const parsed = parseCount(runner("git", ["rev-list", "--count", `${baseRef}..HEAD`], worktreePath));
-    if (parsed === undefined) return { blocker: `git rev-list ${baseRef}..HEAD returned an unparsable count for ${worktreePath}` };
-    return { ahead: parsed };
+    const output = runner("git", ["rev-list", "--left-right", "--count", `${baseRef}...HEAD`], worktreePath).trim();
+    const [behindText, aheadText] = output.split(/\s+/u);
+    const behind = Number.parseInt(behindText ?? "", 10);
+    const ahead = Number.parseInt(aheadText ?? "", 10);
+    if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
+      return { blocker: `git rev-list --left-right --count ${baseRef}...HEAD returned an unparsable count for ${worktreePath}` };
+    }
+    return { ahead, behind };
   } catch (error) {
-    return { blocker: `git rev-list ${baseRef}..HEAD unavailable for ${worktreePath}: ${errorDetail(error)}` };
+    return { blocker: `git rev-list --left-right --count ${baseRef}...HEAD unavailable for ${worktreePath}: ${errorDetail(error)}` };
+  }
+}
+
+function diffEvidenceAgainstBase(runner: OrphanLocalWorktreeCommandRunner, worktreePath: string, baseRef: string | undefined): OrphanLocalWorktreeDiffEvidence {
+  const source = baseRef ? `git diff --shortstat ${baseRef}...HEAD` : "git diff --shortstat <base>...HEAD";
+  if (!baseRef) {
+    return { source, changed: "unknown", summary: "base ref unavailable" };
+  }
+  try {
+    const summary = runner("git", ["diff", "--shortstat", `${baseRef}...HEAD`], worktreePath).trim();
+    return {
+      source,
+      changed: summary.length > 0,
+      summary: summary || "no committed diff against base",
+    };
+  } catch (error) {
+    return { source, changed: "unknown", summary: `git diff unavailable: ${errorDetail(error)}` };
   }
 }
 
@@ -335,6 +371,8 @@ function summarizeDecisionEvidence(entry: OrphanLocalWorktreeEntry): string {
     `exists:${entry.exists ? "yes" : "no"}`,
     `dirty:${String(entry.dirty)}`,
     `ahead:${entry.aheadOfBase ?? "unknown"}`,
+    `behind:${entry.behindBase ?? "unknown"}`,
+    `diff:${entry.diffEvidence.changed === true ? entry.diffEvidence.summary : String(entry.diffEvidence.changed)}`,
     `remote:${String(entry.remoteBranchExists)}`,
     pullRequestEvidence,
     closedPullRequestEvidence,
@@ -510,8 +548,9 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
     const current = isInsidePath(cwd, worktree.path);
     const status = exists ? worktreeStatus(runner, worktree.path) : { dirty: "unknown" as const, blocker: `worktree path is missing: ${worktree.path}` };
     if (status.blocker) blockers.push(status.blocker);
-    const ahead = exists ? aheadOfBase(runner, worktree.path, baseRef) : {};
-    if (ahead.blocker) blockers.push(ahead.blocker);
+    const divergence = exists ? divergenceFromBase(runner, worktree.path, baseRef) : {};
+    if (divergence.blocker) blockers.push(divergence.blocker);
+    const diffEvidence = exists ? diffEvidenceAgainstBase(runner, worktree.path, baseRef) : { source: "git diff --shortstat <base>...HEAD", changed: "unknown" as const, summary: "worktree path is missing" };
     const branch = worktree.branch;
     const remoteBranchExists = branch ? remoteBranches.has(branch) : "unknown";
     const openPullRequest = openPullRequestEvidence(branch, pullRequestIndex);
@@ -522,7 +561,7 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
       exists,
       branch,
       dirty: status.dirty,
-      ahead: ahead.ahead,
+      ahead: divergence.ahead,
       remoteBranchExists,
       openPullRequest,
       closedPullRequest,
@@ -538,8 +577,10 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
       exists,
       dirty: status.dirty,
       changedPathCount: status.changedPathCount,
-      aheadOfBase: ahead.ahead,
+      aheadOfBase: divergence.ahead,
+      behindBase: divergence.behind,
       baseRef,
+      diffEvidence,
       remoteBranchExists,
       remoteBranchRef: branch && remoteBranchExists === true ? [...remoteBranches].find((remoteBranch) => remoteBranch === branch) : undefined,
       openPullRequest,

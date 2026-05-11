@@ -269,7 +269,8 @@ test("operator check forces a concrete active artifact when post-merge main echo
       if (command === "git" && joined === "branch --merged origin/main") return "main\n";
       if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
       if (command === "git" && joined === "status --porcelain=v1 -z") return "";
-      if (command === "git" && joined === "rev-list --count origin/main..HEAD") return "0\n";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
       throw new Error(`unexpected command ${command} ${joined}`);
     },
     pathExists: (targetPath) => targetPath === tempDir,
@@ -330,7 +331,8 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
       if (command === "git" && joined === "branch --merged origin/main") return "main\n";
       if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
       if (command === "git" && joined === "status --porcelain=v1 -z") return "";
-      if (command === "git" && joined === "rev-list --count origin/main..HEAD") return "0\n";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
       throw new Error(`unexpected command ${command} ${joined}`);
     },
     pathExists: (targetPath) => targetPath === tempDir,
@@ -420,10 +422,15 @@ test("operator check projects sibling worktree adoption receipts without cleanup
       if (command === "git" && joined === "branch --merged origin/main") return "main\n";
       if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\norigin/dogfood/remote-active\n";
       if (command === "git" && joined === "status --porcelain=v1 -z") return "";
-      if (command === "git" && joined === "rev-list --count origin/main..HEAD") {
-        if (cwd === localAheadWorktree) return "2\n";
-        if (cwd === remoteWorktree) return "1\n";
-        return "0\n";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") {
+        if (cwd === localAheadWorktree) return "2 files changed, 10 insertions(+), 1 deletion(-)\n";
+        if (cwd === remoteWorktree) return "1 file changed, 1 insertion(+)\n";
+        return "";
+      }
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") {
+        if (cwd === localAheadWorktree) return "1 2\n";
+        if (cwd === remoteWorktree) return "0 1\n";
+        return "0 0\n";
       }
       throw new Error(`unexpected command ${command} ${joined}`);
     },
@@ -445,14 +452,30 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   assert.equal(localAhead?.identifiers.siblingWorktree?.category, "salvage-review");
   assert.equal(localAhead?.identifiers.siblingWorktree?.aheadOfBase, 2);
   assert.equal(localAhead?.identifiers.siblingWorktree?.localOnlyCommitPolicy, "do-not-delete-local-only-commits-automatically");
+  assert.equal(localAhead?.identifiers.siblingWorktree?.behindBase, 1);
   assert.match(localAhead?.reasons.join("\n") ?? "", /preserve local-only commits/);
+
+  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.issue, "#726");
+  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.readOnly, true);
+  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.itemCount, 1);
+  assert.match(snapshot.activeWorkReceipts.salvageReviewQueue.claimBoundary, /does not delete, push, fetch, mutate/);
+  const queueItem = snapshot.activeWorkReceipts.salvageReviewQueue.items[0];
+  assert.equal(queueItem.branch, "dogfood/local-ahead-orphan");
+  assert.equal(queueItem.head, "333");
+  assert.equal(queueItem.category, "salvage-review");
+  assert.equal(queueItem.evidence.aheadOfBase, 2);
+  assert.equal(queueItem.evidence.behindBase, 1);
+  assert.equal(queueItem.evidence.remoteBranchExists, false);
+  assert.equal(queueItem.evidence.diff.changed, true);
+  assert.match(queueItem.evidence.diff.summary, /2 files changed/);
+  assert.equal(queueItem.localOnlyCommitPolicy, "do-not-delete-local-only-commits-automatically");
 
   const remote = byBranch.get("dogfood/remote-active");
   assert.equal(remote?.classification, "active");
   assert.equal(remote?.identifiers.siblingWorktree?.category, "keep");
   assert.equal(remote?.identifiers.siblingWorktree?.remoteBranchExists, true);
 
-  const receiptJson = JSON.stringify(worktreeReceipts);
+  const receiptJson = JSON.stringify([worktreeReceipts, snapshot.activeWorkReceipts.salvageReviewQueue]);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(receiptJson), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
@@ -492,7 +515,8 @@ test("operator check receipt marks closed-PR remote worktree residue as non-acti
       if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\norigin/fooks-issue-631-rn-compare-inspect-visibility\n";
       if (command === "git" && joined === "branch --merged origin/main") return "main\n";
       if (command === "git" && joined === "status --porcelain=v1 -z") return "";
-      if (command === "git" && joined === "rev-list --count origin/main..HEAD") return cwd === closedPrWorktree ? "48\n" : "0\n";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return cwd === closedPrWorktree ? "0 48\n" : "0 0\n";
       if (command === "tmux") return "";
       if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
       if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
@@ -767,7 +791,8 @@ test("operator check receipt classifies stale session and legacy closed branch w
       if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
       if (command === "git" && joined === "branch --merged origin/main") return "main\n";
       if (command === "git" && joined === "status --porcelain=v1 -z") return "";
-      if (command === "git" && joined === "rev-list --count origin/main..HEAD") return "0\n";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
       if (command === "tmux") return `fooks-issue-714-deleted\t${deletedPanePath} (deleted)\tzsh\n`;
       if (command === "gh" && args[0] === "issue") return "[]";
       if (command === "gh" && args[0] === "pr") return "[]";

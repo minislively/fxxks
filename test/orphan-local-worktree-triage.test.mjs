@@ -85,11 +85,16 @@ test("orphan local worktree triage classifies safe cleanup, salvage review, and 
       [`${salvage} :: git status --porcelain=v1 -z`]: "",
       [`${keepRemote} :: git status --porcelain=v1 -z`]: "",
       [`${keepPr} :: git status --porcelain=v1 -z`]: "",
-      [`${cwd} :: git rev-list --count origin/main..HEAD`]: "0\n",
-      [`${safe} :: git rev-list --count origin/main..HEAD`]: "0\n",
-      [`${salvage} :: git rev-list --count origin/main..HEAD`]: "2\n",
-      [`${keepRemote} :: git rev-list --count origin/main..HEAD`]: "1\n",
-      [`${keepPr} :: git rev-list --count origin/main..HEAD`]: "1\n",
+      [`${cwd} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${safe} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${salvage} :: git rev-list --left-right --count origin/main...HEAD`]: "0 2\n",
+      [`${keepRemote} :: git rev-list --left-right --count origin/main...HEAD`]: "0 1\n",
+      [`${keepPr} :: git rev-list --left-right --count origin/main...HEAD`]: "0 1\n",
+      [`${cwd} :: git diff --shortstat origin/main...HEAD`]: "",
+      [`${safe} :: git diff --shortstat origin/main...HEAD`]: "",
+      [`${salvage} :: git diff --shortstat origin/main...HEAD`]: "2 files changed, 10 insertions(+), 1 deletion(-)\n",
+      [`${keepRemote} :: git diff --shortstat origin/main...HEAD`]: "1 file changed, 1 insertion(+)\n",
+      [`${keepPr} :: git diff --shortstat origin/main...HEAD`]: "1 file changed, 1 insertion(+)\n",
       "gh pr list --state open --json number,url,headRefName --limit 200": JSON.stringify([{ number: 709, url: "https://github.com/minislively/fooks/pull/709", headRefName: "dogfood/has-pr" }]),
     }, calls),
   });
@@ -111,6 +116,9 @@ test("orphan local worktree triage classifies safe cleanup, salvage review, and 
 
   const salvageEntry = result.entries.find((entry) => entry.branch === "dogfood/local-ahead");
   assert.equal(salvageEntry?.aheadOfBase, 2);
+  assert.equal(salvageEntry?.behindBase, 0);
+  assert.equal(salvageEntry?.diffEvidence.changed, true);
+  assert.match(salvageEntry?.diffEvidence.summary ?? "", /2 files changed/);
   assert.equal(salvageEntry?.remoteBranchExists, false);
   assert.match(salvageEntry?.manualReviewCommands.join("\n") ?? "", /review or cherry-pick local-only commits/i);
   assert.deepEqual(salvageEntry?.manualCleanupCommands, []);
@@ -120,6 +128,8 @@ test("orphan local worktree triage classifies safe cleanup, salvage review, and 
   assert.match(salvageDecision?.decisionLabel ?? "", /SALVAGE FIRST/);
   assert.match(salvageDecision?.salvageCommand ?? "", /git -C '\/work\/fooks\.omx-worktrees\/local-ahead' log/);
   assert.match(salvageDecision?.deleteCommand ?? "", /defer deletion/);
+  assert.match(salvageDecision?.evidenceSummary ?? "", /behind:0/);
+  assert.match(salvageDecision?.evidenceSummary ?? "", /diff:2 files changed/);
   assert.equal(salvageDecision?.localOnlyCommitPolicy, "do-not-delete-local-only-commits-automatically");
 
   const safeEntry = result.entries.find((entry) => entry.branch === "dogfood/old-merged");
@@ -163,8 +173,10 @@ test("orphan local worktree triage classifies closed-PR remote branches as manua
       "tmux list-panes -a -F #{session_name}\t#{pane_current_path}": "",
       [`${cwd} :: git status --porcelain=v1 -z`]: "",
       [`${closedPrRemote} :: git status --porcelain=v1 -z`]: "",
-      [`${cwd} :: git rev-list --count origin/main..HEAD`]: "0\n",
-      [`${closedPrRemote} :: git rev-list --count origin/main..HEAD`]: "12\n",
+      [`${cwd} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${closedPrRemote} :: git rev-list --left-right --count origin/main...HEAD`]: "0 12\n",
+      [`${cwd} :: git diff --shortstat origin/main...HEAD`]: "",
+      [`${closedPrRemote} :: git diff --shortstat origin/main...HEAD`]: "3 files changed, 12 insertions(+)\n",
       "gh pr list --state open --json number,url,headRefName --limit 200": "[]",
       "gh pr list --state closed --json number,url,headRefName,state,closedAt --limit 200": JSON.stringify([
         {
