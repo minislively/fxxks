@@ -5,6 +5,13 @@ import {
   type OperatorActivitySnapshot,
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
 } from "./operator-activity";
+import {
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND,
+  ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE,
+  triageOrphanLocalWorktrees,
+  type OrphanLocalWorktreeEntry,
+} from "./orphan-local-worktree-triage";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -13,12 +20,13 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
+export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
-  "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, and report lines omit paths and cleanup commands.";
+  "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
 
 export type OperatorCheckVerdict = "activeArtifactPresent" | "idleRequiresActiveArtifact" | "blocked";
 export type OperatorCheckActiveArtifactKind = "issue" | "pullRequest" | "session";
-export type OperatorCheckActiveWorkReceiptKind = "issue" | "pullRequest" | "branch" | "session";
+export type OperatorCheckActiveWorkReceiptKind = "issue" | "pullRequest" | "branch" | "session" | "worktree";
 export type OperatorCheckActiveWorkReceiptClassification = "active" | "closedOrStale" | "mainEcho" | "blocked";
 
 export type OperatorCheckActiveArtifact = {
@@ -45,6 +53,15 @@ export type OperatorCheckActiveWorkReceiptIdentifiers = {
   session?: {
     name: string;
     paneCount: number;
+  };
+  siblingWorktree?: {
+    category: OrphanLocalWorktreeEntry["category"];
+    activeTmuxPaneCount: number;
+    aheadOfBase?: number;
+    dirty: OrphanLocalWorktreeEntry["dirty"];
+    remoteBranchExists: OrphanLocalWorktreeEntry["remoteBranchExists"];
+    openPullRequestState: OrphanLocalWorktreeEntry["openPullRequest"]["state"];
+    localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
   };
 };
 
@@ -184,6 +201,66 @@ function overallReceiptClassification(
   return "blocked";
 }
 
+function siblingWorktreeReceiptClassification(entry: OrphanLocalWorktreeEntry): OperatorCheckActiveWorkReceiptClassification {
+  return entry.category === "keep" ? "active" : "closedOrStale";
+}
+
+function siblingWorktreeReceiptReasons(entry: OrphanLocalWorktreeEntry): string[] {
+  const categoryReason = entry.category === "salvage-review"
+    ? `local-ahead orphan or uncertain local state: preserve local-only commits before adoption or cleanup (${OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE}; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
+    : entry.category === "safe-cleanup"
+      ? `stale worktree residue candidate; no active adoption without manual confirmation (${OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE}; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`
+      : `sibling worktree has active keep evidence and may be adopted only with that evidence (${OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE}; triage ${ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE})`;
+  return uniqueSorted([categoryReason, ...entry.reasons]);
+}
+
+function siblingWorktreeReceipts(
+  cwd: string,
+  baseIdentifiers: Omit<OperatorCheckActiveWorkReceiptIdentifiers, "session" | "siblingWorktree">,
+  baseBlockers: string[],
+  options: OperatorActivityOptions,
+): { receipts: OperatorCheckActiveWorkReceipt[]; blockers: string[] } {
+  try {
+    const triage = triageOrphanLocalWorktrees(cwd, {
+      runner: options.commandRunner
+        ? (command, args, runnerCwd) => options.commandRunner?.(command, args, runnerCwd, 3000) ?? ""
+        : undefined,
+      pathExists: options.pathExists,
+      now: options.now,
+    });
+    const receipts = triage.entries
+      .filter((entry) => !entry.current)
+      .map((entry) => ({
+        kind: "worktree" as const,
+        classification: siblingWorktreeReceiptClassification(entry),
+        identifiers: {
+          ...baseIdentifiers,
+          worktree: {
+            ...baseIdentifiers.worktree,
+            branch: entry.branch,
+            head: entry.head,
+          },
+          siblingWorktree: {
+            category: entry.category,
+            activeTmuxPaneCount: entry.activeTmuxPaneCount,
+            aheadOfBase: entry.aheadOfBase,
+            dirty: entry.dirty,
+            remoteBranchExists: entry.remoteBranchExists,
+            openPullRequestState: entry.openPullRequest.state,
+            localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically" as const,
+          },
+        },
+        source: `${ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND}; ${ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY}`,
+        reasons: siblingWorktreeReceiptReasons(entry),
+        blockers: withRepoBlockers(triage.blockers, baseBlockers),
+      }));
+    return { receipts, blockers: triage.blockers };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { receipts: [], blockers: [`sibling worktree adoption receipt unavailable: ${detail}`] };
+  }
+}
+
 function buildActiveWorkReceipts(
   cwd: string,
   activity: OperatorActivitySnapshot,
@@ -274,9 +351,13 @@ function buildActiveWorkReceipts(
     });
   }
 
+  const siblingReceipts = siblingWorktreeReceipts(cwd, baseIdentifiers, baseBlockers, options);
+  receipts.push(...siblingReceipts.receipts);
+
   const blockers = uniqueSorted([
     ...baseBlockers,
     ...activity.blockers,
+    ...siblingReceipts.blockers,
     ...receipts.flatMap((receipt) => receipt.blockers),
   ]);
   const classification = overallReceiptClassification(receipts, blockers);
