@@ -94,11 +94,14 @@ test("orphan local worktree triage classifies safe cleanup, salvage review, and 
     }, calls),
   });
 
-  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.schemaVersion, 2);
   assert.equal(result.command, "status orphan-worktrees");
   assert.equal(result.linkedIssue, ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE);
   assert.equal(result.claimBoundary, ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY);
   assert.equal(result.readOnly, true);
+  assert.equal(result.linkedIssue, "#711");
+  assert.match(result.claimBoundary, /does not fetch, delete branches\/worktrees/);
+  assert.match(result.claimBoundary, /auto-delete local-only commits/);
   assert.equal(result.siblingRoot, "/work/fooks.omx-worktrees");
   assert.deepEqual(result.blockers, []);
 
@@ -112,9 +115,27 @@ test("orphan local worktree triage classifies safe cleanup, salvage review, and 
   assert.match(salvageEntry?.manualReviewCommands.join("\n") ?? "", /review or cherry-pick local-only commits/i);
   assert.deepEqual(salvageEntry?.manualCleanupCommands, []);
 
+  const salvageDecision = result.decisionTable.find((entry) => entry.branch === "dogfood/local-ahead");
+  assert.equal(salvageDecision?.decision, "salvage-before-delete");
+  assert.match(salvageDecision?.decisionLabel ?? "", /SALVAGE FIRST/);
+  assert.match(salvageDecision?.salvageCommand ?? "", /git -C '\/work\/fooks\.omx-worktrees\/local-ahead' log/);
+  assert.match(salvageDecision?.deleteCommand ?? "", /defer deletion/);
+  assert.equal(salvageDecision?.localOnlyCommitPolicy, "do-not-delete-local-only-commits-automatically");
+
   const safeEntry = result.entries.find((entry) => entry.branch === "dogfood/old-merged");
   assert.equal(safeEntry?.aheadOfBase, 0);
   assert.ok(safeEntry?.manualCleanupCommands.includes("git worktree remove <path>"));
+  const safeDecision = result.decisionTable.find((entry) => entry.branch === "dogfood/old-merged");
+  assert.equal(safeDecision?.decision, "delete-candidate-after-operator-confirmation");
+  assert.match(safeDecision?.deleteCommand ?? "", /git worktree remove '\/work\/fooks\.omx-worktrees\/old-merged'/);
+  assert.match(safeDecision?.deleteCommand ?? "", /git branch -d 'dogfood\/old-merged'/);
+  assert.equal(safeDecision?.operatorConfirmationRequired, true);
+
+  const keepDecision = result.decisionTable.find((entry) => entry.branch === "dogfood/has-pr");
+  assert.equal(keepDecision?.decision, "keep-active-evidence");
+  assert.equal(keepDecision?.deleteCommand, "none from this artifact");
+  assert.equal(result.operatorWorksheet.issue, "#711");
+  assert.match(result.operatorWorksheet.requiredConfirmation, /explicit manual keep\/salvage\/delete outcome/);
 
   assert.equal(calls.some(([command, args]) => command === "git" && ["fetch", "worktree remove", "branch -d"].includes(args.join(" "))), false);
 });
@@ -125,9 +146,11 @@ test("status orphan-worktrees emits parseable JSON", () => {
     encoding: "utf8",
   });
   const result = JSON.parse(stdout);
-  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.schemaVersion, 2);
   assert.equal(result.command, "status orphan-worktrees");
-  assert.equal(result.linkedIssue, "#709");
+  assert.equal(result.linkedIssue, "#711");
   assert.equal(result.readOnly, true);
   assert.ok(Array.isArray(result.entries));
+  assert.ok(Array.isArray(result.decisionTable));
+  assert.equal(result.operatorWorksheet.localOnlyCommitPolicy, "do-not-delete-local-only-commits-automatically");
 });

@@ -96,6 +96,8 @@ export {
 export type {
   OrphanLocalWorktreeCategory,
   OrphanLocalWorktreeCommandRunner,
+  OrphanLocalWorktreeDecisionRow,
+  OrphanLocalWorktreeOperatorDecision,
   OrphanLocalWorktreeEntry,
   OrphanLocalWorktreePathExists,
   OrphanLocalWorktreePullRequestEvidence,

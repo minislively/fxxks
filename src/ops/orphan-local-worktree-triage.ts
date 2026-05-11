@@ -3,12 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseAndSummarizeWorktreeStatus } from "../core/worktree-status";
 
-export const ORPHAN_LOCAL_WORKTREE_TRIAGE_SCHEMA_VERSION = 1;
+export const ORPHAN_LOCAL_WORKTREE_TRIAGE_SCHEMA_VERSION = 2;
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND = "status orphan-worktrees";
-export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE = "#709";
-export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE_URL = "https://github.com/minislively/fooks/issues/709";
+export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE = "#711";
+export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE_URL = "https://github.com/minislively/fooks/issues/711";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY =
-  "Read-only issue #709 local sibling worktree triage; does not fetch, delete branches/worktrees, open PRs, or change runtime/provider/merge-gate policy.";
+  "Read-only issue #711 local sibling worktree salvage/delete decision artifact; does not fetch, delete branches/worktrees, open PRs, auto-delete local-only commits, or change runtime/provider/merge-gate policy.";
 export const DEFAULT_ORPHAN_LOCAL_WORKTREE_TRIAGE_TIMEOUT_MS = 3000;
 
 export type OrphanLocalWorktreeCategory = "safe-cleanup" | "salvage-review" | "keep";
@@ -21,6 +21,25 @@ export type OrphanLocalWorktreePullRequestEvidence =
   | { state: "none"; source: typeof ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE }
   | { state: "open"; source: typeof ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE; pullRequests: { number?: number; url?: string; headRefName?: string }[] }
   | { state: "unknown"; source: typeof ORPHAN_LOCAL_WORKTREE_TRIAGE_PR_SOURCE; reason: string };
+
+export type OrphanLocalWorktreeOperatorDecision =
+  | "keep-active-evidence"
+  | "salvage-before-delete"
+  | "delete-candidate-after-operator-confirmation"
+  | "manual-review-blocked";
+
+export type OrphanLocalWorktreeDecisionRow = {
+  path: string;
+  branch?: string;
+  category: OrphanLocalWorktreeCategory;
+  decision: OrphanLocalWorktreeOperatorDecision;
+  decisionLabel: string;
+  evidenceSummary: string;
+  salvageCommand: string;
+  deleteCommand: string;
+  operatorConfirmationRequired: true;
+  localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+};
 
 export type OrphanLocalWorktreeEntry = {
   path: string;
@@ -55,6 +74,13 @@ export type OrphanLocalWorktreeTriageResult = {
   readOnly: true;
   categories: Record<OrphanLocalWorktreeCategory, OrphanLocalWorktreeEntry[]>;
   entries: OrphanLocalWorktreeEntry[];
+  decisionTable: OrphanLocalWorktreeDecisionRow[];
+  operatorWorksheet: {
+    issue: typeof ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE;
+    readOnly: true;
+    requiredConfirmation: string;
+    localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+  };
   blockers: string[];
 };
 
@@ -229,6 +255,92 @@ function aheadOfBase(runner: OrphanLocalWorktreeCommandRunner, worktreePath: str
   }
 }
 
+
+function concreteCleanupCommand(entry: OrphanLocalWorktreeEntry): string {
+  if (entry.category !== "safe-cleanup") return "not a delete candidate from this artifact";
+  const commands = [`git worktree remove ${shellQuote(entry.path)}`];
+  if (entry.branch) commands.push(`git branch -d ${shellQuote(entry.branch)}`);
+  return commands.join(" && ");
+}
+
+function concreteSalvageCommand(entry: OrphanLocalWorktreeEntry): string {
+  if (!entry.exists) return `test -e ${shellQuote(entry.path)} || git worktree prune --dry-run`;
+  const commands = [`git -C ${shellQuote(entry.path)} status --short --branch`];
+  if (entry.aheadOfBase !== undefined && entry.aheadOfBase > 0) {
+    commands.push(`git -C ${shellQuote(entry.path)} log --oneline --decorate --max-count=20 ${entry.baseRef ?? "origin/main"}..HEAD`);
+  }
+  if (entry.dirty === true || entry.dirty === "unknown") {
+    commands.push(`git -C ${shellQuote(entry.path)} diff --stat`);
+  }
+  return commands.join(" && ");
+}
+
+function summarizeDecisionEvidence(entry: OrphanLocalWorktreeEntry): string {
+  const pullRequestEvidence = entry.openPullRequest.state === "open"
+    ? `open-pr:${entry.openPullRequest.pullRequests.map((pullRequest) => pullRequest.number ? `#${pullRequest.number}` : pullRequest.url ?? pullRequest.headRefName ?? "unknown").join(",")}`
+    : `open-pr:${entry.openPullRequest.state}`;
+  return [
+    `current:${entry.current ? "yes" : "no"}`,
+    `exists:${entry.exists ? "yes" : "no"}`,
+    `dirty:${String(entry.dirty)}`,
+    `ahead:${entry.aheadOfBase ?? "unknown"}`,
+    `remote:${String(entry.remoteBranchExists)}`,
+    pullRequestEvidence,
+    `tmux-panes:${entry.activeTmuxPaneCount}`,
+  ].join("; ");
+}
+
+function decisionForEntry(entry: OrphanLocalWorktreeEntry): Pick<OrphanLocalWorktreeDecisionRow, "decision" | "decisionLabel" | "salvageCommand" | "deleteCommand"> {
+  if (entry.category === "safe-cleanup") {
+    return {
+      decision: "delete-candidate-after-operator-confirmation",
+      decisionLabel: "DELETE CANDIDATE after confirming no needed local state",
+      salvageCommand: concreteSalvageCommand(entry),
+      deleteCommand: concreteCleanupCommand(entry),
+    };
+  }
+
+  if (entry.category === "salvage-review") {
+    return {
+      decision: "salvage-before-delete",
+      decisionLabel: "SALVAGE FIRST; do not delete until local-only evidence is reviewed",
+      salvageCommand: concreteSalvageCommand(entry),
+      deleteCommand: "defer deletion; preserve or cherry-pick local-only commits before any manual cleanup",
+    };
+  }
+
+  if (entry.dirty === "unknown" || entry.remoteBranchExists === "unknown" || entry.openPullRequest.state === "unknown" || !entry.exists) {
+    return {
+      decision: "manual-review-blocked",
+      decisionLabel: "MANUAL REVIEW BLOCKED by incomplete local evidence",
+      salvageCommand: concreteSalvageCommand(entry),
+      deleteCommand: "none from this artifact",
+    };
+  }
+
+  return {
+    decision: "keep-active-evidence",
+    decisionLabel: "KEEP because active PR, remote branch, current worktree, tmux pane, or detached evidence exists",
+    salvageCommand: concreteSalvageCommand(entry),
+    deleteCommand: "none from this artifact",
+  };
+}
+
+function buildDecisionTable(entries: OrphanLocalWorktreeEntry[]): OrphanLocalWorktreeDecisionRow[] {
+  return entries.map((entry) => {
+    const decision = decisionForEntry(entry);
+    return {
+      path: entry.path,
+      branch: entry.branch,
+      category: entry.category,
+      ...decision,
+      evidenceSummary: summarizeDecisionEvidence(entry),
+      operatorConfirmationRequired: true,
+      localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically",
+    };
+  });
+}
+
 function classifyEntry(input: {
   current: boolean;
   exists: boolean;
@@ -365,6 +477,13 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
       keep: entries.filter((entry) => entry.category === "keep"),
     },
     entries,
+    decisionTable: buildDecisionTable(entries),
+    operatorWorksheet: {
+      issue: ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE,
+      readOnly: true,
+      requiredConfirmation: "Record owner, reviewed evidence, and explicit manual keep/salvage/delete outcome before running any cleanup command.",
+      localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically",
+    },
     blockers: uniqueSorted(blockers),
   };
 }
