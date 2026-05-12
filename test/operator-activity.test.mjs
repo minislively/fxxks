@@ -18,6 +18,8 @@ const {
   OPERATOR_ACTIVITY_COMMAND,
   OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
   OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE,
+  OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY,
+  OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE,
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
   OPERATOR_ACTIVITY_REMOTE_SOURCE,
   OPERATOR_ACTIVITY_TMUX_COMMAND,
@@ -184,8 +186,176 @@ test("idle activity snapshot remains zero and read-only with opt-in remote count
     blockers: [],
   });
   assert.deepEqual(snapshot.blockers, []);
-  assert.equal(commandCalls.filter((call) => call.startsWith("gh ")).length, 2);
+  assert.equal(commandCalls.filter((call) => call.startsWith("gh ")).length, 3);
   assert.equal(gitCalls.some((call) => call.includes("fetch")), false);
+});
+
+test("operator activity reports exact-head post-merge main CI and release-report conclusions", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "abc123main";
+  const calls = [];
+  const runs = [
+    {
+      databaseId: 101,
+      status: "completed",
+      conclusion: "success",
+      updatedAt: "2026-05-12T10:00:00Z",
+      headBranch: "main",
+      headSha: mainHead,
+      event: "push",
+      workflowName: "CI",
+      url: "https://github.com/minislively/fooks/actions/runs/101",
+    },
+    {
+      databaseId: 102,
+      status: "completed",
+      conclusion: "success",
+      updatedAt: "2026-05-12T10:05:00Z",
+      headBranch: "main",
+      headSha: mainHead,
+      event: "push",
+      workflowName: "React Web Release Report",
+      url: "https://github.com/minislively/fooks/actions/runs/102",
+    },
+    {
+      databaseId: 99,
+      status: "completed",
+      conclusion: "success",
+      updatedAt: "2026-05-12T09:00:00Z",
+      headBranch: "main",
+      headSha: "stale-premerge",
+      event: "push",
+      workflowName: "CI",
+      url: "https://github.com/minislively/fooks/actions/runs/99",
+    },
+  ];
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-12T10:10:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return JSON.stringify(runs);
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.postMergeMainCiEvidence.available, true);
+  assert.equal(snapshot.postMergeMainCiEvidence.source, OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE);
+  assert.equal(snapshot.postMergeMainCiEvidence.claimBoundary, OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY);
+  assert.equal(snapshot.postMergeMainCiEvidence.readOnly, true);
+  assert.equal(snapshot.postMergeMainCiEvidence.exactHeadRequired, true);
+  assert.equal(snapshot.postMergeMainCiEvidence.mainRef, "origin/main");
+  assert.equal(snapshot.postMergeMainCiEvidence.mainHeadSource, "local origin/main tracking ref; no fetch performed");
+  assert.equal(snapshot.postMergeMainCiEvidence.remoteFreshness, "not verified");
+  assert.equal(snapshot.postMergeMainCiEvidence.mainHead, mainHead);
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.summary, {
+    exactHeadWorkflowCount: 2,
+    successCount: 2,
+    pendingCount: 0,
+    unknownCount: 0,
+    failureCount: 0,
+    allExactHeadConclusionsSuccessful: true,
+  });
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.workflowEvidence.map((item) => [item.workflow, item.status, item.headSha]), [
+    ["CI", "success", mainHead],
+    ["React Web Release Report", "success", mainHead],
+  ]);
+  assert.equal(calls.some((call) => /fetch|delete/.test(call)), false);
+});
+
+test("operator check keeps missing exact-head workflow evidence unknown instead of success", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "new-main-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-12T11:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "gh" && args[0] === "run") {
+        return JSON.stringify([
+          {
+            databaseId: 201,
+            status: "completed",
+            conclusion: "success",
+            updatedAt: "2026-05-12T10:30:00Z",
+            headBranch: "main",
+            headSha: "old-main-head",
+            event: "push",
+            workflowName: "CI",
+            url: "https://github.com/minislively/fooks/actions/runs/201",
+          },
+          {
+            databaseId: 202,
+            status: "in_progress",
+            conclusion: "",
+            updatedAt: "2026-05-12T10:35:00Z",
+            headBranch: "main",
+            headSha: mainHead,
+            event: "push",
+            workflowName: "React Web Release Report",
+            url: "https://github.com/minislively/fooks/actions/runs/202",
+          },
+        ]);
+      }
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.postMergeMainCiEvidence.mainHead, mainHead);
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.workflowEvidence.map((item) => [item.workflow, item.status]), [
+    ["CI", "unknown"],
+    ["React Web Release Report", "pending"],
+  ]);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.successCount, 0);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 1);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.pendingCount, 1);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.allExactHeadConclusionsSuccessful, false);
+  assert.equal(snapshot.activity.postMergeMainCiEvidence, snapshot.postMergeMainCiEvidence);
 });
 
 test("operator activity marks clean current main with zero counts and no sessions as non-active main echo evidence", () => {

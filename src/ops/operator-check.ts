@@ -242,6 +242,7 @@ export type OperatorCheckSnapshot = {
     echoOnly: boolean;
     reasons: string[];
   };
+  postMergeMainCiEvidence: OperatorActivitySnapshot["postMergeMainCiEvidence"];
   activeArtifacts: OperatorCheckActiveArtifact[];
   activeWorkReceipts: OperatorCheckActiveWorkReceipts;
   requiredActiveArtifact: OperatorCheckRequiredActiveArtifact;
@@ -801,6 +802,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
       echoOnly,
       reasons: activity.currentRunEvidence.reasons,
     },
+    postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
     activeArtifacts,
     activeWorkReceipts,
     requiredActiveArtifact: requiredActiveArtifact(!blocked && !hasActiveArtifact),

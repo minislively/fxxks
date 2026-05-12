@@ -28,12 +28,18 @@ export const OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT = 5;
 export const OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE = "status activity current-run dogfood reminder";
 export const OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY =
   "Current-run operator reminder evidence only; read-only, bounded to this snapshot, and not cleanup authority or runtime/provider behavior.";
+export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE =
+  "GitHub Actions run list for exact local origin/main head; read-only and no fetch performed";
+export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY =
+  "Read-only post-merge main CI evidence for the exact local origin/main head only; missing exact-head workflow evidence stays unknown or pending and never becomes success.";
+export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS = ["CI", "React Web Release Report"] as const;
 
 export type OperatorActivityCommandRunner = (command: string, args: string[], cwd: string, timeoutMs: number) => string;
 export type OperatorActivityPathExists = (targetPath: string) => boolean;
 
 export type OperatorActivityOptions = WorktreeEvidenceOptions & {
   includeRemoteCounts?: boolean;
+  includeRemoteWorkflowEvidence?: boolean;
   commandRunner?: OperatorActivityCommandRunner;
   pathExists?: OperatorActivityPathExists;
   now?: () => string;
@@ -147,6 +153,44 @@ export type OperatorActivityCurrentRunEvidence = {
   blockers: string[];
 };
 
+export type OperatorActivityPostMergeMainWorkflowEvidenceStatus = "success" | "failure" | "pending" | "unknown";
+
+export type OperatorActivityPostMergeMainWorkflowEvidence = {
+  workflow: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS[number];
+  status: OperatorActivityPostMergeMainWorkflowEvidenceStatus;
+  conclusion?: string;
+  runStatus?: string;
+  runId?: number;
+  url?: string;
+  headSha?: string;
+  headBranch?: string;
+  event?: string;
+  updatedAt?: string;
+  reason: string;
+};
+
+export type OperatorActivityPostMergeMainCiEvidence = {
+  available: boolean;
+  source: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE;
+  claimBoundary: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY;
+  readOnly: true;
+  exactHeadRequired: true;
+  mainRef: "origin/main";
+  mainHeadSource: "local origin/main tracking ref; no fetch performed";
+  remoteFreshness: "not verified";
+  mainHead?: string;
+  workflowEvidence: OperatorActivityPostMergeMainWorkflowEvidence[];
+  summary: {
+    exactHeadWorkflowCount: number;
+    successCount: number;
+    pendingCount: number;
+    unknownCount: number;
+    failureCount: number;
+    allExactHeadConclusionsSuccessful: boolean;
+  };
+  blockers: string[];
+};
+
 export type OperatorActivitySnapshot = {
   schemaVersion: typeof OPERATOR_ACTIVITY_SCHEMA_VERSION;
   command: typeof OPERATOR_ACTIVITY_COMMAND;
@@ -159,6 +203,7 @@ export type OperatorActivitySnapshot = {
   optionalCounts: OperatorActivityRemoteCounts;
   legacyWorktreeEvidence: OperatorActivityLegacyWorktreeEvidence;
   currentRunEvidence: OperatorActivityCurrentRunEvidence;
+  postMergeMainCiEvidence: OperatorActivityPostMergeMainCiEvidence;
   blockers: string[];
 };
 
@@ -438,6 +483,206 @@ function readRemoteCounts(cwd: string, options: OperatorActivityOptions): Operat
   };
 }
 
+type GhRunListEntry = {
+  databaseId?: number;
+  status?: string;
+  conclusion?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  headBranch?: string;
+  headSha?: string;
+  event?: string;
+  name?: string;
+  workflowName?: string;
+  url?: string;
+};
+
+function readLocalOriginMainHead(cwd: string, options: OperatorActivityOptions): { head?: string; blockers: string[] } {
+  const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
+  try {
+    const head = runner("git", ["rev-parse", "--verify", "origin/main"], cwd, DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS).trim();
+    return head ? { head, blockers: [] } : { blockers: ["origin/main head unavailable: git rev-parse returned empty output"] };
+  } catch (error) {
+    return { blockers: [`origin/main head unavailable: ${errorDetail(error)}`] };
+  }
+}
+
+function parseGhRunList(output: string): { runs: GhRunListEntry[]; blocker?: string } {
+  try {
+    const parsed = JSON.parse(output) as unknown;
+    if (!Array.isArray(parsed)) return { runs: [], blocker: "GitHub Actions run list unavailable: gh returned non-array JSON" };
+    return { runs: parsed.filter((item): item is GhRunListEntry => Boolean(item) && typeof item === "object") as GhRunListEntry[] };
+  } catch (error) {
+    return { runs: [], blocker: `GitHub Actions run list unavailable: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+function workflowNameOf(run: GhRunListEntry): string {
+  return run.workflowName || run.name || "";
+}
+
+function latestRunForWorkflow(runs: GhRunListEntry[], workflow: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS[number], mainHead: string): GhRunListEntry | undefined {
+  return runs
+    .filter((run) => run.headSha === mainHead)
+    .filter((run) => run.headBranch === "main")
+    .filter((run) => workflowNameOf(run) === workflow)
+    .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? "").localeCompare(String(left.updatedAt ?? left.createdAt ?? "")))[0];
+}
+
+function workflowEvidenceFromRun(
+  workflow: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS[number],
+  mainHead: string | undefined,
+  run: GhRunListEntry | undefined,
+): OperatorActivityPostMergeMainWorkflowEvidence {
+  if (!mainHead) {
+    return {
+      workflow,
+      status: "unknown",
+      reason: "origin/main head is unavailable; exact-head workflow evidence cannot be evaluated",
+    };
+  }
+  if (!run) {
+    return {
+      workflow,
+      status: "unknown",
+      headSha: mainHead,
+      reason: `no ${workflow} run was found for the exact origin/main head`,
+    };
+  }
+
+  const runStatus = run.status;
+  const conclusion = run.conclusion;
+  const base = {
+    workflow,
+    conclusion,
+    runStatus,
+    runId: run.databaseId,
+    url: run.url,
+    headSha: run.headSha,
+    headBranch: run.headBranch,
+    event: run.event,
+    updatedAt: run.updatedAt,
+  };
+  if (runStatus !== "completed") {
+    return {
+      ...base,
+      status: "pending",
+      reason: `${workflow} run for the exact origin/main head is ${runStatus ?? "not completed"}`,
+    };
+  }
+  if (conclusion === "success") {
+    return {
+      ...base,
+      status: "success",
+      reason: `${workflow} run completed successfully for the exact origin/main head`,
+    };
+  }
+  if (conclusion) {
+    return {
+      ...base,
+      status: "failure",
+      reason: `${workflow} run for the exact origin/main head completed with conclusion ${conclusion}`,
+    };
+  }
+  return {
+    ...base,
+    status: "unknown",
+    reason: `${workflow} run for the exact origin/main head is completed but has no conclusion`,
+  };
+}
+
+function summarizePostMergeMainCiEvidence(
+  workflowEvidence: OperatorActivityPostMergeMainWorkflowEvidence[],
+): OperatorActivityPostMergeMainCiEvidence["summary"] {
+  const successCount = workflowEvidence.filter((item) => item.status === "success").length;
+  const pendingCount = workflowEvidence.filter((item) => item.status === "pending").length;
+  const unknownCount = workflowEvidence.filter((item) => item.status === "unknown").length;
+  const failureCount = workflowEvidence.filter((item) => item.status === "failure").length;
+  return {
+    exactHeadWorkflowCount: workflowEvidence.filter((item) => Boolean(item.runId)).length,
+    successCount,
+    pendingCount,
+    unknownCount,
+    failureCount,
+    allExactHeadConclusionsSuccessful:
+      workflowEvidence.length === OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS.length
+      && successCount === OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS.length,
+  };
+}
+
+function remoteWorkflowEvidenceEnabled(options: OperatorActivityOptions): boolean {
+  return options.includeRemoteWorkflowEvidence ?? options.includeRemoteCounts ?? false;
+}
+
+function readPostMergeMainCiEvidence(cwd: string, options: OperatorActivityOptions): OperatorActivityPostMergeMainCiEvidence {
+  if (!remoteWorkflowEvidenceEnabled(options)) {
+    const workflowEvidence = OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS.map((workflow) =>
+      workflowEvidenceFromRun(workflow, undefined, undefined)
+    );
+    const blockers = ["remote workflow evidence disabled; pass --include-remote-counts to inspect exact-head post-merge main CI evidence"];
+    return {
+      available: false,
+      source: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE,
+      claimBoundary: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY,
+      readOnly: true,
+      exactHeadRequired: true,
+      mainRef: "origin/main",
+      mainHeadSource: "local origin/main tracking ref; no fetch performed",
+      remoteFreshness: "not verified",
+      workflowEvidence,
+      summary: summarizePostMergeMainCiEvidence(workflowEvidence),
+      blockers,
+    };
+  }
+
+  const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
+  const mainHeadResult = readLocalOriginMainHead(cwd, options);
+  const blockers = [...mainHeadResult.blockers];
+  let runs: GhRunListEntry[] = [];
+
+  try {
+    const output = runner(
+      "gh",
+      [
+        "run",
+        "list",
+        "--branch",
+        "main",
+        "--limit",
+        "50",
+        "--json",
+        "databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,event,name,workflowName,url",
+      ],
+      cwd,
+      DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS,
+    );
+    const parsed = parseGhRunList(output);
+    runs = parsed.runs;
+    if (parsed.blocker) blockers.push(parsed.blocker);
+  } catch (error) {
+    blockers.push(`GitHub Actions run list unavailable: ${errorDetail(error)}`);
+  }
+
+  const workflowEvidence = OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS.map((workflow) =>
+    workflowEvidenceFromRun(workflow, mainHeadResult.head, mainHeadResult.head ? latestRunForWorkflow(runs, workflow, mainHeadResult.head) : undefined)
+  );
+
+  return {
+    available: blockers.length === 0,
+    source: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE,
+    claimBoundary: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY,
+    readOnly: true,
+    exactHeadRequired: true,
+    mainRef: "origin/main",
+    mainHeadSource: "local origin/main tracking ref; no fetch performed",
+    remoteFreshness: "not verified",
+    mainHead: mainHeadResult.head,
+    workflowEvidence,
+    summary: summarizePostMergeMainCiEvidence(workflowEvidence),
+    blockers: uniqueSorted(blockers),
+  };
+}
+
 function buildCurrentRunEvidence(
   worktree: OperatorActivityWorktree,
   tmux: OperatorActivityTmux,
@@ -515,6 +760,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
   const optionalCounts = readRemoteCounts(cwd, options);
   const legacyWorktreeEvidence = readLegacyWorktreeEvidence(cwd, options, generatedAt);
   const currentRunEvidence = buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence);
+  const postMergeMainCiEvidence = readPostMergeMainCiEvidence(cwd, options);
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
 
   return {
@@ -529,6 +775,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     optionalCounts,
     legacyWorktreeEvidence,
     currentRunEvidence,
+    postMergeMainCiEvidence,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
   };
 }

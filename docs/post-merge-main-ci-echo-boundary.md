@@ -22,6 +22,18 @@ new recovery, cleanup, or implementation lane from the success echo alone.
   `currentRunEvidence`. The non-active echo case is only
   `classification: "mainEchoNonActive"` with `mainEchoEvidence: true` and
   `activeWorkEvidence: false`.
+- `fooks check --json` and `fooks status activity --include-remote-counts
+  --json` expose `postMergeMainCiEvidence`, a read-only exact-head summary for
+  local `origin/main`. It reports the local `origin/main` head SHA and the
+  latest `CI` plus `React Web Release Report` workflow conclusions for that
+  exact SHA only. The `mainHeadSource` is the local `origin/main` tracking ref
+  with no fetch performed, and `remoteFreshness` is not verified by this
+  read-only surface.
+- `postMergeMainCiEvidence.summary.allExactHeadConclusionsSuccessful` is true
+  only when both exact-head workflow runs completed with `success`. A missing
+  exact-head run is `status: "unknown"` and an incomplete exact-head run is
+  `status: "pending"`; stale pre-merge successes never satisfy the exact-head
+  success summary.
 - `currentRunEvidence` is intentionally narrow: it requires branch `main`, a
   clean worktree, zero local tracking divergence, zero fooks-like tmux sessions,
   and opt-in GitHub open issue/PR counts of zero. If any proof is missing or a
