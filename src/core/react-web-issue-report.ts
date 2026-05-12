@@ -201,6 +201,38 @@ export type ReactWebIssueReportSummaryJson = {
   firstMinuteSummary: ReactWebIssueFirstMinuteSummary;
 };
 
+export type ReactWebIssueReportMigrationDryRunJson = {
+  schemaVersion: "react-web-issue-report-migration-dry-run.v1";
+  sourceReportSchemaVersion: typeof REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION;
+  command: typeof REACT_WEB_ISSUE_REPORT_COMMAND;
+  projection: "migration-dry-run-json";
+  profile: "react-web";
+  filePath: string;
+  readOnly: true;
+  dryRunOnly: true;
+  autoApply: false;
+  claimBoundary: typeof REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY;
+  inScope: boolean;
+  skippedReason?: string;
+  summary: {
+    candidateCount: number;
+    affectedFiles: string[];
+    safePreviewCandidateCount: number;
+    manualReviewCandidateCount: number;
+  };
+  candidates: {
+    issueId: string;
+    migrationCandidate: ReactWebIssueFixShape;
+    affectedFile: string;
+    firstInspectStep: string;
+    previewAvailable: boolean;
+    humanReviewRequired: true;
+    autoApply: false;
+    dryRunOnly: true;
+    riskNotes: string[];
+  }[];
+};
+
 function issueKindFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueKind {
   return `react-web.${finding.kind}` as ReactWebIssueKind;
 }
@@ -874,6 +906,56 @@ export function buildReactWebIssueReportSummaryJson(report: ReactWebIssueReport)
       manualReviewIssueIds: report.triageRollup.manualReviewIssueIds,
     },
     firstMinuteSummary: report.firstMinuteSummary,
+  };
+}
+
+function migrationRiskNotesFor(issue: ReactWebIssueCard): string[] {
+  const notes = [
+    issue.safetyRationale,
+    issue.fixability === "safe-preview"
+      ? "Safe preview is a read-only shape candidate and still requires human review before use."
+      : "No deterministic safe preview is available; choose the final label/name shape from local source context.",
+    "Do not apply patches automatically or generate accessible-name copy from this dry run.",
+    "Do not infer custom-component semantics.",
+  ];
+  return uniqueCompactStrings(notes, 4, 160);
+}
+
+export function buildReactWebIssueReportMigrationDryRunJson(
+  report: ReactWebIssueReport,
+): ReactWebIssueReportMigrationDryRunJson {
+  const rankedIssues = [...report.issues].sort((a, b) => a.triage.rank - b.triage.rank);
+  const candidates = rankedIssues.map((issue) => ({
+    issueId: issue.id,
+    migrationCandidate: issue.fixShapeGuidance.shape,
+    affectedFile: issue.whereToLook.filePath,
+    firstInspectStep: firstInspectStepFor(issue),
+    previewAvailable: issue.triage.evidence.safePreviewAvailable,
+    humanReviewRequired: true as const,
+    autoApply: false as const,
+    dryRunOnly: true as const,
+    riskNotes: migrationRiskNotesFor(issue),
+  }));
+  return {
+    schemaVersion: "react-web-issue-report-migration-dry-run.v1",
+    sourceReportSchemaVersion: report.schemaVersion,
+    command: report.command,
+    projection: "migration-dry-run-json",
+    profile: report.profile,
+    filePath: report.filePath,
+    readOnly: true,
+    dryRunOnly: true,
+    autoApply: false,
+    claimBoundary: report.claimBoundary,
+    inScope: report.inScope,
+    ...(report.skippedReason ? { skippedReason: report.skippedReason } : {}),
+    summary: {
+      candidateCount: candidates.length,
+      affectedFiles: [...new Set(candidates.map((candidate) => candidate.affectedFile))].sort(),
+      safePreviewCandidateCount: candidates.filter((candidate) => candidate.previewAvailable).length,
+      manualReviewCandidateCount: candidates.filter((candidate) => !candidate.previewAvailable).length,
+    },
+    candidates,
   };
 }
 
