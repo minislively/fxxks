@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
+import {
+  assertReactWebIssueFixtureUsefulness,
+  evaluateReactWebIssueFixtureUsefulness,
+  reactWebIssueFixtureRegressionClasses,
+} from "./helpers/react-web-issue-fixture-gate.mjs";
 
 const repoRoot = process.cwd();
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
@@ -44,19 +49,6 @@ function hasNestedKey(value, key) {
   return Object.values(value).some((entry) => hasNestedKey(entry, key));
 }
 
-function matrixEntry({ fixture, expectedCards, report, preview, acceptedCards, rejectedCards = 0, noiseNotes = [], suggestionPlausibility }) {
-  return {
-    fixture,
-    expectedCards,
-    observedCards: report.summary.issueCount,
-    acceptedCards,
-    rejectedCards,
-    noiseNotes,
-    suggestionPlausibility,
-    parityWithPreviewFindings: report.summary.issueCount === preview.summary.findingCount,
-    verdict: report.summary.issueCount === expectedCards && acceptedCards === expectedCards && rejectedCards === 0 && noiseNotes.length === 0 && report.summary.issueCount === preview.summary.findingCount ? "pass" : "fail",
-  };
-}
 
 test("React Web issue report emits actionable issue cards over label preview findings", () => {
   const report = parseIssues(fixtures.missing);
@@ -286,6 +278,8 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
       file: fixtures.missing,
       expectedCards: 5,
       acceptedCards: 5,
+      expectedSafePreviewCount: 0,
+      expectedManualReviewCount: 5,
       suggestionPlausibility: "TODO accessible-name suggestions are plausible but require human copy review, so no preview is emitted.",
     },
     {
@@ -293,6 +287,8 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
       file: fixtures.association,
       expectedCards: 3,
       acceptedCards: 3,
+      expectedSafePreviewCount: 1,
+      expectedManualReviewCount: 2,
       suggestionPlausibility: "High-confidence native nearby label/control htmlFor/id previews are deterministic and read-only; medium-confidence associations stay manual review.",
     },
     {
@@ -300,19 +296,43 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
       file: fixtures.labelled,
       expectedCards: 0,
       acceptedCards: 0,
+      expectedSafePreviewCount: 0,
+      expectedManualReviewCount: 0,
       suggestionPlausibility: "No suggestion needed because native controls already have label evidence.",
+    },
+    {
+      name: "rn-accessibility-test-anchor.tsx",
+      file: fixtures.rn,
+      expectedCards: 0,
+      acceptedCards: 0,
+      expectedSafePreviewCount: 0,
+      expectedManualReviewCount: 0,
+      expectedUnsupported: true,
+      expectedSkippedReason: /^domain-classification:react-native/,
+      suggestionPlausibility: "React Native fixture is an unsupported boundary and must not produce React Web issue cards.",
     },
   ];
 
-  const matrix = cases.map((item) => {
-    const report = buildReactWebIssueReport(item.file, repoRoot);
-    const preview = buildReactWebLabelPatchPreview(item.file, repoRoot);
-    return matrixEntry({ ...item, fixture: item.name, report, preview });
-  });
+  assert.deepEqual(reactWebIssueFixtureRegressionClasses, [
+    "count-mismatch",
+    "detector-parity",
+    "noisy-suggestion",
+    "unsafe-preview",
+    "unsupported-boundary",
+  ]);
 
-  assert.deepEqual(matrix.map((entry) => entry.verdict), ["pass", "pass", "pass"]);
+  const matrix = evaluateReactWebIssueFixtureUsefulness(
+    cases,
+    (file) => buildReactWebIssueReport(file, repoRoot),
+    (file) => buildReactWebLabelPatchPreview(file, repoRoot),
+  );
+
+  for (const entry of matrix) assertReactWebIssueFixtureUsefulness(entry);
+  assert.deepEqual(matrix.map((entry) => entry.verdict), ["pass", "pass", "pass", "pass"]);
   assert.ok(matrix.every((entry) => entry.parityWithPreviewFindings));
   assert.ok(matrix.every((entry) => entry.noiseNotes.length === 0));
+  assert.ok(matrix.some((entry) => entry.expectedUnsupported === true && entry.unsupported === true));
+  assert.ok(matrix.some((entry) => entry.expectedUnsupported === true && entry.unsupportedSkipBoundary === true));
 });
 
 test("React Web issue report preserves skip and no unsupported custom-component inference boundaries", () => {
@@ -332,17 +352,24 @@ test("React Web issue report preserves skip and no unsupported custom-component 
 test("React Web issue report avoids unsafe htmlFor inference and keeps fallback previews read-only", () => {
   const report = parseIssues(fixtures.unsafeAssociation);
   const preview = buildReactWebLabelPatchPreview(fixtures.unsafeAssociation, repoRoot);
-  const matrix = matrixEntry({
-    fixture: "label-association-unsafe.tsx",
-    expectedCards: preview.summary.findingCount,
-    observedCards: report.summary.issueCount,
-    report,
-    preview,
-    acceptedCards: report.summary.issueCount,
-    suggestionPlausibility: "Unsafe nearby association is rejected; fallback aria-label TODO suggestions remain manual-review without preview.",
-  });
+  const matrix = evaluateReactWebIssueFixtureUsefulness(
+    [
+      {
+        name: "label-association-unsafe.tsx",
+        file: fixtures.unsafeAssociation,
+        expectedCards: preview.summary.findingCount,
+        acceptedCards: report.summary.issueCount,
+        expectedSafePreviewCount: 0,
+        expectedManualReviewCount: report.summary.issueCount,
+        suggestionPlausibility: "Unsafe nearby association is rejected; fallback aria-label TODO suggestions remain manual-review without preview.",
+      },
+    ],
+    (file) => buildReactWebIssueReport(file, repoRoot),
+    (file) => buildReactWebLabelPatchPreview(file, repoRoot),
+  );
 
-  assert.equal(matrix.verdict, "pass");
+  assertReactWebIssueFixtureUsefulness(matrix[0]);
+  assert.equal(matrix[0].verdict, "pass");
   assert.equal(report.summary.safePreviewCount, 0);
   assert.ok(report.summary.manualReviewCount > 0);
   assert.ok(report.issues.every((issue) => issue.fixability === "manual-review"));
