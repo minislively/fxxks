@@ -12,6 +12,13 @@ import {
   findRepoOwnedConventionHintsForIssue,
   type RepoOwnedConventionHintProjection,
 } from "./repo-owned-convention-hints";
+import {
+  buildReactWebIssueDecision,
+  buildReactWebProjectionDecision,
+  buildReactWebStopDecision,
+  summarizeReactWebDecisions,
+  type ReactWebDecision,
+} from "./react-web-decision";
 
 export const REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION = "react-web-issue-report.v1" as const;
 export const REACT_WEB_ISSUE_REPORT_COMMAND = "inspect react-web-issues" as const;
@@ -112,6 +119,7 @@ export type ReactWebIssueCard = {
   conventionHints: RepoOwnedConventionHintProjection[];
   fixShapeGuidance: ReactWebIssueFixShapeGuidance;
   triage: ReactWebIssueTriage;
+  decision: ReactWebDecision;
   skipReason?: string;
   preview?: {
     type: "unified-diff-fragment";
@@ -135,6 +143,7 @@ export type ReactWebIssueFirstMinuteSummaryItem = {
     humanReviewRequired: true;
     autoApply: false;
   };
+  decision: ReactWebDecision;
 };
 
 export type ReactWebIssueFirstMinuteSummary = {
@@ -163,6 +172,8 @@ export type ReactWebIssueReport = {
     manualReviewCount: number;
     unsafeToAutoApplyCount: number;
   };
+  decisionSummary: ReturnType<typeof summarizeReactWebDecisions>;
+  stopDecision?: ReactWebDecision;
   triageRollup: {
     claimBoundary: string;
     criteria: string[];
@@ -199,6 +210,8 @@ export type ReactWebIssueReportSummaryJson = {
     manualReviewIssueIds: string[];
   };
   firstMinuteSummary: ReactWebIssueFirstMinuteSummary;
+  decisionSummary: ReturnType<typeof summarizeReactWebDecisions>;
+  stopDecision?: ReactWebDecision;
 };
 
 export type ReactWebIssueReportMigrationDryRunJson = {
@@ -230,7 +243,10 @@ export type ReactWebIssueReportMigrationDryRunJson = {
     autoApply: false;
     dryRunOnly: true;
     riskNotes: string[];
+    decision: ReactWebDecision;
   }[];
+  decisionSummary: ReturnType<typeof summarizeReactWebDecisions>;
+  stopDecision?: ReactWebDecision;
 };
 
 function issueKindFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueKind {
@@ -661,6 +677,14 @@ function issueCardFor(
     }),
     conventionHints,
     fixShapeGuidance,
+    decision: buildReactWebIssueDecision({
+      cardId: `react-web-label-${index + 1}`,
+      issueKind: issueKindFor(finding),
+      confidence: finding.confidence,
+      fixability,
+      previewAvailable: Boolean(preview),
+      ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
+    }),
     ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
   };
@@ -839,6 +863,7 @@ function buildFirstMinuteSummary(
         humanReviewRequired: issue.fixShapeGuidance.humanReviewRequired,
         autoApply: issue.fixShapeGuidance.autoApply,
       },
+      decision: buildReactWebProjectionDecision({ sourceDecision: issue.decision, projection: "summary-json" }),
     }));
   return {
     sourceTopIssueIds: [...triageRollup.topIssueIds],
@@ -857,6 +882,19 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
     ),
   ));
   const triageRollup = buildTriageRollup(issues);
+  const stopDecision = issues.length === 0
+    ? buildReactWebStopDecision({
+        state: preview.inScope ? "incomplete" : "unsupported",
+        reason: preview.inScope
+          ? "No React Web issue cards were produced from the current bounded label-preview evidence."
+          : preview.skippedReason ?? "Unsupported React Web issue-report boundary.",
+        projection: "issue-card",
+        stopConditions: preview.inScope
+          ? ["Do not invent issue cards when the bounded detector produced no findings."]
+          : ["Unsupported domains must not be converted into React Web work orders."],
+      })
+    : undefined;
+  const decisionSummary = summarizeReactWebDecisions(stopDecision ? [stopDecision] : issues.map((issue) => issue.decision));
   return {
     schemaVersion: REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
     command: REACT_WEB_ISSUE_REPORT_COMMAND,
@@ -878,6 +916,8 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
       manualReviewCount: issues.filter((issue) => issue.fixability === "manual-review").length,
       unsafeToAutoApplyCount: issues.filter((issue) => issue.autoFixSafety === "unsafe-to-auto-apply").length,
     },
+    decisionSummary,
+    ...(stopDecision ? { stopDecision } : {}),
     triageRollup,
     firstMinuteSummary: buildFirstMinuteSummary(triageRollup, issues),
     issues,
@@ -898,6 +938,8 @@ export function buildReactWebIssueReportSummaryJson(report: ReactWebIssueReport)
     inScope: report.inScope,
     ...(report.skippedReason ? { skippedReason: report.skippedReason } : {}),
     summary: report.summary,
+    decisionSummary: report.decisionSummary,
+    ...(report.stopDecision ? { stopDecision: { ...report.stopDecision, source: { ...report.stopDecision.source, projection: "summary-json" } } } : {}),
     triageTopIds: {
       rankedIssueIds: report.triageRollup.rankedIssueIds,
       topIssueIds: report.triageRollup.topIssueIds,
@@ -935,7 +977,23 @@ export function buildReactWebIssueReportMigrationDryRunJson(
     autoApply: false as const,
     dryRunOnly: true as const,
     riskNotes: migrationRiskNotesFor(issue),
+    decision: buildReactWebProjectionDecision({ sourceDecision: issue.decision, projection: "dry-run-json" }),
   }));
+  const stopDecision = candidates.length === 0
+    ? buildReactWebStopDecision({
+        state: report.inScope ? "incomplete" : "unsupported",
+        reason: report.inScope
+          ? "No dry-run candidates were produced from the current React Web issue report."
+          : report.skippedReason ?? "Unsupported React Web dry-run boundary.",
+        projection: "dry-run-json",
+        dryRunOnly: true,
+        stopConditions: report.inScope
+          ? ["Do not invent dry-run candidates when no issue cards exist."]
+          : ["Unsupported domains must not be converted into dry-run candidates."],
+      })
+    : undefined;
+  const decisionSummary = summarizeReactWebDecisions(stopDecision ? [stopDecision] : candidates.map((candidate) => candidate.decision));
+
   return {
     schemaVersion: "react-web-issue-report-migration-dry-run.v1",
     sourceReportSchemaVersion: report.schemaVersion,
@@ -956,6 +1014,8 @@ export function buildReactWebIssueReportMigrationDryRunJson(
       manualReviewCandidateCount: candidates.filter((candidate) => !candidate.previewAvailable).length,
     },
     candidates,
+    decisionSummary,
+    ...(stopDecision ? { stopDecision } : {}),
   };
 }
 

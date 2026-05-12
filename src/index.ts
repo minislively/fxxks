@@ -206,14 +206,34 @@ export {
   REACT_WEB_ISSUE_REPORT_COMMAND,
   REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
   buildReactWebIssueReport,
+  buildReactWebIssueReportMigrationDryRunJson,
+  buildReactWebIssueReportSummaryJson,
   renderReactWebIssueReportText,
 } from "./core/react-web-issue-report";
+export {
+  REACT_WEB_DECISION_SCHEMA_VERSION,
+  buildReactWebIssueDecision,
+  buildReactWebProjectionDecision,
+  buildReactWebStopDecision,
+  failClosedReactWebDecision,
+  summarizeReactWebDecisions,
+} from "./core/react-web-decision";
 export type {
   ReactWebIssueCard,
   ReactWebIssuePriority,
   ReactWebIssueReport,
+  ReactWebIssueReportMigrationDryRunJson,
+  ReactWebIssueReportSummaryJson,
   ReactWebIssueTriageBucket,
   ReactWebIssueTriage,
   ReactWebIssueTriageEvidence,
   ReactWebRelatedContextQuality,
 } from "./core/react-web-issue-report";
+
+export type {
+  BuildReactWebIssueDecisionOptions,
+  ReactWebDecision,
+  ReactWebDecisionAllowedActions,
+  ReactWebDecisionConfidence,
+  ReactWebDecisionState,
+} from "./core/react-web-decision";

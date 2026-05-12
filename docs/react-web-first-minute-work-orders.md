@@ -12,10 +12,11 @@ source-derived React Web evidence
   -> human or agent decides which card matters first, what to inspect, and what not to change
 ```
 
-After #747, the same report also carries a compact first-minute mini work order:
+After #766, the same report carries a compact first-minute mini work order through an explicit decision layer:
 
 ```text
 source-derived React Web evidence
+  -> decision (allowedActions + stopConditions; confidence is not apply authority)
   -> ranked issue cards
   -> firstMinuteSummary
        -> why this issue is first
@@ -24,6 +25,7 @@ source-derived React Web evidence
        -> human decision needed
        -> do-not-do boundaries
        -> compact context hints
+  -> workflow output (`--summary-json` or `--dry-run-json`) reusing the same decision contract
 ```
 
 The goal is to make the first minute legible: a maintainer can see which native-control card to inspect first, why it was prioritized, and which decisions still require human review before any edit happens.
@@ -48,7 +50,7 @@ Use the compact projection when another tool only needs the first-minute work-or
 fooks inspect react-web-issues src/components/Form.tsx --summary-json
 ```
 
-`--summary-json` is intentionally smaller than full `--json`: it keeps the first-minute summary, rollup IDs, read-only flags, and claim boundary, while omitting detailed card fields such as source snippets, preview details, context packets, and suggested actions.
+`--summary-json` is intentionally smaller than full `--json`: it keeps the first-minute summary, decision fields, rollup IDs, read-only flags, and claim boundary, while omitting detailed card fields such as source snippets, preview details, context packets, and suggested actions.
 
 Use the dry-run projection when an agent or migration planner needs read-only candidate rows instead of issue cards:
 
@@ -56,7 +58,20 @@ Use the dry-run projection when an agent or migration planner needs read-only ca
 fooks inspect react-web-issues src/components/Form.tsx --dry-run-json
 ```
 
-`--dry-run-json` is still not an apply path. It projects existing ranked issue evidence into migration candidates with affected files, first inspect steps, preview availability, and risk notes. The projection stays dry-run-only: no patch application, generated accessible-name copy, custom-component semantic inference, or rank/priority/bucket changes.
+`--dry-run-json` is still not an apply path. It projects existing ranked issue evidence into migration candidates with affected files, first inspect steps, preview availability, decision fields, and risk notes. The projection stays dry-run-only: no patch application, generated accessible-name copy, custom-component semantic inference, or rank/priority/bucket changes.
+
+## Decision layer contract
+
+Every full issue card now includes a `decision` object, and `--summary-json` / `--dry-run-json` project that same contract into compact handoffs. The first-pass states are:
+
+- `ready-for-agent-inspect`: inspect is allowed and a read-only patch-shape preview may be suggested, but `allowedActions.applyPatch` remains `false`.
+- `human-decision-required`: inspect is allowed, but label/name shape or copy needs human review before any separate edit.
+- `dry-run-candidate-only`: the dry-run row is inventory for planning only; `dryRunOnly` remains `true`.
+- `unsupported`: unsupported or out-of-scope inputs stop safely.
+- `incomplete`: in-scope inputs with no current issue/candidate evidence stop safely.
+- `malformed-stop`: agent handoff validation failed closed.
+
+The important invariant is structural: **confidence high is evidence quality, not apply authority**. Consumers should check `decision.allowedActions` and `decision.stopConditions`, not infer authority from `confidence`, `fixability`, `triage.bucket`, or preview availability. Current React Web decisions always keep `allowedActions.applyPatch: false`, `allowedActions.generateCopy: false`, `autoApply: false`, and `humanReviewRequired: true`.
 
 ## Agent/tool handoff
 
@@ -66,8 +81,8 @@ An agent should choose the smallest inspect surface that answers the handoff que
 
 | Agent need | Use | First field to read | Keep attached |
 | --- | --- | --- | --- |
-| Decide the first source action for a supported React Web file | `--summary-json` | `firstMinuteSummary.items[0]` | `claimBoundary`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply` |
-| Build read-only migration candidate rows from ranked issue evidence | `--dry-run-json` | `candidates[]` | `dryRunOnly`, `autoApply`, `humanReviewRequired`, `riskNotes` |
+| Decide the first source action for a supported React Web file | `--summary-json` | `firstMinuteSummary.items[0]` | `decision`, `claimBoundary`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply` |
+| Build read-only migration candidate rows from ranked issue evidence | `--dry-run-json` | `candidates[]` | `decision`, `dryRunOnly`, `autoApply`, `humanReviewRequired`, `riskNotes` |
 | Inspect detailed card evidence, context packets, or related local context | `--json` | `issues[]` plus `firstMinuteSummary` | `claimBoundary`, `contextPacket`, `relatedContext`, preview safety fields |
 | A person wants a quick source-reading report | text mode | the first-minute summary before detailed cards | the printed boundaries and manual-review notes |
 
@@ -83,7 +98,7 @@ The intended consumer flow is:
 
 1. Read `firstMinuteSummary.items` in `sourceTopIssueIds` order.
 2. Start with `items[0].firstInspectStep` and `items[0].nextAction`.
-3. Keep `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
+3. Keep `decision`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
 4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority.
 5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
 
@@ -95,7 +110,7 @@ A compact first-minute agent task card should therefore retain the fields that p
 source: fooks inspect react-web-issues <file> --summary-json
 start: firstMinuteSummary.items[0].firstInspectStep
 next: firstMinuteSummary.items[0].nextAction
-preserve: claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance.autoApply
+preserve: decision, claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance.autoApply
 stop: if firstMinuteSummary.items is empty, inspect inScope/skippedReason instead of inventing a task
 ```
 
@@ -111,7 +126,7 @@ The intended dry-run consumer flow is:
 
 1. Read `candidates[]` in the returned order; each candidate is derived from the ranked issue evidence.
 2. Start each row from `candidate.firstInspectStep` and `candidate.affectedFile`.
-3. Keep `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` with every task card.
+3. Keep `decision`, `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` with every task card.
 4. Treat `previewAvailable` as a hint about whether a read-only preview shape exists, not as permission to change source.
 5. If `candidates` is empty, stop and inspect `inScope` / `skippedReason` instead of creating a migration task.
 
@@ -122,7 +137,7 @@ source: fooks inspect react-web-issues <file> --dry-run-json
 row: candidates[n].issueId
 inspect: candidates[n].firstInspectStep
 file: candidates[n].affectedFile
-preserve: dryRunOnly, autoApply, humanReviewRequired, riskNotes
+preserve: decision, dryRunOnly, autoApply, humanReviewRequired, riskNotes
 stop: if candidates is empty or inScope is false, do not create a migration candidate
 ```
 
@@ -144,7 +159,7 @@ Repo-owned convention hints may appear here only as short advisory pointers, for
 The React Web first-minute work order is conservative by design:
 
 - **Read-only:** it reports source-derived evidence and does not edit files.
-- **No auto-apply:** it does not apply patches, trigger codemods, or authorize automatic changes.
+- **No auto-apply:** it does not apply patches, trigger codemods, or authorize automatic changes; high confidence never changes this.
 - **No generated accessible-name copy:** it does not invent final label text, aria-label text, or other accessible-name copy; a human or agent must choose copy from product context.
 - **No broad accessibility audit:** it is a narrow native-control form/accessibility issue report, not a complete WCAG or design-system audit.
 - **No custom-component semantic inference:** custom components remain manual-review evidence unless native-control facts are explicit enough.

@@ -1,3 +1,12 @@
+import path from "node:path";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const {
+  buildReactWebStopDecision,
+  failClosedReactWebDecision,
+} = require(path.join(process.cwd(), "dist", "core", "react-web-decision.js"));
+
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -10,6 +19,12 @@ function unsupportedStop(source, projection) {
     inScope: false,
     skippedReason: projection?.skippedReason,
     autoApply: projection?.autoApply,
+    stopDecision: projection?.stopDecision ?? buildReactWebStopDecision({
+      state: "unsupported",
+      reason: projection?.skippedReason ?? "unsupported-boundary",
+      projection: source === "summary-json" ? "summary-json" : "dry-run-json",
+      dryRunOnly: source === "dry-run-json",
+    }),
   };
 }
 
@@ -20,6 +35,12 @@ function emptyStop(source, reason, projection) {
     reason,
     inScope: projection?.inScope !== false,
     autoApply: projection?.autoApply,
+    stopDecision: projection?.stopDecision ?? buildReactWebStopDecision({
+      state: "incomplete",
+      reason,
+      projection: source === "summary-json" ? "summary-json" : "dry-run-json",
+      dryRunOnly: source === "dry-run-json",
+    }),
   };
 }
 
@@ -27,6 +48,7 @@ function malformedStop(source, reason, projection) {
   return {
     ...emptyStop(source, reason, projection),
     malformed: true,
+    stopDecision: failClosedReactWebDecision(source === "summary-json" ? "summary-json" : "dry-run-json", reason),
   };
 }
 
@@ -36,6 +58,22 @@ function isNonEmptyString(value) {
 
 function isStringArray(value) {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isSafeDecision(value) {
+  return (
+    isObject(value) &&
+    value.schemaVersion === "react-web-decision.v1" &&
+    isNonEmptyString(value.state) &&
+    isObject(value.allowedActions) &&
+    typeof value.allowedActions.inspect === "boolean" &&
+    typeof value.allowedActions.suggestPatch === "boolean" &&
+    value.allowedActions.applyPatch === false &&
+    value.allowedActions.generateCopy === false &&
+    isStringArray(value.stopConditions) &&
+    value.humanReviewRequired === true &&
+    value.autoApply === false
+  );
 }
 
 function isSafeSummaryItem(item) {
@@ -48,6 +86,7 @@ function isSafeSummaryItem(item) {
     isStringArray(item.doNotDo) &&
     isStringArray(item.contextHints) &&
     isObject(item.fixShapeGuidance) &&
+    isSafeDecision(item.decision) &&
     item.fixShapeGuidance.autoApply === false &&
     item.fixShapeGuidance.humanReviewRequired === true
   );
@@ -64,7 +103,8 @@ function isSafeDryRunCandidate(candidate) {
     candidate.humanReviewRequired === true &&
     candidate.autoApply === false &&
     candidate.dryRunOnly === true &&
-    isStringArray(candidate.riskNotes)
+    isStringArray(candidate.riskNotes) &&
+    isSafeDecision(candidate.decision)
   );
 }
 
@@ -104,6 +144,7 @@ export function consumeReactWebSummaryForAgentTask(summary) {
     contextHints: item.contextHints,
     fixShape: item.fixShape,
     fixShapeGuidance: item.fixShapeGuidance,
+    decision: item.decision,
     autoApply: item.fixShapeGuidance?.autoApply ?? summary.autoApply,
     humanReviewRequired: item.fixShapeGuidance?.humanReviewRequired,
   };
@@ -155,6 +196,7 @@ export function consumeReactWebDryRunForAgentTasks(dryRun) {
       autoApply: candidate.autoApply,
       dryRunOnly: candidate.dryRunOnly,
       riskNotes: candidate.riskNotes,
+      decision: candidate.decision,
     })),
   };
 }
