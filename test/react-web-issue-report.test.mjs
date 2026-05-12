@@ -1071,6 +1071,67 @@ test("React Web agent handoff dogfood stops on empty and unsupported projections
   assert.match(rnDryRunStop.skippedReason, /^domain-classification:react-native/);
 });
 
+test("React Web agent handoff dogfood fails closed on malformed projections", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const summary = buildReactWebIssueReportSummaryJson(report);
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(report);
+
+  const malformedSummaryStops = [
+    consumeReactWebSummaryForAgentTask({
+      ...summary,
+      firstMinuteSummary: { ...summary.firstMinuteSummary, items: "not-an-array" },
+    }),
+    consumeReactWebSummaryForAgentTask({
+      ...summary,
+      firstMinuteSummary: {
+        ...summary.firstMinuteSummary,
+        items: [{ ...summary.firstMinuteSummary.items[0], firstInspectStep: undefined }],
+      },
+    }),
+    consumeReactWebSummaryForAgentTask({
+      ...summary,
+      firstMinuteSummary: {
+        ...summary.firstMinuteSummary,
+        items: [{ ...summary.firstMinuteSummary.items[0], fixShapeGuidance: { autoApply: true } }],
+      },
+    }),
+  ];
+
+  for (const stop of malformedSummaryStops) {
+    assert.equal(stop.kind, "stop");
+    assert.equal(stop.source, "summary-json");
+    assert.equal(stop.malformed, true);
+    assert.match(stop.reason, /^malformed-/);
+    assert.equal(Object.hasOwn(stop, "issueId"), false);
+    assert.equal(Object.hasOwn(stop, "firstInspectStep"), false);
+    assert.equal(Object.hasOwn(stop, "nextAction"), false);
+    assert.equal(Object.hasOwn(stop, "fixShapeGuidance"), false);
+  }
+
+  const malformedDryRunStops = [
+    consumeReactWebDryRunForAgentTasks({ ...dryRun, candidates: "not-an-array" }),
+    consumeReactWebDryRunForAgentTasks({
+      ...dryRun,
+      candidates: [{ ...dryRun.candidates[0], affectedFile: undefined }],
+    }),
+    consumeReactWebDryRunForAgentTasks({
+      ...dryRun,
+      candidates: [{ ...dryRun.candidates[0], autoApply: true }],
+    }),
+  ];
+
+  for (const stop of malformedDryRunStops) {
+    assert.equal(stop.kind, "stop");
+    assert.equal(stop.source, "dry-run-json");
+    assert.equal(stop.malformed, true);
+    assert.match(stop.reason, /^malformed-/);
+    assert.deepEqual(stop.candidates, []);
+    assert.equal(Object.hasOwn(stop, "issueId"), false);
+    assert.equal(Object.hasOwn(stop, "affectedFile"), false);
+    assert.equal(Object.hasOwn(stop, "firstInspectStep"), false);
+  }
+});
+
 test("React Web issue report rejects conflicting JSON output flags", () => {
   const cli = runIssues(fixtures.formControls, "--json", "--summary-json");
   assert.notEqual(cli.status, 0);
