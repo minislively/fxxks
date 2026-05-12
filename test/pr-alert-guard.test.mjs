@@ -187,6 +187,165 @@ test("PR alert guard treats already merged pruned dogfood runtime cleanup as no-
   }
 });
 
+
+test("PR alert guard marks dirty duplicate of already-closed linked issue as operator close candidate", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-duplicate-post-merge-"));
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  const eventsPath = path.join(tempDir, "events.json");
+  const prEvidencePath = path.join(tempDir, "pr-evidence.json");
+
+  fs.writeFileSync(alertsPath, "relay: https://github.com/minislively/fooks/pull/769 reopened with dirty merge state after #767 merged");
+  fs.writeFileSync(eventsPath, JSON.stringify({
+    number: 769,
+    title: "React Web decision layer",
+    state: "open",
+    html_url: "https://github.com/minislively/fooks/pull/769",
+    pull_request: {
+      url: "https://api.github.com/repos/minislively/fooks/pulls/769",
+      html_url: "https://github.com/minislively/fooks/pull/769",
+    },
+  }));
+  fs.writeFileSync(prEvidencePath, JSON.stringify({
+    number: 769,
+    title: "React Web decision layer",
+    head: { mergeableState: "dirty" },
+    linkedIssue: {
+      number: 766,
+      state: "closed",
+      closedByPullRequestNumber: 767,
+    },
+    files: [
+      "src/reporting/react-web-evidence-artifact.ts",
+      "scripts/react-web-pr-gate-surface.mjs",
+    ],
+    relatedPullRequests: [
+      {
+        number: 767,
+        title: "React Web decision layer",
+        state: "closed",
+        mergedAt: "2026-05-11T12:00:00Z",
+        files: [
+          "src/reporting/react-web-evidence-artifact.ts",
+          "scripts/react-web-pr-gate-surface.mjs",
+        ],
+      },
+      {
+        number: 768,
+        title: "React Web decision layer",
+        state: "open",
+        files: ["scripts/react-web-pr-gate-surface.mjs"],
+      },
+    ],
+  }));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      guardScript,
+      "--repo",
+      "minislively/fooks",
+      "--alerts",
+      alertsPath,
+      "--events",
+      eventsPath,
+      "--pr-evidence",
+      prEvidencePath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const duplicate = result.rows[0].postMergeDuplicate;
+
+    assert.equal(result.totalRefs, 1);
+    assert.equal(result.counts.pull_request, 1);
+    assert.equal(result.counts.cut, 1);
+    assert.equal(result.counts.allow ?? 0, 0);
+    assert.equal(result.counts["duplicate-post-merge"], 1);
+    assert.equal(duplicate.classification, "duplicate-post-merge");
+    assert.equal(duplicate.recommendation, "operator-close-candidate");
+    assert.equal(duplicate.mergeRecovery, "do-not-start-merge-recovery");
+    assert.equal(duplicate.destructiveAction, "none-read-only");
+    assert.match(duplicate.reasons.join("\n"), /linked issue is already closed/);
+    assert.match(duplicate.reasons.join("\n"), /linked issue was closed by PR #767/);
+    assert.match(duplicate.reasons.join("\n"), /title matches closing PR #767/);
+    assert.match(duplicate.reasons.join("\n"), /files overlap closing PR #767/);
+    assert.match(duplicate.reasons.join("\n"), /current PR head is dirty or not mergeable/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+
+test("PR alert guard does not cut duplicate-looking PR when closing PR is not known merged", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-duplicate-not-merged-"));
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  const eventsPath = path.join(tempDir, "events.json");
+  const prEvidencePath = path.join(tempDir, "pr-evidence.json");
+
+  fs.writeFileSync(alertsPath, "relay: https://github.com/minislively/fooks/pull/769 reopened with dirty merge state after #767 referenced");
+  fs.writeFileSync(eventsPath, JSON.stringify({
+    number: 769,
+    title: "React Web decision layer",
+    state: "open",
+    html_url: "https://github.com/minislively/fooks/pull/769",
+    pull_request: {
+      url: "https://api.github.com/repos/minislively/fooks/pulls/769",
+      html_url: "https://github.com/minislively/fooks/pull/769",
+    },
+  }));
+  fs.writeFileSync(prEvidencePath, JSON.stringify({
+    number: 769,
+    title: "React Web decision layer",
+    head: { mergeableState: "dirty" },
+    linkedIssue: {
+      number: 766,
+      state: "closed",
+      closedByPullRequestNumber: 767,
+    },
+    files: ["scripts/react-web-pr-gate-surface.mjs"],
+    relatedPullRequests: [{
+      number: 767,
+      title: "React Web decision layer",
+      state: "closed",
+      files: ["scripts/react-web-pr-gate-surface.mjs"],
+    }],
+  }));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      guardScript,
+      "--repo",
+      "minislively/fooks",
+      "--alerts",
+      alertsPath,
+      "--events",
+      eventsPath,
+      "--pr-evidence",
+      prEvidencePath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const duplicate = result.rows[0].postMergeDuplicate;
+
+    assert.equal(result.counts.cut ?? 0, 0);
+    assert.equal(result.counts.allow, 1);
+    assert.equal(result.counts["duplicate-post-merge"] ?? 0, 0);
+    assert.equal(duplicate.classification, "insufficient-duplicate-post-merge-evidence");
+    assert.equal(duplicate.recommendation, "continue-normal-pr-triage");
+    assert.equal(duplicate.mergeRecovery, "not-ruled-out");
+    assert.match(duplicate.reasons.join("\n"), /closing PR #767 is related but not known merged/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("PR alert disambiguation docs reference an existing package script", () => {
   const doc = fs.readFileSync(path.join(repoRoot, "docs", "pr-alert-disambiguation.md"), "utf8");
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));

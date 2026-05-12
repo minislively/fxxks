@@ -5,6 +5,7 @@ Clawhip/relay-style alert text can describe a `fooks#NNN` close/comment as PR wo
 - `pull_request` present: safe to continue PR-specific handling.
 - `pull_request` absent: stop PR recovery and treat it as an issue event.
 - Alert says `PR fooks#NNN <new> -> merged` and GitHub already reports the PR as merged: treat it as a verification-only echo, not fresh actionable PR recovery.
+- Optional `--pr-evidence` rows can mark an open PR as `duplicate-post-merge` only when the linked issue is already closed by another PR, same-title or overlapping-file evidence is supplied, and the current head is dirty/not mergeable. Treat that as operator cut/close guidance, not automatic close authority or merge recovery.
 
 The guard is read-only. It never comments, closes, reopens, deletes branches, or changes worktrees.
 
@@ -25,3 +26,7 @@ npm run --silent pr:alerts -- --repo minislively/fooks --alerts /tmp/alerts.txt
 ```
 
 This invokes `gh api repos/<owner>/<repo>/issues/<number>` for each matching alert reference and prints a small markdown report. Use rows with `prHandling=skip` as a hard stop before any PR recovery workflow. Use `prHandling=echo` rows only to verify the already-merged GitHub state; do not start fresh PR recovery from that alert.
+
+## Post-merge duplicate reopen evidence
+
+When dogfood alerts mention a reopened duplicate PR after the linked issue has already been closed by a merged PR, attach saved PR-ish evidence with `--pr-evidence`. The guard remains read-only: `operator-close-candidate` means preserve the evidence and use the explicit operator close flow if appropriate. It never comments, closes, reopens, deletes branches, or weakens merge-gate checks.
