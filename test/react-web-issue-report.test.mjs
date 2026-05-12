@@ -1022,6 +1022,7 @@ test("React Web agent handoff dogfood consumes dry-run JSON as read-only candida
     autoApply: sourceCandidate.autoApply,
     dryRunOnly: sourceCandidate.dryRunOnly,
     riskNotes: sourceCandidate.riskNotes,
+    decision: sourceCandidate.decision,
   });
   assert.equal(firstCandidate.dryRunOnly, true);
   assert.equal(firstCandidate.autoApply, false);
@@ -1036,26 +1037,28 @@ test("React Web agent handoff dogfood stops on empty and unsupported projections
   const labelledDryRun = buildReactWebIssueReportMigrationDryRunJson(labelledReport);
 
   const summaryStop = consumeReactWebSummaryForAgentTask(labelledSummary);
-  assert.deepEqual(summaryStop, {
-    kind: "stop",
-    source: "summary-json",
-    reason: "no-first-minute-items",
-    inScope: true,
-    autoApply: false,
-  });
+  assert.equal(summaryStop.kind, "stop");
+  assert.equal(summaryStop.source, "summary-json");
+  assert.equal(summaryStop.reason, "no-first-minute-items");
+  assert.equal(summaryStop.inScope, true);
+  assert.equal(summaryStop.autoApply, false);
+  assert.equal(summaryStop.stopDecision.state, "incomplete");
+  assert.equal(summaryStop.stopDecision.allowedActions.inspect, false);
+  assert.equal(summaryStop.stopDecision.allowedActions.applyPatch, false);
   assert.equal(Object.hasOwn(summaryStop, "issueId"), false);
   assert.equal(Object.hasOwn(summaryStop, "firstInspectStep"), false);
 
   const dryRunStop = consumeReactWebDryRunForAgentTasks(labelledDryRun);
-  assert.deepEqual(dryRunStop, {
-    kind: "stop",
-    source: "dry-run-json",
-    reason: "no-dry-run-candidates",
-    inScope: true,
-    autoApply: false,
-    dryRunOnly: true,
-    candidates: [],
-  });
+  assert.equal(dryRunStop.kind, "stop");
+  assert.equal(dryRunStop.source, "dry-run-json");
+  assert.equal(dryRunStop.reason, "no-dry-run-candidates");
+  assert.equal(dryRunStop.inScope, true);
+  assert.equal(dryRunStop.autoApply, false);
+  assert.equal(dryRunStop.dryRunOnly, true);
+  assert.deepEqual(dryRunStop.candidates, []);
+  assert.equal(dryRunStop.stopDecision.state, "incomplete");
+  assert.equal(dryRunStop.stopDecision.dryRunOnly, true);
+  assert.equal(dryRunStop.stopDecision.allowedActions.applyPatch, false);
 
   const rnReport = buildReactWebIssueReport(fixtures.rn, repoRoot);
   const rnSummaryStop = consumeReactWebSummaryForAgentTask(buildReactWebIssueReportSummaryJson(rnReport));
@@ -1130,6 +1133,67 @@ test("React Web agent handoff dogfood fails closed on malformed projections", ()
     assert.equal(Object.hasOwn(stop, "affectedFile"), false);
     assert.equal(Object.hasOwn(stop, "firstInspectStep"), false);
   }
+});
+
+test("React Web decision layer contract keeps confidence separate from apply authority", () => {
+  const report = buildReactWebIssueReport(fixtures.association, repoRoot);
+  const safePreviewIssue = report.issues.find((issue) => issue.fixability === "safe-preview");
+  assert.ok(safePreviewIssue, "expected a safe-preview issue");
+
+  assert.equal(safePreviewIssue.confidence, "high");
+  assert.equal(safePreviewIssue.decision.schemaVersion, "react-web-decision.v1");
+  assert.equal(safePreviewIssue.decision.state, "ready-for-agent-inspect");
+  assert.equal(safePreviewIssue.decision.allowedActions.inspect, true);
+  assert.equal(safePreviewIssue.decision.allowedActions.suggestPatch, true);
+  assert.equal(safePreviewIssue.decision.allowedActions.applyPatch, false);
+  assert.equal(safePreviewIssue.decision.allowedActions.generateCopy, false);
+  assert.equal(safePreviewIssue.decision.autoApply, false);
+  assert.equal(safePreviewIssue.decision.humanReviewRequired, true);
+  assert.ok(safePreviewIssue.decision.stopConditions.some((condition) => /high confidence.*does not authorize applyPatch/i.test(condition)));
+
+  const summary = buildReactWebIssueReportSummaryJson(report);
+  const summaryItem = summary.firstMinuteSummary.items.find((item) => item.issueId === safePreviewIssue.id);
+  assert.ok(summaryItem, "expected summary item to reference the safe-preview issue");
+  assert.equal(summaryItem.decision.source.cardId, safePreviewIssue.id);
+  assert.equal(summaryItem.decision.source.projection, "summary-json");
+  assert.equal(summaryItem.decision.allowedActions.applyPatch, false);
+  assert.equal(summary.decisionSummary.applyPatchAllowedCount, 0);
+});
+
+test("React Web decision layer marks manual review, dry-run, unsupported, and malformed handoffs", () => {
+  const manualReport = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  assert.ok(manualReport.issues.length > 0);
+  assert.ok(manualReport.issues.every((issue) => issue.decision.state === "human-decision-required"));
+  assert.ok(manualReport.issues.every((issue) => issue.decision.allowedActions.inspect));
+  assert.ok(manualReport.issues.every((issue) => !issue.decision.allowedActions.suggestPatch));
+  assert.ok(manualReport.issues.every((issue) => issue.decision.stopConditions.length >= 4));
+
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(buildReactWebIssueReport(fixtures.association, repoRoot));
+  assert.ok(dryRun.candidates.length > 0);
+  assert.ok(dryRun.candidates.every((candidate) => candidate.decision.state === "dry-run-candidate-only"));
+  assert.ok(dryRun.candidates.every((candidate) => candidate.decision.dryRunOnly === true));
+  assert.equal(dryRun.dryRunOnly, true);
+  assert.equal(dryRun.decisionSummary.stateCounts["dry-run-candidate-only"], dryRun.candidates.length);
+  assert.equal(dryRun.decisionSummary.applyPatchAllowedCount, 0);
+
+  const rnReport = buildReactWebIssueReport(fixtures.rn, repoRoot);
+  const rnSummary = buildReactWebIssueReportSummaryJson(rnReport);
+  const rnDryRun = buildReactWebIssueReportMigrationDryRunJson(rnReport);
+  assert.equal(rnSummary.stopDecision.state, "unsupported");
+  assert.equal(rnSummary.stopDecision.allowedActions.inspect, false);
+  assert.equal(rnDryRun.stopDecision.state, "unsupported");
+  assert.equal(rnDryRun.stopDecision.dryRunOnly, true);
+  assert.equal(rnDryRun.stopDecision.allowedActions.applyPatch, false);
+
+  const malformed = consumeReactWebSummaryForAgentTask({
+    ...buildReactWebIssueReportSummaryJson(manualReport),
+    firstMinuteSummary: { items: [{ ...manualReport.firstMinuteSummary.items[0], decision: undefined }] },
+  });
+  assert.equal(malformed.kind, "stop");
+  assert.equal(malformed.malformed, true);
+  assert.equal(malformed.stopDecision.state, "malformed-stop");
+  assert.equal(malformed.stopDecision.allowedActions.inspect, false);
+  assert.equal(malformed.stopDecision.allowedActions.applyPatch, false);
 });
 
 test("React Web issue report rejects conflicting JSON output flags", () => {
