@@ -29,4 +29,24 @@ This invokes `gh api repos/<owner>/<repo>/issues/<number>` for each matching ale
 
 ## Post-merge duplicate reopen evidence
 
-When dogfood alerts mention a reopened duplicate PR after the linked issue has already been closed by a merged PR, attach saved PR-ish evidence with `--pr-evidence`. The guard remains read-only: `operator-close-candidate` means preserve the evidence and use the explicit operator close flow if appropriate. It never comments, closes, reopens, deletes branches, or weakens merge-gate checks.
+When dogfood alerts mention reopened duplicate PRs after the linked issue has already been closed by a merged PR, attach saved PR-ish evidence with `--pr-evidence`. The guard remains read-only: `operator-close-candidate` / `cut-duplicate-pr` means preserve the evidence and use the explicit operator close flow if appropriate. It never comments, closes, reopens, deletes branches, or weakens merge-gate checks.
+
+The markdown report includes an `Operator duplicate PR cut evidence` section for every PR with supplied duplicate evidence. For #768/#769-style duplicates, expect concise lines covering:
+
+- linked issue closed state;
+- closing PR number and merged state;
+- same-title and/or overlapping-file duplicate signals;
+- dirty/not-mergeable current PR head;
+- the read-only action boundary.
+
+Example dogfood command shape:
+
+```sh
+npm run --silent pr:alerts -- \
+  --repo minislively/fooks \
+  --alerts /tmp/fooks-duplicate-alerts.txt \
+  --events /tmp/fooks-issues-768-769.json \
+  --pr-evidence /tmp/fooks-pr-768-769-evidence.json
+```
+
+Treat `cut-duplicate-pr` as a conservative operator recommendation, not an automated mutation. Treat `do-not-cut` as insufficient evidence and continue normal PR triage.

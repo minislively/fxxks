@@ -134,6 +134,12 @@ function closingPullNumber(evidence) {
   return Number.isInteger(number) ? number : Number.parseInt(String(number ?? ""), 10);
 }
 
+function linkedIssueNumber(evidence) {
+  const linkedIssue = evidence?.linkedIssue ?? evidence?.linked_issue;
+  const number = linkedIssue?.number ?? linkedIssue?.issueNumber ?? linkedIssue?.issue_number;
+  return Number.isInteger(number) ? number : Number.parseInt(String(number ?? ""), 10);
+}
+
 function headIsDirty(evidence) {
   const head = evidence?.head ?? {};
   const dirtyState = head.mergeableState ?? head.mergeable_state ?? evidence?.mergeableState ?? evidence?.mergeable_state;
@@ -197,11 +203,28 @@ function classifyPostMergeDuplicatePr(evidence) {
   else reasons.push("current PR head is not known dirty");
 
   const isPostMergeDuplicate = linkedIssueIsClosed(evidence) && closingCandidateIsMerged && Number.isInteger(closingNumber) && duplicateSignals.length > 0 && headIsDirty(evidence);
+  const linkedNumber = linkedIssueNumber(evidence);
+  const evidenceLines = [
+    Number.isInteger(linkedNumber)
+      ? `linked issue #${linkedNumber}: ${linkedIssueIsClosed(evidence) ? "closed" : "not known closed"}`
+      : `linked issue: ${linkedIssueIsClosed(evidence) ? "closed" : "not known closed"}`,
+    Number.isInteger(closingNumber)
+      ? `closing PR #${closingNumber}: ${closingCandidateIsMerged ? "merged" : closingCandidate ? "not known merged" : "evidence missing"}`
+      : "closing PR: unknown",
+    duplicateSignals.length > 0
+      ? `duplicate signals: ${duplicateSignals.join("; ")}`
+      : "duplicate signals: no same-title or overlapping-file signal supplied",
+    `current PR head: ${headIsDirty(evidence) ? "dirty/not mergeable" : "not known dirty"}`,
+    "action boundary: read-only evidence only; no close/comment/delete/branch cleanup performed",
+  ];
+
   return {
     classification: isPostMergeDuplicate ? "duplicate-post-merge" : "insufficient-duplicate-post-merge-evidence",
     recommendation: isPostMergeDuplicate ? "operator-close-candidate" : "continue-normal-pr-triage",
+    cutRecommendation: isPostMergeDuplicate ? "cut-duplicate-pr" : "do-not-cut",
     mergeRecovery: isPostMergeDuplicate ? "do-not-start-merge-recovery" : "not-ruled-out",
     destructiveAction: "none-read-only",
+    evidenceLines,
     reasons,
   };
 }
@@ -341,6 +364,22 @@ function renderMarkdown(result) {
     const duplicateGuard = row.postMergeDuplicate ? `${row.postMergeDuplicate.classification}/${row.postMergeDuplicate.recommendation}` : "-";
     lines.push(`| ${row.prHandling} | ${escapeMarkdown(duplicateGuard)} | ${row.kind} | ${ref} | ${escapeMarkdown(row.state)} | ${escapeMarkdown(row.title || "-")} | ${escapeMarkdown(row.reason)} |`);
   }
+
+  const duplicateRows = result.rows.filter((row) => row.postMergeDuplicate?.evidenceLines?.length > 0);
+  if (duplicateRows.length > 0) {
+    lines.push("", "## Operator duplicate PR cut evidence", "");
+    lines.push("Read-only recommendation lines for operator review; the script does not mutate GitHub state.", "");
+    for (const row of duplicateRows) {
+      lines.push(`### ${escapeMarkdown(row.repo)}#${row.number}: ${escapeMarkdown(row.postMergeDuplicate.cutRecommendation)}`);
+      lines.push(`- classification: ${escapeMarkdown(row.postMergeDuplicate.classification)}`);
+      lines.push(`- recommendation: ${escapeMarkdown(row.postMergeDuplicate.recommendation)}`);
+      for (const evidenceLine of row.postMergeDuplicate.evidenceLines) {
+        lines.push(`- evidence: ${escapeMarkdown(evidenceLine)}`);
+      }
+      lines.push("");
+    }
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
