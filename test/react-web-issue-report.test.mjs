@@ -17,6 +17,7 @@ const {
   REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY,
   buildReactWebIssueReport,
   buildReactWebIssueReportSummaryJson,
+  renderReactWebIssueReportText,
 } = require(path.join(repoRoot, "dist", "core", "react-web-issue-report.js"));
 
 const fixtures = {
@@ -47,6 +48,51 @@ function hasNestedKey(value, key) {
   if (!value || typeof value !== "object") return false;
   if (Object.hasOwn(value, key)) return true;
   return Object.values(value).some((entry) => hasNestedKey(entry, key));
+}
+
+function assertCompactFirstMinuteItem(item) {
+  assert.equal(typeof item.whyThisFirst, "string");
+  assert.ok(item.whyThisFirst.length > 0);
+  assert.ok(item.whyThisFirst.length <= 180, item.whyThisFirst);
+  assert.equal(typeof item.nextAction, "string");
+  assert.ok(item.nextAction.length > 0);
+  assert.ok(item.nextAction.length <= 180, item.nextAction);
+
+  assert.ok(Array.isArray(item.humanDecisionNeeded));
+  assert.ok(item.humanDecisionNeeded.length >= 1);
+  assert.ok(item.humanDecisionNeeded.length <= 2);
+  assert.ok(Array.isArray(item.doNotDo));
+  assert.ok(item.doNotDo.length >= 2);
+  assert.ok(item.doNotDo.length <= 3);
+  assert.ok(Array.isArray(item.contextHints));
+  assert.ok(item.contextHints.length >= 1);
+  assert.ok(item.contextHints.length <= 4);
+
+  for (const entry of [...item.humanDecisionNeeded, ...item.doNotDo]) {
+    assert.equal(typeof entry, "string");
+    assert.ok(entry.length > 0);
+    assert.ok(entry.length <= 120, entry);
+  }
+  for (const entry of item.contextHints) {
+    assert.equal(typeof entry, "string");
+    assert.ok(entry.length > 0);
+    assert.ok(entry.length <= 100, entry);
+  }
+
+  assert.ok(item.humanDecisionNeeded.some((entry) => /label\/name|copy|shape/i.test(entry)));
+  assert.ok(item.doNotDo.some((entry) => /apply|patch/i.test(entry)));
+  assert.ok(item.doNotDo.some((entry) => /custom-component semantics/i.test(entry)));
+  assert.ok(item.contextHints.some((entry) => /native|context|source|convention|preview/i.test(entry)));
+
+  const compactText = JSON.stringify({
+    whyThisFirst: item.whyThisFirst,
+    nextAction: item.nextAction,
+    humanDecisionNeeded: item.humanDecisionNeeded,
+    doNotDo: item.doNotDo,
+    contextHints: item.contextHints,
+  });
+  assert.doesNotMatch(compactText, /contextPacket|conventionHints|relatedContext|sourceSignals|suggestedAction|whereToLook|whyItMatters|problem/i);
+  assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|CI gate|merge gate|generated accessible-name copy/i);
 }
 
 
@@ -515,6 +561,10 @@ test("React Web issue report JSON includes machine-readable first-minute summary
       issue.fixShapeGuidance.inspectFirst[0] ?? `${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
     );
     assert.deepEqual(item.inspectFirst, issue.fixShapeGuidance.inspectFirst);
+    assertCompactFirstMinuteItem(item);
+    assert.match(item.whyThisFirst, new RegExp(`Rank ${issue.triage.rank} ${issue.triage.priority} issue`));
+    assert.match(item.nextAction, /Start by inspecting/);
+    assert.ok(item.contextHints.some((entry) => entry.includes(issue.evidence.element)));
     assert.equal(item.fixShapeGuidance.claimBoundary, issue.fixShapeGuidance.claimBoundary);
     assert.equal(item.fixShapeGuidance.humanReviewRequired, true);
     assert.equal(item.fixShapeGuidance.autoApply, false);
@@ -543,6 +593,30 @@ test("React Web issue report JSON includes machine-readable first-minute summary
   assert.doesNotMatch(JSON.stringify(report.firstMinuteSummary), /must-edit|Auto-apply: yes|Controller/i);
 });
 
+test("React Web issue report text renders first-minute summary from canonical projection", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  report.firstMinuteSummary.items[0] = {
+    ...report.firstMinuteSummary.items[0],
+    whyThisFirst: "SENTINEL why from canonical summary.",
+    nextAction: "SENTINEL next action from canonical summary.",
+    humanDecisionNeeded: ["SENTINEL human decision."],
+    doNotDo: ["SENTINEL do not do one.", "SENTINEL do not do two."],
+    contextHints: ["SENTINEL context hint."],
+  };
+
+  const text = renderReactWebIssueReportText(report);
+  const summaryIndex = text.indexOf("## First-minute summary");
+  const issueIndex = text.indexOf("## Issue 1:");
+  assert.ok(summaryIndex > 0);
+  assert.ok(issueIndex > summaryIndex);
+  const compactBlock = text.slice(summaryIndex, issueIndex);
+
+  assert.match(compactBlock, /SENTINEL why from canonical summary/);
+  assert.match(compactBlock, /SENTINEL next action from canonical summary/);
+  assert.match(compactBlock, /SENTINEL human decision/);
+  assert.match(compactBlock, /SENTINEL do not do one/);
+  assert.match(compactBlock, /SENTINEL context hint/);
+});
 
 test("React Web issue report summary JSON is compact first-minute data without detailed issue cards", () => {
   const fullCli = runIssues(fixtures.formControls, "--json");
@@ -587,6 +661,9 @@ test("React Web issue report summary JSON is compact first-minute data without d
     "react-web-label-5",
   ]);
   assert.deepEqual(summary.firstMinuteSummary.sourceTopIssueIds, summary.triageTopIds.topIssueIds);
+  for (const item of summary.firstMinuteSummary.items) {
+    assertCompactFirstMinuteItem(item);
+  }
   assert.deepEqual(Object.hasOwn(summary, "issues"), false);
 
   const compactText = JSON.stringify(summary);
