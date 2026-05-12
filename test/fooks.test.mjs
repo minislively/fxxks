@@ -4991,7 +4991,7 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(doc, /Read `firstMinuteSummary\.items` in `sourceTopIssueIds` order/);
   assert.match(doc, /Start with `items\[0\]\.firstInspectStep` and `items\[0\]\.nextAction`/);
   assert.match(doc, /source: fooks inspect react-web-issues <file> --summary-json/);
-  assert.match(doc, /preserve: claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance\.autoApply/);
+  assert.match(doc, /preserve: decision, claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance\.autoApply/);
   assert.match(doc, /fixShapeGuidance\.autoApply/);
   assert.match(doc, /If `items` is empty, stop/);
   assert.match(doc, /ranked issue cards[\s\S]*firstMinuteSummary[\s\S]*--summary-json|firstMinuteSummary[\s\S]*compact first-minute/);
@@ -5008,7 +5008,7 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(doc, /riskNotes/);
   assert.match(doc, /previewAvailable[\s\S]*read-only preview shape[\s\S]*not as permission to change source/);
   assert.match(doc, /source: fooks inspect react-web-issues <file> --dry-run-json/);
-  assert.match(doc, /preserve: dryRunOnly, autoApply, humanReviewRequired, riskNotes/);
+  assert.match(doc, /preserve: decision, dryRunOnly, autoApply, humanReviewRequired, riskNotes/);
   assert.match(doc, /if candidates is empty or inScope is false, do not create a migration candidate/);
   assert.match(doc, /first inspect step/i);
   assert.match(doc, /next action/i);

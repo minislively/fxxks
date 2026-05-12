@@ -12,6 +12,13 @@ import {
   findRepoOwnedConventionHintsForIssue,
   type RepoOwnedConventionHintProjection,
 } from "./repo-owned-convention-hints";
+import {
+  buildReactWebDryRunDecision,
+  buildReactWebIssueDecision,
+  summarizeReactWebDecision,
+  type ReactWebDecision,
+  type ReactWebDecisionSummary,
+} from "./react-web-decision";
 
 export const REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION = "react-web-issue-report.v1" as const;
 export const REACT_WEB_ISSUE_REPORT_COMMAND = "inspect react-web-issues" as const;
@@ -112,6 +119,7 @@ export type ReactWebIssueCard = {
   conventionHints: RepoOwnedConventionHintProjection[];
   fixShapeGuidance: ReactWebIssueFixShapeGuidance;
   triage: ReactWebIssueTriage;
+  decision: ReactWebDecision;
   skipReason?: string;
   preview?: {
     type: "unified-diff-fragment";
@@ -130,6 +138,7 @@ export type ReactWebIssueFirstMinuteSummaryItem = {
   humanDecisionNeeded: string[];
   doNotDo: string[];
   contextHints: string[];
+  decision: ReactWebDecisionSummary;
   fixShapeGuidance: {
     claimBoundary: ReactWebIssueFixShapeGuidance["claimBoundary"];
     humanReviewRequired: true;
@@ -229,6 +238,7 @@ export type ReactWebIssueReportMigrationDryRunJson = {
     humanReviewRequired: true;
     autoApply: false;
     dryRunOnly: true;
+    decision: ReactWebDecisionSummary;
     riskNotes: string[];
   }[];
 };
@@ -661,6 +671,13 @@ function issueCardFor(
     }),
     conventionHints,
     fixShapeGuidance,
+    decision: buildReactWebIssueDecision({
+      findingId: `react-web-label-${index + 1}`,
+      ruleId: issueKindFor(finding),
+      confidence: finding.confidence,
+      previewAvailable: Boolean(preview),
+      manualReviewReason: safetyRationale,
+    }),
     ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
   };
@@ -834,6 +851,7 @@ function buildFirstMinuteSummary(
       humanDecisionNeeded: humanDecisionNeededFor(issue),
       doNotDo: doNotDoFor(),
       contextHints: contextHintsFor(issue),
+      decision: summarizeReactWebDecision(issue.decision),
       fixShapeGuidance: {
         claimBoundary: issue.fixShapeGuidance.claimBoundary,
         humanReviewRequired: issue.fixShapeGuidance.humanReviewRequired,
@@ -934,6 +952,7 @@ export function buildReactWebIssueReportMigrationDryRunJson(
     humanReviewRequired: true as const,
     autoApply: false as const,
     dryRunOnly: true as const,
+    decision: summarizeReactWebDecision(buildReactWebDryRunDecision(issue.decision)),
     riskNotes: migrationRiskNotesFor(issue),
   }));
   return {

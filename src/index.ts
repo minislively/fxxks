@@ -217,3 +217,19 @@ export type {
   ReactWebIssueTriageEvidence,
   ReactWebRelatedContextQuality,
 } from "./core/react-web-issue-report";
+export {
+  buildReactWebDryRunDecision,
+  buildReactWebIssueDecision,
+  buildReactWebMalformedDecision,
+  buildReactWebUnsupportedDecision,
+  summarizeReactWebDecision,
+} from "./core/react-web-decision";
+export type {
+  BuildReactWebIssueDecisionInput,
+  ReactWebDecision,
+  ReactWebDecisionAllowedActions,
+  ReactWebDecisionConfidence,
+  ReactWebDecisionLevel,
+  ReactWebDecisionState,
+  ReactWebDecisionSummary,
+} from "./core/react-web-decision";

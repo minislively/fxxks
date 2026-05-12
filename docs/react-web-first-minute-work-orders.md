@@ -28,6 +28,20 @@ source-derived React Web evidence
 
 The goal is to make the first minute legible: a maintainer can see which native-control card to inspect first, why it was prioritized, and which decisions still require human review before any edit happens.
 
+After #766, these handoffs also carry an additive decision contract. The contract does not replace the legacy safety fields; it makes the same authority boundary explicit for agents and future workflow projections:
+
+```text
+source-derived React Web evidence
+  -> finding / issue card
+  -> decision
+       -> state
+       -> allowedActions
+       -> stopConditions
+  -> firstMinuteSummary / dry-run candidate / future workflow projection
+```
+
+The important product rule is unchanged: high confidence can make an issue ready for agent inspection, but it still does not authorize patch application.
+
 ## Current CLI surfaces
 
 Use the text report when a person wants the compact work order before the detailed cards:
@@ -66,9 +80,9 @@ An agent should choose the smallest inspect surface that answers the handoff que
 
 | Agent need | Use | First field to read | Keep attached |
 | --- | --- | --- | --- |
-| Decide the first source action for a supported React Web file | `--summary-json` | `firstMinuteSummary.items[0]` | `claimBoundary`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply` |
-| Build read-only migration candidate rows from ranked issue evidence | `--dry-run-json` | `candidates[]` | `dryRunOnly`, `autoApply`, `humanReviewRequired`, `riskNotes` |
-| Inspect detailed card evidence, context packets, or related local context | `--json` | `issues[]` plus `firstMinuteSummary` | `claimBoundary`, `contextPacket`, `relatedContext`, preview safety fields |
+| Decide the first source action for a supported React Web file | `--summary-json` | `firstMinuteSummary.items[0]` | `decision`, `claimBoundary`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply` |
+| Build read-only migration candidate rows from ranked issue evidence | `--dry-run-json` | `candidates[]` | `decision`, `dryRunOnly`, `autoApply`, `humanReviewRequired`, `riskNotes` |
+| Inspect detailed card evidence, context packets, or related local context | `--json` | `issues[]` plus `firstMinuteSummary` | `decision`, `claimBoundary`, `contextPacket`, `relatedContext`, preview safety fields |
 | A person wants a quick source-reading report | text mode | the first-minute summary before detailed cards | the printed boundaries and manual-review notes |
 
 Do not start with full `--json` when the agent only needs the first action, and do not use `--dry-run-json` as a codemod runner. These projections are task-shaping inputs: they choose where to inspect and what evidence to preserve, not whether an edit is allowed.
@@ -83,7 +97,7 @@ The intended consumer flow is:
 
 1. Read `firstMinuteSummary.items` in `sourceTopIssueIds` order.
 2. Start with `items[0].firstInspectStep` and `items[0].nextAction`.
-3. Keep `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
+3. Keep `decision`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
 4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority.
 5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
 
@@ -95,7 +109,7 @@ A compact first-minute agent task card should therefore retain the fields that p
 source: fooks inspect react-web-issues <file> --summary-json
 start: firstMinuteSummary.items[0].firstInspectStep
 next: firstMinuteSummary.items[0].nextAction
-preserve: claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance.autoApply
+preserve: decision, claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance.autoApply
 stop: if firstMinuteSummary.items is empty, inspect inScope/skippedReason instead of inventing a task
 ```
 
@@ -111,7 +125,7 @@ The intended dry-run consumer flow is:
 
 1. Read `candidates[]` in the returned order; each candidate is derived from the ranked issue evidence.
 2. Start each row from `candidate.firstInspectStep` and `candidate.affectedFile`.
-3. Keep `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` with every task card.
+3. Keep `decision`, `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` with every task card.
 4. Treat `previewAvailable` as a hint about whether a read-only preview shape exists, not as permission to change source.
 5. If `candidates` is empty, stop and inspect `inScope` / `skippedReason` instead of creating a migration task.
 
@@ -122,7 +136,7 @@ source: fooks inspect react-web-issues <file> --dry-run-json
 row: candidates[n].issueId
 inspect: candidates[n].firstInspectStep
 file: candidates[n].affectedFile
-preserve: dryRunOnly, autoApply, humanReviewRequired, riskNotes
+preserve: decision, dryRunOnly, autoApply, humanReviewRequired, riskNotes
 stop: if candidates is empty or inScope is false, do not create a migration candidate
 ```
 

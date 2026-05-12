@@ -27,6 +27,10 @@ const {
   buildReactWebIssueReportSummaryJson,
   renderReactWebIssueReportText,
 } = require(path.join(repoRoot, "dist", "core", "react-web-issue-report.js"));
+const {
+  buildReactWebMalformedDecision,
+  buildReactWebUnsupportedDecision,
+} = require(path.join(repoRoot, "dist", "core", "react-web-decision.js"));
 
 const fixtures = {
   missing: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-labels.tsx"),
@@ -208,6 +212,15 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.equal(issue.triage.evidence.sameFileContextAvailable, true);
     assert.equal(issue.triage.evidence.relatedContextCount, issue.relatedContext.length);
     assert.ok(issue.triage.evidence.reasons.length > 0);
+    assert.equal(issue.decision.state, "human-decision-required");
+    assert.equal(issue.decision.ruleId, issue.kind);
+    assert.equal(issue.decision.findingId, issue.id);
+    assert.equal(issue.decision.confidence, issue.confidence);
+    assert.equal(issue.decision.allowedActions.inspect, true);
+    assert.equal(issue.decision.allowedActions.suggestPatch, false);
+    assert.equal(issue.decision.allowedActions.applyPatch, false);
+    assert.equal(issue.decision.allowedActions.generateCopy, false);
+    assert.ok(issue.decision.stopConditions.some((condition) => /generating accessible-name copy/i.test(condition)));
 
     assert.ok(Array.isArray(issue.relatedContext));
     assert.ok(issue.relatedContext.length > 0);
@@ -249,6 +262,13 @@ test("React Web issue report turns nearby native associations into safe preview 
   assert.equal(report.issues[0].triage.evidence.safePreviewAvailable, true);
   assert.equal(report.issues[0].triage.bucket, "safe-preview");
   assert.equal(report.issues[0].triage.rank, 1);
+  assert.equal(report.issues[0].decision.state, "ready-for-agent-inspect");
+  assert.equal(report.issues[0].decision.allowedActions.inspect, true);
+  assert.equal(report.issues[0].decision.allowedActions.suggestPatch, true);
+  assert.equal(report.issues[0].decision.allowedActions.applyPatch, false);
+  assert.equal(report.issues[0].decision.allowedActions.generateCopy, false);
+  assert.ok(report.issues[0].decision.stopConditions.some((condition) => /Stop before editing files/i.test(condition)));
+  assert.equal(report.issues[1].decision.state, "human-decision-required");
   assert.match(report.issues[0].contextPacket.relatedPattern, /safe-preview pattern/);
   assert.ok(report.issues[0].contextPacket.excludedInference.some((entry) => /candidate diff only/.test(entry)));
   assert.match(report.issues[0].preview.text, /htmlFor="email"/);
@@ -747,6 +767,15 @@ test("React Web issue report JSON includes machine-readable first-minute summary
     assert.equal(item.fixShapeGuidance.claimBoundary, issue.fixShapeGuidance.claimBoundary);
     assert.equal(item.fixShapeGuidance.humanReviewRequired, true);
     assert.equal(item.fixShapeGuidance.autoApply, false);
+    assert.deepEqual(item.decision, {
+      state: issue.decision.state,
+      level: issue.decision.level,
+      confidence: issue.decision.confidence,
+      allowedActions: issue.decision.allowedActions,
+      stopConditions: issue.decision.stopConditions,
+    });
+    assert.equal(item.decision.allowedActions.applyPatch, false);
+    assert.equal(item.decision.allowedActions.generateCopy, false);
   }
 
   assert.deepEqual(
@@ -921,6 +950,10 @@ test("React Web issue report migration dry-run JSON projects read-only candidate
     assert.equal(candidate.humanReviewRequired, true);
     assert.equal(candidate.autoApply, false);
     assert.equal(candidate.dryRunOnly, true);
+    assert.equal(candidate.decision.state, "dry-run-candidate-only");
+    assert.equal(candidate.decision.allowedActions.applyPatch, false);
+    assert.equal(candidate.decision.allowedActions.generateCopy, false);
+    assert.ok(candidate.decision.stopConditions.some((condition) => /dryRunOnly remains true/i.test(condition)));
     assert.ok(candidate.riskNotes.length >= 3);
     assert.ok(candidate.riskNotes.some((note) => /human review|human-reviewed/i.test(note)));
     assert.ok(candidate.riskNotes.some((note) => /Do not apply patches automatically/i.test(note)));
@@ -1130,6 +1163,31 @@ test("React Web agent handoff dogfood fails closed on malformed projections", ()
     assert.equal(Object.hasOwn(stop, "affectedFile"), false);
     assert.equal(Object.hasOwn(stop, "firstInspectStep"), false);
   }
+});
+
+test("React Web decision helpers encode unsupported and malformed stop states", () => {
+  const unsupported = buildReactWebUnsupportedDecision({
+    reason: "Custom component semantics are outside the supported native JSX lane",
+    skippedReason: "custom-component-boundary",
+  });
+  assert.equal(unsupported.state, "unsupported");
+  assert.equal(unsupported.allowedActions.inspect, true);
+  assert.equal(unsupported.allowedActions.suggestPatch, false);
+  assert.equal(unsupported.allowedActions.applyPatch, false);
+  assert.equal(unsupported.allowedActions.generateCopy, false);
+  assert.match(unsupported.reason, /custom-component-boundary/);
+  assert.ok(unsupported.stopConditions.some((condition) => /custom-component semantics/i.test(condition)));
+
+  const malformed = buildReactWebMalformedDecision({
+    reason: "firstMinuteSummary.items must be an array",
+  });
+  assert.equal(malformed.state, "malformed-stop");
+  assert.equal(malformed.level, "blocker");
+  assert.equal(malformed.allowedActions.inspect, false);
+  assert.equal(malformed.allowedActions.suggestPatch, false);
+  assert.equal(malformed.allowedActions.applyPatch, false);
+  assert.equal(malformed.allowedActions.generateCopy, false);
+  assert.ok(malformed.stopConditions.some((condition) => /Stop immediately/i.test(condition)));
 });
 
 test("React Web issue report rejects conflicting JSON output flags", () => {
