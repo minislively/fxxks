@@ -102,6 +102,16 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.ok(issue.contextPacket.excludedInference.some((entry) => /broad accessibility coverage/.test(entry)));
     assert.ok(issue.contextPacket.excludedInference.some((entry) => /auto-apply patches/.test(entry)));
     assert.doesNotMatch(JSON.stringify(issue.contextPacket), /must-edit/i);
+    assert.ok(Array.isArray(issue.contextPacket.conventionHints));
+    assert.ok(issue.contextPacket.conventionHints.some((entry) => /react-web\.native-label-context/.test(entry)));
+    assert.ok(Array.isArray(issue.conventionHints));
+    assert.equal(issue.conventionHints.length, 1);
+    assert.equal(issue.conventionHints[0].id, "react-web.native-label-context");
+    assert.equal(issue.conventionHints[0].advisoryOnly, true);
+    assert.equal(issue.conventionHints[0].enforcement, "none");
+    assert.equal(issue.conventionHints[0].source, "internal-prototype-fixture");
+    assert.match(issue.conventionHints[0].policyBoundary, /Advisory convention hint only/);
+    assert.doesNotMatch(JSON.stringify(issue.conventionHints), /must-edit|auto-apply|CI gate|merge gate/i);
     assert.match(issue.skipReason, /human review|accessible-name copy/);
     assert.ok(issue.triage.rank > 0);
     assert.ok(["high", "medium", "low"].includes(issue.triage.priority));
@@ -425,6 +435,9 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /  - related pattern:/);
   assert.match(cli.stdout, /  - nearby precedent:/);
   assert.match(cli.stdout, /  - excluded inference:/);
+  assert.match(cli.stdout, /- convention hints:/);
+  assert.match(cli.stdout, /react-web\.native-label-context/);
+  assert.match(cli.stdout, /Advisory convention hint only/);
   assert.match(cli.stdout, /- fix shape: safe-preview-htmlFor-association/);
   assert.match(cli.stdout, /- inspect first for fix shape:/);
   assert.match(cli.stdout, /Review the safe preview diff as a candidate shape; fooks still does not apply it/);
@@ -577,7 +590,7 @@ test("React Web issue report summary JSON is compact first-minute data without d
   assert.deepEqual(Object.hasOwn(summary, "issues"), false);
 
   const compactText = JSON.stringify(summary);
-  for (const detailedCardKey of ["issues", "contextPacket", "relatedContext", "preview", "evidence", "sourceSignals", "suggestedAction", "whereToLook", "whyItMatters", "problem"]) {
+  for (const detailedCardKey of ["issues", "contextPacket", "conventionHints", "relatedContext", "preview", "evidence", "sourceSignals", "suggestedAction", "whereToLook", "whyItMatters", "problem"]) {
     assert.equal(hasNestedKey(summary, detailedCardKey), false, `summary-json should not include detailed key ${detailedCardKey}`);
   }
   assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|Controller/i);
