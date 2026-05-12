@@ -8,6 +8,10 @@ import {
   buildReactWebIssueRelatedContext,
   type ReactWebIssueRelatedContext,
 } from "./react-web-issue-related-context";
+import {
+  findRepoOwnedConventionHintsForIssue,
+  type RepoOwnedConventionHintProjection,
+} from "./repo-owned-convention-hints";
 
 export const REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION = "react-web-issue-report.v1" as const;
 export const REACT_WEB_ISSUE_REPORT_COMMAND = "inspect react-web-issues" as const;
@@ -75,6 +79,7 @@ export type ReactWebIssueContextPacket = {
   nearbyPrecedent: string;
   confidence: ReactWebIssueConfidence;
   excludedInference: string[];
+  conventionHints: string[];
 };
 
 export type ReactWebIssueCard = {
@@ -104,6 +109,7 @@ export type ReactWebIssueCard = {
   suggestedFixIntent: string;
   suggestedAction: string;
   contextPacket: ReactWebIssueContextPacket;
+  conventionHints: RepoOwnedConventionHintProjection[];
   fixShapeGuidance: ReactWebIssueFixShapeGuidance;
   triage: ReactWebIssueTriage;
   skipReason?: string;
@@ -534,6 +540,7 @@ function contextPacketFor(options: {
   fixability: ReactWebIssueFixability;
   previewAvailable: boolean;
   relatedContext: ReactWebIssueRelatedContext[];
+  conventionHints: RepoOwnedConventionHintProjection[];
 }): ReactWebIssueContextPacket {
   return {
     whyThisFile: `Direct label-preview evidence in ${options.filePath}:${options.finding.loc.startLine}-${options.finding.loc.endLine} produced this native ${options.finding.element} issue card.`,
@@ -548,6 +555,7 @@ function contextPacketFor(options: {
       finding: options.finding,
       previewAvailable: options.previewAvailable,
     }),
+    conventionHints: options.conventionHints.map((hint) => `${hint.id}: ${hint.summary}`),
   };
 }
 
@@ -568,6 +576,12 @@ function issueCardFor(
   const suggestedAction = suggestedFixIntentFor(finding);
   const safetyRationale = safetyRationaleFor(finding);
   const fixability = fixabilityFor(finding);
+  const conventionHints = findRepoOwnedConventionHintsForIssue({
+    profile: "react-web",
+    issueKind: issueKindFor(finding),
+    element: finding.element,
+    filePath,
+  });
   const fixShapeGuidance = fixShapeGuidanceFor({
     filePath,
     finding,
@@ -606,7 +620,9 @@ function issueCardFor(
       fixability,
       previewAvailable: Boolean(preview),
       relatedContext,
+      conventionHints,
     }),
+    conventionHints,
     fixShapeGuidance,
     ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
@@ -843,6 +859,14 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
       `- context: ${issue.evidence.context}`,
     );
+    if (issue.conventionHints.length > 0) {
+      lines.push("- convention hints:");
+      for (const hint of issue.conventionHints) {
+        lines.push(`  - ${hint.id} (${hint.confidence}, advisory): ${hint.summary}`);
+        lines.push(`    boundary: ${hint.policyBoundary}`);
+        lines.push(`    inspect first: ${hint.inspectFirst.join("; ")}`);
+      }
+    }
     if (issue.fixShapeGuidance.inspectFirst.length > 0) {
       lines.push("- inspect first for fix shape:");
       for (const item of issue.fixShapeGuidance.inspectFirst) {

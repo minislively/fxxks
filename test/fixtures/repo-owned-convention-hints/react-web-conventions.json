@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "repo-owned-convention-hints.prototype.v1",
+  "claimBoundary": "Internal fixture-backed convention-hints prototype only: advisory report context, no public config contract, no CI enforcement, no edit authority, and no broad semantic inference.",
+  "hints": [
+    {
+      "id": "react-web.native-label-context",
+      "purpose": "convention-hint",
+      "source": "internal-prototype-fixture",
+      "advisoryOnly": true,
+      "enforcement": "none",
+      "publicConfig": false,
+      "appliesTo": {
+        "profile": "react-web",
+        "issueKinds": [
+          "react-web.missing-accessible-label",
+          "react-web.ambiguous-accessible-label",
+          "react-web.unassociated-nearby-label"
+        ],
+        "elements": ["button", "input", "select", "textarea"],
+        "filePatterns": ["*.tsx", "*.jsx"]
+      },
+      "confidence": "medium",
+      "summary": "Prefer existing visible label, nearby native label/control structure, or source-observed naming hints before choosing final accessible-name copy.",
+      "inspectFirst": [
+        "Inspect same-file JSX around the native control before using broader conventions.",
+        "Use local related-context entries as evidence hints only; final label/name decisions stay human-reviewed."
+      ],
+      "policyBoundary": "Advisory convention hint only; it does not enforce team policy, authorize edits, or infer custom-component semantics.",
+      "excludedInference": [
+        "Does not create a public repo config contract.",
+        "Does not enforce CI or merge policy.",
+        "Does not authorize edits or generated accessible-name copy."
+      ]
+    }
+  ]
+}
