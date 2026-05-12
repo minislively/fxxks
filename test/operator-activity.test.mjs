@@ -309,6 +309,9 @@ test("operator check forces a concrete active artifact when post-merge main echo
     "manual-review-noise": 0,
   });
   assert.equal(snapshot.activeWorkReceipts.staleResidueLedger.totalCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.issue, "#739");
+  assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.readOnly, true);
+  assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.rowCount, 0);
   assert.deepEqual(snapshot.blockers, []);
 });
 
@@ -465,12 +468,23 @@ test("operator check projects sibling worktree adoption receipts without cleanup
     "do-not-delete-local-only-commits-automatically",
   );
   assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=2/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /cleanupReviewManifest=2\(#739\)/);
+  assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.issue, "#739");
+  assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.readOnly, true);
+  assert.match(snapshot.activeWorkReceipts.cleanupReviewManifest.claimBoundary, /per-row reason, risk class, and required manual action/);
+  assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.rowCount, 2);
   const byBranch = new Map(worktreeReceipts.map((receipt) => [receipt.identifiers.worktree.branch, receipt]));
+  const manifestRowsByBranch = new Map(snapshot.activeWorkReceipts.cleanupReviewManifest.rows.map((row) => [row.branch, row]));
 
   const safe = byBranch.get("dogfood/old-clean-residue");
   assert.equal(safe?.classification, "closedOrStale");
   assert.equal(safe?.identifiers.siblingWorktree?.category, "safe-cleanup");
   assert.match(safe?.reasons.join("\n") ?? "", /stale worktree residue candidate/);
+  const safeManifestRow = manifestRowsByBranch.get("dogfood/old-clean-residue");
+  assert.equal(safeManifestRow?.reviewId, "safe-cleanup:dogfood/old-clean-residue");
+  assert.equal(safeManifestRow?.riskClass, "low-confirm-clean-before-manual-cleanup");
+  assert.equal(safeManifestRow?.requiredManualAction, "confirm-no-needed-local-state-before-manual-cleanup");
+  assert.match(safeManifestRow?.reason ?? "", /stale worktree residue candidate/);
 
   const localAhead = byBranch.get("dogfood/local-ahead-orphan");
   assert.equal(localAhead?.classification, "closedOrStale");
@@ -479,6 +493,11 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   assert.equal(localAhead?.identifiers.siblingWorktree?.localOnlyCommitPolicy, "do-not-delete-local-only-commits-automatically");
   assert.equal(localAhead?.identifiers.siblingWorktree?.behindBase, 1);
   assert.match(localAhead?.reasons.join("\n") ?? "", /preserve local-only commits/);
+  const localAheadManifestRow = manifestRowsByBranch.get("dogfood/local-ahead-orphan");
+  assert.equal(localAheadManifestRow?.riskClass, "high-preserve-local-only-state");
+  assert.equal(localAheadManifestRow?.requiredManualAction, "preserve-or-cherry-pick-local-only-commits-before-adoption-or-cleanup");
+  assert.equal(localAheadManifestRow?.evidence.aheadOfBase, 2);
+  assert.equal(localAheadManifestRow?.evidence.remoteBranchExists, false);
 
   assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.issue, "#726");
   assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.readOnly, true);
@@ -504,7 +523,10 @@ test("operator check projects sibling worktree adoption receipts without cleanup
     worktreeReceipts,
     snapshot.activeWorkReceipts.salvageReviewQueue,
     snapshot.activeWorkReceipts.staleResidueLedger,
+    snapshot.activeWorkReceipts.cleanupReviewManifest,
   ]);
+  assert.equal(receiptJson.includes(safeWorktree), false);
+  assert.equal(receiptJson.includes(localAheadWorktree), false);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(receiptJson), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
@@ -783,12 +805,24 @@ test("operator check stale residue ledger aggregates manual-review-noise and exc
   ]);
   assert.equal(ledger.classes[2].nextReviewAction, "confirm-closed-pr-or-detached-review-context-before-ignoring");
   assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=2/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /cleanupReviewManifest=2\(#739\)/);
+
+  const manifest = snapshot.activeWorkReceipts.cleanupReviewManifest;
+  assert.equal(manifest.issue, "#739");
+  assert.equal(manifest.rowCount, 2);
+  assert.deepEqual(manifest.rows.map((row) => row.category), ["manual-review-noise", "manual-review-noise"]);
+  assert.deepEqual(new Set(manifest.rows.map((row) => row.riskClass)), new Set(["medium-confirm-stale-context"]));
+  assert.deepEqual(
+    new Set(manifest.rows.map((row) => row.requiredManualAction)),
+    new Set(["confirm-closed-pr-or-detached-review-context-before-ignoring"]),
+  );
+  assert.equal(JSON.stringify(manifest).includes(keepWorktree), false);
 
   const worktreeReceipts = snapshot.activeWorkReceipts.receipts.filter((receipt) => receipt.kind === "worktree");
   assert.equal(worktreeReceipts.filter((receipt) => receipt.identifiers.siblingWorktree?.category === "manual-review-noise").length, 2);
   assert.equal(worktreeReceipts.filter((receipt) => receipt.identifiers.siblingWorktree?.category === "keep").length, 1);
   assert.equal(JSON.stringify(ledger).includes(keepWorktree), false);
-  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(JSON.stringify(ledger)), false);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands/.test(JSON.stringify([ledger, manifest])), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push/.test(call)), false);
 });
 

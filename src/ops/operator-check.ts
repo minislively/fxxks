@@ -27,11 +27,17 @@ export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
   "Read-only issue #726 operator queue for orphan local-ahead sibling worktrees; lists salvage-review evidence only and does not delete, push, fetch, mutate, or generate cleanup commands for orphan branches.";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE = "#736";
+export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE = "#739";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
+export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
+export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
+export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
+  "Read-only issue #739 operator cleanup-review manifest for stale sibling worktree residue; lists per-row reason, risk class, and required manual action without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -44,6 +50,14 @@ export type OperatorCheckStaleResidueLedgerCategory = "safe-cleanup" | "salvage-
 export type OperatorCheckStaleResidueLedgerNextReviewAction =
   | "review-closed-or-merged-evidence-before-manual-cleanup"
   | "preserve-local-only-commits-before-adoption-or-cleanup"
+  | "confirm-closed-pr-or-detached-review-context-before-ignoring";
+export type OperatorCheckStaleResidueCleanupReviewRiskClass =
+  | "low-confirm-clean-before-manual-cleanup"
+  | "high-preserve-local-only-state"
+  | "medium-confirm-stale-context";
+export type OperatorCheckStaleResidueCleanupReviewManualAction =
+  | "confirm-no-needed-local-state-before-manual-cleanup"
+  | "preserve-or-cherry-pick-local-only-commits-before-adoption-or-cleanup"
   | "confirm-closed-pr-or-detached-review-context-before-ignoring";
 
 export type OperatorCheckActiveArtifact = {
@@ -133,6 +147,41 @@ export type OperatorCheckStaleResidueLedger = {
   localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
 };
 
+export type OperatorCheckStaleResidueCleanupReviewRow = {
+  reviewId: string;
+  branch?: string;
+  head?: string;
+  category: OperatorCheckStaleResidueLedgerCategory;
+  reason: string;
+  reasons: string[];
+  riskClass: OperatorCheckStaleResidueCleanupReviewRiskClass;
+  requiredManualAction: OperatorCheckStaleResidueCleanupReviewManualAction;
+  evidence: {
+    baseRef?: string;
+    aheadOfBase?: number;
+    behindBase?: number;
+    dirty: OrphanLocalWorktreeEntry["dirty"];
+    changedPathCount?: number;
+    remoteBranchExists: OrphanLocalWorktreeEntry["remoteBranchExists"];
+    openPullRequestState: OrphanLocalWorktreeEntry["openPullRequest"]["state"];
+    closedPullRequestState: OrphanLocalWorktreeEntry["closedPullRequest"]["state"];
+    activeTmuxPaneCount: number;
+  };
+  localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+};
+
+export type OperatorCheckStaleResidueCleanupReviewManifest = {
+  schemaVersion: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY;
+  readOnly: true;
+  rowCount: number;
+  rows: OperatorCheckStaleResidueCleanupReviewRow[];
+  localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -154,6 +203,7 @@ export type OperatorCheckActiveWorkReceipts = {
   reportLine: string;
   salvageReviewQueue: OperatorCheckSalvageReviewQueue;
   staleResidueLedger: OperatorCheckStaleResidueLedger;
+  cleanupReviewManifest: OperatorCheckStaleResidueCleanupReviewManifest;
   blockers: string[];
 };
 
@@ -253,6 +303,7 @@ function receiptReportLine(
   blockers: string[],
   salvageReviewQueueItemCount = 0,
   staleResidueLedgerCount = 0,
+  cleanupReviewManifestRowCount = 0,
 ): string {
   const active = receipts.filter((receipt) => receipt.classification === "active").length;
   const stale = receipts.filter((receipt) => receipt.classification === "closedOrStale").length;
@@ -264,6 +315,7 @@ function receiptReportLine(
   if (mainEcho) parts.push("mainEcho=1");
   if (salvageReviewQueueItemCount > 0) parts.push(`salvageReviewQueue=${salvageReviewQueueItemCount}`);
   if (staleResidueLedgerCount > 0) parts.push(`staleResidueLedger=${staleResidueLedgerCount}`);
+  if (cleanupReviewManifestRowCount > 0) parts.push(`cleanupReviewManifest=${cleanupReviewManifestRowCount}(${OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE})`);
   if (blocked) parts.push(`blockers=${blocked}`);
   return parts.join("; ");
 }
@@ -306,6 +358,7 @@ function siblingWorktreeReceipts(
   receipts: OperatorCheckActiveWorkReceipt[];
   salvageReviewQueue: OperatorCheckSalvageReviewQueue;
   staleResidueLedger: OperatorCheckStaleResidueLedger;
+  cleanupReviewManifest: OperatorCheckStaleResidueCleanupReviewManifest;
   blockers: string[];
 } {
   try {
@@ -348,6 +401,7 @@ function siblingWorktreeReceipts(
       receipts,
       salvageReviewQueue: buildSalvageReviewQueue(triage.entries),
       staleResidueLedger: buildStaleResidueLedger(triage.entries),
+      cleanupReviewManifest: buildCleanupReviewManifest(triage.entries),
       blockers: triage.blockers,
     };
   } catch (error) {
@@ -356,6 +410,7 @@ function siblingWorktreeReceipts(
       receipts: [],
       salvageReviewQueue: buildSalvageReviewQueue([]),
       staleResidueLedger: buildStaleResidueLedger([]),
+      cleanupReviewManifest: buildCleanupReviewManifest([]),
       blockers: [`sibling worktree adoption receipt unavailable: ${detail}`],
     };
   }
@@ -383,6 +438,12 @@ function isStaleResidueLedgerCategory(category: OrphanLocalWorktreeEntry["catego
   return category === "safe-cleanup" || category === "salvage-review" || category === "manual-review-noise";
 }
 
+type OperatorCheckStaleResidueEntry = OrphanLocalWorktreeEntry & { category: OperatorCheckStaleResidueLedgerCategory };
+
+function isStaleResidueEntry(entry: OrphanLocalWorktreeEntry): entry is OperatorCheckStaleResidueEntry {
+  return !entry.current && isStaleResidueLedgerCategory(entry.category);
+}
+
 function buildStaleResidueLedger(entries: OrphanLocalWorktreeEntry[]): OperatorCheckStaleResidueLedger {
   const counts: Record<OperatorCheckStaleResidueLedgerCategory, number> = {
     "safe-cleanup": 0,
@@ -406,6 +467,74 @@ function buildStaleResidueLedger(entries: OrphanLocalWorktreeEntry[]): OperatorC
     totalCount: classes.reduce((sum, row) => sum + row.count, 0),
     counts,
     classes,
+    localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically",
+  };
+}
+
+function cleanupReviewRiskClass(entry: OperatorCheckStaleResidueEntry): OperatorCheckStaleResidueCleanupReviewRiskClass {
+  if (entry.category === "salvage-review") return "high-preserve-local-only-state";
+  if (entry.category === "manual-review-noise") return "medium-confirm-stale-context";
+  return "low-confirm-clean-before-manual-cleanup";
+}
+
+function cleanupReviewManualAction(entry: OperatorCheckStaleResidueEntry): OperatorCheckStaleResidueCleanupReviewManualAction {
+  if (entry.category === "salvage-review") return "preserve-or-cherry-pick-local-only-commits-before-adoption-or-cleanup";
+  if (entry.category === "manual-review-noise") return "confirm-closed-pr-or-detached-review-context-before-ignoring";
+  return "confirm-no-needed-local-state-before-manual-cleanup";
+}
+
+function cleanupReviewPrimaryReason(entry: OperatorCheckStaleResidueEntry, reasons: string[]): string {
+  const expectedReason = entry.category === "salvage-review"
+    ? reasons.find((reason) => /preserve local-only commits/u.test(reason))
+    : entry.category === "manual-review-noise"
+      ? reasons.find((reason) => /non-active .*noise/u.test(reason))
+      : reasons.find((reason) => /stale worktree residue candidate/u.test(reason));
+  return expectedReason ?? reasons[0] ?? "stale worktree residue requires manual review before cleanup";
+}
+
+function cleanupReviewId(entry: OperatorCheckStaleResidueEntry): string {
+  const subject = sanitizeReportToken(entry.branch ?? entry.head ?? "unknown") ?? "unknown";
+  return `${entry.category}:${subject}`;
+}
+
+function buildCleanupReviewManifest(entries: OrphanLocalWorktreeEntry[]): OperatorCheckStaleResidueCleanupReviewManifest {
+  const rows = entries
+    .filter(isStaleResidueEntry)
+    .map((entry) => {
+      const reasons = siblingWorktreeReceiptReasons(entry);
+      return {
+        reviewId: cleanupReviewId(entry),
+        branch: entry.branch,
+        head: entry.head,
+        category: entry.category,
+        reason: cleanupReviewPrimaryReason(entry, reasons),
+        reasons,
+        riskClass: cleanupReviewRiskClass(entry),
+        requiredManualAction: cleanupReviewManualAction(entry),
+        evidence: {
+          baseRef: entry.baseRef,
+          aheadOfBase: entry.aheadOfBase,
+          behindBase: entry.behindBase,
+          dirty: entry.dirty,
+          changedPathCount: entry.changedPathCount,
+          remoteBranchExists: entry.remoteBranchExists,
+          openPullRequestState: entry.openPullRequest.state,
+          closedPullRequestState: entry.closedPullRequest.state,
+          activeTmuxPaneCount: entry.activeTmuxPaneCount,
+        },
+        localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically" as const,
+      };
+    });
+
+  return {
+    schemaVersion: OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE,
+    issueUrl: OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL,
+    source: OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE,
+    claimBoundary: OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY,
+    readOnly: true,
+    rowCount: rows.length,
+    rows,
     localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically",
   };
 }
@@ -560,9 +689,11 @@ function buildActiveWorkReceipts(
       blockers,
       siblingReceipts.salvageReviewQueue.itemCount,
       siblingReceipts.staleResidueLedger.totalCount,
+      siblingReceipts.cleanupReviewManifest.rowCount,
     ),
     salvageReviewQueue: siblingReceipts.salvageReviewQueue,
     staleResidueLedger: siblingReceipts.staleResidueLedger,
+    cleanupReviewManifest: siblingReceipts.cleanupReviewManifest,
     blockers,
   };
 }
