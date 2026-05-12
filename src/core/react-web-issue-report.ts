@@ -760,19 +760,26 @@ function doNotDoFor(): string[] {
   );
 }
 
+function conventionContextHintFor(hint: RepoOwnedConventionHintProjection): string {
+  const inspectPointer = hint.inspectFirst[0]
+    ?.replace(/^Inspect/u, "inspect")
+    .replace(/\.$/u, "") ?? hint.summary;
+  return trimSummaryText(`advisory convention ${hint.id}: ${inspectPointer}`, 100);
+}
+
 function contextHintsFor(issue: ReactWebIssueCard): string[] {
   const hints = [
     `native ${issue.evidence.element} at ${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
     `${issue.triage.evidence.relatedContextQuality} context`,
   ];
+  for (const hint of issue.conventionHints.slice(0, 1)) {
+    hints.push(conventionContextHintFor(hint));
+  }
   if (issue.triage.evidence.safePreviewAvailable) {
     hints.push("safe-preview candidate available");
   }
   if (issue.triage.evidence.relatedContextSources.length > 0) {
     hints.push(`related sources: ${issue.triage.evidence.relatedContextSources.slice(0, 3).join(", ")}`);
-  }
-  for (const hint of issue.conventionHints.slice(0, 1)) {
-    hints.push(`advisory convention: ${hint.id}`);
   }
   return uniqueCompactStrings(hints, 4, 100);
 }

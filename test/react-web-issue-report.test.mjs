@@ -110,6 +110,26 @@ function assertCompactFirstMinuteItem(item) {
   assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|CI gate|merge gate|generated accessible-name copy/i);
 }
 
+function assertCompactConventionContextHint(item) {
+  const conventionHints = item.contextHints.filter((entry) => /advisory convention react-web\.native-label-context/.test(entry));
+  assert.equal(conventionHints.length, 1);
+  assert.ok(conventionHints[0].length <= 100, conventionHints[0]);
+  assert.match(conventionHints[0], /inspect same-file JSX/);
+  assert.doesNotMatch(conventionHints[0], /policyBoundary|excludedInference|public config|CI gate|merge gate|auto-apply|must-edit/i);
+}
+
+function assertConventionDoesNotPolluteActionFields(item) {
+  const actionText = JSON.stringify({
+    firstInspectStep: item.firstInspectStep,
+    inspectFirst: item.inspectFirst,
+    whyThisFirst: item.whyThisFirst,
+    nextAction: item.nextAction,
+    humanDecisionNeeded: item.humanDecisionNeeded,
+    doNotDo: item.doNotDo,
+  });
+  assert.doesNotMatch(actionText, /advisory convention|react-web\.native-label-context|repo-owned convention/i);
+}
+
 
 test("React Web issue report emits actionable issue cards over label preview findings", () => {
   const report = parseIssues(fixtures.missing);
@@ -680,6 +700,23 @@ test("React Web issue report JSON includes machine-readable first-minute summary
     "react-web-label-4",
     "react-web-label-5",
   ]);
+  assert.deepEqual(
+    report.issues.map((issue) => [
+      issue.id,
+      issue.triage.rank,
+      issue.triage.priority,
+      issue.triage.bucket,
+      issue.triage.evidence.score,
+    ]),
+    [
+      ["react-web-label-1", 1, "high", "high-confidence-manual-review", 8],
+      ["react-web-label-2", 4, "high", "high-confidence-manual-review", 8],
+      ["react-web-label-3", 5, "high", "high-confidence-manual-review", 8],
+      ["react-web-label-4", 2, "high", "high-confidence-manual-review", 8],
+      ["react-web-label-5", 3, "high", "high-confidence-manual-review", 8],
+    ],
+  );
+  assert.doesNotMatch(JSON.stringify(report.issues.map((issue) => issue.triage)), /convention|react-web\.native-label-context/i);
   assert.deepEqual(report.firstMinuteSummary.sourceTopIssueIds, report.triageRollup.topIssueIds);
   assert.deepEqual(
     report.firstMinuteSummary.items.map((item) => item.issueId),
@@ -697,6 +734,8 @@ test("React Web issue report JSON includes machine-readable first-minute summary
     );
     assert.deepEqual(item.inspectFirst, issue.fixShapeGuidance.inspectFirst);
     assertCompactFirstMinuteItem(item);
+    assertCompactConventionContextHint(item);
+    assertConventionDoesNotPolluteActionFields(item);
     assert.match(item.whyThisFirst, new RegExp(`Rank ${issue.triage.rank} ${issue.triage.priority} issue`));
     assert.match(item.nextAction, /Start by inspecting/);
     assert.ok(item.contextHints.some((entry) => entry.includes(issue.evidence.element)));
@@ -798,6 +837,8 @@ test("React Web issue report summary JSON is compact first-minute data without d
   assert.deepEqual(summary.firstMinuteSummary.sourceTopIssueIds, summary.triageTopIds.topIssueIds);
   for (const item of summary.firstMinuteSummary.items) {
     assertCompactFirstMinuteItem(item);
+    assertCompactConventionContextHint(item);
+    assertConventionDoesNotPolluteActionFields(item);
   }
   assert.deepEqual(Object.hasOwn(summary, "issues"), false);
 
