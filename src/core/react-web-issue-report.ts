@@ -69,6 +69,14 @@ export type ReactWebIssueFixShapeGuidance = {
   autoApply: false;
 };
 
+export type ReactWebIssueContextPacket = {
+  whyThisFile: string;
+  relatedPattern: string;
+  nearbyPrecedent: string;
+  confidence: ReactWebIssueConfidence;
+  excludedInference: string[];
+};
+
 export type ReactWebIssueCard = {
   id: string;
   kind: ReactWebIssueKind;
@@ -95,6 +103,7 @@ export type ReactWebIssueCard = {
   safetyRationale: string;
   suggestedFixIntent: string;
   suggestedAction: string;
+  contextPacket: ReactWebIssueContextPacket;
   fixShapeGuidance: ReactWebIssueFixShapeGuidance;
   triage: ReactWebIssueTriage;
   skipReason?: string;
@@ -470,6 +479,78 @@ function fixShapeGuidanceFor(options: {
   };
 }
 
+function contextPacketRelatedPatternFor(options: {
+  finding: ReactWebLabelPatchPreviewFinding;
+  fixability: ReactWebIssueFixability;
+  previewAvailable: boolean;
+}): string {
+  const base = `${issueKindFor(options.finding)} on a native ${options.finding.element}`;
+  if (options.previewAvailable) {
+    return `${base}; safe-preview pattern because existing JSX provides deterministic nearby label/control association evidence.`;
+  }
+  if (options.finding.kind === "unassociated-nearby-label") {
+    return `${base}; manual-review association pattern because nearby label/control evidence is not deterministic enough for a safe preview.`;
+  }
+  return `${base}; ${options.fixability} pattern because final accessible-name copy requires human review.`;
+}
+
+function contextPacketNearbyPrecedentFor(relatedContext: ReactWebIssueRelatedContext[]): string {
+  const precedent =
+    relatedContext.find((item) => item.source === "local-import" || item.source === "nearby-test") ??
+    relatedContext.find((item) => item.kind !== "same-file-pattern") ??
+    relatedContext[0];
+
+  if (!precedent) {
+    return "No nearby precedent found; inspect only the source finding before considering edits.";
+  }
+
+  const location = `${precedent.file}${precedent.line ? `:${precedent.line}${precedent.endLine && precedent.endLine !== precedent.line ? `-${precedent.endLine}` : ""}` : ""}`;
+  return `${precedent.kind} (${precedent.source}, ${precedent.confidence}) at ${location}: ${precedent.reason}`;
+}
+
+function excludedInferenceFor(options: {
+  finding: ReactWebLabelPatchPreviewFinding;
+  previewAvailable: boolean;
+}): string[] {
+  const excluded = [
+    "Does not infer custom-component semantics.",
+    "Does not claim broad accessibility coverage beyond the native JSX label subset.",
+    "Does not auto-apply patches or make files editable from this report.",
+  ];
+  if (options.previewAvailable) {
+    excluded.push("Safe preview is a candidate diff only; it is not an applied migration.");
+  } else {
+    excluded.push("Does not generate final accessible-name copy for manual-review cards.");
+  }
+  if (options.finding.kind === "unassociated-nearby-label" && !options.previewAvailable) {
+    excluded.push("Does not infer htmlFor/id association when nearby label evidence is not high-confidence deterministic.");
+  }
+  return excluded;
+}
+
+function contextPacketFor(options: {
+  filePath: string;
+  finding: ReactWebLabelPatchPreviewFinding;
+  fixability: ReactWebIssueFixability;
+  previewAvailable: boolean;
+  relatedContext: ReactWebIssueRelatedContext[];
+}): ReactWebIssueContextPacket {
+  return {
+    whyThisFile: `Direct label-preview evidence in ${options.filePath}:${options.finding.loc.startLine}-${options.finding.loc.endLine} produced this native ${options.finding.element} issue card.`,
+    relatedPattern: contextPacketRelatedPatternFor({
+      finding: options.finding,
+      fixability: options.fixability,
+      previewAvailable: options.previewAvailable,
+    }),
+    nearbyPrecedent: contextPacketNearbyPrecedentFor(options.relatedContext),
+    confidence: options.finding.confidence,
+    excludedInference: excludedInferenceFor({
+      finding: options.finding,
+      previewAvailable: options.previewAvailable,
+    }),
+  };
+}
+
 function issueCardFor(
   filePath: string,
   finding: ReactWebLabelPatchPreviewFinding,
@@ -486,6 +567,7 @@ function issueCardFor(
     : undefined;
   const suggestedAction = suggestedFixIntentFor(finding);
   const safetyRationale = safetyRationaleFor(finding);
+  const fixability = fixabilityFor(finding);
   const fixShapeGuidance = fixShapeGuidanceFor({
     filePath,
     finding,
@@ -513,11 +595,18 @@ function issueCardFor(
     },
     relatedContext,
     confidence: finding.confidence,
-    fixability: fixabilityFor(finding),
+    fixability,
     autoFixSafety: autoFixSafetyFor(finding),
     safetyRationale,
     suggestedFixIntent: suggestedAction,
     suggestedAction,
+    contextPacket: contextPacketFor({
+      filePath,
+      finding,
+      fixability,
+      previewAvailable: Boolean(preview),
+      relatedContext,
+    }),
     fixShapeGuidance,
     ...(!isSafePreview ? { skipReason: skipReasonFor(finding) } : {}),
     ...(preview ? { preview } : {}),
@@ -744,6 +833,12 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       `- safety rationale: ${issue.safetyRationale}`,
       ...(issue.skipReason ? [`- skip reason: ${issue.skipReason}`] : []),
       `- suggested action: ${issue.suggestedAction}`,
+      "- context packet:",
+      `  - why this file: ${issue.contextPacket.whyThisFile}`,
+      `  - related pattern: ${issue.contextPacket.relatedPattern}`,
+      `  - nearby precedent: ${issue.contextPacket.nearbyPrecedent}`,
+      `  - confidence: ${issue.contextPacket.confidence}`,
+      `  - excluded inference: ${issue.contextPacket.excludedInference.join("; ")}`,
       `- fix shape: ${issue.fixShapeGuidance.shape} — ${issue.fixShapeGuidance.summary}`,
       `- evidence: ${issue.evidence.sourceSignals.join(", ")}`,
       `- context: ${issue.evidence.context}`,
