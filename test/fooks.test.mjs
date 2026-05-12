@@ -4964,6 +4964,44 @@ test("docs describe opencode as manual custom-tool support without runtime savin
   assert.equal(releaseSmoke.includes('run("npm", ["publish"'), false);
 });
 
+
+test("React Web first-minute work-order docs stay discoverable and boundary-scoped", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const docPath = path.join(repoRoot, "docs", "react-web-first-minute-work-orders.md");
+  const doc = fs.readFileSync(docPath, "utf8");
+  const releaseSmoke = fs.readFileSync(path.join(repoRoot, "scripts", "release-smoke.mjs"), "utf8");
+
+  assert.match(readme, /docs\/react-web-first-minute-work-orders\.md/);
+  assert.ok(pkg.files.includes("docs/react-web-first-minute-work-orders.md"));
+  assert.match(releaseSmoke, /docs\/react-web-first-minute-work-orders\.md/);
+
+  assert.match(doc, /first-minute mini work order/i);
+  assert.match(doc, /Before and after/);
+  assert.match(doc, /ranked issue cards[\s\S]*firstMinuteSummary[\s\S]*--summary-json|firstMinuteSummary[\s\S]*compact first-minute/);
+  assert.match(doc, /fooks inspect react-web-issues src\/components\/Form\.tsx/);
+  assert.match(doc, /--json/);
+  assert.match(doc, /--summary-json/);
+  assert.match(doc, /first inspect step/i);
+  assert.match(doc, /next action/i);
+  assert.match(doc, /human decision needed/i);
+  assert.match(doc, /do-not-do boundaries/i);
+  assert.match(doc, /compact context hints/i);
+
+  assert.match(doc, /Read-only:[\s\S]*does not edit files/);
+  assert.match(doc, /No auto-apply:[\s\S]*does not apply patches/);
+  assert.match(doc, /No generated accessible-name copy:[\s\S]*does not invent final label text/);
+  assert.match(doc, /No broad accessibility audit:[\s\S]*not a complete WCAG or design-system audit/);
+  assert.match(doc, /No custom-component semantic inference:[\s\S]*manual-review evidence/);
+  assert.match(doc, /No RN\/TUI\/WebView expansion:[\s\S]*outside this work-order claim/);
+
+  assert.doesNotMatch(doc, /Auto-apply: yes|must-edit|automatically edits files/i);
+  assert.doesNotMatch(doc, /generates? (?:final )?(?:label text|aria-label text|accessible-name copy)/i);
+  assert.doesNotMatch(doc, /complete WCAG audit|broad accessibility audit available/i);
+  assert.doesNotMatch(doc, /infers? custom-component semantics/i);
+  assert.doesNotMatch(doc, /React Native support is available|WebView support is available|TUI support is available/i);
+});
+
 test("package release surface keeps internal docs out of the npm tarball", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");

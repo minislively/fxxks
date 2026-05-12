@@ -175,6 +175,7 @@ function assertPackedFiles(packEntry) {
     "docs/setup.md",
     "docs/release.md",
     "docs/roadmap.md",
+    "docs/react-web-first-minute-work-orders.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",

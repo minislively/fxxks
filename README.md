@@ -337,6 +337,7 @@ npm test
 Useful public docs:
 
 - Architecture boundaries for source facts, evidence gates, and reporting-vs-authorization separation: [`docs/architecture-boundaries.md`](docs/architecture-boundaries.md)
+- React Web first-minute work-order flow for human maintainers: [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md)
 - Setup details: [`docs/setup.md`](docs/setup.md)
 - opencode support boundary: [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md)
 - Release checklist: [`docs/release.md`](docs/release.md)
