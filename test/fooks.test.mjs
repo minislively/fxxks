@@ -4973,11 +4973,20 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   const releaseSmoke = fs.readFileSync(path.join(repoRoot, "scripts", "release-smoke.mjs"), "utf8");
 
   assert.match(readme, /docs\/react-web-first-minute-work-orders\.md/);
+  assert.match(readme, /--summary-json/);
+  assert.match(readme, /firstMinuteSummary\.items\[0\]/);
+  assert.match(readme, /advisory inspect-first input rather than edit authority/);
   assert.ok(pkg.files.includes("docs/react-web-first-minute-work-orders.md"));
   assert.match(releaseSmoke, /docs\/react-web-first-minute-work-orders\.md/);
 
   assert.match(doc, /first-minute mini work order/i);
   assert.match(doc, /Before and after/);
+  assert.match(doc, /Agent\/tool handoff/);
+  assert.match(doc, /fooks inspect react-web-issues src\/components\/Form\.tsx --summary-json/);
+  assert.match(doc, /Read `firstMinuteSummary\.items` in `sourceTopIssueIds` order/);
+  assert.match(doc, /Start with `items\[0\]\.firstInspectStep` and `items\[0\]\.nextAction`/);
+  assert.match(doc, /fixShapeGuidance\.autoApply/);
+  assert.match(doc, /If `items` is empty, stop/);
   assert.match(doc, /ranked issue cards[\s\S]*firstMinuteSummary[\s\S]*--summary-json|firstMinuteSummary[\s\S]*compact first-minute/);
   assert.match(doc, /fooks inspect react-web-issues src\/components\/Form\.tsx/);
   assert.match(doc, /--json/);
@@ -4994,6 +5003,7 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(doc, /No broad accessibility audit:[\s\S]*not a complete WCAG or design-system audit/);
   assert.match(doc, /No custom-component semantic inference:[\s\S]*manual-review evidence/);
   assert.match(doc, /No RN\/TUI\/WebView expansion:[\s\S]*outside this work-order claim/);
+  assert.match(doc, /contextHints[\s\S]*do not change rank, priority, bucket, or edit authority/);
 
   assert.doesNotMatch(doc, /Auto-apply: yes|must-edit|automatically edits files/i);
   assert.doesNotMatch(doc, /generates? (?:final )?(?:label text|aria-label text|accessible-name copy)/i);
