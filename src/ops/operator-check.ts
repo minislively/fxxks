@@ -21,6 +21,7 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
   "Read-only operator/check artifact for the post-merge main echo versus active work boundary; it requires a concrete issue, PR, or mapped session artifact when the checkout is otherwise idle.";
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
@@ -34,10 +35,13 @@ export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
+export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operator/check stale worktree residue active-boundary projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
   "Read-only issue #739 operator cleanup-review manifest for stale sibling worktree residue; lists per-row reason, risk class, and required manual action without paths, cleanup commands, fetch, delete, push, or mutation authority.";
+export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_CLAIM_BOUNDARY =
+  "Read-only operator/check reminder artifact for stale worktree residue versus active work; stale residue rows are cleanup-review context only and do not satisfy the active issue, PR, or mapped-session requirement.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -182,6 +186,19 @@ export type OperatorCheckStaleResidueCleanupReviewManifest = {
   localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
 };
 
+export type OperatorCheckStaleResidueActiveBoundary = {
+  schemaVersion: typeof OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION;
+  source: typeof OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_CLAIM_BOUNDARY;
+  readOnly: true;
+  staleResidueCount: number;
+  activeArtifactReceiptCount: number;
+  staleResidueIsActiveWorkEvidence: false;
+  satisfiesActiveArtifactRequirement: false;
+  acceptableActiveArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"];
+  reminder: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -204,6 +221,7 @@ export type OperatorCheckActiveWorkReceipts = {
   salvageReviewQueue: OperatorCheckSalvageReviewQueue;
   staleResidueLedger: OperatorCheckStaleResidueLedger;
   cleanupReviewManifest: OperatorCheckStaleResidueCleanupReviewManifest;
+  staleResidueActiveBoundary: OperatorCheckStaleResidueActiveBoundary;
   blockers: string[];
 };
 
@@ -539,6 +557,26 @@ function buildCleanupReviewManifest(entries: OrphanLocalWorktreeEntry[]): Operat
   };
 }
 
+function buildStaleResidueActiveBoundary(
+  staleResidueCount: number,
+  activeArtifactReceiptCount: number,
+): OperatorCheckStaleResidueActiveBoundary {
+  return {
+    schemaVersion: OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION,
+    source: OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE,
+    claimBoundary: OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_CLAIM_BOUNDARY,
+    readOnly: true,
+    staleResidueCount,
+    activeArtifactReceiptCount,
+    staleResidueIsActiveWorkEvidence: false,
+    satisfiesActiveArtifactRequirement: false,
+    acceptableActiveArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"],
+    reminder: staleResidueCount > 0
+      ? "Stale worktree residue is cleanup-review context only; require an open issue, open PR, or mapped fooks tmux session before treating this snapshot as active work."
+      : "No stale worktree residue was projected into this operator/check snapshot.",
+  };
+}
+
 function buildSalvageReviewQueue(entries: OrphanLocalWorktreeEntry[]): OperatorCheckSalvageReviewQueue {
   const items = entries
     .filter((entry) => !entry.current)
@@ -675,6 +713,10 @@ function buildActiveWorkReceipts(
     ...receipts.flatMap((receipt) => receipt.blockers),
   ]);
   const classification = overallReceiptClassification(receipts, blockers);
+  const activeArtifactReceiptCount = receipts.filter((receipt) =>
+    receipt.classification === "active"
+    && (receipt.kind === "issue" || receipt.kind === "pullRequest" || receipt.kind === "session")
+  ).length;
   return {
     schemaVersion: OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION,
     source: OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE,
@@ -694,6 +736,10 @@ function buildActiveWorkReceipts(
     salvageReviewQueue: siblingReceipts.salvageReviewQueue,
     staleResidueLedger: siblingReceipts.staleResidueLedger,
     cleanupReviewManifest: siblingReceipts.cleanupReviewManifest,
+    staleResidueActiveBoundary: buildStaleResidueActiveBoundary(
+      siblingReceipts.staleResidueLedger.totalCount,
+      activeArtifactReceiptCount,
+    ),
     blockers,
   };
 }
