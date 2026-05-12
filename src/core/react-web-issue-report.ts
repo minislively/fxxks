@@ -125,6 +125,11 @@ export type ReactWebIssueFirstMinuteSummaryItem = {
   fixShape: ReactWebIssueFixShape;
   firstInspectStep: string;
   inspectFirst: string[];
+  whyThisFirst: string;
+  nextAction: string;
+  humanDecisionNeeded: string[];
+  doNotDo: string[];
+  contextHints: string[];
   fixShapeGuidance: {
     claimBoundary: ReactWebIssueFixShapeGuidance["claimBoundary"];
     humanReviewRequired: true;
@@ -703,6 +708,75 @@ function firstInspectStepFor(issue: ReactWebIssueCard): string {
   return issue.fixShapeGuidance.inspectFirst[0] ?? `${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`;
 }
 
+function trimSummaryText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function uniqueCompactStrings(values: string[], maxItems: number, maxLength: number): string[] {
+  const seen = new Set<string>();
+  const compact: string[] = [];
+  for (const value of values) {
+    const normalized = trimSummaryText(value.replace(/\s+/g, " ").trim(), maxLength);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    compact.push(normalized);
+    if (compact.length >= maxItems) break;
+  }
+  return compact;
+}
+
+function whyThisFirstFor(issue: ReactWebIssueCard): string {
+  const reason = issue.triage.evidence.reasons[0] ?? `${issue.triage.evidence.relatedContextQuality} local context`;
+  return trimSummaryText(
+    `Rank ${issue.triage.rank} ${issue.triage.priority} issue because ${reason}; ${issue.triage.bucket} remains human-reviewed.`,
+    180,
+  );
+}
+
+function nextActionFor(issue: ReactWebIssueCard): string {
+  return trimSummaryText(`Start by ${firstInspectStepFor(issue).replace(/^Inspect/u, "inspecting")}`, 180);
+}
+
+function humanDecisionNeededFor(issue: ReactWebIssueCard): string[] {
+  const decisions = ["Review the final accessible label/name copy."];
+  if (issue.fixability === "safe-preview") {
+    decisions.push("Confirm the htmlFor/id association before using the preview shape.");
+  } else {
+    decisions.push("Choose the label/name shape from local JSX evidence.");
+  }
+  return uniqueCompactStrings(decisions, 2, 120);
+}
+
+function doNotDoFor(): string[] {
+  return uniqueCompactStrings(
+    [
+      "Do not apply patches automatically from this report.",
+      "Do not infer custom-component semantics.",
+      "Do not generate accessible-name copy automatically.",
+    ],
+    3,
+    120,
+  );
+}
+
+function contextHintsFor(issue: ReactWebIssueCard): string[] {
+  const hints = [
+    `native ${issue.evidence.element} at ${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
+    `${issue.triage.evidence.relatedContextQuality} context`,
+  ];
+  if (issue.triage.evidence.safePreviewAvailable) {
+    hints.push("safe-preview candidate available");
+  }
+  if (issue.triage.evidence.relatedContextSources.length > 0) {
+    hints.push(`related sources: ${issue.triage.evidence.relatedContextSources.slice(0, 3).join(", ")}`);
+  }
+  for (const hint of issue.conventionHints.slice(0, 1)) {
+    hints.push(`advisory convention: ${hint.id}`);
+  }
+  return uniqueCompactStrings(hints, 4, 100);
+}
+
 function buildFirstMinuteSummary(
   triageRollup: ReactWebIssueReport["triageRollup"],
   issues: ReactWebIssueCard[],
@@ -716,6 +790,11 @@ function buildFirstMinuteSummary(
       fixShape: issue.fixShapeGuidance.shape,
       firstInspectStep: firstInspectStepFor(issue),
       inspectFirst: [...issue.fixShapeGuidance.inspectFirst],
+      whyThisFirst: whyThisFirstFor(issue),
+      nextAction: nextActionFor(issue),
+      humanDecisionNeeded: humanDecisionNeededFor(issue),
+      doNotDo: doNotDoFor(),
+      contextHints: contextHintsFor(issue),
       fixShapeGuidance: {
         claimBoundary: issue.fixShapeGuidance.claimBoundary,
         humanReviewRequired: issue.fixShapeGuidance.humanReviewRequired,
@@ -817,19 +896,20 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
     `- criteria: ${report.triageRollup.criteria.join("; ")}`,
   );
 
-  const issuesById = new Map(report.issues.map((issue) => [issue.id, issue]));
-  const compactIssues = report.triageRollup.topIssueIds
-    .map((id) => issuesById.get(id))
-    .filter((issue): issue is ReactWebIssueCard => Boolean(issue));
-  if (compactIssues.length > 0) {
+  if (report.firstMinuteSummary.items.length > 0) {
     lines.push(
       "",
       "## First-minute summary",
       "- Compact read-only triage from existing ranked issue evidence; inspect before editing and keep human review for final label/name decisions.",
     );
-    for (const issue of compactIssues) {
+    for (const item of report.firstMinuteSummary.items) {
       lines.push(
-        `- ${issue.id}: ${issue.fixShapeGuidance.shape}; first inspect: ${issue.fixShapeGuidance.inspectFirst[0] ?? `${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`}`,
+        `- ${item.issueId}: ${item.fixShape}; first inspect: ${item.firstInspectStep}`,
+        `  - why this first: ${item.whyThisFirst}`,
+        `  - next action: ${item.nextAction}`,
+        `  - human decision needed: ${item.humanDecisionNeeded.join("; ")}`,
+        `  - do not do: ${item.doNotDo.join("; ")}`,
+        `  - context hints: ${item.contextHints.join("; ")}`,
       );
     }
   }
