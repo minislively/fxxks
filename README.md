@@ -48,7 +48,7 @@ Use fooks when you want frontend change intelligence for a supported React Web f
 
 ## Quick start and local proof
 
-The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards. `fooks compare <supported-file>` is supporting local source-vs-payload evidence, not the whole product proof.
+The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards. Agents and tools that only need the compact work-order handoff should use `fooks inspect react-web-issues <supported-file> --summary-json`, read `firstMinuteSummary.items[0]`, and treat the result as advisory inspect-first input rather than edit authority. `fooks compare <supported-file>` is supporting local source-vs-payload evidence, not the whole product proof.
 
 `fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks inspect react-web-issues` is the first actionable report surface for narrow native-control form/accessibility findings. `fooks compare` defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local byte counts, exclusions, and claim boundary text.
 
@@ -337,7 +337,7 @@ npm test
 Useful public docs:
 
 - Architecture boundaries for source facts, evidence gates, and reporting-vs-authorization separation: [`docs/architecture-boundaries.md`](docs/architecture-boundaries.md)
-- React Web first-minute work-order flow for human maintainers: [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md)
+- React Web first-minute work-order flow for human maintainers and agent/tool `--summary-json` handoffs: [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md)
 - Setup details: [`docs/setup.md`](docs/setup.md)
 - opencode support boundary: [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md)
 - Release checklist: [`docs/release.md`](docs/release.md)

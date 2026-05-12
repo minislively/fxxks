@@ -50,6 +50,24 @@ fooks inspect react-web-issues src/components/Form.tsx --summary-json
 
 `--summary-json` is intentionally smaller than full `--json`: it keeps the first-minute summary, rollup IDs, read-only flags, and claim boundary, while omitting detailed card fields such as source snippets, preview details, context packets, and suggested actions.
 
+## Agent/tool handoff
+
+Use `--summary-json` when an agent or tool needs a compact first-minute instruction packet instead of the full issue-card report:
+
+```bash
+fooks inspect react-web-issues src/components/Form.tsx --summary-json
+```
+
+The intended consumer flow is:
+
+1. Read `firstMinuteSummary.items` in `sourceTopIssueIds` order.
+2. Start with `items[0].firstInspectStep` and `items[0].nextAction`.
+3. Keep `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
+4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority.
+5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
+
+The compact handoff is not an apply command. It should help an agent choose the first source location to inspect, not skip human review, invent accessible-name copy, treat custom components as native controls, or widen the report into a broader accessibility audit.
+
 ## What the mini work order is allowed to say
 
 A first-minute mini work order is an inspect-first handoff. It can point at the top ranked React Web native-control issue and summarize:
