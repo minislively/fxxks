@@ -50,6 +50,14 @@ fooks inspect react-web-issues src/components/Form.tsx --summary-json
 
 `--summary-json` is intentionally smaller than full `--json`: it keeps the first-minute summary, rollup IDs, read-only flags, and claim boundary, while omitting detailed card fields such as source snippets, preview details, context packets, and suggested actions.
 
+Use the dry-run projection when an agent or migration planner needs read-only candidate rows instead of issue cards:
+
+```bash
+fooks inspect react-web-issues src/components/Form.tsx --dry-run-json
+```
+
+`--dry-run-json` is still not an apply path. It projects existing ranked issue evidence into migration candidates with affected files, first inspect steps, preview availability, and risk notes. The projection stays dry-run-only: no patch application, generated accessible-name copy, custom-component semantic inference, or rank/priority/bucket changes.
+
 ## Agent/tool handoff
 
 Use `--summary-json` when an agent or tool needs a compact first-minute instruction packet instead of the full issue-card report:
@@ -66,7 +74,7 @@ The intended consumer flow is:
 4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority.
 5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
 
-The compact handoff is not an apply command. It should help an agent choose the first source location to inspect, not skip human review, invent accessible-name copy, treat custom components as native controls, or widen the report into a broader accessibility audit.
+The compact handoff is not an apply command. It should help an agent choose the first source location to inspect, not skip human review, invent accessible-name copy, treat custom components as native controls, or widen the report into a broader accessibility audit. If an agent needs candidate rows for a migration plan, use `--dry-run-json` and keep its `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` fields attached to the task card.
 
 ## What the mini work order is allowed to say
 
