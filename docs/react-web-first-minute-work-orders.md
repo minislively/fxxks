@@ -60,6 +60,19 @@ fooks inspect react-web-issues src/components/Form.tsx --dry-run-json
 
 ## Agent/tool handoff
 
+### Agent integration decision tree
+
+An agent should choose the smallest inspect surface that answers the handoff question:
+
+| Agent need | Use | First field to read | Keep attached |
+| --- | --- | --- | --- |
+| Decide the first source action for a supported React Web file | `--summary-json` | `firstMinuteSummary.items[0]` | `claimBoundary`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply` |
+| Build read-only migration candidate rows from ranked issue evidence | `--dry-run-json` | `candidates[]` | `dryRunOnly`, `autoApply`, `humanReviewRequired`, `riskNotes` |
+| Inspect detailed card evidence, context packets, or related local context | `--json` | `issues[]` plus `firstMinuteSummary` | `claimBoundary`, `contextPacket`, `relatedContext`, preview safety fields |
+| A person wants a quick source-reading report | text mode | the first-minute summary before detailed cards | the printed boundaries and manual-review notes |
+
+Do not start with full `--json` when the agent only needs the first action, and do not use `--dry-run-json` as a codemod runner. These projections are task-shaping inputs: they choose where to inspect and what evidence to preserve, not whether an edit is allowed.
+
 Use `--summary-json` when an agent or tool needs a compact first-minute instruction packet instead of the full issue-card report:
 
 ```bash
@@ -75,6 +88,43 @@ The intended consumer flow is:
 5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
 
 The compact handoff is not an apply command. It should help an agent choose the first source location to inspect, not skip human review, invent accessible-name copy, treat custom components as native controls, or widen the report into a broader accessibility audit. If an agent needs candidate rows for a migration plan, use `--dry-run-json` and keep its `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` fields attached to the task card.
+
+A compact first-minute agent task card should therefore retain the fields that prevent overreach:
+
+```text
+source: fooks inspect react-web-issues <file> --summary-json
+start: firstMinuteSummary.items[0].firstInspectStep
+next: firstMinuteSummary.items[0].nextAction
+preserve: claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance.autoApply
+stop: if firstMinuteSummary.items is empty, inspect inScope/skippedReason instead of inventing a task
+```
+
+### Dry-run candidate handoff
+
+Use `--dry-run-json` only when a migration planner needs a list of read-only candidate rows:
+
+```bash
+fooks inspect react-web-issues src/components/Form.tsx --dry-run-json
+```
+
+The intended dry-run consumer flow is:
+
+1. Read `candidates[]` in the returned order; each candidate is derived from the ranked issue evidence.
+2. Start each row from `candidate.firstInspectStep` and `candidate.affectedFile`.
+3. Keep `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` with every task card.
+4. Treat `previewAvailable` as a hint about whether a read-only preview shape exists, not as permission to change source.
+5. If `candidates` is empty, stop and inspect `inScope` / `skippedReason` instead of creating a migration task.
+
+A dry-run agent task card should keep the dry-run boundary visible:
+
+```text
+source: fooks inspect react-web-issues <file> --dry-run-json
+row: candidates[n].issueId
+inspect: candidates[n].firstInspectStep
+file: candidates[n].affectedFile
+preserve: dryRunOnly, autoApply, humanReviewRequired, riskNotes
+stop: if candidates is empty or inScope is false, do not create a migration candidate
+```
 
 ## What the mini work order is allowed to say
 

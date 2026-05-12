@@ -4982,15 +4982,34 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(doc, /first-minute mini work order/i);
   assert.match(doc, /Before and after/);
   assert.match(doc, /Agent\/tool handoff/);
+  assert.match(doc, /Agent integration decision tree/);
+  assert.match(doc, /Agent need[\s\S]*First field to read[\s\S]*Keep attached/);
+  assert.match(doc, /first source action[\s\S]*--summary-json[\s\S]*firstMinuteSummary\.items\[0\]/);
+  assert.match(doc, /migration candidate rows[\s\S]*--dry-run-json[\s\S]*candidates\[\]/);
+  assert.match(doc, /detailed card evidence[\s\S]*--json[\s\S]*issues\[\]/);
   assert.match(doc, /fooks inspect react-web-issues src\/components\/Form\.tsx --summary-json/);
   assert.match(doc, /Read `firstMinuteSummary\.items` in `sourceTopIssueIds` order/);
   assert.match(doc, /Start with `items\[0\]\.firstInspectStep` and `items\[0\]\.nextAction`/);
+  assert.match(doc, /source: fooks inspect react-web-issues <file> --summary-json/);
+  assert.match(doc, /preserve: claimBoundary, humanDecisionNeeded, doNotDo, fixShapeGuidance\.autoApply/);
   assert.match(doc, /fixShapeGuidance\.autoApply/);
   assert.match(doc, /If `items` is empty, stop/);
   assert.match(doc, /ranked issue cards[\s\S]*firstMinuteSummary[\s\S]*--summary-json|firstMinuteSummary[\s\S]*compact first-minute/);
   assert.match(doc, /fooks inspect react-web-issues src\/components\/Form\.tsx/);
   assert.match(doc, /--json/);
   assert.match(doc, /--summary-json/);
+  assert.match(doc, /--dry-run-json/);
+  assert.match(doc, /Dry-run candidate handoff/);
+  assert.match(doc, /Read `candidates\[\]` in the returned order/);
+  assert.match(doc, /candidate\.firstInspectStep/);
+  assert.match(doc, /candidate\.affectedFile/);
+  assert.match(doc, /dryRunOnly/);
+  assert.match(doc, /humanReviewRequired/);
+  assert.match(doc, /riskNotes/);
+  assert.match(doc, /previewAvailable[\s\S]*read-only preview shape[\s\S]*not as permission to change source/);
+  assert.match(doc, /source: fooks inspect react-web-issues <file> --dry-run-json/);
+  assert.match(doc, /preserve: dryRunOnly, autoApply, humanReviewRequired, riskNotes/);
+  assert.match(doc, /if candidates is empty or inScope is false, do not create a migration candidate/);
   assert.match(doc, /first inspect step/i);
   assert.match(doc, /next action/i);
   assert.match(doc, /human decision needed/i);
@@ -5010,6 +5029,7 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.doesNotMatch(doc, /complete WCAG audit|broad accessibility audit available/i);
   assert.doesNotMatch(doc, /infers? custom-component semantics/i);
   assert.doesNotMatch(doc, /React Native support is available|WebView support is available|TUI support is available/i);
+  assert.doesNotMatch(doc, /runs? (?:a )?codemod|codemod execution|CI enforcement|enforces in CI/i);
 });
 
 test("package release surface keeps internal docs out of the npm tarball", () => {
