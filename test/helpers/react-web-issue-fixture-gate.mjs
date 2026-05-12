@@ -138,3 +138,164 @@ export function evaluateReactWebIssueFixtureUsefulness(cases, buildReport, build
     }),
   );
 }
+
+
+export const reactWebWorkOrderQualityRegressionClasses = [
+  "missing-location",
+  "weak-why",
+  "non-action-next-step",
+  "missing-human-decision",
+  "unsafe-do-not-do",
+  "context-hints-bad-size",
+];
+
+function pushWorkOrderFailure(failures, regressionClass, issueId, message) {
+  failures.push({ regressionClass, issueId, message });
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasLocation(value) {
+  return /[^\s:]+:\d+(?:-\d+)?/u.test(value ?? "");
+}
+
+function hasAnyPattern(values, pattern) {
+  return values.some((value) => pattern.test(value ?? ""));
+}
+
+function validateWorkOrderItem({ item, expectedTopIds, issueIds, failures }) {
+  const issueId = isNonEmptyString(item?.issueId) ? item.issueId : "<missing-issue-id>";
+  const inspectFirst = Array.isArray(item?.inspectFirst) ? item.inspectFirst : [];
+  const humanDecisionNeeded = Array.isArray(item?.humanDecisionNeeded) ? item.humanDecisionNeeded : [];
+  const doNotDo = Array.isArray(item?.doNotDo) ? item.doNotDo : [];
+  const contextHints = Array.isArray(item?.contextHints) ? item.contextHints : [];
+  const firstInspectStep = item?.firstInspectStep;
+
+  if (!issueIds.has(issueId) || !expectedTopIds.includes(issueId)) {
+    pushWorkOrderFailure(failures, "missing-location", issueId, `${issueId}: first-minute item is not linked to a top issue id`);
+  }
+  if (!isNonEmptyString(firstInspectStep) || inspectFirst[0] !== firstInspectStep || !hasLocation(firstInspectStep)) {
+    pushWorkOrderFailure(
+      failures,
+      "missing-location",
+      issueId,
+      `${issueId}: first inspect step must match inspectFirst[0] and include a file:line location`,
+    );
+  }
+
+  if (item?.fixShapeGuidance?.humanReviewRequired !== true) {
+    pushWorkOrderFailure(failures, "missing-human-decision", issueId, `${issueId}: fix shape guidance must require human review`);
+  }
+  if (item?.fixShapeGuidance?.autoApply !== false) {
+    pushWorkOrderFailure(failures, "unsafe-do-not-do", issueId, `${issueId}: fix shape guidance must keep autoApply false`);
+  }
+
+  if (
+    !isNonEmptyString(item?.whyThisFirst) ||
+    item.whyThisFirst.length > 180 ||
+    !/(rank|priority|because|evidence|safe preview|context|confidence)/iu.test(item.whyThisFirst)
+  ) {
+    pushWorkOrderFailure(
+      failures,
+      "weak-why",
+      issueId,
+      `${issueId}: whyThisFirst must compactly justify why this top issue is first`,
+    );
+  }
+
+  if (
+    !isNonEmptyString(item?.nextAction) ||
+    item.nextAction.length > 180 ||
+    !/(inspect|review|compare|check)/iu.test(item.nextAction)
+  ) {
+    pushWorkOrderFailure(
+      failures,
+      "non-action-next-step",
+      issueId,
+      `${issueId}: nextAction must name an immediate inspect/review/compare/check action`,
+    );
+  }
+
+  if (
+    humanDecisionNeeded.length < 1 ||
+    humanDecisionNeeded.length > 2 ||
+    humanDecisionNeeded.some((entry) => !isNonEmptyString(entry) || entry.length > 120) ||
+    !hasAnyPattern(humanDecisionNeeded, /(human|review|label|name|copy|association|shape)/iu)
+  ) {
+    pushWorkOrderFailure(
+      failures,
+      "missing-human-decision",
+      issueId,
+      `${issueId}: humanDecisionNeeded must preserve final human label/name/copy/association review`,
+    );
+  }
+
+  if (
+    doNotDo.length < 2 ||
+    doNotDo.length > 3 ||
+    doNotDo.some((entry) => !isNonEmptyString(entry) || entry.length > 120) ||
+    !hasAnyPattern(doNotDo, /(auto-?apply|apply|patch)/iu) ||
+    !hasAnyPattern(doNotDo, /(custom-component|generated|accessible-name copy|infer)/iu)
+  ) {
+    pushWorkOrderFailure(
+      failures,
+      "unsafe-do-not-do",
+      issueId,
+      `${issueId}: doNotDo must block auto-apply/patch and unsupported inference/generated-copy overreach`,
+    );
+  }
+
+  if (
+    contextHints.length < 1 ||
+    contextHints.length > 4 ||
+    contextHints.some((entry) => !isNonEmptyString(entry) || entry.length > 100) ||
+    !hasAnyPattern(contextHints, /(native|context|source|convention|preview|file|line)/iu)
+  ) {
+    pushWorkOrderFailure(
+      failures,
+      "context-hints-bad-size",
+      issueId,
+      `${issueId}: contextHints must be 1-4 compact orienting strings`,
+    );
+  }
+}
+
+export function parseReactWebWorkOrderQuality({ fixture, report }) {
+  const failures = [];
+  const firstMinuteSummary = report?.firstMinuteSummary ?? { sourceTopIssueIds: [], items: [] };
+  const expectedTopIds = Array.isArray(firstMinuteSummary.sourceTopIssueIds) ? firstMinuteSummary.sourceTopIssueIds : [];
+  const items = Array.isArray(firstMinuteSummary.items) ? firstMinuteSummary.items : [];
+  const issueIds = new Set((Array.isArray(report?.issues) ? report.issues : []).map((issue) => issue.id));
+
+  if (expectedTopIds.length !== items.length) {
+    pushWorkOrderFailure(
+      failures,
+      "missing-location",
+      "<summary>",
+      `${fixture}: expected one first-minute item per sourceTopIssueIds entry; topIds=${expectedTopIds.length}, items=${items.length}`,
+    );
+  }
+
+  for (const item of items) validateWorkOrderItem({ item, expectedTopIds, issueIds, failures });
+
+  return {
+    fixture,
+    sourceTopIssueIds: expectedTopIds,
+    observedItemCount: items.length,
+    regressionClasses: [...new Set(failures.map((failure) => failure.regressionClass))],
+    failures,
+    verdict: failures.length === 0 ? "pass" : "fail",
+  };
+}
+
+export function assertReactWebWorkOrderQuality(result) {
+  assert.equal(
+    result.verdict,
+    "pass",
+    `${result.fixture}: work-order quality gate failed (${result.regressionClasses.join(", ") || "unknown"})\n${result.failures
+      .map((failure) => `- [${failure.regressionClass}] ${failure.issueId}: ${failure.message}`)
+      .join("\n")}`,
+  );
+}

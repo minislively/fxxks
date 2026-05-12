@@ -5,8 +5,11 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import {
   assertReactWebIssueFixtureUsefulness,
+  assertReactWebWorkOrderQuality,
   evaluateReactWebIssueFixtureUsefulness,
+  parseReactWebWorkOrderQuality,
   reactWebIssueFixtureRegressionClasses,
+  reactWebWorkOrderQualityRegressionClasses,
 } from "./helpers/react-web-issue-fixture-gate.mjs";
 
 const repoRoot = process.cwd();
@@ -48,6 +51,17 @@ function hasNestedKey(value, key) {
   if (!value || typeof value !== "object") return false;
   if (Object.hasOwn(value, key)) return true;
   return Object.values(value).some((entry) => hasNestedKey(entry, key));
+}
+
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function assertOnlyWorkOrderRegressionClass(report, regressionClass) {
+  const result = parseReactWebWorkOrderQuality({ fixture: regressionClass, report });
+  assert.equal(result.verdict, "fail");
+  assert.deepEqual(result.regressionClasses, [regressionClass]);
 }
 
 function assertCompactFirstMinuteItem(item) {
@@ -409,6 +423,85 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
   assert.ok(matrix.every((entry) => entry.noiseNotes.length === 0));
   assert.ok(matrix.some((entry) => entry.expectedUnsupported === true && entry.unsupported === true));
   assert.ok(matrix.some((entry) => entry.expectedUnsupported === true && entry.unsupportedSkipBoundary === true));
+});
+
+test("React Web first-minute work-order quality gate accepts current output", () => {
+  assert.deepEqual(reactWebWorkOrderQualityRegressionClasses, [
+    "missing-location",
+    "weak-why",
+    "non-action-next-step",
+    "missing-human-decision",
+    "unsafe-do-not-do",
+    "context-hints-bad-size",
+  ]);
+
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const result = parseReactWebWorkOrderQuality({ fixture: "FormControls.tsx", report });
+
+  assertReactWebWorkOrderQuality(result);
+  assert.deepEqual(result.regressionClasses, []);
+  assert.deepEqual(result.sourceTopIssueIds, report.triageRollup.topIssueIds);
+  assert.equal(result.observedItemCount, 3);
+});
+
+test("React Web first-minute work-order quality gate maps fixture regressions to the six classes", () => {
+  const baseReport = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const cases = [
+    {
+      regressionClass: "missing-location",
+      mutate(report) {
+        report.firstMinuteSummary.sourceTopIssueIds = report.firstMinuteSummary.sourceTopIssueIds.slice(1);
+      },
+    },
+    {
+      regressionClass: "weak-why",
+      mutate(report) {
+        report.firstMinuteSummary.items[0].whyThisFirst = "Important.";
+      },
+    },
+    {
+      regressionClass: "non-action-next-step",
+      mutate(report) {
+        report.firstMinuteSummary.items[0].nextAction = "Maybe fix this eventually.";
+      },
+    },
+    {
+      regressionClass: "missing-human-decision",
+      mutate(report) {
+        report.firstMinuteSummary.items[0].humanDecisionNeeded = [];
+      },
+    },
+    {
+      regressionClass: "unsafe-do-not-do",
+      mutate(report) {
+        report.firstMinuteSummary.items[0].doNotDo = ["Stay careful.", "Avoid surprises."];
+      },
+    },
+    {
+      regressionClass: "context-hints-bad-size",
+      mutate(report) {
+        report.firstMinuteSummary.items[0].contextHints = [];
+      },
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    const report = cloneJson(baseReport);
+    fixtureCase.mutate(report);
+    assertOnlyWorkOrderRegressionClass(report, fixtureCase.regressionClass);
+  }
+});
+
+test("React Web first-minute work-order quality gate keeps safety invariants structural", () => {
+  const baseReport = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+
+  const autoApplyReport = cloneJson(baseReport);
+  autoApplyReport.firstMinuteSummary.items[0].fixShapeGuidance.autoApply = true;
+  assertOnlyWorkOrderRegressionClass(autoApplyReport, "unsafe-do-not-do");
+
+  const humanReviewReport = cloneJson(baseReport);
+  humanReviewReport.firstMinuteSummary.items[0].fixShapeGuidance.humanReviewRequired = false;
+  assertOnlyWorkOrderRegressionClass(humanReviewReport, "missing-human-decision");
 });
 
 test("React Web issue report preserves skip and no unsupported custom-component inference boundaries", () => {
