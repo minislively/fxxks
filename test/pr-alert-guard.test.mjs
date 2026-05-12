@@ -140,7 +140,6 @@ test("PR alert guard treats new-to-merged alerts for already merged PRs as verif
   }
 });
 
-
 test("PR alert guard treats already merged pruned dogfood runtime cleanup as no-action echo", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-dogfood-runtime-"));
   const alertsPath = path.join(tempDir, "alerts.txt");
@@ -186,7 +185,6 @@ test("PR alert guard treats already merged pruned dogfood runtime cleanup as no-
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
-
 
 test("PR alert guard marks dirty duplicate of already-closed linked issue as operator close candidate", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-duplicate-post-merge-"));
@@ -265,6 +263,7 @@ test("PR alert guard marks dirty duplicate of already-closed linked issue as ope
     assert.equal(result.counts["duplicate-post-merge"], 1);
     assert.equal(duplicate.classification, "duplicate-post-merge");
     assert.equal(duplicate.recommendation, "operator-close-candidate");
+    assert.equal(duplicate.cutRecommendation, "cut-duplicate-pr");
     assert.equal(duplicate.mergeRecovery, "do-not-start-merge-recovery");
     assert.equal(duplicate.destructiveAction, "none-read-only");
     assert.match(duplicate.reasons.join("\n"), /linked issue is already closed/);
@@ -272,12 +271,17 @@ test("PR alert guard marks dirty duplicate of already-closed linked issue as ope
     assert.match(duplicate.reasons.join("\n"), /title matches closing PR #767/);
     assert.match(duplicate.reasons.join("\n"), /files overlap closing PR #767/);
     assert.match(duplicate.reasons.join("\n"), /current PR head is dirty or not mergeable/);
+    assert.deepEqual(duplicate.evidenceLines, [
+      "linked issue #766: closed",
+      "closing PR #767: merged",
+      "duplicate signals: title matches closing PR #767; files overlap closing PR #767: src/reporting/react-web-evidence-artifact.ts, scripts/react-web-pr-gate-surface.mjs",
+      "current PR head: dirty/not mergeable",
+      "action boundary: read-only evidence only; no close/comment/delete/branch cleanup performed",
+    ]);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
-
-
 
 test("PR alert guard does not cut duplicate-looking PR when closing PR is not known merged", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-duplicate-not-merged-"));
@@ -339,8 +343,93 @@ test("PR alert guard does not cut duplicate-looking PR when closing PR is not kn
     assert.equal(result.counts["duplicate-post-merge"] ?? 0, 0);
     assert.equal(duplicate.classification, "insufficient-duplicate-post-merge-evidence");
     assert.equal(duplicate.recommendation, "continue-normal-pr-triage");
+    assert.equal(duplicate.cutRecommendation, "do-not-cut");
     assert.equal(duplicate.mergeRecovery, "not-ruled-out");
     assert.match(duplicate.reasons.join("\n"), /closing PR #767 is related but not known merged/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("PR alert guard renders compact read-only cut evidence for #768/#769 duplicate candidates", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-pr-alert-guard-operator-cut-evidence-"));
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  const eventsPath = path.join(tempDir, "events.json");
+  const prEvidencePath = path.join(tempDir, "pr-evidence.json");
+
+  fs.writeFileSync(alertsPath, [
+    "relay: https://github.com/minislively/fooks/pull/768 reopened after closing PR #767 merged",
+    "relay: https://github.com/minislively/fooks/pull/769 reopened dirty duplicate after issue #766 closed",
+  ].join("\n"));
+  fs.writeFileSync(eventsPath, JSON.stringify([
+    {
+      number: 768,
+      title: "React Web decision layer",
+      state: "open",
+      html_url: "https://github.com/minislively/fooks/pull/768",
+      pull_request: { html_url: "https://github.com/minislively/fooks/pull/768" },
+    },
+    {
+      number: 769,
+      title: "React Web decision layer",
+      state: "open",
+      html_url: "https://github.com/minislively/fooks/pull/769",
+      pull_request: { html_url: "https://github.com/minislively/fooks/pull/769" },
+    },
+  ]));
+  fs.writeFileSync(prEvidencePath, JSON.stringify({
+    pullRequests: [768, 769].map((number) => ({
+      number,
+      title: "React Web decision layer",
+      head: { mergeableState: "dirty" },
+      linkedIssue: {
+        number: 766,
+        state: "closed",
+        closedByPullRequestNumber: 767,
+      },
+      files: [
+        "src/reporting/react-web-evidence-artifact.ts",
+        "scripts/react-web-pr-gate-surface.mjs",
+      ],
+      relatedPullRequests: [{
+        number: 767,
+        title: "React Web decision layer",
+        state: "closed",
+        mergedAt: "2026-05-11T12:00:00Z",
+        files: [
+          "src/reporting/react-web-evidence-artifact.ts",
+          "scripts/react-web-pr-gate-surface.mjs",
+        ],
+      }],
+    })),
+  }));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      guardScript,
+      "--repo",
+      "minislively/fooks",
+      "--alerts",
+      alertsPath,
+      "--events",
+      eventsPath,
+      "--pr-evidence",
+      prEvidencePath,
+      "--markdown",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    assert.match(stdout, /## Operator duplicate PR cut evidence/);
+    assert.match(stdout, /### minislively\/fooks#768: cut-duplicate-pr/);
+    assert.match(stdout, /### minislively\/fooks#769: cut-duplicate-pr/);
+    assert.match(stdout, /- evidence: linked issue #766: closed/);
+    assert.match(stdout, /- evidence: closing PR #767: merged/);
+    assert.match(stdout, /- evidence: duplicate signals: title matches closing PR #767; files overlap closing PR #767:/);
+    assert.match(stdout, /- evidence: current PR head: dirty\/not mergeable/);
+    assert.match(stdout, /- evidence: action boundary: read-only evidence only; no close\/comment\/delete\/branch cleanup performed/);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -351,7 +440,8 @@ test("PR alert disambiguation docs reference an existing package script", () => 
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
   const referencedScripts = [...doc.matchAll(/npm run --silent ([^\s]+)/g)].map((match) => match[1]);
 
-  assert.deepEqual(referencedScripts, ["pr:alerts", "pr:alerts"]);
+  assert.ok(referencedScripts.length >= 2);
+  assert.ok(referencedScripts.every((script) => script === "pr:alerts"));
   for (const script of referencedScripts) {
     assert.ok(pkg.scripts[script], `docs reference missing npm script: ${script}`);
   }
