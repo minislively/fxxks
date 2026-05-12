@@ -89,6 +89,19 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.ok(issue.safetyRationale.length > 0);
     assert.ok(issue.suggestedFixIntent.length > 0);
     assert.equal(issue.suggestedAction, issue.suggestedFixIntent);
+    assert.equal(typeof issue.contextPacket.whyThisFile, "string");
+    assert.equal(typeof issue.contextPacket.relatedPattern, "string");
+    assert.equal(typeof issue.contextPacket.nearbyPrecedent, "string");
+    assert.equal(issue.contextPacket.confidence, issue.confidence);
+    assert.ok(Array.isArray(issue.contextPacket.excludedInference));
+    assert.ok(issue.contextPacket.excludedInference.length >= 3);
+    assert.match(issue.contextPacket.whyThisFile, /missing-labels\.tsx:\d+-\d+/);
+    assert.match(issue.contextPacket.relatedPattern, /native (button|input|select|textarea)/);
+    assert.match(issue.contextPacket.nearbyPrecedent, /same-file-pattern|nearby-test|same-directory-source|No nearby precedent/);
+    assert.ok(issue.contextPacket.excludedInference.some((entry) => /custom-component semantics/.test(entry)));
+    assert.ok(issue.contextPacket.excludedInference.some((entry) => /broad accessibility coverage/.test(entry)));
+    assert.ok(issue.contextPacket.excludedInference.some((entry) => /auto-apply patches/.test(entry)));
+    assert.doesNotMatch(JSON.stringify(issue.contextPacket), /must-edit/i);
     assert.match(issue.skipReason, /human review|accessible-name copy/);
     assert.ok(issue.triage.rank > 0);
     assert.ok(["high", "medium", "low"].includes(issue.triage.priority));
@@ -140,6 +153,8 @@ test("React Web issue report turns nearby native associations into safe preview 
   assert.equal(report.issues[0].triage.evidence.safePreviewAvailable, true);
   assert.equal(report.issues[0].triage.bucket, "safe-preview");
   assert.equal(report.issues[0].triage.rank, 1);
+  assert.match(report.issues[0].contextPacket.relatedPattern, /safe-preview pattern/);
+  assert.ok(report.issues[0].contextPacket.excludedInference.some((entry) => /candidate diff only/.test(entry)));
   assert.match(report.issues[0].preview.text, /htmlFor="email"/);
   assert.ok(report.issues.every((issue) => issue.relatedContext.length > 0));
   assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 5));
@@ -259,6 +274,11 @@ test("React Web issue report recommends bounded local related context from impor
   assert.ok(entries.some((entry) => entry.file.endsWith("/Input.tsx") && entry.confidence === "medium"));
   assert.ok(entries.some((entry) => entry.kind === "nearby-test" && entry.file.endsWith("/related-context-form.test.tsx") && entry.confidence === "medium"));
   assert.ok(entries.some((entry) => entry.kind === "same-directory-source" && entry.confidence === "low"));
+  assert.match(
+    report.issues[0].contextPacket.nearbyPrecedent,
+    /(FormField\.tsx|Input\.tsx|related-context-form\.test\.tsx)/,
+  );
+  assert.match(report.issues[0].contextPacket.nearbyPrecedent, /(imported-local-component|nearby-test)/);
 
   const buttonEntries = report.issues[1].relatedContext;
   assert.ok(buttonEntries.some((entry) => entry.kind === "same-file-pattern" && entry.file.endsWith("/related-context-form.tsx")));
@@ -400,6 +420,11 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /- fixability: safe-preview/);
   assert.match(cli.stdout, /- auto-fix safety: not-auto-applied/);
   assert.match(cli.stdout, /- suggested action:/);
+  assert.match(cli.stdout, /- context packet:/);
+  assert.match(cli.stdout, /  - why this file:/);
+  assert.match(cli.stdout, /  - related pattern:/);
+  assert.match(cli.stdout, /  - nearby precedent:/);
+  assert.match(cli.stdout, /  - excluded inference:/);
   assert.match(cli.stdout, /- fix shape: safe-preview-htmlFor-association/);
   assert.match(cli.stdout, /- inspect first for fix shape:/);
   assert.match(cli.stdout, /Review the safe preview diff as a candidate shape; fooks still does not apply it/);
@@ -552,7 +577,7 @@ test("React Web issue report summary JSON is compact first-minute data without d
   assert.deepEqual(Object.hasOwn(summary, "issues"), false);
 
   const compactText = JSON.stringify(summary);
-  for (const detailedCardKey of ["issues", "relatedContext", "preview", "evidence", "sourceSignals", "suggestedAction", "whereToLook", "whyItMatters", "problem"]) {
+  for (const detailedCardKey of ["issues", "contextPacket", "relatedContext", "preview", "evidence", "sourceSignals", "suggestedAction", "whereToLook", "whyItMatters", "problem"]) {
     assert.equal(hasNestedKey(summary, detailedCardKey), false, `summary-json should not include detailed key ${detailedCardKey}`);
   }
   assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|Controller/i);
