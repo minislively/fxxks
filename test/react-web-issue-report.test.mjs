@@ -11,6 +11,10 @@ import {
   reactWebIssueFixtureRegressionClasses,
   reactWebWorkOrderQualityRegressionClasses,
 } from "./helpers/react-web-issue-fixture-gate.mjs";
+import {
+  consumeReactWebDryRunForAgentTasks,
+  consumeReactWebSummaryForAgentTask,
+} from "./helpers/react-web-agent-handoff-dogfood.mjs";
 
 const repoRoot = process.cwd();
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
@@ -961,6 +965,110 @@ test("React Web issue report migration dry-run JSON preserves empty and unsuppor
     manualReviewCandidateCount: 0,
   });
   assert.deepEqual(rn.candidates, []);
+});
+
+test("React Web agent handoff dogfood consumes summary JSON as an inspect-first task", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const summary = buildReactWebIssueReportSummaryJson(report);
+  const task = consumeReactWebSummaryForAgentTask(summary);
+  const firstItem = summary.firstMinuteSummary.items[0];
+
+  assert.equal(task.kind, "inspect-first-task");
+  assert.equal(task.source, "summary-json");
+  assert.equal(task.issueId, firstItem.issueId);
+  assert.equal(task.filePath, summary.filePath);
+  assert.equal(task.claimBoundary, summary.claimBoundary);
+  assert.equal(task.firstInspectStep, firstItem.firstInspectStep);
+  assert.equal(task.nextAction, firstItem.nextAction);
+  assert.equal(task.whyThisFirst, firstItem.whyThisFirst);
+  assert.deepEqual(task.humanDecisionNeeded, firstItem.humanDecisionNeeded);
+  assert.deepEqual(task.doNotDo, firstItem.doNotDo);
+  assert.deepEqual(task.contextHints, firstItem.contextHints);
+  assert.equal(task.fixShape, firstItem.fixShape);
+  assert.deepEqual(task.fixShapeGuidance, firstItem.fixShapeGuidance);
+  assert.equal(task.autoApply, false);
+  assert.equal(task.humanReviewRequired, true);
+
+  const handoffText = JSON.stringify(task);
+  assert.match(handoffText, /Read-only React Web issue report/);
+  assert.match(handoffText, /does not auto-apply patches/);
+  assert.match(task.nextAction, /Start by inspecting/);
+  assert.ok(task.contextHints.some((hint) => /native|context|source|convention|preview/i.test(hint)));
+  assert.doesNotMatch(handoffText, /must-edit|Auto-apply: yes|codemod|CI enforcement|merge gate/i);
+});
+
+test("React Web agent handoff dogfood consumes dry-run JSON as read-only candidate tasks", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(report);
+  const handoff = consumeReactWebDryRunForAgentTasks(dryRun);
+
+  assert.equal(handoff.kind, "dry-run-candidate-tasks");
+  assert.equal(handoff.source, "dry-run-json");
+  assert.equal(handoff.filePath, dryRun.filePath);
+  assert.equal(handoff.claimBoundary, dryRun.claimBoundary);
+  assert.equal(handoff.dryRunOnly, true);
+  assert.equal(handoff.autoApply, false);
+  assert.equal(handoff.candidates.length, dryRun.candidates.length);
+
+  const firstCandidate = handoff.candidates[0];
+  const sourceCandidate = dryRun.candidates[0];
+  assert.deepEqual(firstCandidate, {
+    issueId: sourceCandidate.issueId,
+    affectedFile: sourceCandidate.affectedFile,
+    migrationCandidate: sourceCandidate.migrationCandidate,
+    firstInspectStep: sourceCandidate.firstInspectStep,
+    previewAvailable: sourceCandidate.previewAvailable,
+    humanReviewRequired: sourceCandidate.humanReviewRequired,
+    autoApply: sourceCandidate.autoApply,
+    dryRunOnly: sourceCandidate.dryRunOnly,
+    riskNotes: sourceCandidate.riskNotes,
+  });
+  assert.equal(firstCandidate.dryRunOnly, true);
+  assert.equal(firstCandidate.autoApply, false);
+  assert.equal(firstCandidate.humanReviewRequired, true);
+  assert.ok(firstCandidate.riskNotes.some((note) => /Do not apply patches automatically/i.test(note)));
+  assert.doesNotMatch(JSON.stringify(handoff), /must-edit|Auto-apply: yes|codemod|CI enforcement|merge gate/i);
+});
+
+test("React Web agent handoff dogfood stops on empty and unsupported projections", () => {
+  const labelledReport = buildReactWebIssueReport(fixtures.labelled, repoRoot);
+  const labelledSummary = buildReactWebIssueReportSummaryJson(labelledReport);
+  const labelledDryRun = buildReactWebIssueReportMigrationDryRunJson(labelledReport);
+
+  const summaryStop = consumeReactWebSummaryForAgentTask(labelledSummary);
+  assert.deepEqual(summaryStop, {
+    kind: "stop",
+    source: "summary-json",
+    reason: "no-first-minute-items",
+    inScope: true,
+    autoApply: false,
+  });
+  assert.equal(Object.hasOwn(summaryStop, "issueId"), false);
+  assert.equal(Object.hasOwn(summaryStop, "firstInspectStep"), false);
+
+  const dryRunStop = consumeReactWebDryRunForAgentTasks(labelledDryRun);
+  assert.deepEqual(dryRunStop, {
+    kind: "stop",
+    source: "dry-run-json",
+    reason: "no-dry-run-candidates",
+    inScope: true,
+    autoApply: false,
+    dryRunOnly: true,
+    candidates: [],
+  });
+
+  const rnReport = buildReactWebIssueReport(fixtures.rn, repoRoot);
+  const rnSummaryStop = consumeReactWebSummaryForAgentTask(buildReactWebIssueReportSummaryJson(rnReport));
+  assert.equal(rnSummaryStop.kind, "stop");
+  assert.equal(rnSummaryStop.reason, "unsupported-boundary");
+  assert.equal(rnSummaryStop.inScope, false);
+  assert.match(rnSummaryStop.skippedReason, /^domain-classification:react-native/);
+
+  const rnDryRunStop = consumeReactWebDryRunForAgentTasks(buildReactWebIssueReportMigrationDryRunJson(rnReport));
+  assert.equal(rnDryRunStop.kind, "stop");
+  assert.equal(rnDryRunStop.reason, "unsupported-boundary");
+  assert.equal(rnDryRunStop.inScope, false);
+  assert.match(rnDryRunStop.skippedReason, /^domain-classification:react-native/);
 });
 
 test("React Web issue report rejects conflicting JSON output flags", () => {
