@@ -29,6 +29,7 @@ const fixtures = {
   association: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-candidates.tsx"),
   unsafeAssociation: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx"),
   relatedContext: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "related-context-form.tsx"),
+  expandedNativeControls: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -361,6 +362,38 @@ test("React Web issue report includes nearby same-basename tests when not displa
   assert.ok(allEntries.some((entry) => entry.kind === "nearby-test" && entry.file.endsWith("/related-context-form.test.tsx")));
 });
 
+test("React Web issue report covers expanded native control fixture boundaries", () => {
+  const report = parseIssues(fixtures.expandedNativeControls);
+  const preview = buildReactWebLabelPatchPreview(fixtures.expandedNativeControls, repoRoot);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.summary.issueCount, 4);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.manualReviewCount, 4);
+  assert.equal(report.summary.unsafeToAutoApplyCount, 4);
+  assert.equal(report.summary.issueCount, preview.summary.findingCount);
+  assert.ok(report.issues.every((issue) => issue.kind === "react-web.missing-accessible-label"));
+  assert.ok(report.issues.every((issue) => issue.fixability === "manual-review"));
+  assert.ok(report.issues.every((issue) => issue.autoFixSafety === "unsafe-to-auto-apply"));
+  assert.deepEqual(report.issues.map((issue) => issue.fixShapeGuidance.localEvidence.attributes), [
+    ["name=email", "onChange", "required", "type=email", "value"],
+    ["className", 'spread:register("username")'],
+    ["disabled", "name=disabledEmail"],
+    ["name=readonlyNotes", "readOnly"],
+  ]);
+  assert.deepEqual(report.triageRollup.topIssueIds, [
+    "react-web-label-1",
+    "react-web-label-2",
+    "react-web-label-3",
+  ]);
+  assert.deepEqual(report.firstMinuteSummary.sourceTopIssueIds, report.triageRollup.topIssueIds);
+  assertReactWebWorkOrderQuality(parseReactWebWorkOrderQuality({ fixture: "expanded-native-controls.tsx", report }));
+
+  const serialized = JSON.stringify(report);
+  assert.doesNotMatch(serialized, /DesignSystemField|Billing account|billingAccount/);
+  assert.doesNotMatch(serialized, /must-edit|Auto-apply: yes/i);
+});
+
 test("React Web issue report fixture usefulness gate records accepted cards, noise, plausibility, and parity", () => {
   const cases = [
     {
@@ -380,6 +413,15 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
       expectedSafePreviewCount: 1,
       expectedManualReviewCount: 2,
       suggestionPlausibility: "High-confidence native nearby label/control htmlFor/id previews are deterministic and read-only; medium-confidence associations stay manual review.",
+    },
+    {
+      name: "expanded-native-controls.tsx",
+      file: fixtures.expandedNativeControls,
+      expectedCards: 4,
+      acceptedCards: 4,
+      expectedSafePreviewCount: 0,
+      expectedManualReviewCount: 4,
+      suggestionPlausibility: "Controlled, react-hook-form/register, disabled, and readOnly native controls stay manual-review; custom wrapper props are not inferred as native issue cards.",
     },
     {
       name: "labelled-controls.tsx",
@@ -418,7 +460,7 @@ test("React Web issue report fixture usefulness gate records accepted cards, noi
   );
 
   for (const entry of matrix) assertReactWebIssueFixtureUsefulness(entry);
-  assert.deepEqual(matrix.map((entry) => entry.verdict), ["pass", "pass", "pass", "pass"]);
+  assert.deepEqual(matrix.map((entry) => entry.verdict), ["pass", "pass", "pass", "pass", "pass"]);
   assert.ok(matrix.every((entry) => entry.parityWithPreviewFindings));
   assert.ok(matrix.every((entry) => entry.noiseNotes.length === 0));
   assert.ok(matrix.some((entry) => entry.expectedUnsupported === true && entry.unsupported === true));

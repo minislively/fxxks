@@ -10,6 +10,7 @@ const negativeFixture = path.join(repoRoot, "test", "fixtures", "react-web-label
 const rnFixture = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx");
 const associationFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-candidates.tsx");
 const unsafeAssociationFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx");
+const expandedNativeControlsFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx");
 
 function runPreview(file, ...args) {
   return spawnSync(process.execPath, [cliPath, "inspect", "react-web-label-preview", file, ...args], {
@@ -83,6 +84,27 @@ test("React Web label preview suggests conservative nearby label associations", 
   assert.match(preview.findings[1].suggestedPatch.preview, /<label htmlFor="department">/);
   assert.match(preview.findings[1].suggestedPatch.preview, /<select name="department" id="department">/);
   assert.match(preview.findings[2].suggestedPatch.preview, /<textarea name="notes" id="notes" \/>/);
+  assert.ok(preview.findings.every((finding) => finding.suggestedPatch.readOnly === true));
+});
+
+test("React Web label preview covers expanded native control fixture boundaries", () => {
+  const cli = runPreview(expandedNativeControlsFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  assert.deepEqual(preview.summary, { findingCount: 4, missingCount: 4, ambiguousCount: 0, associationCount: 0 });
+  assert.deepEqual(preview.findings.map((finding) => [finding.kind, finding.element, finding.confidence, finding.suggestedPatch.attribute]), [
+    ["missing-accessible-label", "input", "high", "aria-label"],
+    ["missing-accessible-label", "input", "high", "aria-label"],
+    ["missing-accessible-label", "input", "high", "aria-label"],
+    ["missing-accessible-label", "textarea", "high", "aria-label"],
+  ]);
+  assert.ok(preview.findings.some((finding) => /value=\{email\}|onChange/.test(finding.context)));
+  assert.ok(preview.findings.some((finding) => /register\("username"\)/.test(finding.context)));
+  assert.ok(preview.findings.some((finding) => /disabled/.test(finding.context)));
+  assert.ok(preview.findings.some((finding) => /readOnly/.test(finding.context)));
+  assert.doesNotMatch(JSON.stringify(preview), /DesignSystemField|Billing account|billingAccount/);
   assert.ok(preview.findings.every((finding) => finding.suggestedPatch.readOnly === true));
 });
 
