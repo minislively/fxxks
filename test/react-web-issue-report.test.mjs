@@ -19,6 +19,7 @@ const { buildReactWebLabelPatchPreview } = require(path.join(repoRoot, "dist", "
 const {
   REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY,
   buildReactWebIssueReport,
+  buildReactWebIssueReportMigrationDryRunJson,
   buildReactWebIssueReportSummaryJson,
   renderReactWebIssueReportText,
 } = require(path.join(repoRoot, "dist", "core", "react-web-issue-report.js"));
@@ -875,8 +876,99 @@ test("React Web issue report summary JSON preserves skip boundaries without deta
   assert.deepEqual(Object.hasOwn(summary, "issues"), false);
 });
 
+test("React Web issue report migration dry-run JSON projects read-only candidates", () => {
+  const fullCli = runIssues(fixtures.formControls, "--json");
+  const dryRunCli = runIssues(fixtures.formControls, "--dry-run-json");
+  assert.equal(fullCli.status, 0, fullCli.stderr);
+  assert.equal(dryRunCli.status, 0, dryRunCli.stderr);
+
+  const fullReport = JSON.parse(fullCli.stdout);
+  const dryRun = JSON.parse(dryRunCli.stdout);
+  const projected = buildReactWebIssueReportMigrationDryRunJson(fullReport);
+
+  assert.equal(dryRun.schemaVersion, "react-web-issue-report-migration-dry-run.v1");
+  assert.equal(dryRun.sourceReportSchemaVersion, fullReport.schemaVersion);
+  assert.equal(dryRun.command, "inspect react-web-issues");
+  assert.equal(dryRun.projection, "migration-dry-run-json");
+  assert.equal(dryRun.profile, "react-web");
+  assert.equal(dryRun.filePath, fullReport.filePath);
+  assert.equal(dryRun.readOnly, true);
+  assert.equal(dryRun.dryRunOnly, true);
+  assert.equal(dryRun.autoApply, false);
+  assert.equal(dryRun.claimBoundary, REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY);
+  assert.deepEqual(dryRun, projected);
+  assert.deepEqual(
+    dryRun.candidates.map((candidate) => candidate.issueId),
+    fullReport.triageRollup.rankedIssueIds,
+  );
+  assert.deepEqual(dryRun.summary, {
+    candidateCount: 5,
+    affectedFiles: ["fixtures/compressed/FormControls.tsx"],
+    safePreviewCandidateCount: 0,
+    manualReviewCandidateCount: 5,
+  });
+
+  for (const candidate of dryRun.candidates) {
+    assert.match(candidate.issueId, /^react-web-label-/);
+    assert.match(candidate.migrationCandidate, /^human-reviewed-|^safe-preview-/);
+    assert.equal(candidate.affectedFile, "fixtures/compressed/FormControls.tsx");
+    assert.match(candidate.firstInspectStep, /^Inspect fixtures\/compressed\/FormControls\.tsx:\d+-\d+ \((input|select|textarea)\) before editing\.$/);
+    assert.equal(candidate.previewAvailable, false);
+    assert.equal(candidate.humanReviewRequired, true);
+    assert.equal(candidate.autoApply, false);
+    assert.equal(candidate.dryRunOnly, true);
+    assert.ok(candidate.riskNotes.length >= 3);
+    assert.ok(candidate.riskNotes.some((note) => /human review|human-reviewed/i.test(note)));
+    assert.ok(candidate.riskNotes.some((note) => /Do not apply patches automatically/i.test(note)));
+    assert.ok(candidate.riskNotes.every((note) => note.length <= 160));
+  }
+
+  const compactText = JSON.stringify(dryRun);
+  for (const detailedCardKey of ["issues", "contextPacket", "conventionHints", "relatedContext", "preview", "evidence", "sourceSignals", "suggestedAction", "whereToLook", "whyItMatters", "problem"]) {
+    assert.equal(hasNestedKey(dryRun, detailedCardKey), false, `dry-run-json should not include detailed key ${detailedCardKey}`);
+  }
+  assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|Controller|policyBoundary|excludedInference/i);
+});
+
+test("React Web issue report migration dry-run JSON preserves empty and unsupported boundaries", () => {
+  const labelledCli = runIssues(fixtures.labelled, "--dry-run-json");
+  assert.equal(labelledCli.status, 0, labelledCli.stderr);
+  const labelled = JSON.parse(labelledCli.stdout);
+  assert.equal(labelled.inScope, true);
+  assert.equal(labelled.readOnly, true);
+  assert.equal(labelled.dryRunOnly, true);
+  assert.equal(labelled.autoApply, false);
+  assert.deepEqual(labelled.summary, {
+    candidateCount: 0,
+    affectedFiles: [],
+    safePreviewCandidateCount: 0,
+    manualReviewCandidateCount: 0,
+  });
+  assert.deepEqual(labelled.candidates, []);
+
+  const rnCli = runIssues(fixtures.rn, "--dry-run-json");
+  assert.equal(rnCli.status, 0, rnCli.stderr);
+  const rn = JSON.parse(rnCli.stdout);
+  assert.equal(rn.inScope, false);
+  assert.match(rn.skippedReason, /^domain-classification:react-native/);
+  assert.equal(rn.readOnly, true);
+  assert.equal(rn.dryRunOnly, true);
+  assert.equal(rn.autoApply, false);
+  assert.deepEqual(rn.summary, {
+    candidateCount: 0,
+    affectedFiles: [],
+    safePreviewCandidateCount: 0,
+    manualReviewCandidateCount: 0,
+  });
+  assert.deepEqual(rn.candidates, []);
+});
+
 test("React Web issue report rejects conflicting JSON output flags", () => {
   const cli = runIssues(fixtures.formControls, "--json", "--summary-json");
   assert.notEqual(cli.status, 0);
-  assert.match(cli.stderr, /either --json or --summary-json, not both/);
+  assert.match(cli.stderr, /only one of --json, --summary-json, or --dry-run-json/);
+
+  const dryRunCli = runIssues(fixtures.formControls, "--summary-json", "--dry-run-json");
+  assert.notEqual(dryRunCli.status, 0);
+  assert.match(dryRunCli.stderr, /only one of --json, --summary-json, or --dry-run-json/);
 });

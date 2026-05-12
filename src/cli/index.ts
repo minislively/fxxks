@@ -649,7 +649,7 @@ Everyday commands:
   ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect react-web-label-preview <file> [--json]
-  ${displayCliName} inspect react-web-issues <file> [--json|--summary-json]
+  ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
   ${displayCliName} inspect-domain <file> [--json]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
@@ -714,10 +714,11 @@ function parseCompareArgs(args: string[]): { filePath: string; json: boolean } {
   return { filePath: requireFilePath(filePath), json };
 }
 
-function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode: "text" | "json" | "summary-json" } {
+function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode: "text" | "json" | "summary-json" | "dry-run-json" } {
   let filePath: string | undefined;
   let json = false;
   let summaryJson = false;
+  let dryRunJson = false;
 
   for (const arg of args) {
     if (arg === "--json") {
@@ -728,6 +729,10 @@ function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode
       summaryJson = true;
       continue;
     }
+    if (arg === "--dry-run-json") {
+      dryRunJson = true;
+      continue;
+    }
     if (!filePath) {
       filePath = arg;
       continue;
@@ -735,11 +740,14 @@ function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode
     throw new Error(`Unexpected react-web-issues argument: ${arg}`);
   }
 
-  if (json && summaryJson) {
-    throw new Error("inspect react-web-issues accepts either --json or --summary-json, not both");
+  if ([json, summaryJson, dryRunJson].filter(Boolean).length > 1) {
+    throw new Error("inspect react-web-issues accepts only one of --json, --summary-json, or --dry-run-json");
   }
 
-  return { filePath: requireFilePath(filePath), outputMode: summaryJson ? "summary-json" : json ? "json" : "text" };
+  return {
+    filePath: requireFilePath(filePath),
+    outputMode: dryRunJson ? "dry-run-json" : summaryJson ? "summary-json" : json ? "json" : "text",
+  };
 }
 
 function parseInspectEvidenceArgs(args: string[]): { id: string; json: boolean } {
@@ -1348,10 +1356,17 @@ async function run(): Promise<void> {
       }
       if (arg1 === "react-web-issues") {
         const { filePath: file, outputMode } = parseReactWebIssuesArgs(rest.slice(1));
-        const { buildReactWebIssueReport, buildReactWebIssueReportSummaryJson, renderReactWebIssueReportText } = await import("../core/react-web-issue-report.js");
+        const {
+          buildReactWebIssueReport,
+          buildReactWebIssueReportMigrationDryRunJson,
+          buildReactWebIssueReportSummaryJson,
+          renderReactWebIssueReportText,
+        } = await import("../core/react-web-issue-report.js");
         const report = buildReactWebIssueReport(file, process.cwd());
         if (outputMode === "summary-json") {
           print(buildReactWebIssueReportSummaryJson(report));
+        } else if (outputMode === "dry-run-json") {
+          print(buildReactWebIssueReportMigrationDryRunJson(report));
         } else if (outputMode === "json") {
           print(report);
         } else {
