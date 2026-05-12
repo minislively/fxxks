@@ -59,7 +59,9 @@ A first-minute mini work order is an inspect-first handoff. It can point at the 
 - the next action shape, such as reviewing a native label/control association;
 - the human decision needed before choosing final copy or a fix;
 - do-not-do boundaries that keep the report advisory;
-- compact context hints from existing source attributes or nearby evidence.
+- compact context hints from existing source attributes, nearby evidence, or a matched repo-owned convention pointer.
+
+Repo-owned convention hints may appear here only as short advisory pointers, for example a reminder to inspect same-file native JSX first. The compact work order must not inline full convention packets, policy boundaries, excluded-inference lists, config details, or enforcement language.
 
 ## Boundaries that must stay explicit
 
@@ -71,5 +73,6 @@ The React Web first-minute work order is conservative by design:
 - **No broad accessibility audit:** it is a narrow native-control form/accessibility issue report, not a complete WCAG or design-system audit.
 - **No custom-component semantic inference:** custom components remain manual-review evidence unless native-control facts are explicit enough.
 - **No RN/TUI/WebView expansion:** React Native, TUI / React CLI, WebView, Vue/SFC, broad TS/JS, and multi-file refactor lanes remain outside this work-order claim unless future evidence and policy gates promote them.
+- **Convention hints stay advisory:** first-minute `contextHints` may include a short repo-owned convention pointer, but that pointer must not change rank, priority, bucket, first inspect action, next action, or edit authority.
 
 Keep future wording tied to the current inspect surfaces and these boundaries. If a future issue adds apply behavior, generated copy, broader accessibility coverage, custom-component semantics, or new runtime lanes, that should be documented as a separate capability with separate tests and evidence.
