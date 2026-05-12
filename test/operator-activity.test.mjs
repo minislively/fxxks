@@ -312,6 +312,11 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.issue, "#739");
   assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.readOnly, true);
   assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.rowCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.readOnly, true);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
   assert.deepEqual(snapshot.blockers, []);
 });
 
@@ -379,6 +384,13 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
   assert.equal(sessionReceipt?.classification, "active");
   assert.deepEqual(sessionReceipt?.identifiers.session, { name: "fooks-705", paneCount: 1 });
   assert.equal("number" in receiptsByKind.get("issue"), false);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 3);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueActiveBoundary.acceptableActiveArtifacts, [
+    "open GitHub issue",
+    "open GitHub pull request",
+    "mapped fooks tmux session",
+  ]);
 });
 
 
@@ -473,6 +485,11 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.readOnly, true);
   assert.match(snapshot.activeWorkReceipts.cleanupReviewManifest.claimBoundary, /per-row reason, risk class, and required manual action/);
   assert.equal(snapshot.activeWorkReceipts.cleanupReviewManifest.rowCount, 2);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueCount, 2);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 1);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
+  assert.match(snapshot.activeWorkReceipts.staleResidueActiveBoundary.reminder, /require an open issue, open PR, or mapped fooks tmux session/);
   const byBranch = new Map(worktreeReceipts.map((receipt) => [receipt.identifiers.worktree.branch, receipt]));
   const manifestRowsByBranch = new Map(snapshot.activeWorkReceipts.cleanupReviewManifest.rows.map((row) => [row.branch, row]));
 
@@ -524,6 +541,7 @@ test("operator check projects sibling worktree adoption receipts without cleanup
     snapshot.activeWorkReceipts.salvageReviewQueue,
     snapshot.activeWorkReceipts.staleResidueLedger,
     snapshot.activeWorkReceipts.cleanupReviewManifest,
+    snapshot.activeWorkReceipts.staleResidueActiveBoundary,
   ]);
   assert.equal(receiptJson.includes(safeWorktree), false);
   assert.equal(receiptJson.includes(localAheadWorktree), false);
@@ -806,6 +824,9 @@ test("operator check stale residue ledger aggregates manual-review-noise and exc
   assert.equal(ledger.classes[2].nextReviewAction, "confirm-closed-pr-or-detached-review-context-before-ignoring");
   assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=2/);
   assert.match(snapshot.activeWorkReceipts.reportLine, /cleanupReviewManifest=2\(#739\)/);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueCount, 2);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
 
   const manifest = snapshot.activeWorkReceipts.cleanupReviewManifest;
   assert.equal(manifest.issue, "#739");
