@@ -3,6 +3,7 @@
 This document promotes the RN/WebView/TUI domain-profile plan into tracked project docs. It does **not** add runtime support. The current strongest fooks path remains repeated same-file React web `.tsx` / `.jsx` work in Codex, plus the documented same-file `.ts` / `.js` beta when module signals are strong enough.
 
 For the canonical cross-domain taxonomy, outcome vocabulary, claim boundaries, and shard triggers, see [Frontend domain contract](frontend-domain-contract.md).
+Issue #796 adds the [Frontend-family behavior-neutral PRD](frontend-family-prd.md) as the docs-only roadmap lock for current code seams, promotion order, and claim wording.
 
 ## Design rule
 
