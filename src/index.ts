@@ -218,6 +218,14 @@ export {
   failClosedReactWebDecision,
   summarizeReactWebDecisions,
 } from "./core/react-web-decision";
+export {
+  REACT_WEB_DECISION_HANDOFF_BENCHMARK_CLAIM_BOUNDARY,
+  REACT_WEB_DECISION_HANDOFF_BENCHMARK_SCHEMA_VERSION,
+  REACT_WEB_DECISION_HANDOFF_COMPARISON_ARMS,
+  REACT_WEB_DECISION_STOP_BENCHMARK_SCHEMA_VERSION,
+  evaluateReactWebDecisionHandoffBenchmark,
+  evaluateReactWebDecisionStopBenchmark,
+} from "./core/react-web-decision-handoff-benchmark";
 export type {
   ReactWebIssueCard,
   ReactWebIssuePriority,
@@ -237,3 +245,14 @@ export type {
   ReactWebDecisionConfidence,
   ReactWebDecisionState,
 } from "./core/react-web-decision";
+export type {
+  EvaluateReactWebDecisionHandoffBenchmarkInput,
+  ReactWebDecisionDryRunHandoff,
+  ReactWebDecisionDryRunHandoffTask,
+  ReactWebDecisionHandoffBenchmark,
+  ReactWebDecisionHandoffComparisonArm,
+  ReactWebDecisionHandoffTask,
+  ReactWebDecisionStopBenchmark,
+  ReactWebDecisionStopBenchmarkEntry,
+  ReactWebDecisionStopHandoff,
+} from "./core/react-web-decision-handoff-benchmark";
