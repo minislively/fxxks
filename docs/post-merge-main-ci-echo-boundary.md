@@ -20,6 +20,22 @@ or a mapped fooks tmux session. Keep the echo receipt and the active artifact
 receipt separate in reminders so a successful `main` rerun cannot reopen work by
 itself.
 
+## Clean-slate nudge boundary
+
+When the operator snapshot is otherwise clean after merge, dogfood nudges must
+name the clean-slate boundary before describing any next work. Distinguish these
+receipts explicitly:
+
+- **Active work receipt:** active issue, active branch/session, or active PR
+  evidence that can anchor what is being developed.
+- **Merged CI echo receipt:** clean `main` CI or release-report success for the
+  already-merged head.
+
+If only the merged CI echo receipt remains, the nudge should say that no active
+issue/branch/session/PR is currently attached. It may preserve the echo as
+verification evidence, but it must not imply that the merged CI echo is itself
+an active development artifact.
+
 Legacy local `fooks.omx-worktrees` entries that remain after merges are inventory
 or cleanup-review receipts, not active work receipts. When they have local
 branch-archive evidence and no mapped tmux pane, `fooks check --json` may surface
