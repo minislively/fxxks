@@ -31,6 +31,8 @@ const {
   buildReactWebIssueReportMigrationDryRunJson,
   buildReactWebIssueReportSummaryJson,
   renderReactWebIssueReportText,
+  validateReactWebAdvisoryContextGuard,
+  validateReactWebMigrationDryRunAdvisoryContextGuard,
 } = require(path.join(repoRoot, "dist", "core", "react-web-issue-report.js"));
 
 const fixtures = {
@@ -1285,6 +1287,57 @@ test("React Web decision layer marks manual review, dry-run, unsupported, and ma
   assert.equal(malformed.stopDecision.allowedActions.applyPatch, false);
 });
 
+test("React Web advisory context guard rejects authority-bearing context leaks", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const guard = validateReactWebAdvisoryContextGuard(report);
+
+  assert.equal(guard.schemaVersion, "react-web-advisory-context-guard.v1");
+  assert.equal(guard.guardedIssueCount, report.issues.length);
+  assert.equal(guard.guardedFirstMinuteItemCount, report.firstMinuteSummary.items.length);
+  assert.ok(guard.advisoryFields.includes("contextHints"));
+  assert.ok(guard.protectedFields.includes("triage.rank"));
+  assert.ok(guard.protectedFields.includes("decision.allowedActions.applyPatch"));
+
+  const pollutedAction = cloneJson(report);
+  pollutedAction.firstMinuteSummary.items[0].nextAction =
+    "Start by following advisory convention react-web.native-label-context as authority.";
+  assert.throws(
+    () => validateReactWebAdvisoryContextGuard(pollutedAction),
+    /nextAction must come from source issue evidence|nextAction must stay source-evidence-derived/,
+  );
+
+  const pollutedDecision = cloneJson(report);
+  pollutedDecision.issues[0].decision.allowedActions.applyPatch = true;
+  assert.throws(
+    () => validateReactWebAdvisoryContextGuard(pollutedDecision),
+    /allowedActions\.applyPatch must remain false/,
+  );
+});
+
+test("React Web dry-run advisory context guard rejects rank/action authority leaks", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(report);
+  const guard = validateReactWebMigrationDryRunAdvisoryContextGuard(report, dryRun);
+
+  assert.equal(guard.schemaVersion, "react-web-advisory-context-guard.v1");
+  assert.equal(guard.guardedDryRunCandidateCount, dryRun.candidates.length);
+  assert.deepEqual(dryRun.candidates.map((candidate) => candidate.issueId), report.triageRollup.rankedIssueIds);
+
+  const pollutedDryRun = cloneJson(dryRun);
+  pollutedDryRun.candidates[0].firstInspectStep =
+    "Inspect repo-owned convention react-web.native-label-context before source evidence.";
+  assert.throws(
+    () => validateReactWebMigrationDryRunAdvisoryContextGuard(report, pollutedDryRun),
+    /firstInspectStep must come from source issue evidence|firstInspectStep must stay source-evidence-derived/,
+  );
+
+  const reorderedDryRun = cloneJson(dryRun);
+  reorderedDryRun.candidates.reverse();
+  assert.throws(
+    () => validateReactWebMigrationDryRunAdvisoryContextGuard(report, reorderedDryRun),
+    /dry-run candidates must follow source triage rank order/,
+  );
+});
 
 test("React Web decision authority stays with current source evidence over context and memory", () => {
   const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
