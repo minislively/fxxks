@@ -1274,6 +1274,56 @@ test("React Web decision layer marks manual review, dry-run, unsupported, and ma
   assert.equal(malformed.stopDecision.allowedActions.applyPatch, false);
 });
 
+
+test("React Web decision authority stays with current source evidence over context and memory", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  assert.ok(report.issues.length > 0);
+  assert.ok(report.issues.every((issue) => issue.conventionHints.length > 0));
+  assert.ok(report.firstMinuteSummary.items.every((item) => item.contextHints.some((hint) => /advisory convention/.test(hint))));
+
+  for (const issue of report.issues) {
+    assert.equal(issue.conventionHints[0].advisoryOnly, true);
+    assert.equal(issue.conventionHints[0].enforcement, "none");
+    assert.equal(issue.decision.allowedActions.applyPatch, false);
+    assert.equal(issue.decision.allowedActions.generateCopy, false);
+    assert.equal(issue.decision.autoApply, false);
+    assert.equal(issue.decision.humanReviewRequired, true);
+    assert.ok(issue.decision.stopConditions.some((condition) => /source evidence outranks advisory context/i.test(condition)));
+    assert.ok(issue.decision.stopConditions.some((condition) => /Advisory context cannot grant applyPatch or generateCopy authority/i.test(condition)));
+  }
+
+  const summary = buildReactWebIssueReportSummaryJson(report);
+  assert.equal(summary.decisionSummary.applyPatchAllowedCount, 0);
+  assert.equal(summary.decisionSummary.generateCopyAllowedCount, 0);
+  assert.equal(hasNestedKey(summary, "evidenceFreshness"), false);
+  assert.equal(hasNestedKey(summary, "decisionBasis"), false);
+  assert.equal(hasNestedKey(summary, "contextAuthority"), false);
+  assert.doesNotMatch(JSON.stringify(summary.firstMinuteSummary.items.map((item) => item.contextHints)), /must-edit|CI gate|merge gate/i);
+});
+
+test("React Web dry-run candidates remain dry-run-only with preview and context evidence", () => {
+  const report = buildReactWebIssueReport(fixtures.association, repoRoot);
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(report);
+  const previewCandidate = dryRun.candidates.find((candidate) => candidate.previewAvailable);
+  assert.ok(previewCandidate, "expected at least one preview-backed dry-run candidate");
+
+  assert.equal(dryRun.dryRunOnly, true);
+  assert.equal(dryRun.autoApply, false);
+  assert.equal(dryRun.decisionSummary.applyPatchAllowedCount, 0);
+  assert.equal(dryRun.decisionSummary.generateCopyAllowedCount, 0);
+  assert.equal(previewCandidate.dryRunOnly, true);
+  assert.equal(previewCandidate.autoApply, false);
+  assert.equal(previewCandidate.humanReviewRequired, true);
+  assert.equal(previewCandidate.decision.state, "dry-run-candidate-only");
+  assert.equal(previewCandidate.decision.allowedActions.applyPatch, false);
+  assert.equal(previewCandidate.decision.allowedActions.generateCopy, false);
+  assert.ok(previewCandidate.decision.stopConditions.some((condition) => /source evidence outranks advisory context/i.test(condition)));
+  assert.ok(previewCandidate.decision.stopConditions.some((condition) => /dry-run candidate is an inventory row only/i.test(condition)));
+  assert.equal(hasNestedKey(dryRun, "evidenceFreshness"), false);
+  assert.equal(hasNestedKey(dryRun, "decisionBasis"), false);
+  assert.equal(hasNestedKey(dryRun, "contextAuthority"), false);
+});
+
 test("React Web issue report rejects conflicting JSON output flags", () => {
   const cli = runIssues(fixtures.formControls, "--json", "--summary-json");
   assert.notEqual(cli.status, 0);
