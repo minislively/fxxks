@@ -36,6 +36,22 @@ issue/branch/session/PR is currently attached. It may preserve the echo as
 verification evidence, but it must not imply that the merged CI echo is itself
 an active development artifact.
 
+## Development reminder active-artifact rule
+
+A development reminder must not end as a status-only idle report. After it names
+the clean-slate boundary, it must either report a real blocker that prevents
+starting bounded work or create/adopt one active artifact that can anchor the
+next action: an issue, branch, session, or PR. If none of those artifacts exists,
+the reminder should say that it cannot treat the checkout as active development
+until one is created or linked; it should not present clean `main` status, green
+CI, or stale local worktree inventory as the next development action.
+
+Keep this reminder-anchor rule separate from the `fooks check` required-artifact
+contract. Branch-only evidence can be an active work receipt or reminder anchor,
+but it does not satisfy `fooks check` `requiredActiveArtifact` by itself; that
+operator/check field remains limited to an open GitHub issue, an open GitHub
+pull request, or a mapped fooks tmux session.
+
 Legacy local `fooks.omx-worktrees` entries that remain after merges are inventory
 or cleanup-review receipts, not active work receipts. When they have local
 branch-archive evidence and no mapped tmux pane, `fooks check --json` may surface
