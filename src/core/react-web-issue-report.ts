@@ -249,6 +249,82 @@ export type ReactWebIssueReportMigrationDryRunJson = {
   stopDecision?: ReactWebDecision;
 };
 
+export type ReactWebAdvisoryContextGuardResult = {
+  schemaVersion: "react-web-advisory-context-guard.v1";
+  advisoryFields: ("contextHints" | "conventionHints" | "contextPacket.conventionHints")[];
+  protectedFields: string[];
+  guardedIssueCount: number;
+  guardedFirstMinuteItemCount: number;
+  guardedDryRunCandidateCount: number;
+};
+
+const REACT_WEB_ADVISORY_CONTEXT_GUARD_SCHEMA_VERSION = "react-web-advisory-context-guard.v1" as const;
+const ADVISORY_CONTEXT_AUTHORITY_LEAK_PATTERN =
+  /\b(?:advisory convention|repo-owned convention|react-web\.native-label-context|policyBoundary|excludedInference)\b/i;
+
+const ADVISORY_CONTEXT_FIELDS: ReactWebAdvisoryContextGuardResult["advisoryFields"] = [
+  "contextHints",
+  "conventionHints",
+  "contextPacket.conventionHints",
+];
+
+const ADVISORY_CONTEXT_PROTECTED_FIELDS = [
+  "triage.rank",
+  "triage.priority",
+  "triage.bucket",
+  "triage.evidence",
+  "firstMinuteSummary.items.firstInspectStep",
+  "firstMinuteSummary.items.inspectFirst",
+  "firstMinuteSummary.items.whyThisFirst",
+  "firstMinuteSummary.items.nextAction",
+  "migrationDryRun.candidates.firstInspectStep",
+  "decision.allowedActions.applyPatch",
+  "decision.allowedActions.generateCopy",
+  "decision.autoApply",
+  "decision.humanReviewRequired",
+] as const;
+
+function stringifyGuardValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function assertNoAdvisoryContextAuthorityLeak(label: string, value: unknown): void {
+  const serialized = stringifyGuardValue(value);
+  if (serialized && ADVISORY_CONTEXT_AUTHORITY_LEAK_PATTERN.test(serialized)) {
+    throw new Error(`React Web advisory context guard failed: ${label} must stay source-evidence-derived`);
+  }
+}
+
+function assertReactWebReadOnlyDecisionAuthority(label: string, decision: ReactWebDecision): void {
+  if (decision.allowedActions.applyPatch !== false) {
+    throw new Error(`React Web advisory context guard failed: ${label}.allowedActions.applyPatch must remain false`);
+  }
+  if (decision.allowedActions.generateCopy !== false) {
+    throw new Error(`React Web advisory context guard failed: ${label}.allowedActions.generateCopy must remain false`);
+  }
+  if (decision.autoApply !== false) {
+    throw new Error(`React Web advisory context guard failed: ${label}.autoApply must remain false`);
+  }
+  if (decision.humanReviewRequired !== true) {
+    throw new Error(`React Web advisory context guard failed: ${label}.humanReviewRequired must remain true`);
+  }
+}
+
+function advisoryContextGuardResult(options: {
+  guardedIssueCount: number;
+  guardedFirstMinuteItemCount: number;
+  guardedDryRunCandidateCount?: number;
+}): ReactWebAdvisoryContextGuardResult {
+  return {
+    schemaVersion: REACT_WEB_ADVISORY_CONTEXT_GUARD_SCHEMA_VERSION,
+    advisoryFields: [...ADVISORY_CONTEXT_FIELDS],
+    protectedFields: [...ADVISORY_CONTEXT_PROTECTED_FIELDS],
+    guardedIssueCount: options.guardedIssueCount,
+    guardedFirstMinuteItemCount: options.guardedFirstMinuteItemCount,
+    guardedDryRunCandidateCount: options.guardedDryRunCandidateCount ?? 0,
+  };
+}
+
 function issueKindFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueKind {
   return `react-web.${finding.kind}` as ReactWebIssueKind;
 }
@@ -840,6 +916,42 @@ function contextHintsFor(issue: ReactWebIssueCard): string[] {
   return uniqueCompactStrings(hints, 4, 100);
 }
 
+function assertIssueCardAdvisoryContextGuard(issue: ReactWebIssueCard): void {
+  assertNoAdvisoryContextAuthorityLeak(`issue ${issue.id} triage`, issue.triage);
+  assertNoAdvisoryContextAuthorityLeak(`issue ${issue.id} fixShapeGuidance.inspectFirst`, issue.fixShapeGuidance.inspectFirst);
+  assertReactWebReadOnlyDecisionAuthority(`issue ${issue.id} decision`, issue.decision);
+}
+
+function guardFirstMinuteSummaryItem(
+  issue: ReactWebIssueCard,
+  item: ReactWebIssueFirstMinuteSummaryItem,
+): ReactWebIssueFirstMinuteSummaryItem {
+  if (item.issueId !== issue.id) {
+    throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} must match source issue ${issue.id}`);
+  }
+  if (item.fixShape !== issue.fixShapeGuidance.shape) {
+    throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} fixShape must come from source issue`);
+  }
+  if (item.firstInspectStep !== firstInspectStepFor(issue)) {
+    throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} firstInspectStep must come from source issue evidence`);
+  }
+  if (JSON.stringify(item.inspectFirst) !== JSON.stringify(issue.fixShapeGuidance.inspectFirst)) {
+    throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} inspectFirst must come from source issue evidence`);
+  }
+  if (item.whyThisFirst !== whyThisFirstFor(issue)) {
+    throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} whyThisFirst must come from source triage evidence`);
+  }
+  if (item.nextAction !== nextActionFor(issue)) {
+    throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} nextAction must come from source issue evidence`);
+  }
+  assertNoAdvisoryContextAuthorityLeak(`first-minute item ${item.issueId} firstInspectStep`, item.firstInspectStep);
+  assertNoAdvisoryContextAuthorityLeak(`first-minute item ${item.issueId} inspectFirst`, item.inspectFirst);
+  assertNoAdvisoryContextAuthorityLeak(`first-minute item ${item.issueId} whyThisFirst`, item.whyThisFirst);
+  assertNoAdvisoryContextAuthorityLeak(`first-minute item ${item.issueId} nextAction`, item.nextAction);
+  assertReactWebReadOnlyDecisionAuthority(`first-minute item ${item.issueId} decision`, item.decision);
+  return item;
+}
+
 function buildFirstMinuteSummary(
   triageRollup: ReactWebIssueReport["triageRollup"],
   issues: ReactWebIssueCard[],
@@ -848,7 +960,7 @@ function buildFirstMinuteSummary(
   const items = triageRollup.topIssueIds
     .map((id) => issuesById.get(id))
     .filter((issue): issue is ReactWebIssueCard => Boolean(issue))
-    .map((issue) => ({
+    .map((issue) => guardFirstMinuteSummaryItem(issue, {
       issueId: issue.id,
       fixShape: issue.fixShapeGuidance.shape,
       firstInspectStep: firstInspectStepFor(issue),
@@ -895,7 +1007,7 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
       })
     : undefined;
   const decisionSummary = summarizeReactWebDecisions(stopDecision ? [stopDecision] : issues.map((issue) => issue.decision));
-  return {
+  const report: ReactWebIssueReport = {
     schemaVersion: REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION,
     command: REACT_WEB_ISSUE_REPORT_COMMAND,
     profile: "react-web",
@@ -922,6 +1034,28 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
     firstMinuteSummary: buildFirstMinuteSummary(triageRollup, issues),
     issues,
   };
+  validateReactWebAdvisoryContextGuard(report);
+  return report;
+}
+
+export function validateReactWebAdvisoryContextGuard(report: ReactWebIssueReport): ReactWebAdvisoryContextGuardResult {
+  const issuesById = new Map(report.issues.map((issue) => [issue.id, issue]));
+  if (JSON.stringify(report.firstMinuteSummary.sourceTopIssueIds) !== JSON.stringify(report.triageRollup.topIssueIds)) {
+    throw new Error("React Web advisory context guard failed: first-minute sourceTopIssueIds must mirror triage topIssueIds");
+  }
+
+  for (const issue of report.issues) assertIssueCardAdvisoryContextGuard(issue);
+  for (const item of report.firstMinuteSummary.items) {
+    const issue = issuesById.get(item.issueId);
+    if (!issue) throw new Error(`React Web advisory context guard failed: first-minute item ${item.issueId} must reference a source issue`);
+    guardFirstMinuteSummaryItem(issue, item);
+  }
+  if (report.stopDecision) assertReactWebReadOnlyDecisionAuthority("stopDecision", report.stopDecision);
+
+  return advisoryContextGuardResult({
+    guardedIssueCount: report.issues.length,
+    guardedFirstMinuteItemCount: report.firstMinuteSummary.items.length,
+  });
 }
 
 export function buildReactWebIssueReportSummaryJson(report: ReactWebIssueReport): ReactWebIssueReportSummaryJson {
@@ -951,6 +1085,51 @@ export function buildReactWebIssueReportSummaryJson(report: ReactWebIssueReport)
   };
 }
 
+function guardMigrationDryRunCandidate(
+  issue: ReactWebIssueCard,
+  candidate: ReactWebIssueReportMigrationDryRunJson["candidates"][number],
+): ReactWebIssueReportMigrationDryRunJson["candidates"][number] {
+  if (candidate.issueId !== issue.id) {
+    throw new Error(`React Web advisory context guard failed: dry-run candidate ${candidate.issueId} must match source issue ${issue.id}`);
+  }
+  if (candidate.firstInspectStep !== firstInspectStepFor(issue)) {
+    throw new Error(`React Web advisory context guard failed: dry-run candidate ${candidate.issueId} firstInspectStep must come from source issue evidence`);
+  }
+  if (candidate.migrationCandidate !== issue.fixShapeGuidance.shape) {
+    throw new Error(`React Web advisory context guard failed: dry-run candidate ${candidate.issueId} migrationCandidate must come from source issue evidence`);
+  }
+  assertNoAdvisoryContextAuthorityLeak(`dry-run candidate ${candidate.issueId} firstInspectStep`, candidate.firstInspectStep);
+  assertReactWebReadOnlyDecisionAuthority(`dry-run candidate ${candidate.issueId} decision`, candidate.decision);
+  if (candidate.autoApply !== false || candidate.dryRunOnly !== true || candidate.humanReviewRequired !== true) {
+    throw new Error(`React Web advisory context guard failed: dry-run candidate ${candidate.issueId} must remain dry-run/manual-review only`);
+  }
+  return candidate;
+}
+
+export function validateReactWebMigrationDryRunAdvisoryContextGuard(
+  report: ReactWebIssueReport,
+  dryRun: ReactWebIssueReportMigrationDryRunJson,
+): ReactWebAdvisoryContextGuardResult {
+  const issuesById = new Map(report.issues.map((issue) => [issue.id, issue]));
+  const rankedIssueIds = [...report.issues].sort((a, b) => a.triage.rank - b.triage.rank).map((issue) => issue.id);
+  const candidateIssueIds = dryRun.candidates.map((candidate) => candidate.issueId);
+  if (JSON.stringify(candidateIssueIds) !== JSON.stringify(rankedIssueIds)) {
+    throw new Error("React Web advisory context guard failed: dry-run candidates must follow source triage rank order");
+  }
+  for (const candidate of dryRun.candidates) {
+    const issue = issuesById.get(candidate.issueId);
+    if (!issue) throw new Error(`React Web advisory context guard failed: dry-run candidate ${candidate.issueId} must reference a source issue`);
+    guardMigrationDryRunCandidate(issue, candidate);
+  }
+  if (dryRun.stopDecision) assertReactWebReadOnlyDecisionAuthority("dryRun.stopDecision", dryRun.stopDecision);
+
+  return advisoryContextGuardResult({
+    guardedIssueCount: report.issues.length,
+    guardedFirstMinuteItemCount: 0,
+    guardedDryRunCandidateCount: dryRun.candidates.length,
+  });
+}
+
 function migrationRiskNotesFor(issue: ReactWebIssueCard): string[] {
   const notes = [
     issue.safetyRationale,
@@ -967,7 +1146,7 @@ export function buildReactWebIssueReportMigrationDryRunJson(
   report: ReactWebIssueReport,
 ): ReactWebIssueReportMigrationDryRunJson {
   const rankedIssues = [...report.issues].sort((a, b) => a.triage.rank - b.triage.rank);
-  const candidates = rankedIssues.map((issue) => ({
+  const candidates = rankedIssues.map((issue) => guardMigrationDryRunCandidate(issue, {
     issueId: issue.id,
     migrationCandidate: issue.fixShapeGuidance.shape,
     affectedFile: issue.whereToLook.filePath,
@@ -994,7 +1173,7 @@ export function buildReactWebIssueReportMigrationDryRunJson(
     : undefined;
   const decisionSummary = summarizeReactWebDecisions(stopDecision ? [stopDecision] : candidates.map((candidate) => candidate.decision));
 
-  return {
+  const dryRun: ReactWebIssueReportMigrationDryRunJson = {
     schemaVersion: "react-web-issue-report-migration-dry-run.v1",
     sourceReportSchemaVersion: report.schemaVersion,
     command: report.command,
@@ -1017,6 +1196,8 @@ export function buildReactWebIssueReportMigrationDryRunJson(
     decisionSummary,
     ...(stopDecision ? { stopDecision } : {}),
   };
+  validateReactWebMigrationDryRunAdvisoryContextGuard(report, dryRun);
+  return dryRun;
 }
 
 export function renderReactWebIssueReportText(report: ReactWebIssueReport): string {
