@@ -41,7 +41,28 @@
 
 ---
 
-### Layer 2: Frontend Task Benchmark (미구현 - Phase 2)
+### Layer 2: Decision Handoff Benchmark (React Web first pass)
+
+**목적:** 실제 agent-facing work order가 첫 작업 판단을 안전하게 줄이는지 검증
+
+**비교군:**
+- **A. Raw source + generic prompt**
+- **B. Full fooks issue JSON**
+- **C. `--summary-json` decision handoff**
+- **D. `--dry-run-json` decision handoff**
+
+**1차 측정:**
+- **Decision Handoff Correctness** (`decision` 계약이 task/candidate에 보존되는가)
+- **First Inspect Target Presence** (`firstInspectStep`가 실제 `file:line`으로 존재하는가)
+- **Top-1 Issue Linkage** (`sourceTopIssueIds[0]`와 첫 task가 일치하는가)
+- **No-Auto-Apply Compliance** (`applyPatch:false`, `autoApply:false`)
+- **Human Review Boundary Retention** (`humanReviewRequired:true`)
+- **Unsupported/Malformed Stop Rate** (지원 불가/깨진 projection에서 fail-closed stop하는가)
+- **Projection Size Reduction** (full JSON 대비 summary/dry-run 크기 절감; 보조 지표)
+
+**claim boundary:** 이 Layer 2는 deterministic fixture-backed handoff evidence입니다. provider billing-token, runtime-token, latency, live-agent turn-count, 자동 patch apply 증거가 아닙니다.
+
+### Later Layer 3: Frontend Task Benchmark (future applied lane)
 
 **목적:** 실제 프론트 작업 성공성
 
@@ -79,10 +100,13 @@
 | Metric | Layer 1 | Layer 2 | 통합 |
 |--------|---------|---------|------|
 | **Token Savings** | ✅ 85.3% | - | baseline |
-| **Task Success** | - | ⏳ TBD | 핵심 |
-| **Edit Precision** | - | ⏳ TBD | 핵심 |
-| **Retry Count** | - | ⏳ TBD | 효율성 |
-| **Completion Latency** | - | ⏳ TBD | 속도 |
+| **Decision Handoff Correctness** | - | ✅ React Web first pass | 핵심 |
+| **No-Auto-Apply Compliance** | - | ✅ React Web first pass | 핵심 |
+| **Human Review Boundary Retention** | - | ✅ React Web first pass | 핵심 |
+| **Task Success** | - | ⏳ Layer 3 | 미래 applied lane |
+| **Edit Precision** | - | ⏳ Layer 3 | 미래 applied lane |
+| **Retry Count** | - | ⏳ Layer 3 | 효율성 |
+| **Completion Latency** | - | ⏳ Layer 3 | 속도 |
 
 **최종 질문:**
 > "이 서비스가 실제 프론트 복잡 작업에 유리한가?"

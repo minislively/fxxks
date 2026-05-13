@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import {
@@ -15,6 +16,10 @@ import {
   consumeReactWebDryRunForAgentTasks,
   consumeReactWebSummaryForAgentTask,
 } from "./helpers/react-web-agent-handoff-dogfood.mjs";
+import {
+  evaluateReactWebDecisionHandoffBenchmark,
+  evaluateReactWebDecisionStopBenchmark,
+} from "./helpers/react-web-decision-handoff-benchmark.mjs";
 
 const repoRoot = process.cwd();
 const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
@@ -967,6 +972,44 @@ test("React Web issue report migration dry-run JSON preserves empty and unsuppor
   assert.deepEqual(rn.candidates, []);
 });
 
+
+
+test("React Web decision handoff benchmark treats correctness as primary and size as secondary", () => {
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const summary = buildReactWebIssueReportSummaryJson(report);
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(report);
+  const summaryTask = consumeReactWebSummaryForAgentTask(summary);
+  const dryRunTasks = consumeReactWebDryRunForAgentTasks(dryRun);
+  const benchmark = evaluateReactWebDecisionHandoffBenchmark({
+    fixture: "FormControls.tsx",
+    rawSource: fs.readFileSync(fixtures.formControls, "utf8"),
+    fullJson: report,
+    summaryJson: summary,
+    dryRunJson: dryRun,
+    summaryTask,
+    dryRunTasks,
+  });
+
+  assert.equal(benchmark.schemaVersion, "react-web-decision-handoff-benchmark.v1");
+  assert.deepEqual(benchmark.comparisonArms, [
+    "raw-source-generic-prompt",
+    "full-fooks-issue-json",
+    "summary-json-decision-handoff",
+    "dry-run-json-decision-handoff",
+  ]);
+  assert.equal(benchmark.primaryMetrics.decisionHandoffCorrect, true);
+  assert.equal(benchmark.primaryMetrics.firstInspectTargetPresent, true);
+  assert.equal(benchmark.primaryMetrics.top1IssueStartMatch, true);
+  assert.equal(benchmark.primaryMetrics.noAutoApplyCompliance, true);
+  assert.equal(benchmark.primaryMetrics.humanReviewBoundaryRetention, true);
+  assert.equal(benchmark.primaryMetrics.dryRunCandidateSafety, true);
+  assert.ok(benchmark.secondarySizeMetrics.summaryJsonBytes < benchmark.secondarySizeMetrics.fullJsonBytes);
+  assert.ok(benchmark.secondarySizeMetrics.dryRunJsonBytes < benchmark.secondarySizeMetrics.fullJsonBytes);
+  assert.ok(benchmark.secondarySizeMetrics.summaryVsFullReductionPct > 0);
+  assert.ok(benchmark.secondarySizeMetrics.dryRunVsFullReductionPct > 0);
+  assert.match(benchmark.claimBoundary, /not provider-token, billing, latency, live-agent turn-count/i);
+});
+
 test("React Web agent handoff dogfood consumes summary JSON as an inspect-first task", () => {
   const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
   const summary = buildReactWebIssueReportSummaryJson(report);
@@ -1133,6 +1176,41 @@ test("React Web agent handoff dogfood fails closed on malformed projections", ()
     assert.equal(Object.hasOwn(stop, "affectedFile"), false);
     assert.equal(Object.hasOwn(stop, "firstInspectStep"), false);
   }
+});
+
+
+
+test("React Web decision stop benchmark scores unsupported and malformed handoffs as fail-closed", () => {
+  const rnReport = buildReactWebIssueReport(fixtures.rn, repoRoot);
+  const rnSummaryStop = consumeReactWebSummaryForAgentTask(buildReactWebIssueReportSummaryJson(rnReport));
+  const rnDryRunStop = consumeReactWebDryRunForAgentTasks(buildReactWebIssueReportMigrationDryRunJson(rnReport));
+  const report = buildReactWebIssueReport(fixtures.formControls, repoRoot);
+  const malformedSummaryStop = consumeReactWebSummaryForAgentTask({
+    ...buildReactWebIssueReportSummaryJson(report),
+    firstMinuteSummary: { items: "not-an-array" },
+  });
+  const malformedDryRunStop = consumeReactWebDryRunForAgentTasks({
+    ...buildReactWebIssueReportMigrationDryRunJson(report),
+    candidates: "not-an-array",
+  });
+
+  const benchmark = evaluateReactWebDecisionStopBenchmark([
+    rnSummaryStop,
+    rnDryRunStop,
+    malformedSummaryStop,
+    malformedDryRunStop,
+  ]);
+
+  assert.equal(benchmark.schemaVersion, "react-web-decision-stop-benchmark.v1");
+  assert.equal(benchmark.stopCount, 4);
+  assert.equal(benchmark.allStopFailClosed, true);
+  assert.equal(benchmark.unsupportedStopRate, 0.5);
+  assert.equal(benchmark.malformedStopRate, 0.5);
+  assert.deepEqual(
+    benchmark.entries.map((entry) => entry.state),
+    ["unsupported", "unsupported", "malformed-stop", "malformed-stop"],
+  );
+  assert.ok(benchmark.entries.every((entry) => entry.applyPatchAllowed === false));
 });
 
 test("React Web decision layer contract keeps confidence separate from apply authority", () => {
