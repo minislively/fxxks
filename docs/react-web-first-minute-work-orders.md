@@ -16,7 +16,7 @@ After #766, the same report carries a compact first-minute mini work order throu
 
 ```text
 source-derived React Web evidence
-  -> decision (allowedActions + stopConditions; confidence is not apply authority)
+  -> decision (allowedActions + stopConditions; source evidence outranks advisory context/memory; confidence is not apply authority)
   -> ranked issue cards
   -> firstMinuteSummary
        -> why this issue is first
@@ -71,7 +71,7 @@ Every full issue card now includes a `decision` object, and `--summary-json` / `
 - `incomplete`: in-scope inputs with no current issue/candidate evidence stop safely.
 - `malformed-stop`: agent handoff validation failed closed.
 
-The important invariant is structural: **confidence high is evidence quality, not apply authority**. Consumers should check `decision.allowedActions` and `decision.stopConditions`, not infer authority from `confidence`, `fixability`, `triage.bucket`, or preview availability. Current React Web decisions always keep `allowedActions.applyPatch: false`, `allowedActions.generateCopy: false`, `autoApply: false`, and `humanReviewRequired: true`.
+The important invariants are structural: **current source evidence outranks advisory context, repo convention hints, and historical memory**, and **confidence high is evidence quality, not apply authority**. Consumers should check `decision.allowedActions` and `decision.stopConditions`, not infer authority from `confidence`, `fixability`, `triage.bucket`, preview availability, `contextHints`, repo-owned convention hints, or remembered prior sessions. Current React Web decisions always keep `allowedActions.applyPatch: false`, `allowedActions.generateCopy: false`, `autoApply: false`, and `humanReviewRequired: true`. This pass intentionally does not add authority/freshness schema fields such as `evidenceFreshness`, `decisionBasis`, or `contextAuthority`; the existing decision object remains the authority surface.
 
 ## Agent/tool handoff
 
@@ -99,7 +99,7 @@ The intended consumer flow is:
 1. Read `firstMinuteSummary.items` in `sourceTopIssueIds` order.
 2. Start with `items[0].firstInspectStep` and `items[0].nextAction`.
 3. Keep `decision`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
-4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority.
+4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority. Current source evidence wins over those hints and over historical memory.
 5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
 
 The compact handoff is not an apply command. It should help an agent choose the first source location to inspect, not skip human review, invent accessible-name copy, treat custom components as native controls, or widen the report into a broader accessibility audit. If an agent needs candidate rows for a migration plan, use `--dry-run-json` and keep its `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` fields attached to the task card.
@@ -127,7 +127,7 @@ The intended dry-run consumer flow is:
 1. Read `candidates[]` in the returned order; each candidate is derived from the ranked issue evidence.
 2. Start each row from `candidate.firstInspectStep` and `candidate.affectedFile`.
 3. Keep `decision`, `dryRunOnly`, `autoApply`, `humanReviewRequired`, and `riskNotes` with every task card.
-4. Treat `previewAvailable` as a hint about whether a read-only preview shape exists, not as permission to change source.
+4. Treat `previewAvailable` as a hint about whether a read-only preview shape exists, not as permission to change source; dry-run rows remain dry-run-only even when preview/context evidence exists.
 5. If `candidates` is empty, stop and inspect `inScope` / `skippedReason` instead of creating a migration task.
 
 A dry-run agent task card should keep the dry-run boundary visible:
@@ -159,11 +159,11 @@ Repo-owned convention hints may appear here only as short advisory pointers, for
 The React Web first-minute work order is conservative by design:
 
 - **Read-only:** it reports source-derived evidence and does not edit files.
-- **No auto-apply:** it does not apply patches, trigger codemods, or authorize automatic changes; high confidence never changes this.
+- **No auto-apply:** it does not apply patches, trigger codemods, or authorize automatic changes; high confidence, preview availability, convention hints, context packets, and remembered history never change this.
 - **No generated accessible-name copy:** it does not invent final label text, aria-label text, or other accessible-name copy; a human or agent must choose copy from product context.
 - **No broad accessibility audit:** it is a narrow native-control form/accessibility issue report, not a complete WCAG or design-system audit.
 - **No custom-component semantic inference:** custom components remain manual-review evidence unless native-control facts are explicit enough.
 - **No RN/TUI/WebView expansion:** React Native, TUI / React CLI, WebView, Vue/SFC, broad TS/JS, and multi-file refactor lanes remain outside this work-order claim unless future evidence and policy gates promote them.
-- **Convention hints stay advisory:** first-minute `contextHints` may include a short repo-owned convention pointer, but that pointer must not change rank, priority, bucket, first inspect action, next action, or edit authority.
+- **Convention hints stay advisory:** first-minute `contextHints` may include a short repo-owned convention pointer, but that pointer must not change rank, priority, bucket, first inspect action, next action, or edit authority. Source evidence is the authority; convention/context/memory is only a pointer back to source inspection.
 
 Keep future wording tied to the current inspect surfaces and these boundaries. If a future issue adds apply behavior, generated copy, broader accessibility coverage, custom-component semantics, or new runtime lanes, that should be documented as a separate capability with separate tests and evidence.
