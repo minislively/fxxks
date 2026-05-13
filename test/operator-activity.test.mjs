@@ -1184,6 +1184,11 @@ test("operator check surfaces legacy local residue as cleanup-review evidence on
   assert.equal(snapshot.postMergeMainEchoBoundary.mainEchoEvidence, true);
   assert.deepEqual(snapshot.activeArtifacts, []);
   assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.deepEqual(snapshot.requiredActiveArtifact.acceptableArtifacts, [
+    "open GitHub issue",
+    "open GitHub pull request",
+    "mapped fooks tmux session",
+  ]);
 
   const review = snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview;
   assert.equal(review.issue, "#778");
@@ -1196,6 +1201,16 @@ test("operator check surfaces legacy local residue as cleanup-review evidence on
   assert.match(snapshot.activeWorkReceipts.reportLine, /legacyLocalResidueCleanupReview=1\(#778\)/);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueActiveBoundary.acceptableActiveArtifacts, [
+    "open GitHub issue",
+    "open GitHub pull request",
+    "mapped fooks tmux session",
+  ]);
+  assert.equal(
+    snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.classification === "active"),
+    false,
+  );
 
   assert.deepEqual(review.rows, [
     {
