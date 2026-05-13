@@ -17,6 +17,8 @@ Architecture shorthand:
 
 This shorthand describes the intended separation of responsibilities for future implementation work. It does not add runtime behavior, setup eligibility, compact payload reuse, domain support wording, or team/worktree launch authorization.
 
+For issue #796 planning, [Frontend-family behavior-neutral PRD](frontend-family-prd.md) is the docs-only roadmap lock that maps existing domain-profile, payload-policy, runtime, and evidence seams without changing those contracts.
+
 ## Domain vs concern boundary
 
 The frontend-domain contract separates **where code runs** from **what task-relevant library/dataflow evidence is present**.
