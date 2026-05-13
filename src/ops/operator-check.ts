@@ -29,17 +29,23 @@ export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
   "Read-only issue #726 operator queue for orphan local-ahead sibling worktrees; lists salvage-review evidence only and does not delete, push, fetch, mutate, or generate cleanup commands for orphan branches.";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE = "#736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE = "#739";
+export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE = "#778";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
+export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
+export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE = "operator/check legacy local residue cleanup-review projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operator/check stale worktree residue active-boundary projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
   "Read-only issue #739 operator cleanup-review manifest for stale sibling worktree residue; lists per-row reason, risk class, and required manual action without paths, cleanup commands, fetch, delete, push, or mutation authority.";
+export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_CLAIM_BOUNDARY =
+  "Read-only issue #778 operator cleanup-review artifact for legacy local worktree residue from closed or merged artifacts; lists local path evidence only for operator review, never counts it as active work, and includes no cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only operator/check reminder artifact for stale worktree residue versus active work; stale residue rows are cleanup-review context only and do not satisfy the active issue, PR, or mapped-session requirement.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
@@ -174,6 +180,20 @@ export type OperatorCheckStaleResidueCleanupReviewRow = {
   localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
 };
 
+export type OperatorCheckLegacyLocalResidueCleanupReviewRow = {
+  reviewId: string;
+  path: string;
+  branch: string;
+  head?: string;
+  status: OperatorActivitySnapshot["legacyWorktreeEvidence"]["entries"][number]["status"];
+  reasons: string[];
+  archiveEvidence: OperatorActivitySnapshot["legacyWorktreeEvidence"]["entries"][number]["archiveEvidence"];
+  activeSessionEvidence: OperatorActivitySnapshot["legacyWorktreeEvidence"]["entries"][number]["activeSessionEvidence"];
+  staleLocalResidueIsActiveWorkEvidence: false;
+  satisfiesActiveArtifactRequirement: false;
+  requiredManualAction: "confirm-closed-or-merged-artifact-before-manual-cleanup-review";
+};
+
 export type OperatorCheckStaleResidueCleanupReviewManifest = {
   schemaVersion: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SCHEMA_VERSION;
   issue: typeof OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE;
@@ -184,6 +204,20 @@ export type OperatorCheckStaleResidueCleanupReviewManifest = {
   rowCount: number;
   rows: OperatorCheckStaleResidueCleanupReviewRow[];
   localOnlyCommitPolicy: "do-not-delete-local-only-commits-automatically";
+};
+
+export type OperatorCheckLegacyLocalResidueCleanupReview = {
+  schemaVersion: typeof OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_CLAIM_BOUNDARY;
+  readOnly: true;
+  rowCount: number;
+  rows: OperatorCheckLegacyLocalResidueCleanupReviewRow[];
+  staleLocalResidueIsActiveWorkEvidence: false;
+  satisfiesActiveArtifactRequirement: false;
+  cleanupCommandsIncluded: false;
 };
 
 export type OperatorCheckStaleResidueActiveBoundary = {
@@ -221,6 +255,7 @@ export type OperatorCheckActiveWorkReceipts = {
   salvageReviewQueue: OperatorCheckSalvageReviewQueue;
   staleResidueLedger: OperatorCheckStaleResidueLedger;
   cleanupReviewManifest: OperatorCheckStaleResidueCleanupReviewManifest;
+  legacyLocalResidueCleanupReview: OperatorCheckLegacyLocalResidueCleanupReview;
   staleResidueActiveBoundary: OperatorCheckStaleResidueActiveBoundary;
   blockers: string[];
 };
@@ -323,6 +358,7 @@ function receiptReportLine(
   salvageReviewQueueItemCount = 0,
   staleResidueLedgerCount = 0,
   cleanupReviewManifestRowCount = 0,
+  legacyLocalResidueCleanupReviewRowCount = 0,
 ): string {
   const active = receipts.filter((receipt) => receipt.classification === "active").length;
   const stale = receipts.filter((receipt) => receipt.classification === "closedOrStale").length;
@@ -335,6 +371,9 @@ function receiptReportLine(
   if (salvageReviewQueueItemCount > 0) parts.push(`salvageReviewQueue=${salvageReviewQueueItemCount}`);
   if (staleResidueLedgerCount > 0) parts.push(`staleResidueLedger=${staleResidueLedgerCount}`);
   if (cleanupReviewManifestRowCount > 0) parts.push(`cleanupReviewManifest=${cleanupReviewManifestRowCount}(${OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE})`);
+  if (legacyLocalResidueCleanupReviewRowCount > 0) {
+    parts.push(`legacyLocalResidueCleanupReview=${legacyLocalResidueCleanupReviewRowCount}(${OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE})`);
+  }
   if (blocked) parts.push(`blockers=${blocked}`);
   return parts.join("; ");
 }
@@ -558,6 +597,43 @@ function buildCleanupReviewManifest(entries: OrphanLocalWorktreeEntry[]): Operat
   };
 }
 
+function legacyLocalResidueReviewId(entry: OperatorActivitySnapshot["legacyWorktreeEvidence"]["entries"][number]): string {
+  const subject = sanitizeReportToken(entry.branch || entry.head || "unknown") ?? "unknown";
+  return `legacy-local-residue:${subject}`;
+}
+
+function buildLegacyLocalResidueCleanupReview(
+  legacyWorktreeEvidence: OperatorActivitySnapshot["legacyWorktreeEvidence"],
+): OperatorCheckLegacyLocalResidueCleanupReview {
+  const rows = legacyWorktreeEvidence.entries.map((entry) => ({
+    reviewId: legacyLocalResidueReviewId(entry),
+    path: entry.path,
+    branch: entry.branch,
+    head: entry.head,
+    status: entry.status,
+    reasons: entry.reasons,
+    archiveEvidence: entry.archiveEvidence,
+    activeSessionEvidence: entry.activeSessionEvidence,
+    staleLocalResidueIsActiveWorkEvidence: false as const,
+    satisfiesActiveArtifactRequirement: false as const,
+    requiredManualAction: "confirm-closed-or-merged-artifact-before-manual-cleanup-review" as const,
+  }));
+
+  return {
+    schemaVersion: OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE,
+    issueUrl: OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL,
+    source: OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE,
+    claimBoundary: OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_CLAIM_BOUNDARY,
+    readOnly: true,
+    rowCount: rows.length,
+    rows,
+    staleLocalResidueIsActiveWorkEvidence: false,
+    satisfiesActiveArtifactRequirement: false,
+    cleanupCommandsIncluded: false,
+  };
+}
+
 function buildStaleResidueActiveBoundary(
   staleResidueCount: number,
   activeArtifactReceiptCount: number,
@@ -705,6 +781,7 @@ function buildActiveWorkReceipts(
   }
 
   const siblingReceipts = siblingWorktreeReceipts(cwd, baseIdentifiers, baseBlockers, options);
+  const legacyLocalResidueCleanupReview = buildLegacyLocalResidueCleanupReview(activity.legacyWorktreeEvidence);
   receipts.push(...siblingReceipts.receipts);
 
   const blockers = uniqueSorted([
@@ -733,10 +810,12 @@ function buildActiveWorkReceipts(
       siblingReceipts.salvageReviewQueue.itemCount,
       siblingReceipts.staleResidueLedger.totalCount,
       siblingReceipts.cleanupReviewManifest.rowCount,
+      legacyLocalResidueCleanupReview.rowCount,
     ),
     salvageReviewQueue: siblingReceipts.salvageReviewQueue,
     staleResidueLedger: siblingReceipts.staleResidueLedger,
     cleanupReviewManifest: siblingReceipts.cleanupReviewManifest,
+    legacyLocalResidueCleanupReview,
     staleResidueActiveBoundary: buildStaleResidueActiveBoundary(
       siblingReceipts.staleResidueLedger.totalCount,
       activeArtifactReceiptCount,
