@@ -2,6 +2,8 @@
 
 This page frames common "does fooks support X?" questions as future support or evidence lanes. These items are **not required** for the current strongest workflow: Codex repeated same-file React `.tsx` / `.jsx` context reduction, with a narrower experimental Codex-first `.ts` / `.js` same-file beta.
 
+Issue #796 is locked by the [Frontend-family behavior-neutral PRD](frontend-family-prd.md), which maps the current domain-profile, payload-policy, runtime, and evidence seams before any future RN/WebView/TUI promotion work.
+
 If the answer you want sounds like “React Native?”, “WebView?”, “TUI/CLI?”, “Vue?”, “broader TS/JS?”, “multi-file?”, “read interception?”, “LSP rename/reference?”, or “provider parity?”, read that as a roadmap question unless another public doc explicitly says it already shipped.
 
 ## Current strongest workflow
