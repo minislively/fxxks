@@ -20,6 +20,16 @@ or a mapped fooks tmux session. Keep the echo receipt and the active artifact
 receipt separate in reminders so a successful `main` rerun cannot reopen work by
 itself.
 
+Legacy local `fooks.omx-worktrees` entries that remain after merges are inventory
+or cleanup-review receipts, not active work receipts. When they have local
+branch-archive evidence and no mapped tmux pane, `fooks check --json` may surface
+them under `activeWorkReceipts.legacyLocalResidueCleanupReview` so dogfood nudges
+can see the stale local inventory. That review block keeps
+`staleLocalResidueIsActiveWorkEvidence: false` and
+`satisfiesActiveArtifactRequirement: false`; it does not satisfy the active
+artifact requirement and does not add cleanup commands, runtime cleanup order,
+or mutation authority.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
@@ -47,6 +57,11 @@ itself.
   clean worktree, zero local tracking divergence, zero fooks-like tmux sessions,
   and opt-in GitHub open issue/PR counts of zero. If any proof is missing or a
   work signal exists, it remains `activeOrUnknown`.
+- Legacy local `fooks.omx-worktrees` residue can remain visible in inventory
+  after merges, but it is separated from active current-run evidence. Its
+  cleanup-review rows are advisory receipts only and require a separate open
+  issue, open PR, or mapped fooks tmux session before any nudge treats the
+  checkout as active work.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
