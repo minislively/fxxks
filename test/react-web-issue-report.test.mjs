@@ -64,6 +64,51 @@ function hasNestedKey(value, key) {
 }
 
 
+function assertNoImmediateAuthorityLifecycleFields(value) {
+  assert.equal(hasNestedKey(value, "evidenceFreshness"), false);
+  assert.equal(hasNestedKey(value, "decisionBasis"), false);
+  assert.equal(hasNestedKey(value, "contextAuthority"), false);
+}
+
+function assertDecisionActionAuthority(decision) {
+  assert.deepEqual(Object.keys(decision.allowedActions).sort(), [
+    "applyPatch",
+    "generateCopy",
+    "inspect",
+    "suggestPatch",
+  ]);
+  assert.equal(decision.allowedActions.applyPatch, false);
+  assert.equal(decision.allowedActions.generateCopy, false);
+}
+
+function assertFullDecisionContract(decision) {
+  assert.deepEqual(Object.keys(decision).sort(), [
+    "allowedActions",
+    "confidence",
+    "findingId",
+    "level",
+    "reason",
+    "requiredEvidence",
+    "ruleId",
+    "state",
+    "stopConditions",
+  ]);
+  assertNoImmediateAuthorityLifecycleFields(decision);
+  assertDecisionActionAuthority(decision);
+}
+
+function assertSummaryDecisionContract(decision) {
+  assert.deepEqual(Object.keys(decision).sort(), [
+    "allowedActions",
+    "confidence",
+    "level",
+    "state",
+    "stopConditions",
+  ]);
+  assertNoImmediateAuthorityLifecycleFields(decision);
+  assertDecisionActionAuthority(decision);
+}
+
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -202,6 +247,7 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.equal(issue.conventionHints[0].source, "internal-prototype-fixture");
     assert.match(issue.conventionHints[0].policyBoundary, /Advisory convention hint only/);
     assert.doesNotMatch(JSON.stringify(issue.conventionHints), /must-edit|auto-apply|CI gate|merge gate/i);
+    assertFullDecisionContract(issue.decision);
     assert.match(issue.skipReason, /human review|accessible-name copy/);
     assert.ok(issue.triage.rank > 0);
     assert.ok(["high", "medium", "low"].includes(issue.triage.priority));
@@ -218,8 +264,7 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.equal(issue.decision.confidence, issue.confidence);
     assert.equal(issue.decision.allowedActions.inspect, true);
     assert.equal(issue.decision.allowedActions.suggestPatch, false);
-    assert.equal(issue.decision.allowedActions.applyPatch, false);
-    assert.equal(issue.decision.allowedActions.generateCopy, false);
+    assertDecisionActionAuthority(issue.decision);
     assert.ok(issue.decision.stopConditions.some((condition) => /generating accessible-name copy/i.test(condition)));
 
     assert.ok(Array.isArray(issue.relatedContext));
@@ -265,8 +310,7 @@ test("React Web issue report turns nearby native associations into safe preview 
   assert.equal(report.issues[0].decision.state, "ready-for-agent-inspect");
   assert.equal(report.issues[0].decision.allowedActions.inspect, true);
   assert.equal(report.issues[0].decision.allowedActions.suggestPatch, true);
-  assert.equal(report.issues[0].decision.allowedActions.applyPatch, false);
-  assert.equal(report.issues[0].decision.allowedActions.generateCopy, false);
+  assertFullDecisionContract(report.issues[0].decision);
   assert.ok(report.issues[0].decision.stopConditions.some((condition) => /Stop before editing files/i.test(condition)));
   assert.equal(report.issues[1].decision.state, "human-decision-required");
   assert.match(report.issues[0].contextPacket.relatedPattern, /safe-preview pattern/);
@@ -774,8 +818,7 @@ test("React Web issue report JSON includes machine-readable first-minute summary
       allowedActions: issue.decision.allowedActions,
       stopConditions: issue.decision.stopConditions,
     });
-    assert.equal(item.decision.allowedActions.applyPatch, false);
-    assert.equal(item.decision.allowedActions.generateCopy, false);
+    assertSummaryDecisionContract(item.decision);
   }
 
   assert.deepEqual(
@@ -951,8 +994,7 @@ test("React Web issue report migration dry-run JSON projects read-only candidate
     assert.equal(candidate.autoApply, false);
     assert.equal(candidate.dryRunOnly, true);
     assert.equal(candidate.decision.state, "dry-run-candidate-only");
-    assert.equal(candidate.decision.allowedActions.applyPatch, false);
-    assert.equal(candidate.decision.allowedActions.generateCopy, false);
+    assertSummaryDecisionContract(candidate.decision);
     assert.ok(candidate.decision.stopConditions.some((condition) => /dryRunOnly remains true/i.test(condition)));
     assert.ok(candidate.riskNotes.length >= 3);
     assert.ok(candidate.riskNotes.some((note) => /human review|human-reviewed/i.test(note)));

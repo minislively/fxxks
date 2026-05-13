@@ -14,9 +14,9 @@ Repo-owned convention hints are a first prototype for future team-owned fooks ch
 
 This is not the future tracked config surface yet. The first pass does **not** add tracked `.fooks` policy/check files, a public CLI, CI enforcement, merge enforcement, codemod behavior, or edit authority.
 
-Convention hints should remain inspect-first context. They may say what local evidence to inspect, but they must not imply mandatory edits, generated accessible-name copy, broad accessibility coverage, or custom-component semantic inference.
+Convention hints should remain inspect-first context. They may say what local evidence to inspect, but they must not imply mandatory edits, generated accessible-name copy, broad accessibility coverage, or custom-component semantic inference. Current source evidence remains stronger than any advisory convention, stale context, or historical memory-like hint.
 
-In first-minute summaries, convention hints are intentionally weaker than the ranked issue evidence. A matched hint can add a concise `contextHints` entry so an agent sees the team-context pointer, but it must not change ranking, priority, bucket assignment, `inspectFirst`, `nextAction`, or edit authority.
+In first-minute summaries, convention hints are intentionally weaker than the ranked issue evidence. A matched hint can add a concise `contextHints` entry so an agent sees the team-context pointer, but it must not change ranking, priority, bucket assignment, `inspectFirst`, `nextAction`, or edit authority. High confidence and helpful convention context still do not authorize patch application.
 
 ## Graduation path
 

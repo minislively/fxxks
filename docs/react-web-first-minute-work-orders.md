@@ -40,7 +40,7 @@ source-derived React Web evidence
   -> firstMinuteSummary / dry-run candidate / future workflow projection
 ```
 
-The important product rule is unchanged: high confidence can make an issue ready for agent inspection, but it still does not authorize patch application.
+The important product rule is unchanged: high confidence can make an issue ready for agent inspection, but it still does not authorize patch application. Current source evidence is the authority boundary: advisory context, repo-owned convention hints, and historical memory-like context may explain why to inspect something, but they must not outrank source evidence or grant apply authority.
 
 ## Current CLI surfaces
 
