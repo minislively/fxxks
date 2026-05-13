@@ -16,6 +16,9 @@ function assertDocIncludes(text) {
 
 test("post-merge main CI echo boundary doc names the read-only operator surfaces", () => {
   for (const required of [
+    "echo receipt only",
+    "open issue, an open pull request, a non-`main` active branch/worktree signal, or a mapped fooks tmux session",
+    "the echo receipt and the active artifact receipt separate",
     "fooks check --json",
     'verdict: "idleRequiresActiveArtifact"',
     "requiredActiveArtifact.required: true",
