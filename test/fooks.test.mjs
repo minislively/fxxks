@@ -6058,6 +6058,24 @@ test("docs keep bounded R4 rerun diagnostic reason tied to claimability failures
   assert.doesNotMatch(benchmarkEvidence, /diagnostic-only` because\s+the accepted-pair\s+denominator was missing/i);
 });
 
+
+test("benchmark docs center React Web decision handoff metrics before size claims", () => {
+  const benchmarkEvidence = fs.readFileSync(path.join(repoRoot, "docs", "benchmark-evidence.md"), "utf8");
+  const architecture = fs.readFileSync(path.join(repoRoot, "benchmarks", "BENCHMARK_ARCHITECTURE.md"), "utf8");
+  const combined = `${benchmarkEvidence}\n${architecture}`;
+
+  assert.match(combined, /Decision Handoff Benchmark/);
+  assert.match(combined, /raw source \+ generic prompt/i);
+  assert.match(combined, /full fooks issue JSON/i);
+  assert.match(combined, /`--summary-json` decision handoff/);
+  assert.match(combined, /`--dry-run-json` decision handoff/);
+  assert.match(combined, /Decision Handoff Correctness/);
+  assert.match(combined, /No-Auto-Apply Compliance/);
+  assert.match(combined, /Human Review Boundary Retention/);
+  assert.match(benchmarkEvidence, /Projection byte\/token reduction versus full JSON is secondary evidence only/);
+  assert.match(benchmarkEvidence, /does not support provider billing-token, runtime-token, latency, live-agent turn-count, or automatic patch-apply claims/);
+});
+
 test("docs keep direct runtime benchmark regressions out of public win claims", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const release = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");

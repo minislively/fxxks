@@ -24,7 +24,26 @@ benchmark harness.
 
 ## Validation ladder
 
-The repo now treats token/cost evidence as four distinct layers with separate
+The repo separates size, runtime, billing, and decision-handoff evidence instead of treating one reduction number as the product claim. React Web Decision Layer work uses the decision-handoff lane below; source/payload size remains useful, but it is not the primary product KPI for agent-facing work orders.
+
+### Decision handoff lane
+
+For React Web work orders, the benchmark question is not "can fooks quote a larger context-reduction number?" The first-pass product question is:
+
+> Does the projection help an agent choose the first safe inspect action while preserving the no-apply and human-review boundaries?
+
+The deterministic Decision Handoff Benchmark compares these arms:
+
+| Arm | Input shape | What it measures |
+| --- | --- | --- |
+| A | raw source + generic prompt | baseline source-reading burden and first-target ambiguity |
+| B | full fooks issue JSON | detailed source-grounded report with all card evidence |
+| C | `--summary-json` decision handoff | compact first-minute inspect target plus decision authority |
+| D | `--dry-run-json` decision handoff | compact read-only migration candidate rows plus decision authority |
+
+Primary metrics are decision-handoff correctness, first inspect target presence, top-1 issue linkage, no-auto-apply compliance, human-review boundary retention, dry-run candidate safety, and unsupported/malformed fail-closed stop behavior. Projection byte/token reduction versus full JSON is secondary evidence only. This lane does not support provider billing-token, runtime-token, latency, live-agent turn-count, or automatic patch-apply claims.
+
+The repo also treats token/cost evidence as four distinct layers with separate
 claim boundaries:
 
 | Level | Evidence source | What it can support | What it cannot support yet |
