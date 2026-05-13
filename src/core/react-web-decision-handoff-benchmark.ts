@@ -254,8 +254,10 @@ export function evaluateReactWebDecisionStopBenchmark(stops: ReactWebDecisionSto
     entries,
     unsupportedStopRate: entries.length === 0 ? 0 : entries.filter((entry) => entry.state === "unsupported").length / entries.length,
     malformedStopRate: entries.length === 0 ? 0 : entries.filter((entry) => entry.state === "malformed-stop").length / entries.length,
-    allStopFailClosed: entries.every(
-      (entry) => entry.kind === "stop" && !entry.inspectAllowed && !entry.applyPatchAllowed && !entry.generateCopyAllowed && !entry.autoApply,
-    ),
+    allStopFailClosed:
+      entries.length > 0 &&
+      entries.every(
+        (entry) => entry.kind === "stop" && !entry.inspectAllowed && !entry.applyPatchAllowed && !entry.generateCopyAllowed && !entry.autoApply,
+      ),
   };
 }

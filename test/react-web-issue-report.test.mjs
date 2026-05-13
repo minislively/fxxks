@@ -1180,6 +1180,17 @@ test("React Web agent handoff dogfood fails closed on malformed projections", ()
 
 
 
+test("React Web decision stop benchmark does not claim fail-closed behavior without stop evidence", () => {
+  const benchmark = evaluateReactWebDecisionStopBenchmark([]);
+
+  assert.equal(benchmark.schemaVersion, "react-web-decision-stop-benchmark.v1");
+  assert.equal(benchmark.stopCount, 0);
+  assert.equal(benchmark.allStopFailClosed, false);
+  assert.equal(benchmark.unsupportedStopRate, 0);
+  assert.equal(benchmark.malformedStopRate, 0);
+  assert.deepEqual(benchmark.entries, []);
+});
+
 test("React Web decision stop benchmark scores unsupported and malformed handoffs as fail-closed", () => {
   const rnReport = buildReactWebIssueReport(fixtures.rn, repoRoot);
   const rnSummaryStop = consumeReactWebSummaryForAgentTask(buildReactWebIssueReportSummaryJson(rnReport));
