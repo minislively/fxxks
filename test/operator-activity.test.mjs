@@ -1122,6 +1122,111 @@ test("operator activity exposes bounded stale legacy closed worktree evidence fo
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|kill-session/.test(call)), false);
 });
 
+test("operator check surfaces legacy local residue as cleanup-review evidence only", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tempDir, "docs", "fooks-issue-778-branch-archive.md"),
+    [
+      "# Archive: `fooks-issue-767-legacy-residue` stale branch (#767)",
+      "",
+      "- Remote branch: `origin/fooks-issue-767-legacy-residue`",
+      "",
+    ].join("\n"),
+  );
+
+  const staleWorktree = path.join(path.dirname(tempDir), "fooks.omx-worktrees", "fooks-issue-767-legacy-residue");
+  const calls = [];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-13T00:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args, cwd) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          "HEAD 111",
+          "branch refs/heads/main",
+          "",
+          `worktree ${staleWorktree}`,
+          "HEAD 767767",
+          "branch refs/heads/fooks-issue-767-legacy-residue",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\nfooks-issue-767-legacy-residue\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return cwd === staleWorktree ? "0 0\n" : "0 0\n";
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && joined.startsWith("run list ")) return "[]";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir || targetPath === staleWorktree || targetPath === path.join(tempDir, "docs"),
+  });
+
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.postMergeMainEchoBoundary.mainEchoEvidence, true);
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+
+  const review = snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview;
+  assert.equal(review.issue, "#778");
+  assert.equal(review.readOnly, true);
+  assert.equal(review.rowCount, 1);
+  assert.equal(review.cleanupCommandsIncluded, false);
+  assert.equal(review.staleLocalResidueIsActiveWorkEvidence, false);
+  assert.equal(review.satisfiesActiveArtifactRequirement, false);
+  assert.match(review.claimBoundary, /never counts it as active work/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /legacyLocalResidueCleanupReview=1\(#778\)/);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
+
+  assert.deepEqual(review.rows, [
+    {
+      reviewId: "legacy-local-residue:fooks-issue-767-legacy-residue",
+      path: staleWorktree,
+      branch: "fooks-issue-767-legacy-residue",
+      head: "767767",
+      status: "staleClosedArtifact",
+      reasons: [
+        "branch has local branch-archive evidence",
+        "no tmux panes map to this worktree",
+        "worktree is not the current working directory",
+      ],
+      archiveEvidence: {
+        sourcePath: path.join("docs", "fooks-issue-778-branch-archive.md"),
+        matchType: "remote-branch",
+        matchedRef: "origin/fooks-issue-767-legacy-residue",
+        lineNumber: 3,
+      },
+      activeSessionEvidence: "no tmux panes mapped to this worktree",
+      staleLocalResidueIsActiveWorkEvidence: false,
+      satisfiesActiveArtifactRequirement: false,
+      requiredManualAction: "confirm-closed-or-merged-artifact-before-manual-cleanup-review",
+    },
+  ]);
+
+  const reviewJson = JSON.stringify(review);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder/.test(reviewJson), false);
+  assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push|kill-session/.test(call)), false);
+});
+
 test("operator activity keeps legacy worktree inference conservative when tmux is unavailable", () => {
   const tempDir = makeTempProject();
   fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
@@ -1274,8 +1379,11 @@ test("operator check receipt classifies stale session and legacy closed branch w
   );
   assert.equal(closedBranch?.classification, "closedOrStale");
 
+  assert.equal(snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview.rowCount, 1);
+  assert.equal(snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview.rows[0].path, staleWorktree);
+  assert.equal(snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview.rows[0].satisfiesActiveArtifactRequirement, false);
+
   const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
-  assert.equal(receiptJson.includes(staleWorktree), false);
   assert.equal(receiptJson.includes(deletedPanePath), false);
   assert.equal(receiptJson.includes("tmux kill-session"), false);
   assert.equal(receiptJson.includes("manualCleanupCommands"), false);
