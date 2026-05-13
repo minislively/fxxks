@@ -11,6 +11,15 @@ when the available surfaces all point at the already-merged `main` state and no
 current work signal is present. Record the echo as evidence, but do not start a
 new recovery, cleanup, or implementation lane from the success echo alone.
 
+## Durable boundary receipt
+
+A post-merge `main` CI or release-report success is an echo receipt only. It is
+not active work evidence unless one of these separate active artifacts is present:
+an open issue, an open pull request, a non-`main` active branch/worktree signal,
+or a mapped fooks tmux session. Keep the echo receipt and the active artifact
+receipt separate in reminders so a successful `main` rerun cannot reopen work by
+itself.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
