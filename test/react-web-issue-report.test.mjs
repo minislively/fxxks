@@ -60,6 +60,89 @@ function parseIssues(file) {
   return JSON.parse(cli.stdout);
 }
 
+function readGoldenJson(name) {
+  return JSON.parse(fs.readFileSync(path.join(repoRoot, "test", "fixtures", "react-web-issues-golden", name), "utf8"));
+}
+
+function readGoldenText(name) {
+  return fs.readFileSync(path.join(repoRoot, "test", "fixtures", "react-web-issues-golden", name), "utf8").trimEnd();
+}
+
+function projectSummaryGolden(summary) {
+  const firstItem = summary.firstMinuteSummary.items[0];
+  return {
+    schemaVersion: summary.schemaVersion,
+    projection: summary.projection,
+    filePath: summary.filePath,
+    readOnly: summary.readOnly,
+    autoApply: summary.autoApply,
+    summary: summary.summary,
+    triageTopIds: summary.triageTopIds,
+    firstMinuteSummary: {
+      sourceTopIssueIds: summary.firstMinuteSummary.sourceTopIssueIds,
+      firstItem: {
+        issueId: firstItem.issueId,
+        fixShape: firstItem.fixShape,
+        firstInspectStep: firstItem.firstInspectStep,
+        nextAction: firstItem.nextAction,
+        humanDecisionNeeded: firstItem.humanDecisionNeeded,
+        doNotDo: firstItem.doNotDo,
+        fixShapeGuidance: firstItem.fixShapeGuidance,
+        decision: {
+          state: firstItem.decision.state,
+          allowedActions: firstItem.decision.allowedActions,
+          humanReviewRequired: firstItem.decision.humanReviewRequired,
+          autoApply: firstItem.decision.autoApply,
+        },
+      },
+    },
+  };
+}
+
+function projectDryRunGolden(dryRun) {
+  const firstCandidate = dryRun.candidates[0];
+  return {
+    schemaVersion: dryRun.schemaVersion,
+    projection: dryRun.projection,
+    filePath: dryRun.filePath,
+    readOnly: dryRun.readOnly,
+    dryRunOnly: dryRun.dryRunOnly,
+    autoApply: dryRun.autoApply,
+    summary: dryRun.summary,
+    firstCandidate: {
+      issueId: firstCandidate.issueId,
+      affectedFile: firstCandidate.affectedFile,
+      migrationCandidate: firstCandidate.migrationCandidate,
+      firstInspectStep: firstCandidate.firstInspectStep,
+      previewAvailable: firstCandidate.previewAvailable,
+      humanReviewRequired: firstCandidate.humanReviewRequired,
+      autoApply: firstCandidate.autoApply,
+      dryRunOnly: firstCandidate.dryRunOnly,
+      riskNotes: firstCandidate.riskNotes,
+      decision: {
+        state: firstCandidate.decision.state,
+        allowedActions: firstCandidate.decision.allowedActions,
+        humanReviewRequired: firstCandidate.decision.humanReviewRequired,
+        autoApply: firstCandidate.decision.autoApply,
+      },
+    },
+  };
+}
+
+function projectTextGolden(text) {
+  const lines = text.split("\n");
+  const summaryIndex = lines.findIndex((line) => line === "## First-minute summary");
+  assert.ok(summaryIndex >= 0, "expected first-minute summary heading in text output");
+  const summaryLines = lines.slice(summaryIndex, lines.findIndex((line, index) => index > summaryIndex && line.startsWith("## Issue 1:")));
+  return [
+    "## First-minute summary",
+    summaryLines.find((line) => line.startsWith("- react-web-label-1: human-reviewed-native-control-name;")),
+    summaryLines.find((line) => line.trimStart().startsWith("- next action:")),
+    summaryLines.find((line) => line.trimStart().startsWith("- human decision needed:")),
+    summaryLines.find((line) => line.trimStart().startsWith("- do not do:")),
+  ].join("\n").trimEnd();
+}
+
 function hasNestedKey(value, key) {
   if (!value || typeof value !== "object") return false;
   if (Object.hasOwn(value, key)) return true;
@@ -865,6 +948,20 @@ test("React Web issue report summary JSON is compact first-minute data without d
   assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|Controller/i);
 });
 
+
+test("React Web issue report summary JSON matches selected golden contract", () => {
+  const summaryCli = runIssues(fixtures.formControls, "--summary-json");
+  assert.equal(summaryCli.status, 0, summaryCli.stderr);
+  const summary = JSON.parse(summaryCli.stdout);
+  const selected = projectSummaryGolden(summary);
+
+  assert.deepEqual(selected, readGoldenJson("form-controls.summary.selected.json"));
+  assert.equal(selected.firstMinuteSummary.firstItem.decision.allowedActions.applyPatch, false);
+  assert.equal(selected.firstMinuteSummary.firstItem.decision.allowedActions.generateCopy, false);
+  assert.equal(selected.firstMinuteSummary.firstItem.fixShapeGuidance.autoApply, false);
+  assert.match(selected.firstMinuteSummary.firstItem.nextAction, /confirm current source still matches/);
+});
+
 test("React Web issue report summary JSON preserves skip boundaries without detailed cards", () => {
   const rnCli = runIssues(fixtures.rn, "--summary-json");
   assert.equal(rnCli.status, 0, rnCli.stderr);
@@ -943,6 +1040,27 @@ test("React Web issue report migration dry-run JSON projects read-only candidate
     assert.equal(hasNestedKey(dryRun, detailedCardKey), false, `dry-run-json should not include detailed key ${detailedCardKey}`);
   }
   assert.doesNotMatch(compactText, /must-edit|Auto-apply: yes|Controller|policyBoundary|excludedInference/i);
+});
+
+
+test("React Web issue report dry-run JSON matches selected golden contract", () => {
+  const dryRunCli = runIssues(fixtures.formControls, "--dry-run-json");
+  assert.equal(dryRunCli.status, 0, dryRunCli.stderr);
+  const dryRun = JSON.parse(dryRunCli.stdout);
+  const selected = projectDryRunGolden(dryRun);
+
+  assert.deepEqual(selected, readGoldenJson("form-controls.dry-run.selected.json"));
+  assert.equal(selected.dryRunOnly, true);
+  assert.equal(selected.firstCandidate.decision.allowedActions.applyPatch, false);
+  assert.equal(selected.firstCandidate.decision.allowedActions.generateCopy, false);
+  assert.equal(selected.firstCandidate.autoApply, false);
+});
+
+test("React Web issue report text output matches selected golden excerpt", () => {
+  const cli = runIssues(fixtures.formControls);
+  assert.equal(cli.status, 0, cli.stderr);
+
+  assert.equal(projectTextGolden(cli.stdout), readGoldenText("form-controls.text.excerpt.txt"));
 });
 
 test("React Web issue report migration dry-run JSON preserves empty and unsupported boundaries", () => {
