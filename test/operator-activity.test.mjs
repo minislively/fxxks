@@ -50,6 +50,21 @@ function makeTempProject() {
   return tempDir;
 }
 
+test("operator reminder docs require a blocker or active artifact after clean CI/React echoes", () => {
+  const boundaryDoc = fs.readFileSync(path.join(repoRoot, "docs", "post-merge-main-ci-echo-boundary.md"), "utf8");
+  const dogfoodDoc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-merge-reminder-action-803.md"), "utf8");
+
+  assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
+  assert.match(boundaryDoc, /create\/adopt one active artifact/);
+  assert.match(boundaryDoc, /issue, branch, session, or PR/);
+  assert.match(dogfoodDoc, /issue #803/i);
+  assert.match(dogfoodDoc, /must not repeat clean status as the next development action/);
+  assert.match(dogfoodDoc, /report a real blocker/);
+  assert.match(dogfoodDoc, /create or adopt one active issue, branch, session, or PR evidence artifact/);
+  assert.match(dogfoodDoc, /Clean CI, clean React Web release-report echoes, and stale\s+local worktree inventory are verification or review receipts only/);
+  assert.equal(/must repeat clean status as the next development action/.test(dogfoodDoc), false);
+});
+
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
   assert.deepEqual(parseOperatorActivityTmuxPanes("fooks-a\t/tmp/fooks\tzsh\nother\t/tmp/other\tnode\n"), [
     { session: "fooks-a", path: "/tmp/fooks", command: "zsh" },
