@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const repoRoot = process.cwd();
@@ -14,6 +15,7 @@ const expandedNativeControlsFixture = path.join(repoRoot, "test", "fixtures", "r
 const emptyAriaLabelFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx");
 const quietNativeEvidenceFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx");
 const duplicateIdControlsFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx");
+const missingHtmlForTargetFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target.tsx");
 
 function runPreview(file, ...args) {
   return spawnSync(process.execPath, [cliPath, "inspect", "react-web-label-preview", file, ...args], {
@@ -98,6 +100,56 @@ test("React Web label preview reports duplicate literal ids on htmlFor-associate
   assert.doesNotMatch(JSON.stringify(preview), /phone.*duplicate-literal-id/);
 });
 
+test("React Web label preview reports native label htmlFor literals with missing same-file id targets", () => {
+  const cli = runPreview(missingHtmlForTargetFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  assert.equal(preview.summary.findingCount, 3);
+  assert.deepEqual(preview.findings.map((finding) => [finding.kind, finding.element, finding.loc.startLine, finding.confidence, finding.suggestedPatch.attribute]), [
+    ["missing-htmlFor-target", "label", 16, "high", "htmlFor"],
+    ["missing-accessible-label", "input", 29, "high", "aria-label"],
+    ["missing-accessible-label", "input", 33, "high", "aria-label"],
+  ]);
+  const finding = preview.findings[0];
+  assert.equal(finding.missingHtmlForTarget.value, "display-name");
+  assert.match(finding.reason, /no same-file literal id target/);
+  assert.deepEqual(finding.evidence, ["jsx.label", "jsx.label.htmlFor=display-name", "same-file.id-target.missing"]);
+  assert.equal(finding.suggestedPatch.readOnly, true);
+  assert.equal(finding.suggestedPatch.preview, "");
+  assert.doesNotMatch(JSON.stringify(preview), /missing-htmlFor-target.*dynamicTarget|FieldLabel|custom-field|design-system-field/s);
+  assert.ok(preview.findings.some((item) => item.context.includes("wrappedByCustomLabel")));
+  assert.ok(preview.findings.some((item) => item.context.includes("siblingCustomLabel")));
+  assert.doesNotMatch(JSON.stringify(preview.findings), /unassociated-nearby-label.*siblingCustomLabel/s);
+});
+
+test("React Web label preview missing htmlFor targets do not starve existing native-control findings", () => {
+  const source = [
+    'import React from "react";',
+    'export function ManyMissingTargets() {',
+    "  return <form>",
+    ...Array.from({ length: 24 }, (_, index) => `    <label htmlFor="missing-${index}">Missing ${index}</label>`),
+    '    <input name="stillReported" />',
+    "  </form>;",
+    "}",
+    "",
+  ].join("\n");
+  const fixturePath = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "tmp-many-missing-htmlfor-targets.tsx");
+  fs.writeFileSync(fixturePath, source);
+  try {
+    const cli = runPreview(fixturePath, "--json");
+    assert.equal(cli.status, 0, cli.stderr);
+    const preview = JSON.parse(cli.stdout);
+
+    assert.equal(preview.summary.findingCount, 24);
+    assert.ok(preview.findings.some((finding) => finding.kind === "missing-accessible-label" && finding.context.includes('name="stillReported"')));
+    assert.equal(preview.findings.filter((finding) => finding.kind === "missing-htmlFor-target").length, 23);
+  } finally {
+    fs.rmSync(fixturePath, { force: true });
+  }
+});
+
 test("React Web label preview suggests conservative nearby label associations", () => {
   const cli = runPreview(associationFixture, "--json");
   assert.equal(cli.status, 0, cli.stderr);
@@ -151,8 +203,9 @@ test("React Web label preview avoids unsafe nearby label associations", () => {
   assert.equal(preview.summary.associationCount, 0);
   assert.equal(preview.summary.emptyAccessibleNameCount, 0);
   assert.ok(preview.summary.missingCount > 0);
-  assert.ok(preview.findings.every((finding) => finding.suggestedPatch.attribute === "aria-label"));
-  assert.doesNotMatch(cli.stdout, /htmlFor=/);
+  assert.equal(preview.findings.filter((finding) => finding.kind === "missing-htmlFor-target").length, 1);
+  assert.ok(preview.findings.filter((finding) => finding.kind !== "missing-htmlFor-target").every((finding) => finding.suggestedPatch.attribute === "aria-label"));
+  assert.doesNotMatch(JSON.stringify(preview.findings.filter((finding) => finding.kind !== "missing-htmlFor-target")), /htmlFor=/);
 });
 
 test("React Web label preview reports empty aria-label native controls as manual-review findings", () => {
