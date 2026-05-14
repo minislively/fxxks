@@ -81,6 +81,7 @@ function isSafeSummaryItem(item) {
     isObject(item) &&
     isNonEmptyString(item.issueId) &&
     isNonEmptyString(item.firstInspectStep) &&
+    isStringArray(item.inspectFirst) &&
     isNonEmptyString(item.nextAction) &&
     isStringArray(item.humanDecisionNeeded) &&
     isStringArray(item.doNotDo) &&
@@ -137,6 +138,7 @@ export function consumeReactWebSummaryForAgentTask(summary) {
     filePath: summary.filePath,
     claimBoundary: summary.claimBoundary,
     firstInspectStep: item.firstInspectStep,
+    inspectFirst: item.inspectFirst,
     nextAction: item.nextAction,
     whyThisFirst: item.whyThisFirst,
     humanDecisionNeeded: item.humanDecisionNeeded,

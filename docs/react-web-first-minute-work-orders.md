@@ -97,7 +97,7 @@ fooks inspect react-web-issues src/components/Form.tsx --summary-json
 The intended consumer flow is:
 
 1. Read `firstMinuteSummary.items` in `sourceTopIssueIds` order.
-2. Start with `items[0].firstInspectStep` and `items[0].nextAction`.
+2. Start with `items[0].firstInspectStep` and `items[0].nextAction`; inspect that source line first and confirm it still matches the reported evidence before suggesting changes.
 3. Keep `decision`, `humanDecisionNeeded`, `doNotDo`, `fixShapeGuidance.autoApply`, and `claimBoundary` in the agent prompt or task card.
 4. Treat `contextHints` as orienting evidence only; they may include source pointers or short advisory convention pointers, but they do not change rank, priority, bucket, or edit authority. Current source evidence wins over those hints and over historical memory.
 5. If `items` is empty, stop and inspect the top-level `inScope` / `skippedReason` values instead of inventing a React Web task.
