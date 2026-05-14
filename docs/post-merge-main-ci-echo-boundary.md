@@ -36,6 +36,16 @@ issue/branch/session/PR is currently attached. It may preserve the echo as
 verification evidence, but it must not imply that the merged CI echo is itself
 an active development artifact.
 
+### Issue #823 seed receipt
+
+For the #823 post-merge React Web echo nudge, the seed snapshot is verification
+or idle-inventory evidence only: `main` was at `421d3bf`, the worktree dirty
+count was `0`, open PR/issue counts were `0/0`, fooks tmux/process counts were
+`0/0`, and legacy local worktree count was `9`. Those counts are not a React Web
+assignment, release-report task, or cleanup authority. A clean-slate whip still
+needs a fresh issue, branch, session, or PR receipt before describing active
+work.
+
 ## Development reminder active-artifact rule
 
 A development reminder must not end as a status-only idle report. After it names
