@@ -35,7 +35,8 @@ type ReactWebIssueKind =
   | "react-web.missing-accessible-label"
   | "react-web.ambiguous-accessible-label"
   | "react-web.empty-accessible-name"
-  | "react-web.unassociated-nearby-label";
+  | "react-web.unassociated-nearby-label"
+  | "react-web.duplicate-literal-id";
 
 export type ReactWebIssueTriageEvidence = {
   safePreviewAvailable: boolean;
@@ -62,7 +63,8 @@ type ReactWebIssueFixShape =
   | "human-reviewed-placeholder-replacement"
   | "human-reviewed-button-name"
   | "human-reviewed-native-control-name"
-  | "human-reviewed-accessible-name";
+  | "human-reviewed-accessible-name"
+  | "human-reviewed-duplicate-id-association";
 
 export type ReactWebIssueFixShapeGuidance = {
   claimBoundary: string;
@@ -340,6 +342,8 @@ function problemFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return `Native ${finding.element} has empty accessible-name evidence.`;
     case "unassociated-nearby-label":
       return `Nearby label text is not explicitly associated with this native ${finding.element}.`;
+    case "duplicate-literal-id":
+      return `Native ${finding.element} has an ambiguous duplicate id association.`;
   }
 }
 
@@ -353,6 +357,8 @@ function whyItMattersFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return "A blank aria-label creates accessible-name evidence that communicates no useful control name.";
     case "unassociated-nearby-label":
       return "Visible label text may not be programmatically connected to the native form control.";
+    case "duplicate-literal-id":
+      return "Duplicate literal id values can make htmlFor/control associations ambiguous for assistive technology and DOM lookup behavior.";
   }
 }
 
@@ -366,6 +372,8 @@ function suggestedFixIntentFor(finding: ReactWebLabelPatchPreviewFinding): strin
       return "Replace the empty aria-label with human-reviewed accessible-name evidence.";
     case "unassociated-nearby-label":
       return "Connect the nearby native label/control pair with htmlFor/id when the preview evidence remains valid.";
+    case "duplicate-literal-id":
+      return "Inspect every same-file duplicate id occurrence and choose unique, human-reviewed id/htmlFor associations.";
   }
 }
 
@@ -388,12 +396,18 @@ function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
   if (finding.kind === "unassociated-nearby-label") {
     return "Nearby label/control evidence is not high-confidence enough for a safe preview, so fooks reports it for manual review and does not auto-apply it.";
   }
+  if (finding.kind === "duplicate-literal-id") {
+    return "Duplicate literal id associations require source inspection and coordinated id/htmlFor choices, so fooks reports the ambiguity and does not auto-apply it.";
+  }
   return "Correct user-facing accessible-name copy requires human review, so fooks reports the issue and does not auto-apply it.";
 }
 
 function skipReasonFor(finding: ReactWebLabelPatchPreviewFinding): string {
   if (finding.kind === "unassociated-nearby-label") {
     return "Preview skipped because the nearby label/control association is not high-confidence deterministic evidence.";
+  }
+  if (finding.kind === "duplicate-literal-id") {
+    return "Preview skipped because duplicate literal id associations must be resolved by inspecting every same-file occurrence first.";
   }
   return "Preview skipped because generated accessible-name copy would require human review.";
 }
@@ -533,6 +547,7 @@ function fixShapeFor(options: {
     return "human-reviewed-placeholder-replacement";
   }
   if (options.finding.kind === "empty-accessible-name") return "human-reviewed-accessible-name";
+  if (options.finding.kind === "duplicate-literal-id") return "human-reviewed-duplicate-id-association";
   if (options.finding.element === "button") return "human-reviewed-button-name";
   if (
     hasAttributeSignal(options.attributes, "name") ||
@@ -558,6 +573,8 @@ function fixShapeSummaryFor(shape: ReactWebIssueFixShape, element: ReactWebLabel
       return `Use local native ${element} attributes as hints for a human-reviewed accessible-name shape; do not generate copy automatically.`;
     case "human-reviewed-accessible-name":
       return `Choose a human-reviewed accessible-name shape for this native ${element} from local JSX context.`;
+    case "human-reviewed-duplicate-id-association":
+      return `Inspect duplicate same-file id evidence for this native ${element} and choose unique id/htmlFor associations manually.`;
   }
 }
 
@@ -574,6 +591,9 @@ function fixShapeInspectFirstFor(options: {
   steps.push(`Confirm the current source still matches this native ${options.finding.element} evidence before suggesting changes.`);
   if (options.attributes.length > 0) {
     steps.push(`Use current attribute evidence as hints only: ${options.attributes.slice(0, 6).join(", ")}.`);
+  }
+  if (options.finding.kind === "duplicate-literal-id" && options.finding.duplicateId) {
+    steps.push(`Inspect duplicate id lines: ${options.finding.duplicateId.lines.join(", ")} for id "${options.finding.duplicateId.value}" before choosing replacement ids.`);
   }
   if (options.previewAvailable) {
     steps.push("Review the safe preview diff as a candidate shape; fooks still does not apply it.");
@@ -633,6 +653,10 @@ function contextPacketRelatedPatternFor(options: {
   if (options.previewAvailable) {
     return `${base}; safe-preview pattern because existing JSX provides deterministic nearby label/control association evidence.`;
   }
+  if (options.finding.kind === "duplicate-literal-id") {
+    const lines = options.finding.duplicateId?.lines.join(",") ?? "unknown";
+    return `${base}; manual-review duplicate-id pattern because same-file literal id evidence appears on lines ${lines}.`;
+  }
   if (options.finding.kind === "unassociated-nearby-label") {
     return `${base}; manual-review association pattern because nearby label/control evidence is not deterministic enough for a safe preview.`;
   }
@@ -669,6 +693,9 @@ function excludedInferenceFor(options: {
   }
   if (options.finding.kind === "unassociated-nearby-label" && !options.previewAvailable) {
     excluded.push("Does not infer htmlFor/id association when nearby label evidence is not high-confidence deterministic.");
+  }
+  if (options.finding.kind === "duplicate-literal-id") {
+    excluded.push("Does not choose replacement ids or rewrite htmlFor associations for duplicate id cards.");
   }
   return excluded;
 }
