@@ -817,6 +817,15 @@ test("operator check receipt marks closed-PR remote worktree residue as non-acti
     pathExists: (targetPath) => [tempDir, closedPrWorktree].includes(targetPath),
   });
 
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.evidenceBoundary, "ci-echo-and-stale-residue-are-not-active-work");
+  assert.equal(snapshot.postMergeMainEchoBoundary.echoOnly, true);
+  assert.equal(snapshot.activity.currentRunEvidence.classification, "mainEchoNonActive");
+  assert.equal(snapshot.activity.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.activity.currentRunEvidence.evidence.openIssues, 0);
+  assert.equal(snapshot.activity.currentRunEvidence.evidence.openPullRequests, 0);
   assert.equal(snapshot.activeWorkReceipts.classification, "closedOrStale");
   const receipt = snapshot.activeWorkReceipts.receipts.find(
     (item) => item.kind === "worktree" && item.identifiers.worktree.branch === "fooks-issue-631-rn-compare-inspect-visibility",
@@ -835,6 +844,9 @@ test("operator check receipt marks closed-PR remote worktree residue as non-acti
     "salvage-review": 0,
     "manual-review-noise": 1,
   });
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueCount, 1);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
   assert.equal(snapshot.activeWorkReceipts.reportLine.includes(closedPrWorktree), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
