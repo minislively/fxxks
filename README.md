@@ -1,12 +1,12 @@
 # fooks
 
-Frontend change intelligence for lower-cost React Web work.
+Frontend change intelligence for Codex.
 
-`fooks` helps agents spend less time and context rediscovering the same React Web facts before feature work, migrations, refactors, and tests. The first wedge is React Web: source-fact extraction, evidence gates, and actionable issue cards point out narrow form/accessibility issues and, when confidence is high, show read-only safe preview candidates a human or agent can review. Ambiguous or risky cases stay as manual-review cards with skip reasons.
-
-Context reduction and caching remain supporting mechanisms. In the strongest current path, a Codex user mentions the same React `.tsx` / `.jsx` file more than once in one repo: the first eligible mention records compact context, and later same-file prompts may reuse a compact model-facing payload when safe. Claude and opencode are narrower helper paths, not Codex-equivalent automatic optimization.
+`fooks` gives Codex a frontend-aware first minute before React Web edits: it reads source facts, gates the evidence, turns narrow native-control form/accessibility findings into issue cards, and hands agents a compact inspect-first work order. The strongest path today is not “trust a token-savings claim”; it is **run `fooks inspect react-web-issues`, see where the frontend risk is, then edit with the current source open**.
 
 First-minute path:
+
+Run the first value path on a supported React Web file:
 
 ```bash
 npm install -g fxxk-frontend-hooks
@@ -14,37 +14,38 @@ cd your-supported-project
 fooks setup
 fooks doctor
 fooks inspect react-web-issues src/components/Form.tsx
+```
+
+The issue-card output is read-only and actionable: each card explains `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`. High-confidence native label/control findings can include safe preview shape hints, but fooks does **not** auto-apply patches, invent final accessible-name copy, infer custom-component semantics, or claim a broad accessibility audit. Ambiguous cases stay as manual-review cards with stop reasons.
+
+Want to see the product loop before installing it into a real repo? Start with the packaged golden demo: [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md). For the detailed first-minute handoff contract, including `--summary-json` and `--dry-run-json`, see [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md).
+
+Context reduction and caching are supporting mechanisms. In the strongest current Codex path, repeated work on the same React `.tsx` / `.jsx` file may reuse compact same-file context when the evidence gate says that is safe. `fooks compare` shows local source-vs-payload evidence for one supported file, but the launch-facing habit is simpler: **inspect first, then reuse context only when safe**.
+
+Then open Codex in that repo and work normally with the current source open. After the first issue-card pass, supporting local proof commands are:
+
+```bash
+fooks inspect react-web-issues src/components/Form.tsx --summary-json
+fooks inspect react-web-issues src/components/Form.tsx --dry-run-json
 fooks compare src/components/Button.tsx
 ```
 
-Then open Codex in that repo and work normally on the same supported file. `fooks setup` is explicit by design: installing the npm package alone does **not** edit Codex hooks, Claude files, or opencode project files. `fooks doctor` checks local setup/hook readiness, `fooks inspect react-web-issues` renders actionable React Web issue cards, and `fooks compare` shows source size versus the compact fooks model-facing payload for one supported file.
-
-To inspect the first frontend-change-intelligence wedge directly:
-
-```bash
-fooks inspect react-web-issues src/components/Form.tsx
-fooks inspect react-web-issues src/components/Form.tsx --json
-```
-
-Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibility facts can reduce frontend change cost. The current CLI surface is advisory and read-only: it emits issue cards with `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`; only deterministic high-confidence native label/control associations receive preview candidates, while ambiguous or risky findings receive manual-review skip reasons. There is also an experimental Codex-first `.ts` / `.js` same-file beta when module signals are strong enough. TUI / React CLI `.tsx` remains a candidate / evidence-only lane: syntax-level local evidence can exist, but terminal semantics or compact-reuse support are not current claims. The first-minute proof is local model-facing payload evidence and actionable report output, not provider billing or stable runtime-token proof. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap asks, not current support.
+Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibility facts can reduce frontend change risk before feature work, migrations, refactors, or tests. Experimental Codex-first `.ts` / `.js` same-file reuse remains narrow and signal-gated. React Native/WebView, TUI / React CLI promotion, Vue/SFC, broad TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity remain roadmap or boundary lanes, not current support.
 
 - Public npm package: `fxxk-frontend-hooks`
 - CLI command: `fooks`
 
 ## 30-second version
 
-Use fooks when you want frontend change intelligence for a supported React Web file: source-derived context that lowers the cost of repeated feature work, migrations, refactors, and tests, actionable issue cards before editing, conservative safe previews when confidence is high, and smaller model-facing context for repeated same-file Codex work.
+Use fooks when you want Codex to start React Web work with a compact, source-grounded issue card instead of rediscovering frontend facts from scratch.
 
-- **Product direction:** frontend work cost reduction through source facts, evidence gates, actionable reports, and bounded preview guidance.
-- **First wedge:** React Web `.tsx` / `.jsx`; repeated same-file Codex context reuse is the strongest current workflow.
-- **First surface/problem:** `fooks inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]` reports narrow native-control form/accessibility issue cards, compact first-minute handoffs, or dry-run-only migration candidates, with a shared decision layer and read-only safe previews only for deterministic native label/control associations. High confidence is evidence quality, not apply authority.
-- **Supporting mechanism:** context reduction and caching help avoid rediscovering the same source facts, but they are not the whole product positioning.
-- **Experimental beta:** Codex + repeated same-file `.ts` / `.js` module work when module signals are strong enough.
-- **Roadmap asks, not current support:** React Native/WebView, TUI / React CLI promotion beyond candidate / evidence-only status, Vue/SFC, broader TS/JS coverage, multi-file refactors, read interception, LSP semantics, and Claude/opencode parity.
-- **Local proof:** `fooks inspect react-web-issues` shows actionable React Web issue cards, and `fooks compare` shows the original source size versus the compact fooks model-facing payload for one supported file.
-- **Benchmark impact:** the latest launch-grade evidence is estimate-scoped API cost, not billing proof: the corrected 2026-04-22 Codex OAuth campaign accepted 15/15 matched pairs and reduced median estimated OpenAI API cost by 4.171% under recorded pricing assumptions; larger Next.js and Tailwind profiles reported 26.492% and 38.238% median estimated API-cost reductions.
-- **Evidence boundary:** fooks supports prompt-size/context-load estimates and estimate-scoped API-cost evidence under explicit assumptions; it does not prove provider invoices, billing-grade charges, stable runtime-token wins, or Claude/opencode automatic savings.
-- **Usage-log boundary:** fooks is not a `ccusage` replacement and does not parse private usage logs by default; see [`docs/usage-log-boundary.md`](docs/usage-log-boundary.md).
+1. **Inspect first:** `fooks inspect react-web-issues <file>` ranks narrow native JSX label/control risks and tells the agent where to look before editing.
+2. **Handoff safely:** `--summary-json` gives agents `firstMinuteSummary.items[0]`, `decision`, `humanDecisionNeeded`, and `doNotDo` boundaries as advisory inspect-first input rather than edit authority.
+3. **Preview only when safe:** `--dry-run-json` lists migration candidates and preview availability, but remains dry-run-only with `autoApply: false` and human review for final label/name choices.
+4. **Reuse when safe:** repeated same-file Codex work may reuse compact context after evidence gates pass; `fooks compare` is supporting local payload proof, not the headline.
+5. **Prove narrowly:** benchmark and cost numbers are estimate-scoped supporting evidence, not provider invoice, billing-token, stable runtime-token, or Claude/opencode automatic-savings proof.
+
+See the example source, command output, summary handoff, and dry-run boundary in [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md).
 
 ## Quick start and local proof
 
