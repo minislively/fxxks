@@ -563,14 +563,16 @@ function fixShapeInspectFirstFor(options: {
   const steps = [
     `Inspect ${options.filePath}:${options.finding.loc.startLine}-${options.finding.loc.endLine} (${options.finding.element}) before editing.`,
   ];
+  steps.push(`Confirm the current source still matches this native ${options.finding.element} evidence before suggesting changes.`);
   if (options.attributes.length > 0) {
-    steps.push(`Use existing attribute evidence as hints only: ${options.attributes.slice(0, 6).join(", ")}.`);
+    steps.push(`Use current attribute evidence as hints only: ${options.attributes.slice(0, 6).join(", ")}.`);
   }
   if (options.previewAvailable) {
     steps.push("Review the safe preview diff as a candidate shape; fooks still does not apply it.");
   } else {
-    steps.push("Select the final label/name text manually; fooks does not generate accessible-name copy.");
+    steps.push("Select the final label/name text manually; fooks does not generate final label/name copy.");
   }
+  steps.push("If this is a custom component or the evidence changed, stop and read the source normally.");
   for (const item of options.relatedContext.slice(0, 2)) {
     const location = `${item.file}${item.line ? `:${item.line}${item.endLine && item.endLine !== item.line ? `-${item.endLine}` : ""}` : ""}`;
     steps.push(`Inspect related ${item.kind} (${item.source}) at ${location}.`);
@@ -867,11 +869,14 @@ function whyThisFirstFor(issue: ReactWebIssueCard): string {
 }
 
 function nextActionFor(issue: ReactWebIssueCard): string {
-  return trimSummaryText(`Start by ${firstInspectStepFor(issue).replace(/^Inspect/u, "inspecting")}`, 180);
+  const target = firstInspectStepFor(issue)
+    .replace(/^Inspect\s+/u, "")
+    .replace(/\s+before editing\.$/u, "");
+  return trimSummaryText(`Inspect ${target} first; confirm current source still matches before suggesting changes.`, 180);
 }
 
 function humanDecisionNeededFor(issue: ReactWebIssueCard): string[] {
-  const decisions = ["Review the final accessible label/name copy."];
+  const decisions = ["Confirm the final accessible label/name copy from current source context."];
   if (issue.fixability === "safe-preview") {
     decisions.push("Confirm the htmlFor/id association before using the preview shape.");
   } else {
@@ -885,7 +890,7 @@ function doNotDoFor(): string[] {
     [
       "Do not apply patches automatically from this report.",
       "Do not infer custom-component semantics.",
-      "Do not generate accessible-name copy automatically.",
+      "Do not generate final label/name copy automatically.",
     ],
     3,
     120,

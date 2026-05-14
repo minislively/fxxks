@@ -665,10 +665,10 @@ test("React Web issue report text mode prints per-card manual-review fix-shape g
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /- top manual-review ids: react-web-label-1, react-web-label-4, react-web-label-5/);
   assert.match(cli.stdout, /- fix shape: human-reviewed-native-control-name/);
-  assert.match(cli.stdout, /Use existing attribute evidence as hints only: name=email, onChange, required, type=email/);
-  assert.match(cli.stdout, /Use existing attribute evidence as hints only: className, spread:field, type=text/);
-  assert.match(cli.stdout, /Use existing attribute evidence as hints only: className, spread:register\("email"\)/);
-  assert.match(cli.stdout, /Select the final label\/name text manually; fooks does not generate accessible-name copy/);
+  assert.match(cli.stdout, /Use current attribute evidence as hints only: name=email, onChange, required, type=email/);
+  assert.match(cli.stdout, /Use current attribute evidence as hints only: className, spread:field, type=text/);
+  assert.match(cli.stdout, /Use current attribute evidence as hints only: className, spread:register\("email"\)/);
+  assert.match(cli.stdout, /Select the final label\/name text manually; fooks does not generate final label\/name copy/);
   assert.match(cli.stdout, /- inspect first for fix shape:/);
   assert.doesNotMatch(cli.stdout, /must-edit|Auto-apply: yes|Controller/);
 });
@@ -749,7 +749,11 @@ test("React Web issue report JSON includes machine-readable first-minute summary
     assertCompactConventionContextHint(item);
     assertConventionDoesNotPolluteActionFields(item);
     assert.match(item.whyThisFirst, new RegExp(`Rank ${issue.triage.rank} ${issue.triage.priority} issue`));
-    assert.match(item.nextAction, /Start by inspecting/);
+    assert.match(item.nextAction, /^Inspect .* first; confirm current source still matches/);
+    assert.ok(item.inspectFirst.some((entry) => /current source still matches/.test(entry)));
+    assert.ok(item.inspectFirst.some((entry) => /custom component|evidence changed/.test(entry)));
+    assert.ok(item.humanDecisionNeeded.some((entry) => /current source context/.test(entry)));
+    assert.ok(item.doNotDo.some((entry) => /final label\/name copy/.test(entry)));
     assert.ok(item.contextHints.some((entry) => entry.includes(issue.evidence.element)));
     assert.equal(item.fixShapeGuidance.claimBoundary, issue.fixShapeGuidance.claimBoundary);
     assert.equal(item.fixShapeGuidance.humanReviewRequired, true);
@@ -1037,7 +1041,8 @@ test("React Web agent handoff dogfood consumes summary JSON as an inspect-first 
   const handoffText = JSON.stringify(task);
   assert.match(handoffText, /Read-only React Web issue report/);
   assert.match(handoffText, /does not auto-apply patches/);
-  assert.match(task.nextAction, /Start by inspecting/);
+  assert.match(task.nextAction, /^Inspect .* first; confirm current source still matches/);
+  assert.ok(task.inspectFirst.some((entry) => /custom component|evidence changed/.test(entry)));
   assert.ok(task.contextHints.some((hint) => /native|context|source|convention|preview/i.test(hint)));
   assert.doesNotMatch(handoffText, /must-edit|Auto-apply: yes|codemod|CI enforcement|merge gate/i);
 });

@@ -90,15 +90,15 @@ Representative first item:
   "fixShape": "human-reviewed-native-control-name",
   "firstInspectStep": "Inspect fixtures/compressed/FormControls.tsx:23-23 (input) before editing.",
   "whyThisFirst": "Rank 1 high issue because label-preview confidence is high; high-confidence-manual-review remains human-reviewed.",
-  "nextAction": "Start by inspecting fixtures/compressed/FormControls.tsx:23-23 (input) before editing.",
+  "nextAction": "Inspect fixtures/compressed/FormControls.tsx:23-23 (input) first; confirm current source still matches before suggesting changes.",
   "humanDecisionNeeded": [
-    "Review the final accessible label/name copy.",
+    "Confirm the final accessible label/name copy from current source context.",
     "Choose the label/name shape from local JSX evidence."
   ],
   "doNotDo": [
     "Do not apply patches automatically from this report.",
     "Do not infer custom-component semantics.",
-    "Do not generate accessible-name copy automatically."
+    "Do not generate final label/name copy automatically."
   ],
   "decision": {
     "state": "human-decision-required",
