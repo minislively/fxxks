@@ -12,6 +12,7 @@ const associationFixture = path.join(repoRoot, "test", "fixtures", "react-web-la
 const unsafeAssociationFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx");
 const expandedNativeControlsFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx");
 const emptyAriaLabelFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx");
+const quietNativeEvidenceFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx");
 
 function runPreview(file, ...args) {
   return spawnSync(process.execPath, [cliPath, "inspect", "react-web-label-preview", file, ...args], {
@@ -65,6 +66,17 @@ test("React Web label preview stays quiet when native controls have narrow label
   assert.equal(preview.inScope, true);
   assert.deepEqual(preview.summary, { findingCount: 0, missingCount: 0, ambiguousCount: 0, emptyAccessibleNameCount: 0, associationCount: 0 });
   assert.deepEqual(preview.findings, []);
+});
+
+test("React Web label preview stays quiet for native controls with sufficient name evidence and custom decoys", () => {
+  const cli = runPreview(quietNativeEvidenceFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  assert.deepEqual(preview.summary, { findingCount: 0, missingCount: 0, ambiguousCount: 0, emptyAccessibleNameCount: 0, associationCount: 0 });
+  assert.deepEqual(preview.findings, []);
+  assert.doesNotMatch(JSON.stringify(preview), /DesignSystemTextInput|displayName|TODO:/);
 });
 
 test("React Web label preview suggests conservative nearby label associations", () => {

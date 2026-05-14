@@ -43,6 +43,7 @@ const fixtures = {
   relatedContext: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "related-context-form.tsx"),
   expandedNativeControls: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx"),
   emptyAriaLabel: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx"),
+  quietNativeEvidence: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -691,6 +692,26 @@ test("React Web first-minute work-order quality gate keeps safety invariants str
   const humanReviewReport = cloneJson(baseReport);
   humanReviewReport.firstMinuteSummary.items[0].fixShapeGuidance.humanReviewRequired = false;
   assertOnlyWorkOrderRegressionClass(humanReviewReport, "missing-human-decision");
+});
+
+test("React Web issue report stays quiet for native name evidence and custom decoys", () => {
+  const report = parseIssues(fixtures.quietNativeEvidence);
+  const summary = buildReactWebIssueReportSummaryJson(report);
+  const dryRun = buildReactWebIssueReportMigrationDryRunJson(report);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.summary.issueCount, 0);
+  assert.equal(report.summary.manualReviewCount, 0);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.unsafeToAutoApplyCount, 0);
+  assert.deepEqual(report.issues, []);
+  assert.deepEqual(report.firstMinuteSummary, { sourceTopIssueIds: [], items: [] });
+  assert.equal(summary.autoApply, false);
+  assert.deepEqual(summary.firstMinuteSummary, { sourceTopIssueIds: [], items: [] });
+  assert.equal(dryRun.autoApply, false);
+  assert.equal(dryRun.dryRunOnly, true);
+  assert.deepEqual(dryRun.candidates, []);
+  assert.doesNotMatch(JSON.stringify(report), /DesignSystemTextInput|displayName|TODO:/);
 });
 
 test("React Web issue report preserves skip and no unsupported custom-component inference boundaries", () => {
