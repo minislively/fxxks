@@ -8,7 +8,12 @@ export const REACT_WEB_LABEL_PATCH_PREVIEW_SCHEMA_VERSION = "react-web-label-pat
 export const REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY =
   "Read-only React Web JSX label preview only: detects a narrow set of native interactive elements with missing, ambiguous, or empty accessible-label evidence and suggests read-only patch fragments without editing files or claiming full accessibility coverage." as const;
 
-type ReactWebLabelFindingKind = "missing-accessible-label" | "ambiguous-accessible-label" | "empty-accessible-name" | "unassociated-nearby-label";
+type ReactWebLabelFindingKind =
+  | "missing-accessible-label"
+  | "ambiguous-accessible-label"
+  | "empty-accessible-name"
+  | "unassociated-nearby-label"
+  | "duplicate-literal-id";
 type ReactWebLabelConfidence = "high" | "medium";
 type ReactWebInteractiveElement = "button" | "input" | "select" | "textarea";
 
@@ -20,6 +25,10 @@ export type ReactWebLabelPatchPreviewFinding = {
   confidence: ReactWebLabelConfidence;
   reason: string;
   evidence: string[];
+  duplicateId?: {
+    value: string;
+    lines: number[];
+  };
   suggestedPatch: {
     type: "unified-diff-fragment";
     readOnly: true;
@@ -224,6 +233,19 @@ function countLiteralAttributeValues(sourceFile: ts.SourceFile, attrName: string
   return counts;
 }
 
+function literalAttributeLocations(sourceFile: ts.SourceFile, attrName: string): Map<string, SourceRange[]> {
+  const locations = new Map<string, SourceRange[]>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const value = stringLiteralAttributeValue(node, attrName);
+      if (value) locations.set(value, [...(locations.get(value) ?? []), sourceRangeOf(sourceFile, node)]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return locations;
+}
+
 function labelContainsNativeControl(labelElement: ts.JsxElement): boolean {
   let contains = false;
   const visit = (node: ts.Node): void => {
@@ -425,6 +447,7 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
   const lines = sourceText.split(/\r?\n/);
   const labelledIds = collectHtmlForIds(sourceFile);
   const literalIdCounts = countLiteralAttributeValues(sourceFile, "id");
+  const literalIdLocations = literalAttributeLocations(sourceFile, "id");
   const literalIds = new Set(literalIdCounts.keys());
   const controlNameCounts = countLiteralAttributeValues(sourceFile, "name");
   const findings: ReactWebLabelPatchPreviewFinding[] = [];
@@ -435,6 +458,36 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
       if (INTERACTIVE_TAGS.has(tag as ReactWebInteractiveElement)) {
         const element = tag as ReactWebInteractiveElement;
         const attrs = attributesOf(node);
+        const literalId = stringLiteralAttributeValue(node, "id");
+        const duplicateIdLines = literalId ? (literalIdLocations.get(literalId) ?? []).map((loc) => loc.startLine) : [];
+        if (literalId && labelledIds.has(literalId) && duplicateIdLines.length > 1) {
+          const loc = sourceRangeOf(sourceFile, node);
+          findings.push({
+            kind: "duplicate-literal-id",
+            element,
+            loc,
+            context: lineContext(lines, loc),
+            confidence: "high",
+            reason: `Native ${element} id "${literalId}" is referenced by htmlFor but the same literal id appears ${duplicateIdLines.length} times in this file, so the label/control association is ambiguous and needs manual review.`,
+            evidence: [
+              `jsx.${element}`,
+              `jsx.${element}.id.duplicate=${literalId}`,
+              "jsx.label.htmlFor",
+              `same-file.literal-id.lines=${duplicateIdLines.join(",")}`,
+            ],
+            duplicateId: {
+              value: literalId,
+              lines: duplicateIdLines,
+            },
+            suggestedPatch: {
+              type: "unified-diff-fragment",
+              readOnly: true,
+              attribute: "id/htmlFor",
+              insertion: `manual-review duplicate id ${escapeAttribute(literalId)}`,
+              preview: "",
+            },
+          });
+        }
         const labelEvidence = classifyLabelEvidence({ node, tag: element, attrs, labelledIds });
         if (labelEvidence && !labelEvidence.labelled) {
           const loc = sourceRangeOf(sourceFile, node);

@@ -44,6 +44,7 @@ const fixtures = {
   expandedNativeControls: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx"),
   emptyAriaLabel: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx"),
   quietNativeEvidence: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx"),
+  duplicateIds: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -346,6 +347,37 @@ test("React Web issue report emits manual-review cards for empty native aria-lab
   assert.equal(first.decision.autoApply, false);
   assert.equal(first.decision.humanReviewRequired, true);
   assert.ok(first.fixShapeGuidance.inspectFirst.some((entry) => /does not generate final label\/name copy/.test(entry)));
+  assert.doesNotMatch(JSON.stringify(report), /Auto-apply: yes|must-edit/i);
+});
+
+
+test("React Web issue report emits manual-review cards for duplicate literal native ids", () => {
+  const report = parseIssues(fixtures.duplicateIds);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.summary.issueCount, 2);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.manualReviewCount, 2);
+  assert.equal(report.summary.unsafeToAutoApplyCount, 2);
+  assert.ok(report.issues.every((issue) => issue.kind === "react-web.duplicate-literal-id"));
+  assert.ok(report.issues.every((issue) => issue.fixability === "manual-review"));
+  assert.ok(report.issues.every((issue) => issue.autoFixSafety === "unsafe-to-auto-apply"));
+
+  const first = report.issues[0];
+  assert.equal(first.whereToLook.filePath, "test/fixtures/react-web-label-preview/duplicate-id-controls.tsx");
+  assert.deepEqual(report.issues.map((issue) => issue.whereToLook.line), [7, 9]);
+  assert.match(first.problem, /ambiguous duplicate id association/);
+  assert.match(first.whyItMatters, /Duplicate literal id values/);
+  assert.match(first.suggestedAction, /Inspect every same-file duplicate id occurrence/);
+  assert.match(first.skipReason, /inspecting every same-file occurrence/);
+  assert.deepEqual(first.fixShapeGuidance.shape, "human-reviewed-duplicate-id-association");
+  assert.ok(first.fixShapeGuidance.inspectFirst.some((entry) => /duplicate id lines: 7, 9/.test(entry)));
+  assert.ok(first.contextPacket.excludedInference.some((entry) => /Does not choose replacement ids/.test(entry)));
+  assert.ok(first.evidence.sourceSignals.some((entry) => entry === "same-file.literal-id.lines=7,9"));
+  assert.equal(first.decision.allowedActions.inspect, true);
+  assert.equal(first.decision.allowedActions.applyPatch, false);
+  assert.equal(first.decision.autoApply, false);
+  assert.equal(first.decision.humanReviewRequired, true);
   assert.doesNotMatch(JSON.stringify(report), /Auto-apply: yes|must-edit/i);
 });
 

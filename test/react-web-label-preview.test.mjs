@@ -13,6 +13,7 @@ const unsafeAssociationFixture = path.join(repoRoot, "test", "fixtures", "react-
 const expandedNativeControlsFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx");
 const emptyAriaLabelFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx");
 const quietNativeEvidenceFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx");
+const duplicateIdControlsFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx");
 
 function runPreview(file, ...args) {
   return spawnSync(process.execPath, [cliPath, "inspect", "react-web-label-preview", file, ...args], {
@@ -77,6 +78,24 @@ test("React Web label preview stays quiet for native controls with sufficient na
   assert.deepEqual(preview.summary, { findingCount: 0, missingCount: 0, ambiguousCount: 0, emptyAccessibleNameCount: 0, associationCount: 0 });
   assert.deepEqual(preview.findings, []);
   assert.doesNotMatch(JSON.stringify(preview), /DesignSystemTextInput|displayName|TODO:/);
+});
+
+
+test("React Web label preview reports duplicate literal ids on htmlFor-associated native controls", () => {
+  const cli = runPreview(duplicateIdControlsFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  assert.deepEqual(preview.summary, { findingCount: 2, missingCount: 0, ambiguousCount: 0, emptyAccessibleNameCount: 0, associationCount: 0 });
+  assert.deepEqual(preview.findings.map((finding) => [finding.kind, finding.element, finding.confidence, finding.suggestedPatch.attribute]), [
+    ["duplicate-literal-id", "input", "high", "id/htmlFor"],
+    ["duplicate-literal-id", "input", "high", "id/htmlFor"],
+  ]);
+  assert.ok(preview.findings.every((finding) => finding.duplicateId.value === "email"));
+  assert.deepEqual(preview.findings.map((finding) => finding.duplicateId.lines), [[7, 9], [7, 9]]);
+  assert.ok(preview.findings.every((finding) => finding.reason.includes("referenced by htmlFor")));
+  assert.doesNotMatch(JSON.stringify(preview), /phone.*duplicate-literal-id/);
 });
 
 test("React Web label preview suggests conservative nearby label associations", () => {
