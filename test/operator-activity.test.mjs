@@ -54,6 +54,7 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const boundaryDoc = fs.readFileSync(path.join(repoRoot, "docs", "post-merge-main-ci-echo-boundary.md"), "utf8");
   const dogfoodDoc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-merge-reminder-action-803.md"), "utf8");
   const issue823Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-merge-react-web-ci-echo-anchor-823.md"), "utf8");
+  const issue832Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "check-clean-main-ci-echo-832.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
@@ -72,6 +73,12 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue823Doc, /fresh active issue, branch, session, or PR/);
   assert.match(issue823Doc, /green CI, a successful release report, or\s+legacy local worktree residue as the active-work reason/);
   assert.match(issue823Doc, /not cleanup authority/);
+  assert.match(issue832Doc, /issue #832/i);
+  assert.match(issue832Doc, /`fooks check` must not\s+end as a status recap/);
+  assert.match(issue832Doc, /create or adopt exactly one bounded active\s+artifact first/);
+  assert.match(issue832Doc, /report only that artifact as the next development anchor/);
+  assert.match(issue832Doc, /verification or inventory\s+receipts only/);
+  assert.match(issue832Doc, /not change runtime\/provider behavior/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
