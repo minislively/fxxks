@@ -53,6 +53,7 @@ function makeTempProject() {
 test("operator reminder docs require a blocker or active artifact after clean CI/React echoes", () => {
   const boundaryDoc = fs.readFileSync(path.join(repoRoot, "docs", "post-merge-main-ci-echo-boundary.md"), "utf8");
   const dogfoodDoc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-merge-reminder-action-803.md"), "utf8");
+  const issue823Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-merge-react-web-ci-echo-anchor-823.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
@@ -66,6 +67,11 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(dogfoodDoc, /create or adopt one active issue, branch, session, or PR evidence artifact/);
   assert.match(dogfoodDoc, /Clean CI, clean React Web release-report echoes, and stale\s+local worktree inventory are verification or review receipts only/);
   assert.equal(/must repeat clean status as the next development action/.test(dogfoodDoc), false);
+  assert.match(issue823Doc, /issue #823/i);
+  assert.match(issue823Doc, /post-merge React Web CI or release-report nudge must stay non-active unless a\s+fresh active artifact exists/);
+  assert.match(issue823Doc, /fresh active issue, branch, session, or PR/);
+  assert.match(issue823Doc, /green CI, a successful release report, or\s+legacy local worktree residue as the active-work reason/);
+  assert.match(issue823Doc, /not cleanup authority/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
