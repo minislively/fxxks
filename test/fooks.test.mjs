@@ -4970,14 +4970,23 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const docPath = path.join(repoRoot, "docs", "react-web-first-minute-work-orders.md");
   const doc = fs.readFileSync(docPath, "utf8");
+  const demoPath = path.join(repoRoot, "docs", "demo", "react-web-issues.md");
+  const demo = fs.readFileSync(demoPath, "utf8");
   const releaseSmoke = fs.readFileSync(path.join(repoRoot, "scripts", "release-smoke.mjs"), "utf8");
 
   assert.match(readme, /docs\/react-web-first-minute-work-orders\.md/);
+  assert.match(readme, /docs\/demo\/react-web-issues\.md/);
+  assert.match(readme, /frontend change intelligence/i);
+  assert.match(readme, /fooks inspect react-web-issues src\/components\/Form\.tsx/);
+  assert.match(readme, /advisory inspect-first input rather than edit authority/);
+  assert.match(readme, /estimate-scoped supporting evidence|estimate-scoped supporting proof|estimate-scoped/);
   assert.match(readme, /--summary-json/);
   assert.match(readme, /firstMinuteSummary\.items\[0\]/);
   assert.match(readme, /advisory inspect-first input rather than edit authority/);
   assert.ok(pkg.files.includes("docs/react-web-first-minute-work-orders.md"));
+  assert.ok(pkg.files.includes("docs/demo/react-web-issues.md"));
   assert.match(releaseSmoke, /docs\/react-web-first-minute-work-orders\.md/);
+  assert.match(releaseSmoke, /docs\/demo\/react-web-issues\.md/);
 
   assert.match(doc, /first-minute mini work order/i);
   assert.match(doc, /Before and after/);
@@ -5033,6 +5042,30 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.doesNotMatch(doc, /infers? custom-component semantics/i);
   assert.doesNotMatch(doc, /React Native support is available|WebView support is available|TUI support is available/i);
   assert.doesNotMatch(doc, /runs? (?:a )?codemod|codemod execution|CI enforcement|enforces in CI/i);
+
+  assert.match(demo, /React Web issue-card golden demo/);
+  assert.match(demo, /\.\.\/react-web-first-minute-work-orders\.md/);
+  assert.match(demo, /fooks inspect react-web-issues fixtures\/compressed\/FormControls\.tsx/);
+  assert.match(demo, /Before source/);
+  assert.match(demo, /problem/);
+  assert.match(demo, /whyItMatters/);
+  assert.match(demo, /whereToLook/);
+  assert.match(demo, /confidence/);
+  assert.match(demo, /suggestedAction/);
+  assert.match(demo, /--summary-json/);
+  assert.match(demo, /firstMinuteSummary|First-minute handoff/);
+  assert.match(demo, /--dry-run-json/);
+  assert.match(demo, /previewAvailable/);
+  assert.match(demo, /humanReviewRequired/);
+  assert.match(demo, /autoApply/);
+  assert.match(demo, /dryRunOnly/);
+  assert.match(demo, /read-only review aid/);
+  assert.match(demo, /Do \*\*not\*\* generate final label copy automatically/);
+  assert.match(demo, /No broad accessibility audit/);
+  assert.match(demo, /No RN\/WebView\/TUI expansion/);
+  assert.match(demo, /No billing proof/);
+  assert.doesNotMatch(demo, /Auto-apply: yes|must-edit|automatically edits files/i);
+  assert.doesNotMatch(demo, /React Native support is available|WebView support is available|TUI support is available/i);
 });
 
 test("package release surface keeps internal docs out of the npm tarball", () => {
