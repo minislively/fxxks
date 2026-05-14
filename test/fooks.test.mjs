@@ -17,6 +17,18 @@ import { cleanupMetricSessions } from "./metric-cleanup.mjs";
 const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
 const require = createRequire(import.meta.url);
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function readReactWebIssueGoldenText(name) {
+  return fs.readFileSync(path.join(repoRoot, "test", "fixtures", "react-web-issues-golden", name), "utf8").trimEnd();
+}
+
+function readReactWebIssueGoldenJson(name) {
+  return JSON.parse(fs.readFileSync(path.join(repoRoot, "test", "fixtures", "react-web-issues-golden", name), "utf8"));
+}
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
 const {
   DESIGN_REVIEW_METADATA_ITEM_CAPS,
@@ -5066,6 +5078,21 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(demo, /No billing proof/);
   assert.doesNotMatch(demo, /Auto-apply: yes|must-edit|automatically edits files/i);
   assert.doesNotMatch(demo, /React Native support is available|WebView support is available|TUI support is available/i);
+});
+
+
+test("React Web issue-card public demo keeps selected golden handoff strings", () => {
+  const demo = fs.readFileSync(path.join(repoRoot, "docs", "demo", "react-web-issues.md"), "utf8");
+  const summaryGolden = readReactWebIssueGoldenJson("form-controls.summary.selected.json");
+  const dryRunGolden = readReactWebIssueGoldenJson("form-controls.dry-run.selected.json");
+  const firstItem = summaryGolden.firstMinuteSummary.firstItem;
+
+  assert.match(demo, new RegExp(escapeRegExp(firstItem.firstInspectStep)));
+  assert.match(demo, new RegExp(escapeRegExp(firstItem.nextAction)));
+  assert.match(demo, new RegExp(escapeRegExp(firstItem.humanDecisionNeeded[0])));
+  assert.match(demo, new RegExp(escapeRegExp(firstItem.doNotDo[0])));
+  assert.match(demo, new RegExp(escapeRegExp(firstItem.doNotDo[2])));
+  assert.match(demo, new RegExp(escapeRegExp(String(dryRunGolden.firstCandidate.dryRunOnly))));
 });
 
 test("package release surface keeps internal docs out of the npm tarball", () => {

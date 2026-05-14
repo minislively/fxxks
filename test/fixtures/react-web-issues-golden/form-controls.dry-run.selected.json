@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "react-web-issue-report-migration-dry-run.v1",
+  "projection": "migration-dry-run-json",
+  "filePath": "fixtures/compressed/FormControls.tsx",
+  "readOnly": true,
+  "dryRunOnly": true,
+  "autoApply": false,
+  "summary": {
+    "candidateCount": 5,
+    "affectedFiles": [
+      "fixtures/compressed/FormControls.tsx"
+    ],
+    "safePreviewCandidateCount": 0,
+    "manualReviewCandidateCount": 5
+  },
+  "firstCandidate": {
+    "issueId": "react-web-label-1",
+    "affectedFile": "fixtures/compressed/FormControls.tsx",
+    "migrationCandidate": "human-reviewed-native-control-name",
+    "firstInspectStep": "Inspect fixtures/compressed/FormControls.tsx:23-23 (input) before editing.",
+    "previewAvailable": false,
+    "humanReviewRequired": true,
+    "autoApply": false,
+    "dryRunOnly": true,
+    "riskNotes": [
+      "Correct user-facing accessible-name copy requires human review, so fooks reports the issue and does not auto-apply it.",
+      "No deterministic safe preview is available; choose the final label/name shape from local source context.",
+      "Do not apply patches automatically or generate accessible-name copy from this dry run.",
+      "Do not infer custom-component semantics."
+    ],
+    "decision": {
+      "state": "dry-run-candidate-only",
+      "allowedActions": {
+        "inspect": true,
+        "suggestPatch": false,
+        "applyPatch": false,
+        "generateCopy": false
+      },
+      "humanReviewRequired": true,
+      "autoApply": false
+    }
+  }
+}
