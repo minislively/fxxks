@@ -66,9 +66,12 @@ or mutation authority.
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
   `verdict: "idleRequiresActiveArtifact"` with
-  `requiredActiveArtifact.required: true`; the acceptable active artifacts are
-  an open GitHub issue, an open GitHub pull request, or a mapped fooks tmux
-  session.
+  `requiredActiveArtifact.required: true`; `requiredActiveArtifact.dogfoodHandoff`
+  must expose `status: "requires-live-artifact"`,
+  `requiredBeforeNextDevelopmentAction: true`, and the
+  `ci-echo-and-stale-residue-are-not-active-work` evidence boundary. The
+  acceptable active artifacts are an open GitHub issue, an open GitHub pull
+  request, or a mapped fooks tmux session.
 - `fooks status activity --include-remote-counts --json` exposes
   `currentRunEvidence`. The non-active echo case is only
   `classification: "mainEchoNonActive"` with `mainEchoEvidence: true` and

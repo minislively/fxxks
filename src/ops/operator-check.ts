@@ -80,6 +80,12 @@ export type OperatorCheckRequiredActiveArtifact = {
   required: boolean;
   acceptableArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"];
   message: string;
+  dogfoodHandoff: {
+    status: "requires-live-artifact" | "satisfied" | "blocked";
+    requiredBeforeNextDevelopmentAction: boolean;
+    evidenceBoundary: "ci-echo-and-stale-residue-are-not-active-work";
+    nextAction: string;
+  };
 };
 
 export type OperatorCheckActiveWorkReceiptIdentifiers = {
@@ -839,13 +845,27 @@ function activeArtifactsFrom(activity: OperatorActivitySnapshot): OperatorCheckA
   return artifacts;
 }
 
-function requiredActiveArtifact(required: boolean): OperatorCheckRequiredActiveArtifact {
+function requiredActiveArtifact(state: { blocked: boolean; hasActiveArtifact: boolean }): OperatorCheckRequiredActiveArtifact {
+  const required = !state.blocked && !state.hasActiveArtifact;
+  const status = state.blocked ? "blocked" : required ? "requires-live-artifact" : "satisfied";
   return {
     required,
     acceptableArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"],
-    message: required
-      ? "No concrete active issue, PR, or mapped fooks session is present; create or link one before treating post-merge main echoes as active work."
-      : "A concrete active issue, PR, or mapped fooks session is present, so the snapshot is not idle echo-only evidence.",
+    message: state.blocked
+      ? "Operator check is blocked; resolve blockers before deciding whether an active issue, PR, or mapped fooks session is required."
+      : required
+        ? "No concrete active issue, PR, or mapped fooks session is present; create or link one before treating post-merge main echoes as active work."
+        : "A concrete active issue, PR, or mapped fooks session is present, so the snapshot is not idle echo-only evidence.",
+    dogfoodHandoff: {
+      status,
+      requiredBeforeNextDevelopmentAction: required,
+      evidenceBoundary: "ci-echo-and-stale-residue-are-not-active-work",
+      nextAction: state.blocked
+        ? "Resolve operator-check blockers before using this snapshot for session-whip handoff."
+        : required
+          ? "Create or link an open issue, open PR, or mapped fooks tmux session before reporting this clean post-merge snapshot as active work."
+          : "Continue using the concrete active artifact already present in this snapshot.",
+    },
   };
 }
 
@@ -884,7 +904,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
     activeArtifacts,
     activeWorkReceipts,
-    requiredActiveArtifact: requiredActiveArtifact(!blocked && !hasActiveArtifact),
+    requiredActiveArtifact: requiredActiveArtifact({ blocked, hasActiveArtifact }),
     activity,
     blockers,
   };
