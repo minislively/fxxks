@@ -36,7 +36,8 @@ type ReactWebIssueKind =
   | "react-web.ambiguous-accessible-label"
   | "react-web.empty-accessible-name"
   | "react-web.unassociated-nearby-label"
-  | "react-web.duplicate-literal-id";
+  | "react-web.duplicate-literal-id"
+  | "react-web.missing-htmlFor-target";
 
 export type ReactWebIssueTriageEvidence = {
   safePreviewAvailable: boolean;
@@ -60,6 +61,7 @@ export type ReactWebIssueTriage = {
 type ReactWebIssueFixShape =
   | "safe-preview-htmlFor-association"
   | "human-reviewed-label-association"
+  | "human-reviewed-htmlFor-target"
   | "human-reviewed-placeholder-replacement"
   | "human-reviewed-button-name"
   | "human-reviewed-native-control-name"
@@ -344,6 +346,8 @@ function problemFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return `Nearby label text is not explicitly associated with this native ${finding.element}.`;
     case "duplicate-literal-id":
       return `Native ${finding.element} has an ambiguous duplicate id association.`;
+    case "missing-htmlFor-target":
+      return `Native label htmlFor target is missing from same-file literal id evidence.`;
   }
 }
 
@@ -359,6 +363,8 @@ function whyItMattersFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return "Visible label text may not be programmatically connected to the native form control.";
     case "duplicate-literal-id":
       return "Duplicate literal id values can make htmlFor/control associations ambiguous for assistive technology and DOM lookup behavior.";
+    case "missing-htmlFor-target":
+      return "A native label with htmlFor must reference an existing control id; otherwise visible label text may not be programmatically connected to its intended control.";
   }
 }
 
@@ -374,6 +380,8 @@ function suggestedFixIntentFor(finding: ReactWebLabelPatchPreviewFinding): strin
       return "Connect the nearby native label/control pair with htmlFor/id when the preview evidence remains valid.";
     case "duplicate-literal-id":
       return "Inspect every same-file duplicate id occurrence and choose unique, human-reviewed id/htmlFor associations.";
+    case "missing-htmlFor-target":
+      return "Inspect the exact native label line, verify whether the target id should exist in this file, and manually choose a human-reviewed htmlFor/id association or stop if the target is intentionally external.";
   }
 }
 
@@ -399,6 +407,9 @@ function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
   if (finding.kind === "duplicate-literal-id") {
     return "Duplicate literal id associations require source inspection and coordinated id/htmlFor choices, so fooks reports the ambiguity and does not auto-apply it.";
   }
+  if (finding.kind === "missing-htmlFor-target") {
+    return "A missing htmlFor target may require adding or correcting an id, moving the label, or recognizing intentional cross-file/runtime wiring, so fooks reports the exact native label line for manual review and does not auto-apply it.";
+  }
   return "Correct user-facing accessible-name copy requires human review, so fooks reports the issue and does not auto-apply it.";
 }
 
@@ -408,6 +419,9 @@ function skipReasonFor(finding: ReactWebLabelPatchPreviewFinding): string {
   }
   if (finding.kind === "duplicate-literal-id") {
     return "Preview skipped because duplicate literal id associations must be resolved by inspecting every same-file occurrence first.";
+  }
+  if (finding.kind === "missing-htmlFor-target") {
+    return "Preview skipped because the htmlFor target is absent from same-file literal id evidence; stop if source inspection shows the target is intentionally generated, external, or no longer missing.";
   }
   return "Preview skipped because generated accessible-name copy would require human review.";
 }
@@ -434,6 +448,7 @@ function nativeElementWeight(element: ReactWebLabelPatchPreviewFinding["element"
     case "textarea":
       return 2;
     case "button":
+    case "label":
       return 1;
   }
 }
@@ -548,6 +563,7 @@ function fixShapeFor(options: {
   }
   if (options.finding.kind === "empty-accessible-name") return "human-reviewed-accessible-name";
   if (options.finding.kind === "duplicate-literal-id") return "human-reviewed-duplicate-id-association";
+  if (options.finding.kind === "missing-htmlFor-target") return "human-reviewed-htmlFor-target";
   if (options.finding.element === "button") return "human-reviewed-button-name";
   if (
     hasAttributeSignal(options.attributes, "name") ||
@@ -565,6 +581,8 @@ function fixShapeSummaryFor(shape: ReactWebIssueFixShape, element: ReactWebLabel
       return `Inspect the read-only htmlFor/id association preview for this native ${element}; use only after human review.`;
     case "human-reviewed-label-association":
       return `Inspect nearby same-file label/control JSX and choose a human-reviewed association shape for this native ${element}.`;
+    case "human-reviewed-htmlFor-target":
+      return "Inspect the native label htmlFor literal and same-file id evidence before choosing any htmlFor/id target fix.";
     case "human-reviewed-placeholder-replacement":
       return `Replace placeholder-only evidence with a human-reviewed label shape for this native ${element}; do not reuse placeholder text automatically.`;
     case "human-reviewed-button-name":
@@ -594,6 +612,10 @@ function fixShapeInspectFirstFor(options: {
   }
   if (options.finding.kind === "duplicate-literal-id" && options.finding.duplicateId) {
     steps.push(`Inspect duplicate id lines: ${options.finding.duplicateId.lines.join(", ")} for id "${options.finding.duplicateId.value}" before choosing replacement ids.`);
+  }
+  if (options.finding.kind === "missing-htmlFor-target" && options.finding.missingHtmlForTarget) {
+    steps.push(`Inspect the native label htmlFor="${options.finding.missingHtmlForTarget.value}" line exactly; no same-file literal id target was found.`);
+    steps.push("Stop if the target id is intentionally generated at runtime, supplied from another file, or the source changed to include a same-file literal id.");
   }
   if (options.previewAvailable) {
     steps.push("Review the safe preview diff as a candidate shape; fooks still does not apply it.");
@@ -657,6 +679,9 @@ function contextPacketRelatedPatternFor(options: {
     const lines = options.finding.duplicateId?.lines.join(",") ?? "unknown";
     return `${base}; manual-review duplicate-id pattern because same-file literal id evidence appears on lines ${lines}.`;
   }
+  if (options.finding.kind === "missing-htmlFor-target") {
+    return `${base}; manual-review missing-htmlFor-target pattern because no same-file literal id matches the native label htmlFor value.`;
+  }
   if (options.finding.kind === "unassociated-nearby-label") {
     return `${base}; manual-review association pattern because nearby label/control evidence is not deterministic enough for a safe preview.`;
   }
@@ -696,6 +721,10 @@ function excludedInferenceFor(options: {
   }
   if (options.finding.kind === "duplicate-literal-id") {
     excluded.push("Does not choose replacement ids or rewrite htmlFor associations for duplicate id cards.");
+  }
+  if (options.finding.kind === "missing-htmlFor-target") {
+    excluded.push("Does not infer custom label component semantics or flag dynamic htmlFor expressions as missing literal targets.");
+    excluded.push("Does not choose a replacement id or rewrite htmlFor for missing-target cards.");
   }
   return excluded;
 }

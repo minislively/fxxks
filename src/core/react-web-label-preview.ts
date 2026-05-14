@@ -13,9 +13,10 @@ type ReactWebLabelFindingKind =
   | "ambiguous-accessible-label"
   | "empty-accessible-name"
   | "unassociated-nearby-label"
-  | "duplicate-literal-id";
+  | "duplicate-literal-id"
+  | "missing-htmlFor-target";
 type ReactWebLabelConfidence = "high" | "medium";
-type ReactWebInteractiveElement = "button" | "input" | "select" | "textarea";
+type ReactWebInteractiveElement = "button" | "input" | "select" | "textarea" | "label";
 
 export type ReactWebLabelPatchPreviewFinding = {
   kind: ReactWebLabelFindingKind;
@@ -28,6 +29,9 @@ export type ReactWebLabelPatchPreviewFinding = {
   duplicateId?: {
     value: string;
     lines: number[];
+  };
+  missingHtmlForTarget?: {
+    value: string;
   };
   suggestedPatch: {
     type: "unified-diff-fragment";
@@ -152,7 +156,7 @@ function hasNonEmptyAttr(values: Map<string, string>, ...names: string[]): boole
 function isWrappedByLabel(node: ts.Node): boolean {
   let current: ts.Node | undefined = node.parent;
   while (current) {
-    if (ts.isJsxElement(current) && tagNameOf(current.openingElement).toLowerCase() === "label") return true;
+    if (ts.isJsxElement(current) && tagNameOf(current.openingElement) === "label") return true;
     current = current.parent;
   }
   return false;
@@ -162,10 +166,10 @@ function collectHtmlForIds(sourceFile: ts.SourceFile): Set<string> {
   const ids = new Set<string>();
   const visit = (node: ts.Node): void => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-      if (tagNameOf(node).toLowerCase() === "label") {
+      if (tagNameOf(node) === "label") {
         for (const property of node.attributes.properties) {
           if (!ts.isJsxAttribute(property) || property.name.getText() !== "htmlFor") continue;
-          const value = jsxAttributeText(property.initializer);
+          const value = stringLiteralAttributeValue(node, "htmlFor");
           if (value) ids.add(value);
         }
       }
@@ -174,6 +178,51 @@ function collectHtmlForIds(sourceFile: ts.SourceFile): Set<string> {
   };
   visit(sourceFile);
   return ids;
+}
+
+function collectMissingHtmlForTargetFindings(options: {
+  sourceFile: ts.SourceFile;
+  lines: string[];
+  literalIds: Set<string>;
+}): ReactWebLabelPatchPreviewFinding[] {
+  const findings: ReactWebLabelPatchPreviewFinding[] = [];
+  const visit = (node: ts.Node): void => {
+    if (findings.length >= FINDING_LIMIT) return;
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      if (tagNameOf(node) === "label") {
+        const htmlFor = stringLiteralAttributeValue(node, "htmlFor");
+        if (htmlFor && !options.literalIds.has(htmlFor)) {
+          const loc = sourceRangeOf(options.sourceFile, node);
+          findings.push({
+            kind: "missing-htmlFor-target",
+            element: "label",
+            loc,
+            context: lineContext(options.lines, loc),
+            confidence: "high",
+            reason: `Native label htmlFor "${htmlFor}" has no same-file literal id target, so the label/control association must be inspected manually before any change.`,
+            evidence: [
+              "jsx.label",
+              `jsx.label.htmlFor=${htmlFor}`,
+              "same-file.id-target.missing",
+            ],
+            missingHtmlForTarget: {
+              value: htmlFor,
+            },
+            suggestedPatch: {
+              type: "unified-diff-fragment",
+              readOnly: true,
+              attribute: "htmlFor",
+              insertion: `manual-review htmlFor target ${escapeAttribute(htmlFor)}`,
+              preview: "",
+            },
+          });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(options.sourceFile);
+  return findings;
 }
 
 function escapeAttribute(value: string): string {
@@ -292,8 +341,8 @@ function findNearbyLabelAssociationCandidate(options: {
 
   const previousSibling = siblings[controlIndex - 1];
   const nextSibling = siblings[controlIndex + 1];
-  const previousLabel = previousSibling && ts.isJsxElement(previousSibling) && tagNameOf(previousSibling.openingElement).toLowerCase() === "label" ? previousSibling : undefined;
-  const nextLabel = nextSibling && ts.isJsxElement(nextSibling) && tagNameOf(nextSibling.openingElement).toLowerCase() === "label" ? nextSibling : undefined;
+  const previousLabel = previousSibling && ts.isJsxElement(previousSibling) && tagNameOf(previousSibling.openingElement) === "label" ? previousSibling : undefined;
+  const nextLabel = nextSibling && ts.isJsxElement(nextSibling) && tagNameOf(nextSibling.openingElement) === "label" ? nextSibling : undefined;
   const labelElement = previousLabel ?? nextLabel;
   if (!labelElement) return undefined;
   const labelAttrs = attributesOf(labelElement.openingElement).values;
@@ -450,6 +499,7 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
   const literalIdLocations = literalAttributeLocations(sourceFile, "id");
   const literalIds = new Set(literalIdCounts.keys());
   const controlNameCounts = countLiteralAttributeValues(sourceFile, "name");
+  const missingHtmlForTargetFindings = collectMissingHtmlForTargetFindings({ sourceFile, lines, literalIds });
   const findings: ReactWebLabelPatchPreviewFinding[] = [];
 
   const visit = (node: ts.Node): void => {
@@ -547,17 +597,23 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
   };
   visit(sourceFile);
 
+  const missingHtmlForTargetLimit = Math.max(0, FINDING_LIMIT - findings.length);
+  const cappedFindings = [
+    ...missingHtmlForTargetFindings.slice(0, missingHtmlForTargetLimit),
+    ...findings,
+  ].slice(0, FINDING_LIMIT);
+
   return {
     ...base,
     inScope: true,
     summary: {
-      findingCount: findings.length,
-      missingCount: findings.filter((finding) => finding.kind === "missing-accessible-label").length,
-      ambiguousCount: findings.filter((finding) => finding.kind === "ambiguous-accessible-label").length,
-      emptyAccessibleNameCount: findings.filter((finding) => finding.kind === "empty-accessible-name").length,
-      associationCount: findings.filter((finding) => finding.kind === "unassociated-nearby-label").length,
+      findingCount: cappedFindings.length,
+      missingCount: cappedFindings.filter((finding) => finding.kind === "missing-accessible-label").length,
+      ambiguousCount: cappedFindings.filter((finding) => finding.kind === "ambiguous-accessible-label").length,
+      emptyAccessibleNameCount: cappedFindings.filter((finding) => finding.kind === "empty-accessible-name").length,
+      associationCount: cappedFindings.filter((finding) => finding.kind === "unassociated-nearby-label").length,
     },
-    findings,
+    findings: cappedFindings,
   };
 }
 

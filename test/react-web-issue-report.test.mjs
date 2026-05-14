@@ -45,6 +45,7 @@ const fixtures = {
   emptyAriaLabel: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx"),
   quietNativeEvidence: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx"),
   duplicateIds: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx"),
+  missingHtmlForTarget: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -379,6 +380,43 @@ test("React Web issue report emits manual-review cards for duplicate literal nat
   assert.equal(first.decision.autoApply, false);
   assert.equal(first.decision.humanReviewRequired, true);
   assert.doesNotMatch(JSON.stringify(report), /Auto-apply: yes|must-edit/i);
+});
+
+test("React Web issue report emits manual-review cards for native label htmlFor literals without same-file targets", () => {
+  const report = parseIssues(fixtures.missingHtmlForTarget);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.summary.issueCount, 3);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.manualReviewCount, 3);
+  assert.equal(report.summary.unsafeToAutoApplyCount, 3);
+  const issue = report.issues.find((item) => item.kind === "react-web.missing-htmlFor-target");
+  assert.ok(issue);
+  assert.equal(issue.kind, "react-web.missing-htmlFor-target");
+  assert.equal(issue.whereToLook.filePath, "test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx");
+  assert.equal(issue.whereToLook.line, 16);
+  assert.equal(issue.evidence.element, "label");
+  assert.equal(issue.confidence, "high");
+  assert.equal(issue.fixability, "manual-review");
+  assert.equal(issue.autoFixSafety, "unsafe-to-auto-apply");
+  assert.equal(issue.preview, undefined);
+  assert.match(issue.problem, /htmlFor target is missing/);
+  assert.match(issue.whyItMatters, /must reference an existing control id/);
+  assert.match(issue.suggestedAction, /exact native label line/);
+  assert.match(issue.skipReason, /target is absent from same-file literal id evidence/);
+  assert.deepEqual(issue.fixShapeGuidance.shape, "human-reviewed-htmlFor-target");
+  assert.ok(issue.fixShapeGuidance.inspectFirst.some((entry) => /htmlFor="display-name"/.test(entry)));
+  assert.ok(issue.fixShapeGuidance.inspectFirst.some((entry) => /Stop if the target id is intentionally generated at runtime/.test(entry)));
+  assert.ok(issue.contextPacket.excludedInference.some((entry) => /dynamic htmlFor expressions/.test(entry)));
+  assert.ok(issue.contextPacket.excludedInference.some((entry) => /Does not choose a replacement id/.test(entry)));
+  assert.deepEqual(issue.evidence.sourceSignals, ["jsx.label", "jsx.label.htmlFor=display-name", "same-file.id-target.missing"]);
+  assert.equal(issue.decision.allowedActions.inspect, true);
+  assert.equal(issue.decision.allowedActions.applyPatch, false);
+  assert.equal(issue.decision.autoApply, false);
+  assert.equal(issue.decision.humanReviewRequired, true);
+  assert.ok(report.issues.some((item) => item.evidence.context.includes("wrappedByCustomLabel")));
+  assert.ok(report.issues.some((item) => item.evidence.context.includes("siblingCustomLabel")));
+  assert.doesNotMatch(JSON.stringify(report), /react-web\\.missing-htmlFor-target.*dynamicTarget|FieldLabel|design-system-field/s);
 });
 
 test("React Web issue report turns nearby native associations into safe preview cards", () => {
@@ -790,7 +828,8 @@ test("React Web issue report avoids unsafe htmlFor inference and keeps fallback 
   assert.ok(report.issues.every((issue) => issue.relatedContext.length <= 5));
   assert.ok(report.issues.every((issue) => issue.relatedContext.every((entry) => entry.action === "inspect-first")));
   assert.doesNotMatch(JSON.stringify(report.issues.flatMap((issue) => issue.relatedContext)), /must-edit|auto-apply/i);
-  assert.doesNotMatch(JSON.stringify(report), /htmlFor=/);
+  assert.equal(report.issues.filter((issue) => issue.kind === "react-web.missing-htmlFor-target").length, 1);
+  assert.doesNotMatch(JSON.stringify(report.issues.filter((issue) => issue.kind !== "react-web.missing-htmlFor-target")), /htmlFor=/);
 });
 
 test("React Web issue report text mode is issue-card-first and prints the claim boundary", () => {
