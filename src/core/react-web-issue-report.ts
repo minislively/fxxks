@@ -34,6 +34,7 @@ export type ReactWebRelatedContextQuality = "same-file-only" | "local-supporting
 type ReactWebIssueKind =
   | "react-web.missing-accessible-label"
   | "react-web.ambiguous-accessible-label"
+  | "react-web.empty-accessible-name"
   | "react-web.unassociated-nearby-label";
 
 export type ReactWebIssueTriageEvidence = {
@@ -335,6 +336,8 @@ function problemFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return `Native ${finding.element} lacks recognized accessible-label evidence.`;
     case "ambiguous-accessible-label":
       return `Native ${finding.element} only has ambiguous accessible-label evidence.`;
+    case "empty-accessible-name":
+      return `Native ${finding.element} has empty accessible-name evidence.`;
     case "unassociated-nearby-label":
       return `Nearby label text is not explicitly associated with this native ${finding.element}.`;
   }
@@ -346,6 +349,8 @@ function whyItMattersFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return "Users of assistive technology may not get a meaningful control name, making the control hard to understand or operate.";
     case "ambiguous-accessible-label":
       return "Placeholder-only labeling can disappear during input and is weaker than an explicit accessible name.";
+    case "empty-accessible-name":
+      return "A blank aria-label creates accessible-name evidence that communicates no useful control name.";
     case "unassociated-nearby-label":
       return "Visible label text may not be programmatically connected to the native form control.";
   }
@@ -357,6 +362,8 @@ function suggestedFixIntentFor(finding: ReactWebLabelPatchPreviewFinding): strin
       return "Add an explicit accessible label with human-reviewed copy for the native control.";
     case "ambiguous-accessible-label":
       return "Replace placeholder-only labeling with explicit label evidence or human-reviewed aria-label copy.";
+    case "empty-accessible-name":
+      return "Replace the empty aria-label with human-reviewed accessible-name evidence.";
     case "unassociated-nearby-label":
       return "Connect the nearby native label/control pair with htmlFor/id when the preview evidence remains valid.";
   }
@@ -525,6 +532,7 @@ function fixShapeFor(options: {
   if (options.finding.kind === "ambiguous-accessible-label" && hasAttributeSignal(options.attributes, "placeholder")) {
     return "human-reviewed-placeholder-replacement";
   }
+  if (options.finding.kind === "empty-accessible-name") return "human-reviewed-accessible-name";
   if (options.finding.element === "button") return "human-reviewed-button-name";
   if (
     hasAttributeSignal(options.attributes, "name") ||

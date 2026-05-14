@@ -42,6 +42,7 @@ const fixtures = {
   unsafeAssociation: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "label-association-unsafe.tsx"),
   relatedContext: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "related-context-form.tsx"),
   expandedNativeControls: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx"),
+  emptyAriaLabel: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -314,6 +315,37 @@ test("React Web issue report emits actionable issue cards over label preview fin
     assert.doesNotMatch(JSON.stringify(issue.relatedContext), /must-edit|auto-apply/i);
     assert.equal(issue.preview, undefined);
   }
+});
+
+test("React Web issue report emits manual-review cards for empty native aria-labels", () => {
+  const report = parseIssues(fixtures.emptyAriaLabel);
+  const preview = buildReactWebLabelPatchPreview(fixtures.emptyAriaLabel, repoRoot);
+
+  assert.equal(report.summary.issueCount, 3);
+  assert.equal(report.summary.manualReviewCount, 3);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.unsafeToAutoApplyCount, 3);
+  assert.equal(report.summary.issueCount, preview.summary.findingCount);
+  assert.equal(preview.summary.emptyAccessibleNameCount, 3);
+  assert.ok(report.issues.every((issue) => issue.kind === "react-web.empty-accessible-name"));
+  assert.deepEqual(report.issues.map((issue) => [issue.evidence.element, issue.confidence, issue.fixability, issue.autoFixSafety, Boolean(issue.preview)]), [
+    ["input", "high", "manual-review", "unsafe-to-auto-apply", false],
+    ["button", "high", "manual-review", "unsafe-to-auto-apply", false],
+    ["textarea", "high", "manual-review", "unsafe-to-auto-apply", false],
+  ]);
+
+  const first = report.issues[0];
+  assert.match(first.problem, /empty accessible-name evidence/);
+  assert.match(first.whyItMatters, /blank aria-label/);
+  assert.match(first.suggestedAction, /Replace the empty aria-label/);
+  assert.match(first.contextPacket.relatedPattern, /react-web\.empty-accessible-name/);
+  assert.equal(first.decision.allowedActions.inspect, true);
+  assert.equal(first.decision.allowedActions.applyPatch, false);
+  assert.equal(first.decision.allowedActions.generateCopy, false);
+  assert.equal(first.decision.autoApply, false);
+  assert.equal(first.decision.humanReviewRequired, true);
+  assert.ok(first.fixShapeGuidance.inspectFirst.some((entry) => /does not generate final label\/name copy/.test(entry)));
+  assert.doesNotMatch(JSON.stringify(report), /Auto-apply: yes|must-edit/i);
 });
 
 test("React Web issue report turns nearby native associations into safe preview cards", () => {
