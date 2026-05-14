@@ -6,9 +6,9 @@ import type { SourceRange } from "./schema";
 
 export const REACT_WEB_LABEL_PATCH_PREVIEW_SCHEMA_VERSION = "react-web-label-patch-preview.v1" as const;
 export const REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY =
-  "Read-only React Web JSX label preview only: detects a narrow set of native interactive elements with missing or ambiguous accessible-label evidence and suggests deterministic patch fragments without editing files or claiming full accessibility coverage." as const;
+  "Read-only React Web JSX label preview only: detects a narrow set of native interactive elements with missing, ambiguous, or empty accessible-label evidence and suggests read-only patch fragments without editing files or claiming full accessibility coverage." as const;
 
-type ReactWebLabelFindingKind = "missing-accessible-label" | "ambiguous-accessible-label" | "unassociated-nearby-label";
+type ReactWebLabelFindingKind = "missing-accessible-label" | "ambiguous-accessible-label" | "empty-accessible-name" | "unassociated-nearby-label";
 type ReactWebLabelConfidence = "high" | "medium";
 type ReactWebInteractiveElement = "button" | "input" | "select" | "textarea";
 
@@ -43,6 +43,7 @@ export type ReactWebLabelPatchPreview = {
     findingCount: number;
     missingCount: number;
     ambiguousCount: number;
+    emptyAccessibleNameCount: number;
     associationCount: number;
   };
   findings: ReactWebLabelPatchPreviewFinding[];
@@ -101,6 +102,14 @@ function stringLiteralAttributeValue(node: JsxInteractiveNode | ts.JsxOpeningEle
     return undefined;
   }
   return undefined;
+}
+
+function hasEmptyStringLiteralAttribute(node: JsxInteractiveNode | ts.JsxOpeningElement, attrName: string): boolean {
+  for (const property of node.attributes.properties) {
+    if (!ts.isJsxAttribute(property) || property.name.getText() !== attrName) continue;
+    return Boolean(property.initializer && ts.isStringLiteral(property.initializer) && property.initializer.text.trim() === "");
+  }
+  return false;
 }
 
 function tagNameOf(node: JsxInteractiveNode | ts.JsxOpeningElement): string {
@@ -331,6 +340,16 @@ function classifyLabelEvidence(options: {
 
   if (tag === "input" && values.get("type")?.toLowerCase() === "hidden") return undefined;
 
+  if (hasEmptyStringLiteralAttribute(node, "aria-label")) {
+    return {
+      labelled: false,
+      kind: "empty-accessible-name",
+      confidence: "high",
+      reason: `Native ${tag} has an empty aria-label string literal, so the accessible name evidence is present but blank and must be replaced with human-reviewed copy.`,
+      evidence: [...evidence, `jsx.${tag}.aria-label.empty`],
+    };
+  }
+
   if (hasNonEmptyAttr(values, "aria-label")) return { labelled: true, evidence: [...evidence, `jsx.${tag}.aria-label`] };
   if (hasNonEmptyAttr(values, "aria-labelledby")) return { labelled: true, evidence: [...evidence, `jsx.${tag}.aria-labelledby`] };
   if (hasNonEmptyAttr(values, "title")) return { labelled: true, evidence: [...evidence, `jsx.${tag}.title`] };
@@ -397,7 +416,7 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
       ...base,
       inScope: false,
       skippedReason: `domain-classification:${detection.classification}`,
-      summary: { findingCount: 0, missingCount: 0, ambiguousCount: 0, associationCount: 0 },
+      summary: { findingCount: 0, missingCount: 0, ambiguousCount: 0, emptyAccessibleNameCount: 0, associationCount: 0 },
       findings: [],
     };
   }
@@ -482,6 +501,7 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
       findingCount: findings.length,
       missingCount: findings.filter((finding) => finding.kind === "missing-accessible-label").length,
       ambiguousCount: findings.filter((finding) => finding.kind === "ambiguous-accessible-label").length,
+      emptyAccessibleNameCount: findings.filter((finding) => finding.kind === "empty-accessible-name").length,
       associationCount: findings.filter((finding) => finding.kind === "unassociated-nearby-label").length,
     },
     findings,
@@ -497,7 +517,7 @@ export function renderReactWebLabelPatchPreviewText(preview: ReactWebLabelPatchP
     `File: ${preview.filePath}`,
     `Read-only: ${preview.readOnly ? "yes" : "no"}`,
     `In scope: ${preview.inScope ? "yes" : "no"}`,
-    `Findings: ${preview.summary.findingCount} (missing: ${preview.summary.missingCount}, ambiguous: ${preview.summary.ambiguousCount}, associations: ${preview.summary.associationCount})`,
+    `Findings: ${preview.summary.findingCount} (missing: ${preview.summary.missingCount}, ambiguous: ${preview.summary.ambiguousCount}, empty names: ${preview.summary.emptyAccessibleNameCount}, associations: ${preview.summary.associationCount})`,
   ];
   if (preview.skippedReason) lines.push(`Skipped: ${preview.skippedReason}`);
   if (preview.findings.length === 0) return `${lines.join("\n")}\n`;
