@@ -57,6 +57,9 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
   assert.match(boundaryDoc, /issue, branch, session, or PR/);
+  assert.match(boundaryDoc, /requiredActiveArtifact\.dogfoodHandoff/);
+  assert.match(boundaryDoc, /requires-live-artifact/);
+  assert.match(boundaryDoc, /ci-echo-and-stale-residue-are-not-active-work/);
   assert.match(dogfoodDoc, /issue #803/i);
   assert.match(dogfoodDoc, /must not repeat clean status as the next development action/);
   assert.match(dogfoodDoc, /report a real blocker/);
@@ -480,6 +483,13 @@ test("operator check forces a concrete active artifact when post-merge main echo
     "mapped fooks tmux session",
   ]);
   assert.match(snapshot.requiredActiveArtifact.message, /No concrete active issue, PR, or mapped fooks session/);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.requiredBeforeNextDevelopmentAction, true);
+  assert.equal(
+    snapshot.requiredActiveArtifact.dogfoodHandoff.evidenceBoundary,
+    "ci-echo-and-stale-residue-are-not-active-work",
+  );
+  assert.match(snapshot.requiredActiveArtifact.dogfoodHandoff.nextAction, /Create or link an open issue, open PR, or mapped fooks tmux session/);
   assert.equal(snapshot.activity.optionalCounts.enabled, true);
   assert.equal(snapshot.activity.currentRunEvidence.mainEchoEvidence, true);
   assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
@@ -540,6 +550,9 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
 
   assert.equal(snapshot.verdict, "activeArtifactPresent");
   assert.equal(snapshot.requiredActiveArtifact.required, false);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "satisfied");
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.requiredBeforeNextDevelopmentAction, false);
+  assert.match(snapshot.requiredActiveArtifact.dogfoodHandoff.nextAction, /concrete active artifact already present/);
   assert.deepEqual(snapshot.activeArtifacts, [
     { kind: "issue", count: 1, source: OPERATOR_ACTIVITY_REMOTE_SOURCE },
     { kind: "pullRequest", count: 1, source: OPERATOR_ACTIVITY_REMOTE_SOURCE },
@@ -1204,6 +1217,12 @@ test("operator check surfaces legacy local residue as cleanup-review evidence on
     "open GitHub pull request",
     "mapped fooks tmux session",
   ]);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.requiredBeforeNextDevelopmentAction, true);
+  assert.equal(
+    snapshot.requiredActiveArtifact.dogfoodHandoff.evidenceBoundary,
+    "ci-echo-and-stale-residue-are-not-active-work",
+  );
 
   const review = snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview;
   assert.equal(review.issue, "#778");
