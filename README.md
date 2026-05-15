@@ -6,6 +6,20 @@ Frontend change intelligence for Codex.
 
 First-minute path:
 
+Scenario: a user asks Codex, “implement the `Form.tsx` feature.” Before editing, fooks should be the first inspect step, not a patch authority:
+
+```text
+user request
+  -> AI starts the task
+  -> fooks preflight on the supported React Web file
+  -> current source is read for JSX / TSX form-control evidence
+  -> issue cards + compact first-minute work order are handed to the AI
+  -> AI reopens or reruns against current source if freshness no longer matches
+  -> AI keeps the user's feature scope, then edits and verifies normally
+```
+
+Treat that handoff as advisory context: it tells the agent where to inspect first, what not to assume, and when a human decision is still needed. It is not auto-fix, not auto-apply, not codemod authority, and not permission to turn a feature request into a broad accessibility audit. Unsupported or ambiguous frontend lanes should fall back to normal source reading rather than a compact fooks payload.
+
 Run the first value path on a supported React Web file:
 
 ```bash
