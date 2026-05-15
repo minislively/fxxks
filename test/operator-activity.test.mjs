@@ -1258,6 +1258,23 @@ test("operator check surfaces legacy local residue as cleanup-review evidence on
   assert.equal(review.satisfiesActiveArtifactRequirement, false);
   assert.match(review.claimBoundary, /never counts it as active work/);
   assert.match(snapshot.activeWorkReceipts.reportLine, /legacyLocalResidueCleanupReview=1\(#778\)/);
+  assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.issue, "#853");
+  assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.readOnly, true);
+  assert.deepEqual(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence, {
+    openIssueCount: 0,
+    openPullRequestCount: 0,
+    mappedFooksTmuxProcSessionCount: 0,
+  });
+  assert.deepEqual(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.cleanupReviewResidueEvidence, {
+    siblingStaleResidueCount: 0,
+    legacyLocalResidueCount: 1,
+    totalLocalOnlyResidueCount: 1,
+  });
+  assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.localOnlyResidueIsActiveWorkEvidence, false);
+  assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
+  assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.cleanupReviewEvidenceOnly, true);
+  assert.match(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.claimBoundary, /separates open issue, open PR, mapped fooks tmux\/proc session counts/);
+  assert.match(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.reminder, /cleanup-review evidence only/);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
