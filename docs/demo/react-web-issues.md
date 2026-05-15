@@ -74,6 +74,22 @@ JSON consumers should preserve the same issue-card meaning:
 }
 ```
 
+## Current representative emitted card families
+
+The public demo keeps short selected golden rows for the current React Web issue-card families instead of treating the compressed form fixture as the only example. These rows come from `fooks inspect react-web-issues <file> --json` and preserve the canonical emitted `kind` names:
+
+| Example | Golden row | Emitted kind | Fixture | Preview | Boundary |
+| --- | --- | --- | --- | --- | --- |
+| Missing native label/name | `missing-native-label-name` | `react-web.missing-accessible-label` | `test/fixtures/react-web-label-preview/missing-labels.tsx` | no | Human-reviewed label/name copy only. |
+| Ambiguous native label/name | `ambiguous-native-label-name` | `react-web.ambiguous-accessible-label` | `test/fixtures/react-web-label-preview/missing-labels.tsx` | no | Placeholder-like evidence is not final copy. |
+| Empty aria label | `empty-aria-label` | `react-web.empty-accessible-name` | `test/fixtures/react-web-label-preview/empty-aria-labels.tsx` | no | Empty accessible-name evidence requires human review. |
+| Missing same-file `htmlFor` target | `missing-htmlFor-target` | `react-web.missing-htmlFor-target` | `test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx` | no | Keep the capital `F` kind; do not reintroduce the older lowercase missing-htmlfor kind. |
+| Nearby native label/control preview | `safe-preview-nearby-label-control` | `react-web.unassociated-nearby-label` | `test/fixtures/react-web-label-preview/label-association-candidates.tsx` | yes | Preview is read-only evidence, not apply authority. |
+| Duplicate literal id | `duplicate-literal-id` | `react-web.duplicate-literal-id` | `test/fixtures/react-web-label-preview/duplicate-id-controls.tsx` | no | Inspect every duplicate id occurrence before choosing associations. |
+| Conflicting native label association | `conflicting-label-association` | `react-web.conflicting-label-association` | `test/fixtures/react-web-label-preview/conflicting-label-association.tsx` | no | Native labels targeting one id stay manual-review. |
+
+Do not derive a source issue-count API, lowercase `missing-htmlfor` kind, detector expansion, runtime/provider behavior change, merge-gate rule, performance claim, or broad product claim from these selected rows.
+
 ## First-minute handoff (`--summary-json`)
 
 Agents that only need the compact work order should read the first summary item, then inspect the current source before suggesting anything.

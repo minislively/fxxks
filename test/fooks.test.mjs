@@ -4995,6 +4995,10 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(readme, /--summary-json/);
   assert.match(readme, /firstMinuteSummary\.items\[0\]/);
   assert.match(readme, /advisory inspect-first input rather than edit authority/);
+  assert.match(readme, /react-web\.missing-htmlFor-target/);
+  assert.match(readme, /react-web\.duplicate-literal-id/);
+  assert.match(readme, /react-web\.conflicting-label-association/);
+  assert.doesNotMatch(readme, /react-web\.missing-htmlfor-target|sourceIssueCounts/);
   assert.ok(pkg.files.includes("docs/react-web-first-minute-work-orders.md"));
   assert.ok(pkg.files.includes("docs/demo/react-web-issues.md"));
   assert.match(releaseSmoke, /docs\/react-web-first-minute-work-orders\.md/);
@@ -5071,12 +5075,21 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(demo, /humanReviewRequired/);
   assert.match(demo, /autoApply/);
   assert.match(demo, /dryRunOnly/);
+  assert.match(demo, /Current representative emitted card families/);
+  assert.match(demo, /react-web\.missing-accessible-label/);
+  assert.match(demo, /react-web\.ambiguous-accessible-label/);
+  assert.match(demo, /react-web\.empty-accessible-name/);
+  assert.match(demo, /react-web\.missing-htmlFor-target/);
+  assert.match(demo, /react-web\.unassociated-nearby-label/);
+  assert.match(demo, /react-web\.duplicate-literal-id/);
+  assert.match(demo, /react-web\.conflicting-label-association/);
   assert.match(demo, /read-only review aid/);
   assert.match(demo, /Do \*\*not\*\* generate final label copy automatically/);
   assert.match(demo, /No broad accessibility audit/);
   assert.match(demo, /No RN\/WebView\/TUI expansion/);
   assert.match(demo, /No billing proof/);
   assert.doesNotMatch(demo, /Auto-apply: yes|must-edit|automatically edits files/i);
+  assert.doesNotMatch(demo, /react-web\.missing-htmlfor-target|sourceIssueCounts/);
   assert.doesNotMatch(demo, /React Native support is available|WebView support is available|TUI support is available/i);
 });
 
@@ -5085,6 +5098,7 @@ test("React Web issue-card public demo keeps selected golden handoff strings", (
   const demo = fs.readFileSync(path.join(repoRoot, "docs", "demo", "react-web-issues.md"), "utf8");
   const summaryGolden = readReactWebIssueGoldenJson("form-controls.summary.selected.json");
   const dryRunGolden = readReactWebIssueGoldenJson("form-controls.dry-run.selected.json");
+  const familyGolden = readReactWebIssueGoldenJson("current-card-families.selected.json");
   const firstItem = summaryGolden.firstMinuteSummary.firstItem;
 
   assert.match(demo, new RegExp(escapeRegExp(firstItem.firstInspectStep)));
@@ -5093,6 +5107,11 @@ test("React Web issue-card public demo keeps selected golden handoff strings", (
   assert.match(demo, new RegExp(escapeRegExp(firstItem.doNotDo[0])));
   assert.match(demo, new RegExp(escapeRegExp(firstItem.doNotDo[2])));
   assert.match(demo, new RegExp(escapeRegExp(String(dryRunGolden.firstCandidate.dryRunOnly))));
+  for (const family of familyGolden.families) {
+    assert.match(demo, new RegExp(escapeRegExp(family.name)));
+    assert.match(demo, new RegExp(escapeRegExp(family.filePath)));
+    assert.match(demo, new RegExp(escapeRegExp(family.selectedIssue.kind)));
+  }
 });
 
 test("package release surface keeps internal docs out of the npm tarball", () => {
