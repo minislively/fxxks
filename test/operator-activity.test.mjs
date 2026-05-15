@@ -727,7 +727,7 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   assert.equal(localAheadManifestRow?.evidence.aheadOfBase, 2);
   assert.equal(localAheadManifestRow?.evidence.remoteBranchExists, false);
 
-  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.issue, "#726");
+  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.issue, "#843");
   assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.readOnly, true);
   assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.itemCount, 1);
   assert.match(snapshot.activeWorkReceipts.salvageReviewQueue.claimBoundary, /does not delete, push, fetch, mutate/);
