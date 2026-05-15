@@ -56,6 +56,7 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const issue823Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-merge-react-web-ci-echo-anchor-823.md"), "utf8");
   const issue832Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "check-clean-main-ci-echo-832.md"), "utf8");
   const issue857Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-development-reminder-857.md"), "utf8");
+  const issue863Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "green-receipt-next-anchor-863.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
@@ -90,6 +91,17 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue857Doc, /branch `er\/clean-slate-reminder-857`/);
   assert.match(issue857Doc, /node --test test\/operator-activity\.test\.mjs test\/post-merge-main-ci-echo-boundary-doc\.test\.mjs/);
   assert.match(issue857Doc, /does not change provider\s+behavior, merge gates, detector scope, frontend behavior, cleanup policy,\s+performance claims, or product claims/);
+  assert.match(issue863Doc, /issue #863/i);
+  assert.match(issue863Doc, /final green post-merge `main` receipts from the next fooks\s+development anchor/);
+  assert.match(issue863Doc, /both `main` CI and the React Web release-report\s+green/);
+  assert.match(issue863Doc, /final verification receipts only/);
+  assert.match(issue863Doc, /neither receipt is a concrete next-development anchor by itself/);
+  assert.match(issue863Doc, /create or adopt one concrete issue, branch, session,\s+or PR artifact/);
+  assert.match(issue863Doc, /report the concrete blocker that prevents creating or\s+adopting an issue, branch, session, or PR artifact/);
+  assert.match(issue863Doc, /must not repeat the final green `main` CI receipt or React Web\s+release-report receipt as the answer/);
+  assert.match(issue863Doc, /branch `dogfood\/issue-863-green-receipt-next-anchor`/);
+  assert.match(issue863Doc, /node --test test\/operator-activity\.test\.mjs test\/post-merge-main-ci-echo-boundary-doc\.test\.mjs/);
+  assert.match(issue863Doc, /does not\s+change runtime\/provider behavior, merge-gate policy, detector scope, React Web\s+behavior, React Native behavior, TUI behavior, WebView behavior, performance\s+claims, or product claims/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
