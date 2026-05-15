@@ -136,6 +136,12 @@ receipt-only report is not an active development anchor.
   CI success as receipts only, sets repeated receipt-only reports to false, and
   requires newly created/adopted issue evidence plus mapped OMX session evidence
   before the next nudge report can describe active development.
+- `docs/dogfood/current-development-nudge-target-871.md` is the issue #871
+  current-development nudge target artifact. It keeps PR #870 merged CI/release
+  receipts receipt-only and documents that the answer to "what is being
+  developed" must use current target evidence: spawned issue #871, the spawned
+  non-`main` branch/worktree, mapped OMX session, and the `delta`, `ahead`, and
+  `proc` fields.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
