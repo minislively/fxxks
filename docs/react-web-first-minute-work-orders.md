@@ -75,6 +75,8 @@ The important invariants are structural: **current source evidence outranks advi
 
 ## Agent/tool handoff
 
+For a feature request such as “implement the `Form.tsx` feature,” this handoff should shape the agent's first minute, not replace source reading. Run the supported React Web inspect surface, keep the decision and do-not-do fields attached, confirm the current source still matches the reported evidence, then continue the requested feature work without widening it into an automatic fix or broad audit.
+
 ### Agent integration decision tree
 
 An agent should choose the smallest inspect surface that answers the handoff question:
