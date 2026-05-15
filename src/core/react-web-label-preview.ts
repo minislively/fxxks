@@ -13,6 +13,7 @@ type ReactWebLabelFindingKind =
   | "ambiguous-accessible-label"
   | "empty-accessible-name"
   | "unassociated-nearby-label"
+  | "conflicting-label-association"
   | "duplicate-literal-id"
   | "missing-htmlFor-target";
 type ReactWebLabelConfidence = "high" | "medium";
@@ -32,6 +33,11 @@ export type ReactWebLabelPatchPreviewFinding = {
   };
   missingHtmlForTarget?: {
     value: string;
+  };
+  conflictingLabelAssociation?: {
+    value: string;
+    labelLines: number[];
+    controlLine: number;
   };
   suggestedPatch: {
     type: "unified-diff-fragment";
@@ -162,23 +168,24 @@ function isWrappedByLabel(node: ts.Node): boolean {
   return false;
 }
 
-function collectHtmlForIds(sourceFile: ts.SourceFile): Set<string> {
-  const ids = new Set<string>();
+function collectHtmlForReferences(sourceFile: ts.SourceFile): Map<string, SourceRange[]> {
+  const references = new Map<string, SourceRange[]>();
   const visit = (node: ts.Node): void => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       if (tagNameOf(node) === "label") {
         for (const property of node.attributes.properties) {
           if (!ts.isJsxAttribute(property) || property.name.getText() !== "htmlFor") continue;
           const value = stringLiteralAttributeValue(node, "htmlFor");
-          if (value) ids.add(value);
+          if (value) references.set(value, [...(references.get(value) ?? []), sourceRangeOf(sourceFile, node)]);
         }
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return ids;
+  return references;
 }
+
 
 function collectMissingHtmlForTargetFindings(options: {
   sourceFile: ts.SourceFile;
@@ -494,7 +501,8 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
 
   const sourceFile = ts.createSourceFile(fullPath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const lines = sourceText.split(/\r?\n/);
-  const labelledIds = collectHtmlForIds(sourceFile);
+  const htmlForReferences = collectHtmlForReferences(sourceFile);
+  const labelledIds = new Set(htmlForReferences.keys());
   const literalIdCounts = countLiteralAttributeValues(sourceFile, "id");
   const literalIdLocations = literalAttributeLocations(sourceFile, "id");
   const literalIds = new Set(literalIdCounts.keys());
@@ -537,6 +545,38 @@ export function buildReactWebLabelPatchPreview(filePath: string, cwd = process.c
               preview: "",
             },
           });
+        } else if (literalId && (literalIdCounts.get(literalId) ?? 0) === 1) {
+          const htmlForReferenceLines = (htmlForReferences.get(literalId) ?? []).map((loc) => loc.startLine);
+          if (htmlForReferenceLines.length > 1) {
+            const loc = sourceRangeOf(sourceFile, node);
+            findings.push({
+              kind: "conflicting-label-association",
+              element,
+              loc,
+              context: lineContext(lines, loc),
+              confidence: "high",
+              reason: `Native ${element} id "${literalId}" is targeted by ${htmlForReferenceLines.length} same-file native label htmlFor literals, so the accessible-name intent is ambiguous and needs inspect-first manual review.`,
+              evidence: [
+                `jsx.${element}`,
+                `jsx.${element}.id=${literalId}`,
+                "jsx.label.htmlFor.multiple",
+                `same-file.native-label.lines=${htmlForReferenceLines.join(",")}`,
+                `same-file.native-control.line=${loc.startLine}`,
+              ],
+              conflictingLabelAssociation: {
+                value: literalId,
+                labelLines: htmlForReferenceLines,
+                controlLine: loc.startLine,
+              },
+              suggestedPatch: {
+                type: "unified-diff-fragment",
+                readOnly: true,
+                attribute: "id/htmlFor",
+                insertion: `manual-review conflicting labels for ${escapeAttribute(literalId)}`,
+                preview: "",
+              },
+            });
+          }
         }
         const labelEvidence = classifyLabelEvidence({ node, tag: element, attrs, labelledIds });
         if (labelEvidence && !labelEvidence.labelled) {

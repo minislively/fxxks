@@ -36,6 +36,7 @@ type ReactWebIssueKind =
   | "react-web.ambiguous-accessible-label"
   | "react-web.empty-accessible-name"
   | "react-web.unassociated-nearby-label"
+  | "react-web.conflicting-label-association"
   | "react-web.duplicate-literal-id"
   | "react-web.missing-htmlFor-target";
 
@@ -61,6 +62,7 @@ export type ReactWebIssueTriage = {
 type ReactWebIssueFixShape =
   | "safe-preview-htmlFor-association"
   | "human-reviewed-label-association"
+  | "human-reviewed-conflicting-label-association"
   | "human-reviewed-htmlFor-target"
   | "human-reviewed-placeholder-replacement"
   | "human-reviewed-button-name"
@@ -344,6 +346,8 @@ function problemFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return `Native ${finding.element} has empty accessible-name evidence.`;
     case "unassociated-nearby-label":
       return `Nearby label text is not explicitly associated with this native ${finding.element}.`;
+    case "conflicting-label-association":
+      return `Multiple native labels target the same native ${finding.element} id.`;
     case "duplicate-literal-id":
       return `Native ${finding.element} has an ambiguous duplicate id association.`;
     case "missing-htmlFor-target":
@@ -361,6 +365,8 @@ function whyItMattersFor(finding: ReactWebLabelPatchPreviewFinding): string {
       return "A blank aria-label creates accessible-name evidence that communicates no useful control name.";
     case "unassociated-nearby-label":
       return "Visible label text may not be programmatically connected to the native form control.";
+    case "conflicting-label-association":
+      return "Multiple same-file native labels for one native control can create ambiguous accessible-name intent, especially when the labels describe different concepts.";
     case "duplicate-literal-id":
       return "Duplicate literal id values can make htmlFor/control associations ambiguous for assistive technology and DOM lookup behavior.";
     case "missing-htmlFor-target":
@@ -378,6 +384,8 @@ function suggestedFixIntentFor(finding: ReactWebLabelPatchPreviewFinding): strin
       return "Replace the empty aria-label with human-reviewed accessible-name evidence.";
     case "unassociated-nearby-label":
       return "Connect the nearby native label/control pair with htmlFor/id when the preview evidence remains valid.";
+    case "conflicting-label-association":
+      return "Inspect the exact native label and control lines, then manually choose whether the labels should be merged, separated, or left unchanged; stop if the source changed or the association is intentional.";
     case "duplicate-literal-id":
       return "Inspect every same-file duplicate id occurrence and choose unique, human-reviewed id/htmlFor associations.";
     case "missing-htmlFor-target":
@@ -404,6 +412,9 @@ function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
   if (finding.kind === "unassociated-nearby-label") {
     return "Nearby label/control evidence is not high-confidence enough for a safe preview, so fooks reports it for manual review and does not auto-apply it.";
   }
+  if (finding.kind === "conflicting-label-association") {
+    return "Conflicting native label associations require source inspection and human intent, so fooks reports the ambiguity and does not auto-apply it.";
+  }
   if (finding.kind === "duplicate-literal-id") {
     return "Duplicate literal id associations require source inspection and coordinated id/htmlFor choices, so fooks reports the ambiguity and does not auto-apply it.";
   }
@@ -416,6 +427,9 @@ function safetyRationaleFor(finding: ReactWebLabelPatchPreviewFinding): string {
 function skipReasonFor(finding: ReactWebLabelPatchPreviewFinding): string {
   if (finding.kind === "unassociated-nearby-label") {
     return "Preview skipped because the nearby label/control association is not high-confidence deterministic evidence.";
+  }
+  if (finding.kind === "conflicting-label-association") {
+    return "Preview skipped because multiple native labels target the same native control id; stop if source inspection shows the association is intentional, already changed, or not a native label/control pair.";
   }
   if (finding.kind === "duplicate-literal-id") {
     return "Preview skipped because duplicate literal id associations must be resolved by inspecting every same-file occurrence first.";
@@ -562,6 +576,7 @@ function fixShapeFor(options: {
     return "human-reviewed-placeholder-replacement";
   }
   if (options.finding.kind === "empty-accessible-name") return "human-reviewed-accessible-name";
+  if (options.finding.kind === "conflicting-label-association") return "human-reviewed-conflicting-label-association";
   if (options.finding.kind === "duplicate-literal-id") return "human-reviewed-duplicate-id-association";
   if (options.finding.kind === "missing-htmlFor-target") return "human-reviewed-htmlFor-target";
   if (options.finding.element === "button") return "human-reviewed-button-name";
@@ -581,6 +596,8 @@ function fixShapeSummaryFor(shape: ReactWebIssueFixShape, element: ReactWebLabel
       return `Inspect the read-only htmlFor/id association preview for this native ${element}; use only after human review.`;
     case "human-reviewed-label-association":
       return `Inspect nearby same-file label/control JSX and choose a human-reviewed association shape for this native ${element}.`;
+    case "human-reviewed-conflicting-label-association":
+      return `Inspect every native label targeting this native ${element} before choosing any label/control association change.`;
     case "human-reviewed-htmlFor-target":
       return "Inspect the native label htmlFor literal and same-file id evidence before choosing any htmlFor/id target fix.";
     case "human-reviewed-placeholder-replacement":
@@ -609,6 +626,10 @@ function fixShapeInspectFirstFor(options: {
   steps.push(`Confirm the current source still matches this native ${options.finding.element} evidence before suggesting changes.`);
   if (options.attributes.length > 0) {
     steps.push(`Use current attribute evidence as hints only: ${options.attributes.slice(0, 6).join(", ")}.`);
+  }
+  if (options.finding.kind === "conflicting-label-association" && options.finding.conflictingLabelAssociation) {
+    steps.push(`Inspect native label lines: ${options.finding.conflictingLabelAssociation.labelLines.join(", ")} targeting id "${options.finding.conflictingLabelAssociation.value}" and native control line ${options.finding.conflictingLabelAssociation.controlLine}.`);
+    steps.push("Stop if the multiple labels are intentional, the source changed, any label/control is not native JSX, or the final accessible-name intent is unclear.");
   }
   if (options.finding.kind === "duplicate-literal-id" && options.finding.duplicateId) {
     steps.push(`Inspect duplicate id lines: ${options.finding.duplicateId.lines.join(", ")} for id "${options.finding.duplicateId.value}" before choosing replacement ids.`);
@@ -675,6 +696,10 @@ function contextPacketRelatedPatternFor(options: {
   if (options.previewAvailable) {
     return `${base}; safe-preview pattern because existing JSX provides deterministic nearby label/control association evidence.`;
   }
+  if (options.finding.kind === "conflicting-label-association") {
+    const lines = options.finding.conflictingLabelAssociation?.labelLines.join(",") ?? "unknown";
+    return `${base}; manual-review conflicting-label-association pattern because native label htmlFor literals on lines ${lines} target the same native control id.`;
+  }
   if (options.finding.kind === "duplicate-literal-id") {
     const lines = options.finding.duplicateId?.lines.join(",") ?? "unknown";
     return `${base}; manual-review duplicate-id pattern because same-file literal id evidence appears on lines ${lines}.`;
@@ -718,6 +743,10 @@ function excludedInferenceFor(options: {
   }
   if (options.finding.kind === "unassociated-nearby-label" && !options.previewAvailable) {
     excluded.push("Does not infer htmlFor/id association when nearby label evidence is not high-confidence deterministic.");
+  }
+  if (options.finding.kind === "conflicting-label-association") {
+    excluded.push("Does not merge, delete, reorder, or rewrite labels for conflicting label association cards.");
+    excluded.push("Does not flag custom label components, dynamic htmlFor/id expressions, missing targets, or duplicate-id cases as conflicting-label associations.");
   }
   if (options.finding.kind === "duplicate-literal-id") {
     excluded.push("Does not choose replacement ids or rewrite htmlFor associations for duplicate id cards.");
