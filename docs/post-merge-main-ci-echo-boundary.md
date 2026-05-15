@@ -41,10 +41,13 @@ an active development artifact.
 A development reminder must not end as a status-only idle report. After it names
 the clean-slate boundary, it must either report a real blocker that prevents
 starting bounded work or create/adopt one active artifact that can anchor the
-next action: an issue, branch, session, or PR. If none of those artifacts exists,
-the reminder should say that it cannot treat the checkout as active development
-until one is created or linked; it should not present clean `main` status, green
-CI, or stale local worktree inventory as the next development action.
+next action: an issue, branch, session, or PR. Blocker and no-blocker reports
+must both keep the concrete next action explicit: either the action required to
+unblock/create the anchor, or the next development action attached to the
+adopted anchor. If none of those artifacts exists, the reminder should say that
+it cannot treat the checkout as active development until one is created or
+linked; it should not present clean `main` status, green CI, or stale local
+worktree inventory as the next development action.
 
 Keep this reminder-anchor rule separate from the `fooks check` required-artifact
 contract. Branch-only evidence can be an active work receipt or reminder anchor,
