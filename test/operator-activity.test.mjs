@@ -56,6 +56,8 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const issue823Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-merge-react-web-ci-echo-anchor-823.md"), "utf8");
   const issue832Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "check-clean-main-ci-echo-832.md"), "utf8");
 
+  const issue857Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-dev-reminder-857.md"), "utf8");
+
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
   assert.match(boundaryDoc, /issue, branch, session, or PR/);
@@ -79,6 +81,15 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue832Doc, /report only that artifact as the next development anchor/);
   assert.match(issue832Doc, /verification or inventory\s+receipts only/);
   assert.match(issue832Doc, /not change runtime\/provider behavior/);
+  assert.match(issue857Doc, /issue #857/i);
+  assert.match(issue857Doc, /must not end as an idle\/status summary/);
+  assert.match(issue857Doc, /must not use a green CI or React Web release-report echo as the next development\s+anchor/);
+  assert.match(issue857Doc, /report a concrete blocker/);
+  assert.match(issue857Doc, /name one active evidence anchor: an issue, branch, session, or PR/);
+  assert.match(issue857Doc, /no active development anchor is currently attached and stop there/);
+  assert.match(issue857Doc, /`dogfood\/issue-857-clean-slate-dev-reminder`/);
+  assert.match(issue857Doc, /clean checkout state or CI echo is\s+not the anchor/);
+  assert.match(issue857Doc, /does not fetch, delete, push,\s+prune, mutate runtime state/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
