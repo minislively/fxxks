@@ -55,10 +55,12 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const dogfoodDoc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-merge-reminder-action-803.md"), "utf8");
   const issue823Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-merge-react-web-ci-echo-anchor-823.md"), "utf8");
   const issue832Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "check-clean-main-ci-echo-832.md"), "utf8");
+  const issue857Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-development-reminder-857.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
   assert.match(boundaryDoc, /issue, branch, session, or PR/);
+  assert.match(boundaryDoc, /Blocker and no-blocker reports\s+must both keep the concrete next action explicit/);
   assert.match(boundaryDoc, /requiredActiveArtifact\.dogfoodHandoff/);
   assert.match(boundaryDoc, /requires-live-artifact/);
   assert.match(boundaryDoc, /ci-echo-and-stale-residue-are-not-active-work/);
@@ -79,6 +81,15 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue832Doc, /report only that artifact as the next development anchor/);
   assert.match(issue832Doc, /verification or inventory\s+receipts only/);
   assert.match(issue832Doc, /not change runtime\/provider behavior/);
+  assert.match(issue857Doc, /issue #857/i);
+  assert.match(issue857Doc, /main head: `a5d9ba1`/);
+  assert.match(issue857Doc, /open PR\/issues: `0\/0`/);
+  assert.match(issue857Doc, /Blocker report:[\s\S]*concrete next action required/);
+  assert.match(issue857Doc, /No-blocker report:[\s\S]*concrete active issue, branch,\s+session, or PR anchor/);
+  assert.match(issue857Doc, /no active issue\/branch\/session\/PR is currently\s+attached/);
+  assert.match(issue857Doc, /branch `er\/clean-slate-reminder-857`/);
+  assert.match(issue857Doc, /node --test test\/operator-activity\.test\.mjs test\/post-merge-main-ci-echo-boundary-doc\.test\.mjs/);
+  assert.match(issue857Doc, /does not change provider\s+behavior, merge gates, detector scope, frontend behavior, cleanup policy,\s+performance claims, or product claims/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
