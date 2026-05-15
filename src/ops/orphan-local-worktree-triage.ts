@@ -7,8 +7,8 @@ export const ORPHAN_LOCAL_WORKTREE_TRIAGE_SCHEMA_VERSION = 2;
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_COMMAND = "status orphan-worktrees";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE = "#711";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE_URL = "https://github.com/minislively/fooks/issues/711";
-export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE = "#726";
-export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL = "https://github.com/minislively/fooks/issues/726";
+export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE = "#843";
+export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL = "https://github.com/minislively/fooks/issues/843";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY =
   "Read-only issue #711 local sibling worktree salvage/delete decision artifact; does not fetch, delete branches/worktrees, open PRs, auto-delete local-only commits, or change runtime/provider/merge-gate policy.";
 export const DEFAULT_ORPHAN_LOCAL_WORKTREE_TRIAGE_TIMEOUT_MS = 3000;
