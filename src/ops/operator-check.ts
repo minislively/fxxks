@@ -22,6 +22,7 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
@@ -35,15 +36,18 @@ export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE = "#736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE = "#739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE = "#778";
 export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_ISSUE = "#853";
+export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE = "#865";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
 export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/853";
+export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/865";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE = "operator/check legacy local residue cleanup-review projection";
 export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operator/check local-only residue active-boundary projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operator/check stale worktree residue active-boundary projection";
+export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE = "operator/check legacy review-worktree residue clean-slate boundary projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
@@ -54,6 +58,8 @@ export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #853 operator boundary for local-only stale worktree/branch residue; separates open issue, open PR, mapped fooks tmux/proc session counts from cleanup-review residue, and never lets local-only residue satisfy active work/session requirements.";
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only operator/check reminder artifact for stale worktree residue versus active work; stale residue rows are cleanup-review context only and do not satisfy the active issue, PR, or mapped-session requirement.";
+export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_CLAIM_BOUNDARY =
+  "Read-only issue #865 dogfood clean-slate nudge artifact for legacy review-worktree residue; classifies legacy local review worktrees as stale/manual-review evidence only and requires actual active development to have issue, branch, session, PR evidence, or a concrete blocker.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -268,6 +274,27 @@ export type OperatorCheckStaleResidueActiveBoundary = {
   reminder: string;
 };
 
+export type OperatorCheckLegacyReviewWorktreeResidueBoundary = {
+  schemaVersion: typeof OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_CLAIM_BOUNDARY;
+  readOnly: true;
+  legacyReviewWorktreeResidueCount: number;
+  classification: "stale-manual-review-evidence";
+  staleManualReviewEvidenceOnly: true;
+  satisfiesActiveDevelopmentRequirement: false;
+  acceptableActiveDevelopmentEvidence: [
+    "open GitHub issue",
+    "non-main active branch",
+    "mapped fooks tmux session",
+    "open GitHub pull request",
+    "concrete blocker",
+  ];
+  nudgeRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -293,6 +320,7 @@ export type OperatorCheckActiveWorkReceipts = {
   legacyLocalResidueCleanupReview: OperatorCheckLegacyLocalResidueCleanupReview;
   localOnlyResidueActiveBoundary: OperatorCheckLocalOnlyResidueActiveBoundary;
   staleResidueActiveBoundary: OperatorCheckStaleResidueActiveBoundary;
+  legacyReviewWorktreeResidueBoundary: OperatorCheckLegacyReviewWorktreeResidueBoundary;
   blockers: string[];
 };
 
@@ -690,6 +718,33 @@ function buildStaleResidueActiveBoundary(
   };
 }
 
+function buildLegacyReviewWorktreeResidueBoundary(
+  legacyReviewWorktreeResidueCount: number,
+): OperatorCheckLegacyReviewWorktreeResidueBoundary {
+  return {
+    schemaVersion: OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE,
+    issueUrl: OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL,
+    source: OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE,
+    claimBoundary: OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_CLAIM_BOUNDARY,
+    readOnly: true,
+    legacyReviewWorktreeResidueCount,
+    classification: "stale-manual-review-evidence",
+    staleManualReviewEvidenceOnly: true,
+    satisfiesActiveDevelopmentRequirement: false,
+    acceptableActiveDevelopmentEvidence: [
+      "open GitHub issue",
+      "non-main active branch",
+      "mapped fooks tmux session",
+      "open GitHub pull request",
+      "concrete blocker",
+    ],
+    nudgeRule: legacyReviewWorktreeResidueCount > 0
+      ? "During clean-slate dogfood nudges, legacy local review worktree residue is stale/manual-review evidence only; report actual active development only from issue, branch, session, PR evidence, or a concrete blocker."
+      : "No legacy local review worktree residue was projected into this clean-slate boundary.",
+  };
+}
+
 function buildLocalOnlyResidueActiveBoundary(
   activity: OperatorActivitySnapshot,
   siblingStaleResidueCount: number,
@@ -893,6 +948,7 @@ function buildActiveWorkReceipts(
       siblingReceipts.staleResidueLedger.totalCount,
       activeArtifactReceiptCount,
     ),
+    legacyReviewWorktreeResidueBoundary: buildLegacyReviewWorktreeResidueBoundary(activity.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount),
     blockers,
   };
 }

@@ -65,6 +65,14 @@ can see the stale local inventory. That review block keeps
 artifact requirement and does not add cleanup commands, runtime cleanup order,
 or mutation authority.
 
+For issue #865, clean-slate nudges also get the summary boundary
+`activeWorkReceipts.legacyReviewWorktreeResidueBoundary`. It classifies legacy
+local review-worktree residue as `stale-manual-review-evidence` only, including
+the eight old-review-worktree case, and keeps
+`satisfiesActiveDevelopmentRequirement: false`. Actual active development must
+come from issue, branch, session, or PR evidence, or from a concrete blocker
+that prevents creating or adopting one of those anchors.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
@@ -100,6 +108,10 @@ or mutation authority.
   cleanup-review rows are advisory receipts only and require a separate open
   issue, open PR, or mapped fooks tmux session before any nudge treats the
   checkout as active work.
+- `activeWorkReceipts.legacyReviewWorktreeResidueBoundary` is the issue #865
+  clean-slate nudge summary for old local review worktrees. It is read-only
+  stale/manual-review evidence, not cleanup authority and not active
+  development evidence.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.

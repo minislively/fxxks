@@ -57,6 +57,7 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const issue832Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "check-clean-main-ci-echo-832.md"), "utf8");
   const issue857Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-development-reminder-857.md"), "utf8");
   const issue863Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "green-receipt-next-anchor-863.md"), "utf8");
+  const issue865Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-legacy-review-worktree-residue-865.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
@@ -102,6 +103,24 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue863Doc, /branch `dogfood\/issue-863-green-receipt-next-anchor`/);
   assert.match(issue863Doc, /node --test test\/operator-activity\.test\.mjs test\/post-merge-main-ci-echo-boundary-doc\.test\.mjs/);
   assert.match(issue863Doc, /does not\s+change runtime\/provider behavior, merge-gate policy, detector scope, React Web\s+behavior, React Native behavior, TUI behavior, WebView behavior, performance\s+claims, or product claims/);
+  assert.match(issue865Doc, /issue #865/i);
+  assert.match(issue865Doc, /old local review\s+worktrees as active development after open PR\/issues and live sessions are zero/);
+  assert.match(issue865Doc, /legacy review-worktree residue is stale\/manual-review evidence\s+only/);
+  assert.match(issue865Doc, /active issue evidence/);
+  assert.match(issue865Doc, /active non-`main` branch evidence/);
+  assert.match(issue865Doc, /active mapped fooks session evidence/);
+  assert.match(issue865Doc, /active PR evidence/);
+  assert.match(issue865Doc, /concrete blocker/);
+  assert.match(issue865Doc, /legacyReviewWorktreeResidueBoundary/);
+  assert.match(issue865Doc, /classification: "stale-manual-review-evidence"/);
+  assert.match(issue865Doc, /satisfiesActiveDevelopmentRequirement: false/);
+  assert.match(issue865Doc, /does not delete legacy worktrees/);
+  assert.match(issue865Doc, /change runtime\/provider behavior/);
+  assert.match(issue865Doc, /change merge-gate\s+policy/);
+  assert.match(issue865Doc, /broaden detector scope/);
+  assert.match(issue865Doc, /change React Web\/RN\/TUI\/WebView behavior/);
+  assert.match(issue865Doc, /performance claims/);
+  assert.match(issue865Doc, /product claims/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
@@ -1338,6 +1357,106 @@ test("operator check surfaces legacy local residue as cleanup-review evidence on
 
   const reviewJson = JSON.stringify(review);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder/.test(reviewJson), false);
+  assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push|kill-session/.test(call)), false);
+});
+
+test("operator check classifies eight legacy review worktrees as stale manual-review evidence for clean-slate nudges", () => {
+  const tempDir = makeTempProject();
+  fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
+  const legacyBranches = Array.from({ length: 8 }, (_, index) => `fooks-review-legacy-pr-${index + 1}`);
+  fs.writeFileSync(
+    path.join(tempDir, "docs", "fooks-issue-865-branch-archive.md"),
+    [
+      "# Issue #865 legacy review worktree archive",
+      "",
+      ...legacyBranches.map((branch) => `- Remote branch: \`origin/${branch}\``),
+      "",
+    ].join("\n"),
+  );
+
+  const staleWorktrees = new Map(
+    legacyBranches.map((branch) => [
+      branch,
+      path.join(path.dirname(tempDir), "fooks.omx-worktrees", branch),
+    ]),
+  );
+  const calls = [];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-15T00:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args, cwd) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        const rows = [`worktree ${tempDir}`, "HEAD mainsha", "branch refs/heads/main", ""];
+        for (const [branch, worktreePath] of staleWorktrees) {
+          rows.push(`worktree ${worktreePath}`, `HEAD ${branch.replace(/\W/gu, "").slice(0, 12)}`, `branch refs/heads/${branch}`, "");
+        }
+        return rows.join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return ["main", ...legacyBranches].join("\n") + "\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") {
+        assert.ok(cwd === tempDir || [...staleWorktrees.values()].includes(cwd), `unexpected divergence cwd ${cwd}`);
+        return "0 0\n";
+      }
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && joined.startsWith("run list ")) return "[]";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) =>
+      targetPath === tempDir
+      || targetPath === path.join(tempDir, "docs")
+      || [...staleWorktrees.values()].includes(targetPath),
+  });
+
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(snapshot.activity.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount, 8);
+  assert.equal(snapshot.activity.legacyWorktreeEvidence.omittedEntryCount, 3);
+  assert.equal(snapshot.activeWorkReceipts.legacyLocalResidueCleanupReview.rowCount, OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT);
+
+  const boundary = snapshot.activeWorkReceipts.legacyReviewWorktreeResidueBoundary;
+  assert.equal(boundary.issue, "#865");
+  assert.equal(boundary.readOnly, true);
+  assert.equal(boundary.legacyReviewWorktreeResidueCount, 8);
+  assert.equal(boundary.classification, "stale-manual-review-evidence");
+  assert.equal(boundary.staleManualReviewEvidenceOnly, true);
+  assert.equal(boundary.satisfiesActiveDevelopmentRequirement, false);
+  assert.deepEqual(boundary.acceptableActiveDevelopmentEvidence, [
+    "open GitHub issue",
+    "non-main active branch",
+    "mapped fooks tmux session",
+    "open GitHub pull request",
+    "concrete blocker",
+  ]);
+  assert.match(boundary.claimBoundary, /issue #865/);
+  assert.match(boundary.claimBoundary, /stale\/manual-review evidence only/);
+  assert.match(boundary.nudgeRule, /issue, branch, session, PR evidence, or a concrete blocker/);
+  assert.equal(
+    snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.classification === "active"),
+    false,
+  );
+
+  const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push|kill-session/.test(call)), false);
 });
 
