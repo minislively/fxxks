@@ -58,6 +58,7 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const issue857Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-development-reminder-857.md"), "utf8");
   const issue863Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "green-receipt-next-anchor-863.md"), "utf8");
   const issue865Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-legacy-review-worktree-residue-865.md"), "utf8");
+  const issue867Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-receipt-nudge-anchor-867.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
@@ -121,6 +122,21 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue865Doc, /change React Web\/RN\/TUI\/WebView behavior/);
   assert.match(issue865Doc, /performance claims/);
   assert.match(issue865Doc, /product claims/);
+  assert.match(issue867Doc, /issue #867/i);
+  assert.match(issue867Doc, /PR #866/);
+  assert.match(issue867Doc, /main CI\/release success is a receipt/);
+  assert.match(issue867Doc, /fresh post-receipt nudge/);
+  assert.match(issue867Doc, /new issue, branch, session, PR anchor, or concrete blocker/);
+  assert.match(issue867Doc, /postReceiptNudgeAnchorBoundary/);
+  assert.match(issue867Doc, /requiresFreshPostReceiptNudgeAnchor: true/);
+  assert.match(issue867Doc, /mainCiReleaseSuccessReceipt/);
+  assert.match(issue867Doc, /activeDevelopmentEvidence: false/);
+  assert.match(issue867Doc, /does not change runtime\/provider behavior/);
+  assert.match(issue867Doc, /merge-gate policy/);
+  assert.match(issue867Doc, /detector scope/);
+  assert.match(issue867Doc, /React Web\/RN\/TUI\/WebView behavior/);
+  assert.match(issue867Doc, /performance claims/);
+  assert.match(issue867Doc, /product claims/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
@@ -1458,6 +1474,102 @@ test("operator check classifies eight legacy review worktrees as stale manual-re
   const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push|kill-session/.test(call)), false);
+});
+
+test("operator check requires post-receipt nudge anchor after #866 main CI release receipts", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "866-main-receipt-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-15T12:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") {
+        return JSON.stringify([
+          {
+            databaseId: 86601,
+            status: "completed",
+            conclusion: "success",
+            updatedAt: "2026-05-15T11:40:00Z",
+            headBranch: "main",
+            headSha: mainHead,
+            event: "push",
+            workflowName: "CI",
+            url: "https://github.com/minislively/fooks/actions/runs/86601",
+          },
+          {
+            databaseId: 86602,
+            status: "completed",
+            conclusion: "success",
+            updatedAt: "2026-05-15T11:45:00Z",
+            headBranch: "main",
+            headSha: mainHead,
+            event: "push",
+            workflowName: "React Web Release Report",
+            url: "https://github.com/minislively/fooks/actions/runs/86602",
+          },
+        ]);
+      }
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.allExactHeadConclusionsSuccessful, true);
+  assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
+
+  const boundary = snapshot.activeWorkReceipts.postReceiptNudgeAnchorBoundary;
+  assert.equal(boundary.issue, "#867");
+  assert.equal(boundary.readOnly, true);
+  assert.equal(boundary.closedLegacyWorktreeBucketReceipt.issue, "#866");
+  assert.equal(boundary.closedLegacyWorktreeBucketReceipt.activeDevelopmentEvidence, false);
+  assert.equal(boundary.mainCiReleaseSuccessReceipt.allExactHeadConclusionsSuccessful, true);
+  assert.equal(boundary.mainCiReleaseSuccessReceipt.activeDevelopmentEvidence, false);
+  assert.deepEqual(boundary.currentAnchorEvidence, {
+    openIssueCount: 0,
+    openPullRequestCount: 0,
+    nonMainBranch: undefined,
+    mappedFooksTmuxSessionCount: 0,
+    concreteBlockerCount: 0,
+  });
+  assert.equal(boundary.requiresFreshPostReceiptNudgeAnchor, true);
+  assert.deepEqual(boundary.acceptableFreshAnchors, [
+    "new issue",
+    "non-main branch",
+    "mapped fooks tmux session",
+    "open pull request",
+    "concrete blocker",
+  ]);
+  assert.match(boundary.claimBoundary, /issue #867/);
+  assert.match(boundary.claimBoundary, /#866 main CI\/release success/);
+  assert.match(boundary.nudgeRule, /must name a fresh issue, branch, session, PR anchor, or a concrete blocker/);
+  assert.match(boundary.nudgeRule, /main CI\/release success is receipt-only/);
+
+  const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
 });
 
 test("operator activity keeps legacy worktree inference conservative when tmux is unavailable", () => {
