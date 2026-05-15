@@ -9,6 +9,8 @@ fooks inspect react-web-issues <supported-react-web-file>
 fooks inspect react-web-issues fixtures/compressed/FormControls.tsx
 ```
 
+The CLI text output is long by design because it is an agent work order. This demo quotes short snippets for humans; agents can consume the full report when planning edits.
+
 The examples below are intentionally split into short golden slices instead of one kitchen-sink fixture. They show the current emitted card families that are safe to present in README-facing docs: missing native label/name evidence, empty `aria-label` evidence, same-file missing `htmlFor` targets, high-confidence read-only `htmlFor` association previews, duplicate literal native ids, and conflicting native label associations. Each full card still carries the stable human/agent fields `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`; the snippets show only the shortest representative lines.
 
 ## Demo 1: missing or empty native label/name evidence
