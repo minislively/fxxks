@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "react-web-issue-report-summary.v1",
+  "projection": "summary-json",
+  "filePath": "test/fixtures/react-web-label-preview/label-association-candidates.tsx",
+  "readOnly": true,
+  "autoApply": false,
+  "summary": {
+    "issueCount": 3,
+    "safePreviewCount": 1,
+    "manualReviewCount": 2,
+    "unsafeToAutoApplyCount": 2
+  },
+  "triageTopIds": {
+    "rankedIssueIds": [
+      "react-web-label-1",
+      "react-web-label-2",
+      "react-web-label-3"
+    ],
+    "topIssueIds": [
+      "react-web-label-1",
+      "react-web-label-2",
+      "react-web-label-3"
+    ],
+    "topManualReviewIssueIds": [
+      "react-web-label-2",
+      "react-web-label-3"
+    ],
+    "safePreviewIssueIds": [
+      "react-web-label-1"
+    ],
+    "manualReviewIssueIds": [
+      "react-web-label-2",
+      "react-web-label-3"
+    ]
+  },
+  "firstMinuteSummary": {
+    "sourceTopIssueIds": [
+      "react-web-label-1",
+      "react-web-label-2",
+      "react-web-label-3"
+    ],
+    "firstItem": {
+      "issueId": "react-web-label-1",
+      "fixShape": "safe-preview-htmlFor-association",
+      "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/label-association-candidates.tsx:7-7 (input) before editing.",
+      "nextAction": "Inspect test/fixtures/react-web-label-preview/label-association-candidates.tsx:7-7 (input) first; confirm current source still matches before suggesting changes.",
+      "humanDecisionNeeded": [
+        "Confirm the final accessible label/name copy from current source context.",
+        "Confirm the htmlFor/id association before using the preview shape."
+      ],
+      "doNotDo": [
+        "Do not apply patches automatically from this report.",
+        "Do not infer custom-component semantics.",
+        "Do not generate final label/name copy automatically."
+      ],
+      "fixShapeGuidance": {
+        "claimBoundary": "Local fix-shape guidance only: uses native element, same-file JSX attributes/context, safe-preview presence, and related-context entries; it is read-only, requires human review, and does not generate accessible-name copy or infer custom-component semantics.",
+        "humanReviewRequired": true,
+        "autoApply": false
+      },
+      "decision": {
+        "state": "ready-for-agent-inspect",
+        "allowedActions": {
+          "inspect": true,
+          "suggestPatch": true,
+          "applyPatch": false,
+          "generateCopy": false
+        },
+        "humanReviewRequired": true,
+        "autoApply": false
+      }
+    }
+  }
+}

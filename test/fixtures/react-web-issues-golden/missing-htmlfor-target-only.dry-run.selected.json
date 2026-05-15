@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "react-web-issue-report-migration-dry-run.v1",
+  "projection": "migration-dry-run-json",
+  "filePath": "test/fixtures/react-web-label-preview/missing-htmlfor-target-only.tsx",
+  "readOnly": true,
+  "dryRunOnly": true,
+  "autoApply": false,
+  "summary": {
+    "candidateCount": 1,
+    "affectedFiles": [
+      "test/fixtures/react-web-label-preview/missing-htmlfor-target-only.tsx"
+    ],
+    "safePreviewCandidateCount": 0,
+    "manualReviewCandidateCount": 1
+  },
+  "firstCandidate": {
+    "issueId": "react-web-label-1",
+    "affectedFile": "test/fixtures/react-web-label-preview/missing-htmlfor-target-only.tsx",
+    "migrationCandidate": "human-reviewed-htmlFor-target",
+    "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/missing-htmlfor-target-only.tsx:4-4 (label) before editing.",
+    "previewAvailable": false,
+    "humanReviewRequired": true,
+    "autoApply": false,
+    "dryRunOnly": true,
+    "riskNotes": [
+      "A missing htmlFor target may require adding or correcting an id, moving the label, or recognizing intentional cross-file/runtime wiring, so fooks reports the e…",
+      "No deterministic safe preview is available; choose the final label/name shape from local source context.",
+      "Do not apply patches automatically or generate accessible-name copy from this dry run.",
+      "Do not infer custom-component semantics."
+    ],
+    "decision": {
+      "state": "dry-run-candidate-only",
+      "allowedActions": {
+        "inspect": true,
+        "suggestPatch": false,
+        "applyPatch": false,
+        "generateCopy": false
+      },
+      "humanReviewRequired": true,
+      "autoApply": false
+    }
+  }
+}

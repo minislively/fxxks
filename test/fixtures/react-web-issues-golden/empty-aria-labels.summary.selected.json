@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "react-web-issue-report-summary.v1",
+  "projection": "summary-json",
+  "filePath": "test/fixtures/react-web-label-preview/empty-aria-labels.tsx",
+  "readOnly": true,
+  "autoApply": false,
+  "summary": {
+    "issueCount": 3,
+    "safePreviewCount": 0,
+    "manualReviewCount": 3,
+    "unsafeToAutoApplyCount": 3
+  },
+  "triageTopIds": {
+    "rankedIssueIds": [
+      "react-web-label-1",
+      "react-web-label-3",
+      "react-web-label-2"
+    ],
+    "topIssueIds": [
+      "react-web-label-1",
+      "react-web-label-3",
+      "react-web-label-2"
+    ],
+    "topManualReviewIssueIds": [
+      "react-web-label-1",
+      "react-web-label-3",
+      "react-web-label-2"
+    ],
+    "safePreviewIssueIds": [],
+    "manualReviewIssueIds": [
+      "react-web-label-1",
+      "react-web-label-3",
+      "react-web-label-2"
+    ]
+  },
+  "firstMinuteSummary": {
+    "sourceTopIssueIds": [
+      "react-web-label-1",
+      "react-web-label-3",
+      "react-web-label-2"
+    ],
+    "firstItem": {
+      "issueId": "react-web-label-1",
+      "fixShape": "human-reviewed-accessible-name",
+      "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/empty-aria-labels.tsx:4-4 (input) before editing.",
+      "nextAction": "Inspect test/fixtures/react-web-label-preview/empty-aria-labels.tsx:4-4 (input) first; confirm current source still matches before suggesting changes.",
+      "humanDecisionNeeded": [
+        "Confirm the final accessible label/name copy from current source context.",
+        "Choose the label/name shape from local JSX evidence."
+      ],
+      "doNotDo": [
+        "Do not apply patches automatically from this report.",
+        "Do not infer custom-component semantics.",
+        "Do not generate final label/name copy automatically."
+      ],
+      "fixShapeGuidance": {
+        "claimBoundary": "Local fix-shape guidance only: uses native element, same-file JSX attributes/context, safe-preview presence, and related-context entries; it is read-only, requires human review, and does not generate accessible-name copy or infer custom-component semantics.",
+        "humanReviewRequired": true,
+        "autoApply": false
+      },
+      "decision": {
+        "state": "human-decision-required",
+        "allowedActions": {
+          "inspect": true,
+          "suggestPatch": false,
+          "applyPatch": false,
+          "generateCopy": false
+        },
+        "humanReviewRequired": true,
+        "autoApply": false
+      }
+    }
+  }
+}

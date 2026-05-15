@@ -46,6 +46,7 @@ const fixtures = {
   quietNativeEvidence: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx"),
   duplicateIds: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx"),
   missingHtmlForTarget: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target.tsx"),
+  missingHtmlForTargetOnly: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target-only.tsx"),
   conflictingLabelAssociation: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "conflicting-label-association.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
@@ -141,11 +142,25 @@ function projectTextGolden(text) {
   const summaryLines = lines.slice(summaryIndex, lines.findIndex((line, index) => index > summaryIndex && line.startsWith("## Issue 1:")));
   return [
     "## First-minute summary",
-    summaryLines.find((line) => line.startsWith("- react-web-label-1: human-reviewed-native-control-name;")),
+    summaryLines.find((line) => /^- react-web-(?:label|htmlfor-target)-\d+:/.test(line)),
     summaryLines.find((line) => line.trimStart().startsWith("- next action:")),
     summaryLines.find((line) => line.trimStart().startsWith("- human decision needed:")),
     summaryLines.find((line) => line.trimStart().startsWith("- do not do:")),
   ].join("\n").trimEnd();
+}
+
+function projectSummaryGoldenWithSource(summary) {
+  return {
+    ...projectSummaryGolden(summary),
+    sourceIssueCounts: summary.sourceIssueCounts,
+  };
+}
+
+function projectDryRunGoldenWithSource(dryRun) {
+  return {
+    ...projectDryRunGolden(dryRun),
+    sourceIssueCounts: dryRun.sourceIssueCounts,
+  };
 }
 
 function hasNestedKey(value, key) {
@@ -1226,6 +1241,64 @@ test("React Web issue report text output matches selected golden excerpt", () =>
   assert.equal(cli.status, 0, cli.stderr);
 
   assert.equal(projectTextGolden(cli.stdout), readGoldenText("form-controls.text.excerpt.txt"));
+});
+
+test("React Web issue report selected golden contracts cover current demo card families", () => {
+  const cases = [
+    {
+      fixture: fixtures.emptyAriaLabel,
+      prefix: "empty-aria-labels",
+      expectedKind: "react-web.empty-accessible-name",
+      expectedFixShape: "human-reviewed-accessible-name",
+    },
+    {
+      fixture: fixtures.missingHtmlForTargetOnly,
+      prefix: "missing-htmlfor-target-only",
+      expectedKind: "react-web.missing-htmlFor-target",
+      expectedFixShape: "human-reviewed-htmlFor-target",
+    },
+    {
+      fixture: fixtures.association,
+      prefix: "label-association-candidates",
+      expectedKind: "react-web.unassociated-nearby-label",
+      expectedFixShape: "safe-preview-htmlFor-association",
+    },
+    {
+      fixture: fixtures.duplicateIds,
+      prefix: "duplicate-id-controls",
+      expectedKind: "react-web.duplicate-literal-id",
+      expectedFixShape: "human-reviewed-duplicate-id-association",
+    },
+    {
+      fixture: fixtures.conflictingLabelAssociation,
+      prefix: "conflicting-label-association",
+      expectedKind: "react-web.conflicting-label-association",
+      expectedFixShape: "human-reviewed-conflicting-label-association",
+    },
+  ];
+
+  for (const entry of cases) {
+    const report = parseIssues(entry.fixture);
+    assert.ok(report.issues.some((issue) => issue.kind === entry.expectedKind));
+
+    const summaryCli = runIssues(entry.fixture, "--summary-json");
+    const dryRunCli = runIssues(entry.fixture, "--dry-run-json");
+    const textCli = runIssues(entry.fixture);
+    assert.equal(summaryCli.status, 0, summaryCli.stderr);
+    assert.equal(dryRunCli.status, 0, dryRunCli.stderr);
+    assert.equal(textCli.status, 0, textCli.stderr);
+
+    const summary = JSON.parse(summaryCli.stdout);
+    const dryRun = JSON.parse(dryRunCli.stdout);
+    assert.equal(summary.firstMinuteSummary.items[0].decision.issueKind, entry.expectedKind);
+    assert.equal(dryRun.candidates[0].decision.issueKind, entry.expectedKind);
+    assert.equal(summary.firstMinuteSummary.items[0].fixShape, entry.expectedFixShape);
+    assert.equal(dryRun.candidates[0].migrationCandidate, entry.expectedFixShape);
+
+    assert.deepEqual(projectSummaryGolden(summary), readGoldenJson(`${entry.prefix}.summary.selected.json`));
+    assert.deepEqual(projectDryRunGolden(dryRun), readGoldenJson(`${entry.prefix}.dry-run.selected.json`));
+    assert.equal(projectTextGolden(textCli.stdout), readGoldenText(`${entry.prefix}.text.excerpt.txt`));
+  }
 });
 
 test("React Web issue report migration dry-run JSON preserves empty and unsupported boundaries", () => {

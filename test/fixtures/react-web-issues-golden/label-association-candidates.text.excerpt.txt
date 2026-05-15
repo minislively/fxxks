@@ -1,0 +1,5 @@
+## First-minute summary
+- react-web-label-1: safe-preview-htmlFor-association; first inspect: Inspect test/fixtures/react-web-label-preview/label-association-candidates.tsx:7-7 (input) before editing.
+  - next action: Inspect test/fixtures/react-web-label-preview/label-association-candidates.tsx:7-7 (input) first; confirm current source still matches before suggesting changes.
+  - human decision needed: Confirm the final accessible label/name copy from current source context.; Confirm the htmlFor/id association before using the preview shape.
+  - do not do: Do not apply patches automatically from this report.; Do not infer custom-component semantics.; Do not generate final label/name copy automatically.

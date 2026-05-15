@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "react-web-issue-report-migration-dry-run.v1",
+  "projection": "migration-dry-run-json",
+  "filePath": "test/fixtures/react-web-label-preview/conflicting-label-association.tsx",
+  "readOnly": true,
+  "dryRunOnly": true,
+  "autoApply": false,
+  "summary": {
+    "candidateCount": 5,
+    "affectedFiles": [
+      "test/fixtures/react-web-label-preview/conflicting-label-association.tsx"
+    ],
+    "safePreviewCandidateCount": 0,
+    "manualReviewCandidateCount": 5
+  },
+  "firstCandidate": {
+    "issueId": "react-web-label-2",
+    "affectedFile": "test/fixtures/react-web-label-preview/conflicting-label-association.tsx",
+    "migrationCandidate": "human-reviewed-conflicting-label-association",
+    "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/conflicting-label-association.tsx:10-10 (input) before editing.",
+    "previewAvailable": false,
+    "humanReviewRequired": true,
+    "autoApply": false,
+    "dryRunOnly": true,
+    "riskNotes": [
+      "Conflicting native label associations require source inspection and human intent, so fooks reports the ambiguity and does not auto-apply it.",
+      "No deterministic safe preview is available; choose the final label/name shape from local source context.",
+      "Do not apply patches automatically or generate accessible-name copy from this dry run.",
+      "Do not infer custom-component semantics."
+    ],
+    "decision": {
+      "state": "dry-run-candidate-only",
+      "allowedActions": {
+        "inspect": true,
+        "suggestPatch": false,
+        "applyPatch": false,
+        "generateCopy": false
+      },
+      "humanReviewRequired": true,
+      "autoApply": false
+    }
+  }
+}

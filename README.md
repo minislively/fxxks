@@ -16,9 +16,9 @@ fooks doctor
 fooks inspect react-web-issues src/components/Form.tsx
 ```
 
-The issue-card output is read-only and actionable: each card explains `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`. High-confidence native label/control findings can include safe preview shape hints, but fooks does **not** auto-apply patches, invent final accessible-name copy, infer custom-component semantics, or claim a broad accessibility audit. Ambiguous cases stay as manual-review cards with stop reasons.
+The issue-card output is read-only and actionable: each card explains `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`. Current React Web cards can cover missing native label/name evidence, empty `aria-label` evidence, same-file missing `htmlFor` targets, high-confidence nearby label/control association previews, duplicate literal native ids, and conflicting native label associations. High-confidence native label/control findings can include safe preview shape hints, but fooks does **not** auto-apply patches, invent final accessible-name copy, infer custom-component semantics, or claim a broad accessibility audit. Ambiguous cases stay as manual-review cards with stop reasons.
 
-Want to see the product loop before installing it into a real repo? Start with the packaged golden demo: [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md). For the detailed first-minute handoff contract, including `--summary-json` and `--dry-run-json`, see [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md).
+Want to see the product loop before installing it into a real repo? Start with the packaged golden demo: [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md). It is split into short representative examples rather than one kitchen-sink fixture, including duplicate-id and conflicting-label manual-review cards now proven by source/tests. For the detailed first-minute handoff contract, including `--summary-json` and `--dry-run-json`, see [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md).
 
 Context reduction and caching are supporting mechanisms. In the strongest current Codex path, repeated work on the same React `.tsx` / `.jsx` file may reuse compact same-file context when the evidence gate says that is safe. `fooks compare` shows local source-vs-payload evidence for one supported file, but the launch-facing habit is simpler: **inspect first, then reuse context only when safe**.
 
@@ -39,7 +39,7 @@ Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibi
 
 Use fooks when you want Codex to start React Web work with a compact, source-grounded issue card instead of rediscovering frontend facts from scratch.
 
-1. **Inspect first:** `fooks inspect react-web-issues <file>` ranks narrow native JSX label/control risks and tells the agent where to look before editing.
+1. **Inspect first:** `fooks inspect react-web-issues <file>` ranks narrow native JSX label/control risks—missing names, empty `aria-label`, missing same-file `htmlFor` targets, safe-preview association candidates, duplicate ids, and conflicting native label associations—and tells the agent where to look before editing.
 2. **Handoff safely:** `--summary-json` gives agents `firstMinuteSummary.items[0]`, `decision`, `humanDecisionNeeded`, and `doNotDo` boundaries as advisory inspect-first input rather than edit authority.
 3. **Preview only when safe:** `--dry-run-json` lists migration candidates and preview availability, but remains dry-run-only with `autoApply: false` and human review for final label/name choices.
 4. **Reuse when safe:** repeated same-file Codex work may reuse compact context after evidence gates pass; `fooks compare` is supporting local payload proof, not the headline.
