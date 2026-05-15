@@ -142,6 +142,12 @@ receipt-only report is not an active development anchor.
   developed" must use current target evidence: spawned issue #871, the spawned
   non-`main` branch/worktree, mapped OMX session, and the `delta`, `ahead`, and
   `proc` fields.
+- `docs/dogfood/post-success-nudge-replay-boundary-873.md` is the issue #873
+  post-success nudge replay boundary artifact. It keeps PR #872 green
+  `main` CI/release receipts receipt-only and documents that when open
+  PR/issues and live OMX are zero, the nudge must spawn/adopt one current
+  issue/branch/session target and report `delta`, `ahead`, and `proc` evidence
+  instead of answering with the prior CI receipt.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
