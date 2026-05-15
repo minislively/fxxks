@@ -24,6 +24,7 @@ export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
@@ -39,12 +40,14 @@ export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE = "#778";
 export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_ISSUE = "#853";
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE = "#865";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE = "#867";
+export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE = "#869";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
 export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/853";
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/865";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE_URL = "https://github.com/minislively/fooks/issues/867";
+export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/869";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE = "operator/check legacy local residue cleanup-review projection";
@@ -52,6 +55,7 @@ export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operato
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operator/check stale worktree residue active-boundary projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE = "operator/check legacy review-worktree residue clean-slate boundary projection";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SOURCE = "operator/check post-receipt dogfood nudge anchor projection";
+export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE = "operator/check receipt-only dogfood nudge loop boundary projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
@@ -66,6 +70,8 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_CLAIM_BOUNDA
   "Read-only issue #865 dogfood clean-slate nudge artifact for legacy review-worktree residue; classifies legacy local review worktrees as stale/manual-review evidence only and requires actual active development to have issue, branch, session, PR evidence, or a concrete blocker.";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_CLAIM_BOUNDARY =
   "Read-only issue #867 dogfood post-receipt nudge artifact; treats the #866 main CI/release success and closed legacy worktree bucket as receipts only, and requires the next nudge to name a fresh issue, branch, session, PR anchor, or concrete blocker.";
+export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_CLAIM_BOUNDARY =
+  "Read-only issue #869 dogfood receipt-only nudge loop artifact; after PR #868 receipt-only closeout, the next nudge report must name newly created or adopted issue evidence plus mapped OMX session evidence, not the last merged commit, main CI run, or release receipt.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -334,6 +340,36 @@ export type OperatorCheckPostReceiptNudgeAnchorBoundary = {
   nudgeRule: string;
 };
 
+export type OperatorCheckReceiptOnlyNudgeLoopBoundary = {
+  schemaVersion: typeof OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_CLAIM_BOUNDARY;
+  readOnly: true;
+  priorReceipt: {
+    pullRequest: "#868";
+    lastMergedCommitOrMainCiRunIsActiveDevelopmentEvidence: false;
+  };
+  currentRequiredEvidence: {
+    newlyCreatedOrAdoptedIssueCount?: number;
+    mappedOmxSessionCount: number;
+  };
+  requiresIssueAndOmxSessionEvidence: boolean;
+  satisfiesNudgeReportAnchorRequirement: boolean;
+  repeatedReceiptOnlyReportAllowed: false;
+  requiredReportEvidence: [
+    "newly created/adopted issue evidence",
+    "mapped OMX session evidence",
+  ];
+  prohibitedReportAnchors: [
+    "last merged commit",
+    "main CI run",
+    "release receipt",
+  ];
+  nudgeRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -361,6 +397,7 @@ export type OperatorCheckActiveWorkReceipts = {
   staleResidueActiveBoundary: OperatorCheckStaleResidueActiveBoundary;
   legacyReviewWorktreeResidueBoundary: OperatorCheckLegacyReviewWorktreeResidueBoundary;
   postReceiptNudgeAnchorBoundary: OperatorCheckPostReceiptNudgeAnchorBoundary;
+  receiptOnlyNudgeLoopBoundary: OperatorCheckReceiptOnlyNudgeLoopBoundary;
   blockers: string[];
 };
 
@@ -837,6 +874,48 @@ function buildPostReceiptNudgeAnchorBoundary(
   };
 }
 
+function buildReceiptOnlyNudgeLoopBoundary(
+  activity: OperatorActivitySnapshot,
+): OperatorCheckReceiptOnlyNudgeLoopBoundary {
+  const issueCount = activity.currentRunEvidence.evidence.openIssues;
+  const mappedOmxSessionCount = activity.currentRunEvidence.evidence.fooksSessionCount;
+  const hasIssueEvidence = typeof issueCount === "number" && issueCount > 0;
+  const hasMappedOmxSessionEvidence = mappedOmxSessionCount > 0;
+  const satisfiesNudgeReportAnchorRequirement = hasIssueEvidence && hasMappedOmxSessionEvidence;
+
+  return {
+    schemaVersion: OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE,
+    issueUrl: OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL,
+    source: OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE,
+    claimBoundary: OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_CLAIM_BOUNDARY,
+    readOnly: true,
+    priorReceipt: {
+      pullRequest: "#868",
+      lastMergedCommitOrMainCiRunIsActiveDevelopmentEvidence: false,
+    },
+    currentRequiredEvidence: {
+      newlyCreatedOrAdoptedIssueCount: issueCount,
+      mappedOmxSessionCount,
+    },
+    requiresIssueAndOmxSessionEvidence: !satisfiesNudgeReportAnchorRequirement,
+    satisfiesNudgeReportAnchorRequirement,
+    repeatedReceiptOnlyReportAllowed: false,
+    requiredReportEvidence: [
+      "newly created/adopted issue evidence",
+      "mapped OMX session evidence",
+    ],
+    prohibitedReportAnchors: [
+      "last merged commit",
+      "main CI run",
+      "release receipt",
+    ],
+    nudgeRule: satisfiesNudgeReportAnchorRequirement
+      ? "The next dogfood nudge report may proceed only by naming the newly created/adopted issue evidence and mapped OMX session evidence; the PR #868 merged commit and main CI run remain receipts only."
+      : "After the PR #868 receipt-only closeout, do not repeat a receipt-only nudge report; name newly created/adopted issue evidence plus mapped OMX session evidence before reporting active development, and do not use the last merged commit or main CI run as the anchor.",
+  };
+}
+
 function buildLocalOnlyResidueActiveBoundary(
   activity: OperatorActivitySnapshot,
   siblingStaleResidueCount: number,
@@ -1042,6 +1121,7 @@ function buildActiveWorkReceipts(
     ),
     legacyReviewWorktreeResidueBoundary: buildLegacyReviewWorktreeResidueBoundary(activity.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount),
     postReceiptNudgeAnchorBoundary: buildPostReceiptNudgeAnchorBoundary(activity),
+    receiptOnlyNudgeLoopBoundary: buildReceiptOnlyNudgeLoopBoundary(activity),
     blockers,
   };
 }

@@ -59,6 +59,7 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   const issue863Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "green-receipt-next-anchor-863.md"), "utf8");
   const issue865Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-slate-legacy-review-worktree-residue-865.md"), "utf8");
   const issue867Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "post-receipt-nudge-anchor-867.md"), "utf8");
+  const issue869Doc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "receipt-only-nudge-loop-anchor-869.md"), "utf8");
 
   assert.match(boundaryDoc, /A development reminder must not end as a status-only idle report/);
   assert.match(boundaryDoc, /create\/adopt one active artifact/);
@@ -137,6 +138,22 @@ test("operator reminder docs require a blocker or active artifact after clean CI
   assert.match(issue867Doc, /React Web\/RN\/TUI\/WebView behavior/);
   assert.match(issue867Doc, /performance claims/);
   assert.match(issue867Doc, /product claims/);
+  assert.match(issue869Doc, /issue #869/i);
+  assert.match(issue869Doc, /PR #868/);
+  assert.match(issue869Doc, /successful `main` CI\s+run was already recorded as a receipt/);
+  assert.match(issue869Doc, /newly created or adopted issue evidence/);
+  assert.match(issue869Doc, /mapped OMX session evidence/);
+  assert.match(issue869Doc, /must not reuse the last merged commit, the successful\s+`main` CI run, or any release receipt/);
+  assert.match(issue869Doc, /receiptOnlyNudgeLoopBoundary/);
+  assert.match(issue869Doc, /requiresIssueAndOmxSessionEvidence: true/);
+  assert.match(issue869Doc, /satisfiesNudgeReportAnchorRequirement: false/);
+  assert.match(issue869Doc, /repeatedReceiptOnlyReportAllowed: false/);
+  assert.match(issue869Doc, /does not change runtime\/provider behavior/);
+  assert.match(issue869Doc, /merge-gate policy/);
+  assert.match(issue869Doc, /detector scope/);
+  assert.match(issue869Doc, /React Web\/RN\/TUI\/WebView behavior/);
+  assert.match(issue869Doc, /performance claims/);
+  assert.match(issue869Doc, /product\s+claims/);
 });
 
 test("parseOperatorActivityTmuxPanes parses tab-delimited session, path, and command", () => {
@@ -1570,6 +1587,132 @@ test("operator check requires post-receipt nudge anchor after #866 main CI relea
 
   const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
+});
+
+test("operator check requires issue plus OMX session evidence after #868 receipt-only nudge loop", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "868-main-receipt-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-15T12:20:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") {
+        return JSON.stringify([
+          {
+            databaseId: 86801,
+            status: "completed",
+            conclusion: "success",
+            updatedAt: "2026-05-15T12:00:00Z",
+            headBranch: "main",
+            headSha: mainHead,
+            event: "push",
+            workflowName: "CI",
+            url: "https://github.com/minislively/fooks/actions/runs/86801",
+          },
+        ]);
+      }
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  const boundary = snapshot.activeWorkReceipts.receiptOnlyNudgeLoopBoundary;
+  assert.equal(boundary.issue, "#869");
+  assert.equal(boundary.readOnly, true);
+  assert.equal(boundary.priorReceipt.pullRequest, "#868");
+  assert.equal(boundary.priorReceipt.lastMergedCommitOrMainCiRunIsActiveDevelopmentEvidence, false);
+  assert.deepEqual(boundary.currentRequiredEvidence, {
+    newlyCreatedOrAdoptedIssueCount: 0,
+    mappedOmxSessionCount: 0,
+  });
+  assert.equal(boundary.requiresIssueAndOmxSessionEvidence, true);
+  assert.equal(boundary.satisfiesNudgeReportAnchorRequirement, false);
+  assert.equal(boundary.repeatedReceiptOnlyReportAllowed, false);
+  assert.deepEqual(boundary.requiredReportEvidence, [
+    "newly created/adopted issue evidence",
+    "mapped OMX session evidence",
+  ]);
+  assert.deepEqual(boundary.prohibitedReportAnchors, [
+    "last merged commit",
+    "main CI run",
+    "release receipt",
+  ]);
+  assert.match(boundary.claimBoundary, /issue #869/);
+  assert.match(boundary.claimBoundary, /PR #868 receipt-only closeout/);
+  assert.match(boundary.nudgeRule, /newly created\/adopted issue evidence plus mapped OMX session evidence/);
+  assert.match(boundary.nudgeRule, /last merged commit or main CI run/);
+
+  const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
+});
+
+test("operator check satisfies #869 only when issue and OMX session evidence are both present", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-15T12:25:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return `omx-issue-869\t${tempDir}\tzsh\n`;
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[{\"number\":869}]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-869-active-head", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "issue-869-active-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  const boundary = snapshot.activeWorkReceipts.receiptOnlyNudgeLoopBoundary;
+  assert.deepEqual(boundary.currentRequiredEvidence, {
+    newlyCreatedOrAdoptedIssueCount: 1,
+    mappedOmxSessionCount: 1,
+  });
+  assert.equal(boundary.requiresIssueAndOmxSessionEvidence, false);
+  assert.equal(boundary.satisfiesNudgeReportAnchorRequirement, true);
+  assert.equal(boundary.repeatedReceiptOnlyReportAllowed, false);
+  assert.match(boundary.nudgeRule, /may proceed only by naming the newly created\/adopted issue evidence and mapped OMX session evidence/);
 });
 
 test("operator activity keeps legacy worktree inference conservative when tmux is unavailable", () => {

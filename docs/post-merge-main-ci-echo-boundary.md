@@ -80,6 +80,13 @@ post-receipt nudge must name a new issue, branch, session, PR anchor, or a
 concrete blocker; `requiresFreshPostReceiptNudgeAnchor: true` means the green
 receipt is not enough to describe active development.
 
+For issue #869, receipt-only nudge-loop reports get
+`activeWorkReceipts.receiptOnlyNudgeLoopBoundary`. It treats the PR #868 merged
+commit and successful `main` CI run as prior receipts only. The next dogfood
+nudge report must name newly created/adopted issue evidence plus mapped OMX
+session evidence; `requiresIssueAndOmxSessionEvidence: true` means another
+receipt-only report is not an active development anchor.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
@@ -124,6 +131,11 @@ receipt is not enough to describe active development.
   receipt, sets receipt active-development evidence to false, and requires a
   fresh issue, branch, session, PR anchor, or concrete blocker before the next
   nudge can describe active development.
+- `activeWorkReceipts.receiptOnlyNudgeLoopBoundary` is the issue #869
+  receipt-only nudge-loop summary. It keeps the PR #868 merged commit and main
+  CI success as receipts only, sets repeated receipt-only reports to false, and
+  requires newly created/adopted issue evidence plus mapped OMX session evidence
+  before the next nudge report can describe active development.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
