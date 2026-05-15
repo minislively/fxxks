@@ -46,6 +46,7 @@ const fixtures = {
   quietNativeEvidence: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx"),
   duplicateIds: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx"),
   missingHtmlForTarget: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target.tsx"),
+  conflictingLabelAssociation: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "conflicting-label-association.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -380,6 +381,46 @@ test("React Web issue report emits manual-review cards for duplicate literal nat
   assert.equal(first.decision.autoApply, false);
   assert.equal(first.decision.humanReviewRequired, true);
   assert.doesNotMatch(JSON.stringify(report), /Auto-apply: yes|must-edit/i);
+});
+
+
+test("React Web issue report emits inspect-first manual-review cards for conflicting native label associations", () => {
+  const report = parseIssues(fixtures.conflictingLabelAssociation);
+
+  assert.equal(report.inScope, true);
+  const issue = report.issues.find((item) => item.kind === "react-web.conflicting-label-association");
+  assert.ok(issue);
+  assert.equal(issue.whereToLook.filePath, "test/fixtures/react-web-label-preview/conflicting-label-association.tsx");
+  assert.equal(issue.whereToLook.line, 10);
+  assert.equal(issue.evidence.element, "input");
+  assert.equal(issue.confidence, "high");
+  assert.equal(issue.fixability, "manual-review");
+  assert.equal(issue.autoFixSafety, "unsafe-to-auto-apply");
+  assert.equal(issue.preview, undefined);
+  assert.match(issue.problem, /Multiple native labels target the same native input id/);
+  assert.match(issue.whyItMatters, /ambiguous accessible-name intent/);
+  assert.match(issue.suggestedAction, /exact native label and control lines/);
+  assert.match(issue.skipReason, /multiple native labels target the same native control id/);
+  assert.deepEqual(issue.fixShapeGuidance.shape, "human-reviewed-conflicting-label-association");
+  assert.ok(issue.fixShapeGuidance.inspectFirst.some((entry) => /native label lines: 8, 9 targeting id "email" and native control line 10/.test(entry)));
+  assert.ok(issue.fixShapeGuidance.inspectFirst.some((entry) => /Stop if the multiple labels are intentional/.test(entry)));
+  assert.match(issue.contextPacket.relatedPattern, /native label htmlFor literals on lines 8,9 target the same native control id/);
+  assert.ok(issue.contextPacket.excludedInference.some((entry) => /Does not merge, delete, reorder, or rewrite labels/.test(entry)));
+  assert.ok(issue.contextPacket.excludedInference.some((entry) => /custom label components, dynamic htmlFor\/id expressions, missing targets, or duplicate-id cases/.test(entry)));
+  assert.deepEqual(issue.evidence.sourceSignals, [
+    "jsx.input",
+    "jsx.input.id=email",
+    "jsx.label.htmlFor.multiple",
+    "same-file.native-label.lines=8,9",
+    "same-file.native-control.line=10",
+  ]);
+  assert.equal(issue.decision.allowedActions.inspect, true);
+  assert.equal(issue.decision.allowedActions.applyPatch, false);
+  assert.equal(issue.decision.autoApply, false);
+  assert.equal(issue.decision.humanReviewRequired, true);
+  const conflicts = report.issues.filter((item) => item.kind === "react-web.conflicting-label-association");
+  assert.equal(conflicts.length, 1);
+  assert.doesNotMatch(JSON.stringify(conflicts.map((item) => item.evidence.sourceSignals)), /custom-field|runtime-email|missing-field|duplicate/);
 });
 
 test("React Web issue report emits manual-review cards for native label htmlFor literals without same-file targets", () => {

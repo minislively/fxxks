@@ -16,6 +16,7 @@ const emptyAriaLabelFixture = path.join(repoRoot, "test", "fixtures", "react-web
 const quietNativeEvidenceFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx");
 const duplicateIdControlsFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "duplicate-id-controls.tsx");
 const missingHtmlForTargetFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target.tsx");
+const conflictingLabelAssociationFixture = path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "conflicting-label-association.tsx");
 
 function runPreview(file, ...args) {
   return spawnSync(process.execPath, [cliPath, "inspect", "react-web-label-preview", file, ...args], {
@@ -98,6 +99,40 @@ test("React Web label preview reports duplicate literal ids on htmlFor-associate
   assert.deepEqual(preview.findings.map((finding) => finding.duplicateId.lines), [[7, 9], [7, 9]]);
   assert.ok(preview.findings.every((finding) => finding.reason.includes("referenced by htmlFor")));
   assert.doesNotMatch(JSON.stringify(preview), /phone.*duplicate-literal-id/);
+});
+
+
+test("React Web label preview reports multiple native labels targeting one native control id", () => {
+  const cli = runPreview(conflictingLabelAssociationFixture, "--json");
+  assert.equal(cli.status, 0, cli.stderr);
+  const preview = JSON.parse(cli.stdout);
+
+  assert.equal(preview.inScope, true);
+  const conflicts = preview.findings.filter((finding) => finding.kind === "conflicting-label-association");
+  assert.equal(conflicts.length, 1);
+  const conflict = conflicts[0];
+  assert.deepEqual([conflict.kind, conflict.element, conflict.loc.startLine, conflict.confidence, conflict.suggestedPatch.attribute], [
+    "conflicting-label-association",
+    "input",
+    10,
+    "high",
+    "id/htmlFor",
+  ]);
+  assert.deepEqual(conflict.conflictingLabelAssociation, { value: "email", labelLines: [8, 9], controlLine: 10 });
+  assert.match(conflict.reason, /targeted by 2 same-file native label htmlFor literals/);
+  assert.deepEqual(conflict.evidence, [
+    "jsx.input",
+    "jsx.input.id=email",
+    "jsx.label.htmlFor.multiple",
+    "same-file.native-label.lines=8,9",
+    "same-file.native-control.line=10",
+  ]);
+  assert.equal(conflict.suggestedPatch.readOnly, true);
+  assert.equal(conflict.suggestedPatch.preview, "");
+  assert.doesNotMatch(JSON.stringify(conflicts), /custom-field|runtime-email|missing-field|duplicate/);
+  assert.equal(preview.findings.filter((finding) => finding.kind === "missing-htmlFor-target").length, 1);
+  assert.equal(preview.findings.filter((finding) => finding.kind === "duplicate-literal-id").length, 2);
+  assert.equal(preview.findings.filter((finding) => finding.kind === "empty-accessible-name").length, 1);
 });
 
 test("React Web label preview reports native label htmlFor literals with missing same-file id targets", () => {
