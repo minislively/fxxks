@@ -5057,13 +5057,23 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
 
   assert.match(demo, /React Web issue-card golden demo/);
   assert.match(demo, /\.\.\/react-web-first-minute-work-orders\.md/);
+  assert.match(demo, /short golden slices instead of one kitchen-sink fixture/);
   assert.match(demo, /fooks inspect react-web-issues fixtures\/compressed\/FormControls\.tsx/);
-  assert.match(demo, /Before source/);
+  assert.match(demo, /Demo 1: missing native label\/name evidence/);
+  assert.match(demo, /Demo 2: empty `aria-label` evidence/);
+  assert.match(demo, /Demo 3: `htmlFor` wiring cards/);
+  assert.match(demo, /fooks inspect react-web-issues test\/fixtures\/react-web-label-preview\/empty-aria-labels\.tsx/);
+  assert.match(demo, /fooks inspect react-web-issues test\/fixtures\/react-web-label-preview\/missing-htmlfor-target\.tsx/);
+  assert.match(demo, /fooks inspect react-web-issues test\/fixtures\/react-web-label-preview\/label-association-candidates\.tsx/);
   assert.match(demo, /problem/);
   assert.match(demo, /whyItMatters/);
   assert.match(demo, /whereToLook/);
   assert.match(demo, /confidence/);
   assert.match(demo, /suggestedAction/);
+  assert.match(demo, /react-web\\.empty-accessible-name|Native input has empty accessible-name evidence/);
+  assert.match(demo, /react-web\\.missing-htmlfor-target|Native label references htmlFor="missing-email"/);
+  assert.match(demo, /safe-preview-htmlFor-association/);
+  assert.match(demo, /No duplicate-id\/conflicting-label emitted-card claim/);
   assert.match(demo, /--summary-json/);
   assert.match(demo, /firstMinuteSummary|First-minute handoff/);
   assert.match(demo, /--dry-run-json/);
@@ -5085,13 +5095,25 @@ test("React Web issue-card public demo keeps selected golden handoff strings", (
   const demo = fs.readFileSync(path.join(repoRoot, "docs", "demo", "react-web-issues.md"), "utf8");
   const summaryGolden = readReactWebIssueGoldenJson("form-controls.summary.selected.json");
   const dryRunGolden = readReactWebIssueGoldenJson("form-controls.dry-run.selected.json");
+  const emptyAriaSummaryGolden = readReactWebIssueGoldenJson("empty-aria-labels.summary.selected.json");
+  const associationDryRunGolden = readReactWebIssueGoldenJson("label-association-candidates.dry-run.selected.json");
+  const missingHtmlForSummaryGolden = readReactWebIssueGoldenJson("missing-htmlfor-target.summary.selected.json");
   const firstItem = summaryGolden.firstMinuteSummary.firstItem;
+  const emptyAriaFirstItem = emptyAriaSummaryGolden.firstMinuteSummary.firstItem;
+  const associationCandidate = associationDryRunGolden.firstCandidate;
+  const missingHtmlForFirstItem = missingHtmlForSummaryGolden.firstMinuteSummary.firstItem;
 
   assert.match(demo, new RegExp(escapeRegExp(firstItem.firstInspectStep)));
   assert.match(demo, new RegExp(escapeRegExp(firstItem.nextAction)));
   assert.match(demo, new RegExp(escapeRegExp(firstItem.humanDecisionNeeded[0])));
   assert.match(demo, new RegExp(escapeRegExp(firstItem.doNotDo[0])));
   assert.match(demo, new RegExp(escapeRegExp(firstItem.doNotDo[2])));
+  assert.match(demo, new RegExp(escapeRegExp(emptyAriaFirstItem.firstInspectStep)));
+  assert.match(demo, new RegExp(escapeRegExp(emptyAriaFirstItem.nextAction)));
+  assert.match(demo, new RegExp(escapeRegExp(missingHtmlForFirstItem.issueId)));
+  assert.match(demo, new RegExp(escapeRegExp(missingHtmlForFirstItem.fixShape)));
+  assert.match(demo, new RegExp(escapeRegExp(associationCandidate.migrationCandidate)));
+  assert.match(demo, new RegExp(escapeRegExp(String(associationCandidate.previewAvailable))));
   assert.match(demo, new RegExp(escapeRegExp(String(dryRunGolden.firstCandidate.dryRunOnly))));
 });
 

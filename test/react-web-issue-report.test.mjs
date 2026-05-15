@@ -141,11 +141,25 @@ function projectTextGolden(text) {
   const summaryLines = lines.slice(summaryIndex, lines.findIndex((line, index) => index > summaryIndex && line.startsWith("## Issue 1:")));
   return [
     "## First-minute summary",
-    summaryLines.find((line) => line.startsWith("- react-web-label-1: human-reviewed-native-control-name;")),
+    summaryLines.find((line) => line.startsWith("- react-web-label-1:") || line.startsWith("- react-web-htmlfor-target-1:")),
     summaryLines.find((line) => line.trimStart().startsWith("- next action:")),
     summaryLines.find((line) => line.trimStart().startsWith("- human decision needed:")),
     summaryLines.find((line) => line.trimStart().startsWith("- do not do:")),
   ].join("\n").trimEnd();
+}
+
+function projectSummaryGoldenWithSource(summary) {
+  return {
+    ...projectSummaryGolden(summary),
+    sourceIssueCounts: summary.sourceIssueCounts,
+  };
+}
+
+function projectDryRunGoldenWithSource(dryRun) {
+  return {
+    ...projectDryRunGolden(dryRun),
+    sourceIssueCounts: dryRun.sourceIssueCounts,
+  };
 }
 
 function hasNestedKey(value, key) {
@@ -1178,6 +1192,55 @@ test("React Web issue report text output matches selected golden excerpt", () =>
   assert.equal(cli.status, 0, cli.stderr);
 
   assert.equal(projectTextGolden(cli.stdout), readGoldenText("form-controls.text.excerpt.txt"));
+});
+
+test("React Web issue report selected golden contracts cover current demo card families", () => {
+  const cases = [
+    {
+      fixture: fixtures.emptyAriaLabel,
+      prefix: "empty-aria-labels",
+      expectedKind: "react-web.empty-accessible-name",
+      expectedFixShape: "human-reviewed-accessible-name",
+      expectedSourceCounts: { "label-preview": 3, "htmlFor-target-resolution": 0, total: 3 },
+    },
+    {
+      fixture: fixtures.missingHtmlForTarget,
+      prefix: "missing-htmlfor-target",
+      expectedKind: "react-web.missing-htmlfor-target",
+      expectedFixShape: "human-reviewed-htmlFor-target-resolution",
+      expectedSourceCounts: { "label-preview": 0, "htmlFor-target-resolution": 1, total: 1 },
+    },
+    {
+      fixture: fixtures.association,
+      prefix: "label-association-candidates",
+      expectedKind: "react-web.unassociated-nearby-label",
+      expectedFixShape: "safe-preview-htmlFor-association",
+      expectedSourceCounts: { "label-preview": 3, "htmlFor-target-resolution": 0, total: 3 },
+    },
+  ];
+
+  for (const entry of cases) {
+    const report = parseIssues(entry.fixture);
+    assert.equal(report.issues[0].kind, entry.expectedKind);
+
+    const summaryCli = runIssues(entry.fixture, "--summary-json");
+    const dryRunCli = runIssues(entry.fixture, "--dry-run-json");
+    const textCli = runIssues(entry.fixture);
+    assert.equal(summaryCli.status, 0, summaryCli.stderr);
+    assert.equal(dryRunCli.status, 0, dryRunCli.stderr);
+    assert.equal(textCli.status, 0, textCli.stderr);
+
+    const summary = JSON.parse(summaryCli.stdout);
+    const dryRun = JSON.parse(dryRunCli.stdout);
+    assert.deepEqual(summary.sourceIssueCounts, entry.expectedSourceCounts);
+    assert.deepEqual(dryRun.sourceIssueCounts, entry.expectedSourceCounts);
+    assert.equal(summary.firstMinuteSummary.items[0].fixShape, entry.expectedFixShape);
+    assert.equal(dryRun.candidates[0].migrationCandidate, entry.expectedFixShape);
+
+    assert.deepEqual(projectSummaryGoldenWithSource(summary), readGoldenJson(`${entry.prefix}.summary.selected.json`));
+    assert.deepEqual(projectDryRunGoldenWithSource(dryRun), readGoldenJson(`${entry.prefix}.dry-run.selected.json`));
+    assert.equal(projectTextGolden(textCli.stdout), readGoldenText(`${entry.prefix}.text.excerpt.txt`));
+  }
 });
 
 test("React Web issue report migration dry-run JSON preserves empty and unsupported boundaries", () => {

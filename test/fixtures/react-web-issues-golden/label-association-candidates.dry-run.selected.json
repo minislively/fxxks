@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "react-web-issue-report-migration-dry-run.v1",
+  "projection": "migration-dry-run-json",
+  "filePath": "test/fixtures/react-web-label-preview/label-association-candidates.tsx",
+  "readOnly": true,
+  "dryRunOnly": true,
+  "autoApply": false,
+  "sourceIssueCounts": {
+    "label-preview": 3,
+    "htmlFor-target-resolution": 0,
+    "total": 3
+  },
+  "summary": {
+    "candidateCount": 3,
+    "affectedFiles": [
+      "test/fixtures/react-web-label-preview/label-association-candidates.tsx"
+    ],
+    "safePreviewCandidateCount": 1,
+    "manualReviewCandidateCount": 2
+  },
+  "firstCandidate": {
+    "issueId": "react-web-label-1",
+    "affectedFile": "test/fixtures/react-web-label-preview/label-association-candidates.tsx",
+    "migrationCandidate": "safe-preview-htmlFor-association",
+    "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/label-association-candidates.tsx:7-7 (input) before editing.",
+    "previewAvailable": true,
+    "humanReviewRequired": true,
+    "autoApply": false,
+    "dryRunOnly": true,
+    "riskNotes": [
+      "The report can preview a high-confidence deterministic native htmlFor/id association from existing JSX evidence, but fooks remains read-only and does not apply…",
+      "Safe preview is a read-only shape candidate and still requires human review before use.",
+      "Do not apply patches automatically or generate accessible-name copy from this dry run.",
+      "Do not infer custom-component semantics."
+    ],
+    "decision": {
+      "state": "dry-run-candidate-only",
+      "allowedActions": {
+        "inspect": true,
+        "suggestPatch": true,
+        "applyPatch": false,
+        "generateCopy": false
+      },
+      "humanReviewRequired": true,
+      "autoApply": false
+    }
+  }
+}

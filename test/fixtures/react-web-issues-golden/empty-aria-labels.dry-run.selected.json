@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "react-web-issue-report-migration-dry-run.v1",
+  "projection": "migration-dry-run-json",
+  "filePath": "test/fixtures/react-web-label-preview/empty-aria-labels.tsx",
+  "readOnly": true,
+  "dryRunOnly": true,
+  "autoApply": false,
+  "sourceIssueCounts": {
+    "label-preview": 3,
+    "htmlFor-target-resolution": 0,
+    "total": 3
+  },
+  "summary": {
+    "candidateCount": 3,
+    "affectedFiles": [
+      "test/fixtures/react-web-label-preview/empty-aria-labels.tsx"
+    ],
+    "safePreviewCandidateCount": 0,
+    "manualReviewCandidateCount": 3
+  },
+  "firstCandidate": {
+    "issueId": "react-web-label-1",
+    "affectedFile": "test/fixtures/react-web-label-preview/empty-aria-labels.tsx",
+    "migrationCandidate": "human-reviewed-accessible-name",
+    "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/empty-aria-labels.tsx:4-4 (input) before editing.",
+    "previewAvailable": false,
+    "humanReviewRequired": true,
+    "autoApply": false,
+    "dryRunOnly": true,
+    "riskNotes": [
+      "Correct user-facing accessible-name copy requires human review, so fooks reports the issue and does not auto-apply it.",
+      "No deterministic safe preview is available; choose the final label/name shape from local source context.",
+      "Do not apply patches automatically or generate accessible-name copy from this dry run.",
+      "Do not infer custom-component semantics."
+    ],
+    "decision": {
+      "state": "dry-run-candidate-only",
+      "allowedActions": {
+        "inspect": true,
+        "suggestPatch": false,
+        "applyPatch": false,
+        "generateCopy": false
+      },
+      "humanReviewRequired": true,
+      "autoApply": false
+    }
+  }
+}

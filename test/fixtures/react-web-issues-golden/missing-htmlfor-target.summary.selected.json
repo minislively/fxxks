@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "react-web-issue-report-summary.v1",
+  "projection": "summary-json",
+  "filePath": "test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx",
+  "readOnly": true,
+  "autoApply": false,
+  "sourceIssueCounts": {
+    "label-preview": 0,
+    "htmlFor-target-resolution": 1,
+    "total": 1
+  },
+  "summary": {
+    "issueCount": 1,
+    "safePreviewCount": 0,
+    "manualReviewCount": 1,
+    "unsafeToAutoApplyCount": 1
+  },
+  "triageTopIds": {
+    "rankedIssueIds": [
+      "react-web-htmlfor-target-1"
+    ],
+    "topIssueIds": [
+      "react-web-htmlfor-target-1"
+    ],
+    "topManualReviewIssueIds": [
+      "react-web-htmlfor-target-1"
+    ],
+    "safePreviewIssueIds": [],
+    "manualReviewIssueIds": [
+      "react-web-htmlfor-target-1"
+    ]
+  },
+  "firstMinuteSummary": {
+    "sourceTopIssueIds": [
+      "react-web-htmlfor-target-1"
+    ],
+    "firstItem": {
+      "issueId": "react-web-htmlfor-target-1",
+      "fixShape": "human-reviewed-htmlFor-target-resolution",
+      "firstInspectStep": "Inspect test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx:6-6 (label) before editing.",
+      "nextAction": "Inspect test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx:6-6 (label) first; confirm current source still matches before suggesting changes.",
+      "humanDecisionNeeded": [
+        "Confirm the final accessible label/name copy from current source context.",
+        "Choose the label/name shape from local JSX evidence."
+      ],
+      "doNotDo": [
+        "Do not apply patches automatically from this report.",
+        "Do not infer custom-component semantics.",
+        "Do not generate final label/name copy automatically."
+      ],
+      "fixShapeGuidance": {
+        "claimBoundary": "Local htmlFor target-resolution guidance only: uses same-file literal label htmlFor/id evidence; it is read-only, requires human review, and does not create ids, generate copy, or infer custom-component semantics.",
+        "humanReviewRequired": true,
+        "autoApply": false
+      },
+      "decision": {
+        "state": "human-decision-required",
+        "allowedActions": {
+          "inspect": true,
+          "suggestPatch": false,
+          "applyPatch": false,
+          "generateCopy": false
+        },
+        "humanReviewRequired": true,
+        "autoApply": false
+      }
+    }
+  }
+}
