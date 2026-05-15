@@ -73,6 +73,13 @@ the eight old-review-worktree case, and keeps
 come from issue, branch, session, or PR evidence, or from a concrete blocker
 that prevents creating or adopting one of those anchors.
 
+For issue #867, post-receipt nudges get
+`activeWorkReceipts.postReceiptNudgeAnchorBoundary`. It treats the #866 main
+CI/release success and closed legacy worktree bucket as receipts only. A fresh
+post-receipt nudge must name a new issue, branch, session, PR anchor, or a
+concrete blocker; `requiresFreshPostReceiptNudgeAnchor: true` means the green
+receipt is not enough to describe active development.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
@@ -112,6 +119,11 @@ that prevents creating or adopting one of those anchors.
   clean-slate nudge summary for old local review worktrees. It is read-only
   stale/manual-review evidence, not cleanup authority and not active
   development evidence.
+- `activeWorkReceipts.postReceiptNudgeAnchorBoundary` is the issue #867
+  post-receipt nudge summary. It keeps the #866 main CI/release success as a
+  receipt, sets receipt active-development evidence to false, and requires a
+  fresh issue, branch, session, PR anchor, or concrete blocker before the next
+  nudge can describe active development.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
