@@ -662,6 +662,7 @@ Everyday commands:
   ${displayCliName} status worktree
   ${displayCliName} status react-web [--json]
   ${displayCliName} status artifacts [--json]
+  ${displayCliName} status stale-worktrees [--json]
   ${displayCliName} status orphan-worktrees [--json]
   ${displayCliName} status activity [--include-remote-counts]
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -1474,6 +1475,17 @@ async function run(): Promise<void> {
         print(auditArtifacts(process.cwd()));
         return;
       }
+      if (arg1 === "stale-worktrees") {
+        const allowed = new Set(["--json"]);
+        for (const arg of rest.slice(1)) {
+          if (!allowed.has(arg)) {
+            throw new Error(`Unexpected status stale-worktrees argument: ${arg}`);
+          }
+        }
+        const { buildStaleWorktreeAudit } = await import("../ops/stale-worktree-audit.js");
+        print(buildStaleWorktreeAudit(process.cwd(), { command: "status stale-worktrees" }));
+        return;
+      }
       if (arg1 === "orphan-worktrees") {
         const allowed = new Set(["--json"]);
         for (const arg of rest.slice(1)) {
@@ -1496,7 +1508,7 @@ async function run(): Promise<void> {
         print(readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: rest.includes("--include-remote-counts") }));
         return;
       }
-      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', 'react-web', 'artifacts', 'orphan-worktrees', or 'activity'");
+      throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', 'react-web', 'artifacts', 'stale-worktrees', 'orphan-worktrees', or 'activity'");
     }
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");
