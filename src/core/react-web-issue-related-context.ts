@@ -12,6 +12,7 @@ export type ReactWebRelatedContextConfidence = "high" | "medium" | "low";
 
 export type ReactWebRelatedContextSource =
   | "label-preview"
+  | "htmlFor-target-resolution"
   | "local-import"
   | "same-directory"
   | "nearby-test";

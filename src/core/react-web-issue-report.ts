@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import ts from "typescript";
+
 import {
   buildReactWebLabelPatchPreview,
   REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY,
@@ -23,9 +27,12 @@ import {
 export const REACT_WEB_ISSUE_REPORT_SCHEMA_VERSION = "react-web-issue-report.v1" as const;
 export const REACT_WEB_ISSUE_REPORT_COMMAND = "inspect react-web-issues" as const;
 export const REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY =
-  "Read-only React Web issue report for a narrow native JSX label/accessibility subset only: adapts label-preview findings into actionable issue cards, never edits files, does not auto-apply patches, does not claim broad accessibility coverage, and does not infer custom-component semantics." as const;
+  "Read-only React Web issue report for a narrow native JSX label/accessibility subset only: adapts label-preview findings and same-file literal htmlFor target-resolution signals into actionable issue cards, never edits files, does not auto-apply patches, does not claim broad accessibility coverage, and does not infer custom-component semantics." as const;
 
 type ReactWebIssueConfidence = "high" | "medium";
+type ReactWebIssueSourceKind = "label-preview" | "htmlFor-target-resolution";
+type ReactWebIssueElement = ReactWebLabelPatchPreviewFinding["element"] | "label";
+export type ReactWebIssueSourceCounts = Record<ReactWebIssueSourceKind, number> & { total: number };
 type ReactWebIssueFixability = "safe-preview" | "manual-review";
 type ReactWebIssueAutoFixSafety = "not-auto-applied" | "unsafe-to-auto-apply";
 export type ReactWebIssuePriority = "high" | "medium" | "low";
@@ -35,12 +42,13 @@ type ReactWebIssueKind =
   | "react-web.missing-accessible-label"
   | "react-web.ambiguous-accessible-label"
   | "react-web.empty-accessible-name"
-  | "react-web.unassociated-nearby-label";
+  | "react-web.unassociated-nearby-label"
+  | "react-web.missing-htmlfor-target";
 
 export type ReactWebIssueTriageEvidence = {
   safePreviewAvailable: boolean;
   confidence: ReactWebIssueConfidence;
-  nativeElement: ReactWebLabelPatchPreviewFinding["element"];
+  nativeElement: ReactWebIssueElement;
   sameFileContextAvailable: boolean;
   relatedContextCount: number;
   relatedContextSources: ReactWebIssueRelatedContext["source"][];
@@ -62,7 +70,8 @@ type ReactWebIssueFixShape =
   | "human-reviewed-placeholder-replacement"
   | "human-reviewed-button-name"
   | "human-reviewed-native-control-name"
-  | "human-reviewed-accessible-name";
+  | "human-reviewed-accessible-name"
+  | "human-reviewed-htmlFor-target-resolution";
 
 export type ReactWebIssueFixShapeGuidance = {
   claimBoundary: string;
@@ -70,7 +79,7 @@ export type ReactWebIssueFixShapeGuidance = {
   summary: string;
   inspectFirst: string[];
   localEvidence: {
-    element: ReactWebLabelPatchPreviewFinding["element"];
+    element: ReactWebIssueElement;
     attributes: string[];
     sameFileContextAvailable: boolean;
     safePreviewAvailable: boolean;
@@ -101,7 +110,12 @@ export type ReactWebIssueCard = {
     endLine: number;
     context: string;
     sourceSignals: string[];
-    element: ReactWebLabelPatchPreviewFinding["element"];
+    element: ReactWebIssueElement;
+  };
+  source: {
+    kind: ReactWebIssueSourceKind;
+    summary: string;
+    evidence: string[];
   };
   whereToLook: {
     filePath: string;
@@ -165,6 +179,7 @@ export type ReactWebIssueReport = {
     claimBoundary: typeof REACT_WEB_LABEL_PATCH_PREVIEW_CLAIM_BOUNDARY;
     findingCount: number;
   };
+  sourceIssueCounts: ReactWebIssueSourceCounts;
   inScope: boolean;
   skippedReason?: string;
   summary: {
@@ -202,6 +217,7 @@ export type ReactWebIssueReportSummaryJson = {
   claimBoundary: typeof REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY;
   inScope: boolean;
   skippedReason?: string;
+  sourceIssueCounts: ReactWebIssueSourceCounts;
   summary: ReactWebIssueReport["summary"];
   triageTopIds: {
     rankedIssueIds: string[];
@@ -228,6 +244,7 @@ export type ReactWebIssueReportMigrationDryRunJson = {
   claimBoundary: typeof REACT_WEB_ISSUE_REPORT_CLAIM_BOUNDARY;
   inScope: boolean;
   skippedReason?: string;
+  sourceIssueCounts: ReactWebIssueSourceCounts;
   summary: {
     candidateCount: number;
     affectedFiles: string[];
@@ -330,6 +347,125 @@ function issueKindFor(finding: ReactWebLabelPatchPreviewFinding): ReactWebIssueK
   return `react-web.${finding.kind}` as ReactWebIssueKind;
 }
 
+type ReactWebMissingHtmlForTargetSignal = {
+  targetId: string;
+  loc: {
+    startLine: number;
+    endLine: number;
+  };
+  context: string;
+  confidence: ReactWebIssueConfidence;
+  evidence: string[];
+};
+
+function absolutePathFor(filePath: string, cwd: string): string {
+  return path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+}
+
+function compactSourceLine(value: string, max = 180): string {
+  const compacted = value.replace(/\s+/g, " ").trim();
+  return compacted.length > max ? `${compacted.slice(0, Math.max(0, max - 1)).trimEnd()}…` : compacted;
+}
+
+function jsxTagNameText(tagName: ts.JsxTagNameExpression): string | undefined {
+  if (ts.isIdentifier(tagName)) return tagName.text;
+  if (ts.isJsxNamespacedName(tagName)) return `${tagName.namespace.text}:${tagName.name.text}`;
+  return undefined;
+}
+
+function stringLiteralAttributeValue(attributes: ts.JsxAttributes, name: string): string | undefined {
+  const property = attributes.properties.find((item): item is ts.JsxAttribute =>
+    ts.isJsxAttribute(item) && ts.isIdentifier(item.name) && item.name.text === name
+  );
+  if (!property?.initializer || !ts.isStringLiteral(property.initializer)) return undefined;
+  const value = property.initializer.text.trim();
+  return value || undefined;
+}
+
+function hasDynamicIdAttribute(attributes: ts.JsxAttributes): boolean {
+  return attributes.properties.some((item) =>
+    ts.isJsxAttribute(item) &&
+    ts.isIdentifier(item.name) &&
+    item.name.text === "id" &&
+    item.initializer !== undefined &&
+    !ts.isStringLiteral(item.initializer)
+  );
+}
+
+function findMissingHtmlForTargetSignals(filePath: string, cwd: string): ReactWebMissingHtmlForTargetSignal[] {
+  const absolutePath = absolutePathFor(filePath, cwd);
+  let source = "";
+  try {
+    source = fs.readFileSync(absolutePath, "utf8");
+  } catch {
+    return [];
+  }
+
+  const sourceFile = ts.createSourceFile(absolutePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const lines = source.split(/\r?\n/);
+  const idCounts = new Map<string, number>();
+  let hasDynamicId = false;
+
+  function collectIds(node: ts.Node): void {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const literalId = stringLiteralAttributeValue(node.attributes, "id");
+      if (literalId) idCounts.set(literalId, (idCounts.get(literalId) ?? 0) + 1);
+      if (hasDynamicIdAttribute(node.attributes)) hasDynamicId = true;
+    }
+    ts.forEachChild(node, collectIds);
+  }
+  collectIds(sourceFile);
+
+  if (hasDynamicId) return [];
+
+  const signals: ReactWebMissingHtmlForTargetSignal[] = [];
+  function visitLabels(node: ts.Node): void {
+    if (ts.isJsxOpeningElement(node) && jsxTagNameText(node.tagName) === "label") {
+      const targetId = stringLiteralAttributeValue(node.attributes, "htmlFor");
+      if (targetId && (idCounts.get(targetId) ?? 0) === 0) {
+        const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+        const end = sourceFile.getLineAndCharacterOfPosition(node.end);
+        const context = compactSourceLine(lines[start.line] ?? node.getText(sourceFile));
+        signals.push({
+          targetId,
+          loc: {
+            startLine: start.line + 1,
+            endLine: end.line + 1,
+          },
+          context,
+          confidence: "medium",
+          evidence: [
+            "jsx.label.htmlFor.literal",
+            "jsx.id.same-file-target.missing",
+            "dynamic-id-attributes.absent",
+          ],
+        });
+      }
+    }
+    ts.forEachChild(node, visitLabels);
+  }
+  visitLabels(sourceFile);
+
+  return signals;
+}
+
+function relatedContextForMissingHtmlForTarget(
+  filePath: string,
+  signal: ReactWebMissingHtmlForTargetSignal,
+): ReactWebIssueRelatedContext[] {
+  return [{
+    kind: "same-file-pattern",
+    file: filePath,
+    reason: `Inspect the same-file literal label htmlFor="${signal.targetId}" because no matching literal id target was found in this file.`,
+    confidence: signal.confidence,
+    source: "htmlFor-target-resolution",
+    action: "inspect-first",
+    line: signal.loc.startLine,
+    endLine: signal.loc.endLine,
+    context: signal.context,
+  }];
+}
+
 function problemFor(finding: ReactWebLabelPatchPreviewFinding): string {
   switch (finding.kind) {
     case "missing-accessible-label":
@@ -409,17 +545,18 @@ function relatedContextQualityFor(relatedContext: ReactWebIssueRelatedContext[])
   if (sources.has("local-import") || sources.has("nearby-test")) {
     return "local-supporting-context";
   }
-  if (sources.has("label-preview")) return "same-file-only";
+  if (sources.has("label-preview") || sources.has("htmlFor-target-resolution")) return "same-file-only";
   return "thin-local-context";
 }
 
-function nativeElementWeight(element: ReactWebLabelPatchPreviewFinding["element"]): number {
+function nativeElementWeight(element: ReactWebIssueElement): number {
   switch (element) {
     case "input":
     case "select":
     case "textarea":
       return 2;
     case "button":
+    case "label":
       return 1;
   }
 }
@@ -438,7 +575,9 @@ function priorityFor(score: number): ReactWebIssuePriority {
 function triageEvidenceFor(issue: Omit<ReactWebIssueCard, "triage">): ReactWebIssueTriageEvidence {
   const safePreviewAvailable = issue.fixability === "safe-preview" && Boolean(issue.preview);
   const sameFileContextAvailable = issue.relatedContext.some(
-    (item) => item.kind === "same-file-pattern" && item.source === "label-preview",
+    (item) =>
+      item.kind === "same-file-pattern" &&
+      (item.source === "label-preview" || item.source === "htmlFor-target-resolution"),
   );
   const relatedContextSources = uniqueRelatedContextSources(issue.relatedContext);
   const relatedContextQuality = relatedContextQualityFor(issue.relatedContext);
@@ -451,10 +590,10 @@ function triageEvidenceFor(issue: Omit<ReactWebIssueCard, "triage">): ReactWebIs
   }
   if (issue.confidence === "high") {
     score += 3;
-    reasons.push("label-preview confidence is high");
+    reasons.push(`${issue.source.kind} confidence is high`);
   } else {
     score += 1;
-    reasons.push("label-preview confidence is medium");
+    reasons.push(`${issue.source.kind} confidence is medium`);
   }
 
   const elementWeight = nativeElementWeight(issue.evidence.element);
@@ -558,6 +697,8 @@ function fixShapeSummaryFor(shape: ReactWebIssueFixShape, element: ReactWebLabel
       return `Use local native ${element} attributes as hints for a human-reviewed accessible-name shape; do not generate copy automatically.`;
     case "human-reviewed-accessible-name":
       return `Choose a human-reviewed accessible-name shape for this native ${element} from local JSX context.`;
+    case "human-reviewed-htmlFor-target-resolution":
+      return "Inspect the literal htmlFor target and choose a human-reviewed target-resolution shape; do not create ids automatically.";
   }
 }
 
@@ -740,6 +881,11 @@ function issueCardFor(
       sourceSignals: finding.evidence,
       element: finding.element,
     },
+    source: {
+      kind: "label-preview" as const,
+      summary: "Label-preview patch-preview detector produced this issue card from native JSX evidence.",
+      evidence: finding.evidence,
+    },
     whereToLook: {
       filePath,
       line: finding.loc.startLine,
@@ -786,6 +932,112 @@ function issueCardFor(
   };
 }
 
+function issueCardForMissingHtmlForTarget(
+  filePath: string,
+  signal: ReactWebMissingHtmlForTargetSignal,
+  index: number,
+): ReactWebIssueCard {
+  const relatedContext = relatedContextForMissingHtmlForTarget(filePath, signal);
+  const cardId = `react-web-htmlfor-target-${index + 1}`;
+  const skipReason =
+    "Preview skipped because same-file literal htmlFor target resolution needs manual review and may involve renamed, generated, or cross-file ids.";
+  const suggestedAction =
+    `Inspect label htmlFor="${signal.targetId}" and decide whether to correct the target id, add a matching native-control id, or remove stale label wiring.`;
+  const fixShapeGuidance: ReactWebIssueFixShapeGuidance = {
+    claimBoundary:
+      "Local htmlFor target-resolution guidance only: uses same-file literal label htmlFor/id evidence; it is read-only, requires human review, and does not create ids, generate copy, or infer custom-component semantics.",
+    shape: "human-reviewed-htmlFor-target-resolution",
+    summary:
+      "Inspect the literal htmlFor target and choose a human-reviewed target-resolution shape; do not create ids automatically.",
+    inspectFirst: [
+      `Inspect ${filePath}:${signal.loc.startLine}-${signal.loc.endLine} (label) before editing.`,
+      `Confirm whether htmlFor="${signal.targetId}" should point to an existing native control, a renamed id, or stale wiring.`,
+      "Search current same-file JSX for the intended target before suggesting id changes.",
+      "If target creation depends on generated, dynamic, cross-file, or custom-component semantics, stop and read the source normally.",
+    ],
+    localEvidence: {
+      element: "label",
+      attributes: [`htmlFor=${signal.targetId}`],
+      sameFileContextAvailable: true,
+      safePreviewAvailable: false,
+      relatedContextCount: relatedContext.length,
+      relatedContextSources: uniqueRelatedContextSources(relatedContext),
+    },
+    humanReviewRequired: true,
+    autoApply: false,
+  };
+  const issueWithoutTriage = {
+    id: cardId,
+    kind: "react-web.missing-htmlfor-target" as const,
+    problem: `Native label references htmlFor="${signal.targetId}" but no same-file literal id target was found.`,
+    whyItMatters:
+      "Visible label text may not be programmatically connected to its intended native control when htmlFor points at a missing id.",
+    evidence: {
+      filePath,
+      line: signal.loc.startLine,
+      endLine: signal.loc.endLine,
+      context: signal.context,
+      sourceSignals: signal.evidence,
+      element: "label" as const,
+    },
+    source: {
+      kind: "htmlFor-target-resolution" as const,
+      summary: "Same-file literal target-resolution found a label htmlFor value without exactly one matching literal id.",
+      evidence: signal.evidence,
+    },
+    whereToLook: {
+      filePath,
+      line: signal.loc.startLine,
+      endLine: signal.loc.endLine,
+      context: signal.context,
+    },
+    relatedContext,
+    confidence: signal.confidence,
+    fixability: "manual-review" as const,
+    autoFixSafety: "unsafe-to-auto-apply" as const,
+    safetyRationale:
+      "Correct target resolution may require renaming ids, creating missing ids, or understanding dynamic/cross-file behavior, so fooks reports it for manual review and does not auto-apply it.",
+    suggestedFixIntent: suggestedAction,
+    suggestedAction,
+    contextPacket: {
+      whyThisFile: `Same-file literal htmlFor target-resolution evidence in ${filePath}:${signal.loc.startLine}-${signal.loc.endLine} produced this native label issue card.`,
+      relatedPattern:
+        "react-web.missing-htmlfor-target on a native label; manual-review target-resolution pattern because no deterministic safe preview is available.",
+      nearbyPrecedent: contextPacketNearbyPrecedentFor(relatedContext),
+      confidence: signal.confidence,
+      excludedInference: [
+        "Does not infer custom-component semantics.",
+        "Does not claim broad accessibility coverage beyond the native JSX label subset.",
+        "Does not auto-apply patches or make files editable from this report.",
+        "Does not infer generated, dynamic, or cross-file id targets.",
+        "Does not create missing ids or rename existing ids automatically.",
+      ],
+      conventionHints: [],
+    },
+    conventionHints: [],
+    fixShapeGuidance,
+    decision: buildReactWebIssueDecision({
+      cardId,
+      issueKind: "react-web.missing-htmlfor-target",
+      confidence: signal.confidence,
+      fixability: "manual-review",
+      previewAvailable: false,
+      skipReason,
+    }),
+    skipReason,
+  };
+  const evidence = triageEvidenceFor(issueWithoutTriage);
+  return {
+    ...issueWithoutTriage,
+    triage: {
+      rank: index + 1,
+      priority: priorityFor(evidence.score),
+      bucket: triageBucketFor(issueWithoutTriage),
+      evidence,
+    },
+  };
+}
+
 function compareIssuePriority(a: ReactWebIssueCard, b: ReactWebIssueCard): number {
   return (
     b.triage.evidence.score - a.triage.evidence.score ||
@@ -816,7 +1068,7 @@ function buildTriageRollup(issues: ReactWebIssueCard[]): ReactWebIssueReport["tr
       "Conservative local triage only: ranks issue cards from existing report evidence and does not edit files, auto-apply patches, infer custom-component semantics, or claim a broad accessibility audit.",
     criteria: [
       "safe preview availability",
-      "label-preview confidence",
+      "source evidence confidence",
       "native element type",
       "same-file JSX context",
       "related-context count and source quality",
@@ -998,20 +1250,31 @@ function buildFirstMinuteSummary(
 
 export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()): ReactWebIssueReport {
   const preview = buildReactWebLabelPatchPreview(filePath, cwd);
-  const issues = withTriageRanks(preview.findings.map((finding, index) =>
+  const previewIssues = preview.findings.map((finding, index) =>
     issueCardFor(
       preview.filePath,
       finding,
       index,
       buildReactWebIssueRelatedContext(preview.filePath, finding, cwd),
     ),
-  ));
+  );
+  const missingHtmlForTargetIssues = preview.inScope && preview.findings.length === 0
+    ? findMissingHtmlForTargetSignals(preview.filePath, cwd).map((signal, index) =>
+        issueCardForMissingHtmlForTarget(preview.filePath, signal, previewIssues.length + index)
+      )
+    : [];
+  const issues = withTriageRanks([...previewIssues, ...missingHtmlForTargetIssues]);
+  const sourceIssueCounts: ReactWebIssueSourceCounts = {
+    "label-preview": previewIssues.length,
+    "htmlFor-target-resolution": missingHtmlForTargetIssues.length,
+    total: issues.length,
+  };
   const triageRollup = buildTriageRollup(issues);
   const stopDecision = issues.length === 0
     ? buildReactWebStopDecision({
         state: preview.inScope ? "incomplete" : "unsupported",
         reason: preview.inScope
-          ? "No React Web issue cards were produced from the current bounded label-preview evidence."
+          ? "No React Web issue cards were produced from the current bounded label-preview or htmlFor target-resolution evidence."
           : preview.skippedReason ?? "Unsupported React Web issue-report boundary.",
         projection: "issue-card",
         stopConditions: preview.inScope
@@ -1033,6 +1296,7 @@ export function buildReactWebIssueReport(filePath: string, cwd = process.cwd()):
       claimBoundary: preview.claimBoundary,
       findingCount: preview.summary.findingCount,
     },
+    sourceIssueCounts,
     inScope: preview.inScope,
     ...(preview.skippedReason ? { skippedReason: preview.skippedReason } : {}),
     summary: {
@@ -1084,6 +1348,7 @@ export function buildReactWebIssueReportSummaryJson(report: ReactWebIssueReport)
     claimBoundary: report.claimBoundary,
     inScope: report.inScope,
     ...(report.skippedReason ? { skippedReason: report.skippedReason } : {}),
+    sourceIssueCounts: report.sourceIssueCounts,
     summary: report.summary,
     decisionSummary: report.decisionSummary,
     ...(report.stopDecision ? { stopDecision: { ...report.stopDecision, source: { ...report.stopDecision.source, projection: "summary-json" } } } : {}),
@@ -1199,6 +1464,7 @@ export function buildReactWebIssueReportMigrationDryRunJson(
     claimBoundary: report.claimBoundary,
     inScope: report.inScope,
     ...(report.skippedReason ? { skippedReason: report.skippedReason } : {}),
+    sourceIssueCounts: report.sourceIssueCounts,
     summary: {
       candidateCount: candidates.length,
       affectedFiles: [...new Set(candidates.map((candidate) => candidate.affectedFile))].sort(),
@@ -1224,6 +1490,7 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
     `Auto-apply: ${report.autoApply ? "yes" : "no"}`,
     `In scope: ${report.inScope ? "yes" : "no"}`,
     `Issues: ${report.summary.issueCount} (safe preview: ${report.summary.safePreviewCount}, manual review: ${report.summary.manualReviewCount}, unsafe to auto-apply: ${report.summary.unsafeToAutoApplyCount})`,
+    `Source issues: label-preview ${report.sourceIssueCounts["label-preview"]}, htmlFor target-resolution ${report.sourceIssueCounts["htmlFor-target-resolution"]}`,
   ];
   if (report.skippedReason) lines.push(`Skipped: ${report.skippedReason}`);
   if (report.issues.length === 0) return `${lines.join("\n")}\n`;
@@ -1266,6 +1533,7 @@ export function renderReactWebIssueReportText(report: ReactWebIssueReport): stri
       `- why: ${issue.whyItMatters}`,
       `- where to look: ${issue.whereToLook.filePath}:${issue.whereToLook.line}-${issue.whereToLook.endLine}`,
       `- element: ${issue.evidence.element}`,
+      `- source: ${issue.source.kind} — ${issue.source.summary}`,
       `- confidence: ${issue.confidence}`,
       `- fixability: ${issue.fixability}`,
       `- auto-fix safety: ${issue.autoFixSafety}`,

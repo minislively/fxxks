@@ -44,6 +44,9 @@ const fixtures = {
   expandedNativeControls: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "expanded-native-controls.tsx"),
   emptyAriaLabel: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "empty-aria-labels.tsx"),
   quietNativeEvidence: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "quiet-native-evidence.tsx"),
+  missingHtmlForTarget: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "missing-htmlfor-target.tsx"),
+  quietHtmlForTarget: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "htmlfor-target-quiet.tsx"),
+  staticQuietHtmlForTarget: path.join(repoRoot, "test", "fixtures", "react-web-label-preview", "htmlfor-target-static-quiet.tsx"),
   formControls: path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
   rn: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "rn-accessibility-test-anchor.tsx"),
   customComponent: path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "react-web", "custom-form-shell.tsx"),
@@ -392,7 +395,7 @@ test("React Web issue report JSON includes conservative priority rollup for firs
   assert.match(report.triageRollup.claimBoundary, /does not.*infer custom-component semantics/);
   assert.deepEqual(report.triageRollup.criteria, [
     "safe preview availability",
-    "label-preview confidence",
+    "source evidence confidence",
     "native element type",
     "same-file JSX context",
     "related-context count and source quality",
@@ -761,6 +764,67 @@ test("React Web issue report avoids unsafe htmlFor inference and keeps fallback 
   assert.doesNotMatch(JSON.stringify(report), /htmlFor=/);
 });
 
+
+test("React Web issue report emits conservative manual-review card for missing htmlFor target", () => {
+  const report = parseIssues(fixtures.missingHtmlForTarget);
+  const summary = JSON.parse(runIssues(fixtures.missingHtmlForTarget, "--summary-json").stdout);
+  const dryRun = JSON.parse(runIssues(fixtures.missingHtmlForTarget, "--dry-run-json").stdout);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.sourcePreview.findingCount, 0);
+  assert.deepEqual(report.sourceIssueCounts, {
+    "label-preview": 0,
+    "htmlFor-target-resolution": 1,
+    total: 1,
+  });
+  assert.equal(report.summary.issueCount, 1);
+  assert.equal(report.summary.safePreviewCount, 0);
+  assert.equal(report.summary.manualReviewCount, 1);
+  assert.equal(report.summary.unsafeToAutoApplyCount, 1);
+
+  const issue = report.issues[0];
+  assert.equal(issue.kind, "react-web.missing-htmlfor-target");
+  assert.equal(issue.source.kind, "htmlFor-target-resolution");
+  assert.equal(issue.evidence.element, "label");
+  assert.equal(issue.confidence, "medium");
+  assert.equal(issue.fixability, "manual-review");
+  assert.equal(issue.autoFixSafety, "unsafe-to-auto-apply");
+  assert.equal(issue.preview, undefined);
+  assert.match(issue.problem, /missing-email/);
+  assert.match(issue.safetyRationale, /manual review/);
+  assert.match(issue.skipReason, /target resolution needs manual review/);
+  assert.deepEqual(issue.relatedContext.map((entry) => entry.source), ["htmlFor-target-resolution"]);
+  assert.equal(issue.fixShapeGuidance.shape, "human-reviewed-htmlFor-target-resolution");
+  assert.equal(issue.fixShapeGuidance.localEvidence.safePreviewAvailable, false);
+  assert.deepEqual(issue.fixShapeGuidance.localEvidence.relatedContextSources, ["htmlFor-target-resolution"]);
+  assert.doesNotMatch(issue.contextPacket.whyThisFile, /Direct label-preview evidence|label-preview confidence/);
+  assert.equal(issue.relatedContext.some((entry) => entry.source === "label-preview"), false);
+
+  assert.deepEqual(summary.sourceIssueCounts, report.sourceIssueCounts);
+  assert.deepEqual(dryRun.sourceIssueCounts, report.sourceIssueCounts);
+  assert.equal(dryRun.summary.candidateCount, 1);
+  assert.equal(dryRun.candidates[0].migrationCandidate, "human-reviewed-htmlFor-target-resolution");
+  assert.equal(dryRun.candidates[0].previewAvailable, false);
+});
+
+test("React Web issue report keeps htmlFor target-resolution quiet for matching, duplicate, and custom-component boundaries", () => {
+  const report = parseIssues(fixtures.staticQuietHtmlForTarget);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.sourceIssueCounts["htmlFor-target-resolution"], 0);
+  assert.equal(report.issues.some((issue) => issue.kind === "react-web.missing-htmlfor-target"), false);
+  assert.doesNotMatch(JSON.stringify(report), /missing-custom/);
+});
+
+test("React Web issue report keeps htmlFor target-resolution quiet for dynamic htmlFor and dynamic id boundaries", () => {
+  const report = parseIssues(fixtures.quietHtmlForTarget);
+
+  assert.equal(report.inScope, true);
+  assert.equal(report.sourceIssueCounts["htmlFor-target-resolution"], 0);
+  assert.equal(report.issues.some((issue) => issue.kind === "react-web.missing-htmlfor-target"), false);
+});
+
+
 test("React Web issue report text mode is issue-card-first and prints the claim boundary", () => {
   const cli = runIssues(fixtures.association);
   assert.equal(cli.status, 0, cli.stderr);
@@ -770,7 +834,7 @@ test("React Web issue report text mode is issue-card-first and prints the claim 
   assert.match(cli.stdout, /- priority counts:/);
   assert.match(cli.stdout, /- ranked issue ids:/);
   assert.match(cli.stdout, /- top manual-review ids:/);
-  assert.match(cli.stdout, /- criteria: safe preview availability; label-preview confidence; native element type; same-file JSX context; related-context count and source quality/);
+  assert.match(cli.stdout, /- criteria: safe preview availability; source evidence confidence; native element type; same-file JSX context; related-context count and source quality/);
   assert.match(cli.stdout, /## Issue 1:/);
   assert.match(cli.stdout, /- triage: rank 1, high priority, safe-preview, score \d+/);
   assert.match(cli.stdout, /- triage evidence: safe preview yes, same-file context yes, related context \d+ \(/);
