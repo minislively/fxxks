@@ -1,0 +1,147 @@
+{
+  "schemaVersion": "react-web-issue-card-families.selected.v1",
+  "sourceCommand": "fooks inspect react-web-issues <file> --json",
+  "claimBoundary": "Selected public-demo golden rows only; the report remains read-only and does not auto-apply patches, generate final accessible-name copy, infer custom-component semantics, or claim broad accessibility coverage.",
+  "families": [
+    {
+      "name": "missing-native-label-name",
+      "filePath": "test/fixtures/react-web-label-preview/missing-labels.tsx",
+      "selectedIssue": {
+        "kind": "react-web.missing-accessible-label",
+        "problem": "Native input lacks recognized accessible-label evidence.",
+        "whereToLook": "test/fixtures/react-web-label-preview/missing-labels.tsx:9-9",
+        "element": "input",
+        "fixShape": "human-reviewed-native-control-name",
+        "autoFixSafety": "unsafe-to-auto-apply",
+        "previewAvailable": false,
+        "suggestedAction": "Add an explicit accessible label with human-reviewed copy for the native control."
+      },
+      "summary": {
+        "issueCount": 5,
+        "safePreviewCount": 0,
+        "manualReviewCount": 5,
+        "unsafeToAutoApplyCount": 5
+      }
+    },
+    {
+      "name": "ambiguous-native-label-name",
+      "filePath": "test/fixtures/react-web-label-preview/missing-labels.tsx",
+      "selectedIssue": {
+        "kind": "react-web.ambiguous-accessible-label",
+        "problem": "Native input only has ambiguous accessible-label evidence.",
+        "whereToLook": "test/fixtures/react-web-label-preview/missing-labels.tsx:10-10",
+        "element": "input",
+        "fixShape": "human-reviewed-placeholder-replacement",
+        "autoFixSafety": "unsafe-to-auto-apply",
+        "previewAvailable": false,
+        "suggestedAction": "Replace placeholder-only labeling with explicit label evidence or human-reviewed aria-label copy."
+      },
+      "summary": {
+        "issueCount": 5,
+        "safePreviewCount": 0,
+        "manualReviewCount": 5,
+        "unsafeToAutoApplyCount": 5
+      }
+    },
+    {
+      "name": "empty-aria-label",
+      "filePath": "test/fixtures/react-web-label-preview/empty-aria-labels.tsx",
+      "selectedIssue": {
+        "kind": "react-web.empty-accessible-name",
+        "problem": "Native input has empty accessible-name evidence.",
+        "whereToLook": "test/fixtures/react-web-label-preview/empty-aria-labels.tsx:4-4",
+        "element": "input",
+        "fixShape": "human-reviewed-accessible-name",
+        "autoFixSafety": "unsafe-to-auto-apply",
+        "previewAvailable": false,
+        "suggestedAction": "Replace the empty aria-label with human-reviewed accessible-name evidence."
+      },
+      "summary": {
+        "issueCount": 3,
+        "safePreviewCount": 0,
+        "manualReviewCount": 3,
+        "unsafeToAutoApplyCount": 3
+      }
+    },
+    {
+      "name": "missing-htmlFor-target",
+      "filePath": "test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx",
+      "selectedIssue": {
+        "kind": "react-web.missing-htmlFor-target",
+        "problem": "Native label htmlFor target is missing from same-file literal id evidence.",
+        "whereToLook": "test/fixtures/react-web-label-preview/missing-htmlfor-target.tsx:16-16",
+        "element": "label",
+        "fixShape": "human-reviewed-htmlFor-target",
+        "autoFixSafety": "unsafe-to-auto-apply",
+        "previewAvailable": false,
+        "suggestedAction": "Inspect the exact native label line, verify whether the target id should exist in this file, and manually choose a human-reviewed htmlFor/id association or stop if the target is intentionally external."
+      },
+      "summary": {
+        "issueCount": 3,
+        "safePreviewCount": 0,
+        "manualReviewCount": 3,
+        "unsafeToAutoApplyCount": 3
+      }
+    },
+    {
+      "name": "safe-preview-nearby-label-control",
+      "filePath": "test/fixtures/react-web-label-preview/label-association-candidates.tsx",
+      "selectedIssue": {
+        "kind": "react-web.unassociated-nearby-label",
+        "problem": "Nearby label text is not explicitly associated with this native input.",
+        "whereToLook": "test/fixtures/react-web-label-preview/label-association-candidates.tsx:7-7",
+        "element": "input",
+        "fixShape": "safe-preview-htmlFor-association",
+        "autoFixSafety": "not-auto-applied",
+        "previewAvailable": true,
+        "suggestedAction": "Connect the nearby native label/control pair with htmlFor/id when the preview evidence remains valid."
+      },
+      "summary": {
+        "issueCount": 3,
+        "safePreviewCount": 1,
+        "manualReviewCount": 2,
+        "unsafeToAutoApplyCount": 2
+      }
+    },
+    {
+      "name": "duplicate-literal-id",
+      "filePath": "test/fixtures/react-web-label-preview/duplicate-id-controls.tsx",
+      "selectedIssue": {
+        "kind": "react-web.duplicate-literal-id",
+        "problem": "Native input has an ambiguous duplicate id association.",
+        "whereToLook": "test/fixtures/react-web-label-preview/duplicate-id-controls.tsx:7-7",
+        "element": "input",
+        "fixShape": "human-reviewed-duplicate-id-association",
+        "autoFixSafety": "unsafe-to-auto-apply",
+        "previewAvailable": false,
+        "suggestedAction": "Inspect every same-file duplicate id occurrence and choose unique, human-reviewed id/htmlFor associations."
+      },
+      "summary": {
+        "issueCount": 2,
+        "safePreviewCount": 0,
+        "manualReviewCount": 2,
+        "unsafeToAutoApplyCount": 2
+      }
+    },
+    {
+      "name": "conflicting-label-association",
+      "filePath": "test/fixtures/react-web-label-preview/conflicting-label-association.tsx",
+      "selectedIssue": {
+        "kind": "react-web.conflicting-label-association",
+        "problem": "Multiple native labels target the same native input id.",
+        "whereToLook": "test/fixtures/react-web-label-preview/conflicting-label-association.tsx:10-10",
+        "element": "input",
+        "fixShape": "human-reviewed-conflicting-label-association",
+        "autoFixSafety": "unsafe-to-auto-apply",
+        "previewAvailable": false,
+        "suggestedAction": "Inspect the exact native label and control lines, then manually choose whether the labels should be merged, separated, or left unchanged; stop if the source changed or the association is intentional."
+      },
+      "summary": {
+        "issueCount": 5,
+        "safePreviewCount": 0,
+        "manualReviewCount": 5,
+        "unsafeToAutoApplyCount": 5
+      }
+    }
+  ]
+}

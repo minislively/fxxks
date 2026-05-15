@@ -134,6 +134,79 @@ function projectDryRunGolden(dryRun) {
   };
 }
 
+const currentCardFamilyGoldenCases = [
+  {
+    name: "missing-native-label-name",
+    fixture: "missing",
+    kind: "react-web.missing-accessible-label",
+    element: "input",
+  },
+  {
+    name: "ambiguous-native-label-name",
+    fixture: "missing",
+    kind: "react-web.ambiguous-accessible-label",
+  },
+  {
+    name: "empty-aria-label",
+    fixture: "emptyAriaLabel",
+    kind: "react-web.empty-accessible-name",
+  },
+  {
+    name: "missing-htmlFor-target",
+    fixture: "missingHtmlForTarget",
+    kind: "react-web.missing-htmlFor-target",
+  },
+  {
+    name: "safe-preview-nearby-label-control",
+    fixture: "association",
+    kind: "react-web.unassociated-nearby-label",
+    previewAvailable: true,
+  },
+  {
+    name: "duplicate-literal-id",
+    fixture: "duplicateIds",
+    kind: "react-web.duplicate-literal-id",
+  },
+  {
+    name: "conflicting-label-association",
+    fixture: "conflictingLabelAssociation",
+    kind: "react-web.conflicting-label-association",
+  },
+];
+
+function projectCurrentCardFamiliesGolden() {
+  return {
+    schemaVersion: "react-web-issue-card-families.selected.v1",
+    sourceCommand: "fooks inspect react-web-issues <file> --json",
+    claimBoundary: "Selected public-demo golden rows only; the report remains read-only and does not auto-apply patches, generate final accessible-name copy, infer custom-component semantics, or claim broad accessibility coverage.",
+    families: currentCardFamilyGoldenCases.map((testCase) => {
+      const report = parseIssues(fixtures[testCase.fixture]);
+      const selectedIssue = report.issues.find((issue) => {
+        if (issue.kind !== testCase.kind) return false;
+        if (testCase.element && issue.evidence.element !== testCase.element) return false;
+        if (testCase.previewAvailable !== undefined && Boolean(issue.preview) !== testCase.previewAvailable) return false;
+        return true;
+      });
+      assert.ok(selectedIssue, `expected ${testCase.name} selected issue`);
+      return {
+        name: testCase.name,
+        filePath: report.filePath,
+        selectedIssue: {
+          kind: selectedIssue.kind,
+          problem: selectedIssue.problem,
+          whereToLook: `${selectedIssue.whereToLook.filePath}:${selectedIssue.whereToLook.line}-${selectedIssue.whereToLook.endLine}`,
+          element: selectedIssue.evidence.element,
+          fixShape: selectedIssue.fixShapeGuidance.shape,
+          autoFixSafety: selectedIssue.autoFixSafety,
+          previewAvailable: Boolean(selectedIssue.preview),
+          suggestedAction: selectedIssue.suggestedAction,
+        },
+        summary: report.summary,
+      };
+    }),
+  };
+}
+
 function projectTextGolden(text) {
   const lines = text.split("\n");
   const summaryIndex = lines.findIndex((line) => line === "## First-minute summary");
@@ -1226,6 +1299,26 @@ test("React Web issue report text output matches selected golden excerpt", () =>
   assert.equal(cli.status, 0, cli.stderr);
 
   assert.equal(projectTextGolden(cli.stdout), readGoldenText("form-controls.text.excerpt.txt"));
+});
+
+test("React Web issue report selected current card-family golden stays refreshed", () => {
+  const selected = projectCurrentCardFamiliesGolden();
+
+  assert.deepEqual(selected, readGoldenJson("current-card-families.selected.json"));
+  assert.deepEqual(
+    selected.families.map((family) => family.selectedIssue.kind),
+    [
+      "react-web.missing-accessible-label",
+      "react-web.ambiguous-accessible-label",
+      "react-web.empty-accessible-name",
+      "react-web.missing-htmlFor-target",
+      "react-web.unassociated-nearby-label",
+      "react-web.duplicate-literal-id",
+      "react-web.conflicting-label-association",
+    ],
+  );
+  assert.ok(selected.families.find((family) => family.name === "safe-preview-nearby-label-control").selectedIssue.previewAvailable);
+  assert.doesNotMatch(JSON.stringify(selected), /react-web\.missing-htmlfor-target|sourceIssueCounts/);
 });
 
 test("React Web issue report migration dry-run JSON preserves empty and unsupported boundaries", () => {
