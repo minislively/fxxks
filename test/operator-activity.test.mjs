@@ -35,8 +35,12 @@ const {
   readOperatorCheckSnapshot,
 } = require(path.join(repoRoot, "dist", "ops", "operator-check.js"));
 
+function runWithCli(cliPath, args, cwd, envOverrides = {}) {
+  return JSON.parse(execFileSync(process.execPath, [cliPath, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
+}
+
 function run(args, cwd, envOverrides = {}) {
-  return JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
+  return runWithCli(cli, args, cwd, envOverrides);
 }
 
 function runText(args, cwd) {
@@ -779,12 +783,28 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.equal(JSON.stringify(check).includes("tmux activity unavailable"), false);
   assert.equal(check.postMergeMainCiEvidence.summary.unknownCount, 2);
   assert.equal(check.runtimeProvenance.schemaVersion, 1);
+  assert.notEqual(check.runtimeProvenance, null);
+  assert.equal(check.runtimeProvenance.package.status, "known");
+  assert.equal(check.runtimeProvenance.package.name, "fxxk-frontend-hooks");
+  assert.equal(check.runtimeProvenance.package.version, "0.1.3");
+  assert.equal(check.runtimeProvenance.runtime.cwd, tempDir);
+  assert.equal(check.runtimeProvenance.runtime.argv1Status, "known");
   assert.equal(check.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.equal(check.runtimeProvenance.artifacts.executionKindStatus, "known");
+  assert.equal(check.runtimeProvenance.artifacts.cliEntrypointStatus, "known");
+  assert.equal(check.runtimeProvenance.artifacts.freshnessStatus, "known");
   assert.match(check.runtimeProvenance.artifacts.operatorCheckModulePath, /dist[\\/]ops[\\/]operator-check\.js$/);
+  assert.match(check.runtimeProvenance.artifacts.operatorCheckModuleRealPath, /dist[\\/]ops[\\/]operator-check\.js$/);
   assert.match(check.runtimeProvenance.artifacts.cliEntrypointPath, /dist[\\/]cli[\\/]index\.js$/);
+  assert.match(check.runtimeProvenance.artifacts.cliEntrypointRealPath, /dist[\\/]cli[\\/]index\.js$/);
   assert.match(check.runtimeProvenance.artifacts.sourceOperatorCheckPath, /src[\\/]ops[\\/]operator-check\.ts$/);
+  assert.equal(typeof check.runtimeProvenance.artifacts.sourceNewerThanOperatorCheckModule, "boolean");
+  assert.equal(check.runtimeProvenance.git.scope, "invocation-cwd");
+  assert.equal(check.runtimeProvenance.git.cwd, tempDir);
   assert.equal(check.runtimeProvenance.git.head, "no-tmux-cli-main-head");
+  assert.equal(check.runtimeProvenance.git.headStatus, "known");
   assert.equal(check.runtimeProvenance.git.branch, "main");
+  assert.equal(check.runtimeProvenance.git.branchStatus, "known");
 
   const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
   assert.equal(activity.tmux.available, true);
@@ -792,6 +812,79 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.deepEqual(activity.tmux.blockers, []);
   assert.deepEqual(activity.blockers, []);
   assert.equal(activity.currentRunEvidence.mainEchoEvidence, true);
+});
+
+
+test("CLI check provenance keeps git unknowns diagnostic-only", () => {
+  const { tempDir, env } = makeNoTmuxServerCliFixture();
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-git-provenance-bin-"));
+  writeExecutable(path.join(binDir, "git"), `#!/bin/sh
+if [ "$*" = "rev-parse HEAD" ] || [ "$*" = "branch --show-current" ]; then
+  echo "git provenance unavailable" >&2
+  exit 2
+fi
+PATH=${JSON.stringify(env.PATH)} exec git "$@"
+`);
+  const check = run(["check", "--json"], tempDir, { ...env, PATH: `${binDir}${path.delimiter}${env.PATH}` });
+
+  assert.equal(check.runtimeProvenance.git.scope, "invocation-cwd");
+  assert.equal(check.runtimeProvenance.git.cwd, tempDir);
+  assert.equal(check.runtimeProvenance.git.head, undefined);
+  assert.equal(check.runtimeProvenance.git.headStatus, "unknown");
+  assert.equal(check.runtimeProvenance.git.branch, undefined);
+  assert.equal(check.runtimeProvenance.git.branchStatus, "unknown");
+  assert.match(check.runtimeProvenance.git.blockers.join("\n"), /git rev-parse HEAD unavailable/);
+  assert.match(check.runtimeProvenance.git.blockers.join("\n"), /git branch --show-current unavailable/);
+  assert.deepEqual(check.blockers, []);
+  assert.equal(check.verdict, "idleRequiresActiveArtifact");
+});
+
+
+test("CLI check provenance rejects unrelated ancestor package.json", () => {
+  const { tempDir, env } = makeNoTmuxServerCliFixture();
+  const hostRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-host-package-"));
+  fs.writeFileSync(path.join(hostRoot, "package.json"), JSON.stringify({ name: "host-app", version: "9.9.9" }));
+  const standaloneDist = path.join(hostRoot, "dist");
+  fs.cpSync(path.join(repoRoot, "dist"), standaloneDist, { recursive: true });
+  const standaloneCli = path.join(standaloneDist, "cli", "index.js");
+
+  const check = runWithCli(standaloneCli, ["check", "--json"], tempDir, env);
+
+  assert.equal(check.runtimeProvenance.package.status, "unknown");
+  assert.equal(check.runtimeProvenance.package.name, undefined);
+  assert.equal(check.runtimeProvenance.package.version, undefined);
+  assert.match(check.runtimeProvenance.package.reason, /does not match fooks CLI artifact ownership/);
+  assert.equal(check.runtimeProvenance.artifacts.sourceOperatorCheckPath, undefined);
+  assert.equal(check.runtimeProvenance.artifacts.freshnessStatus, "unknown");
+  assert.deepEqual(check.blockers, []);
+});
+
+test("CLI check provenance reports explicit unknowns when package/source context is unavailable", () => {
+  const { tempDir, env } = makeNoTmuxServerCliFixture();
+  const standaloneRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-standalone-cli-"));
+  const standaloneDist = path.join(standaloneRoot, "dist");
+  fs.cpSync(path.join(repoRoot, "dist"), standaloneDist, { recursive: true });
+  const standaloneCli = path.join(standaloneDist, "cli", "index.js");
+
+  const check = runWithCli(standaloneCli, ["check", "--json"], tempDir, env);
+
+  assert.equal(check.runtimeProvenance.schemaVersion, 1);
+  assert.equal(check.runtimeProvenance.runtime.cwd, tempDir);
+  assert.equal(check.runtimeProvenance.runtime.argv1Status, "known");
+  assert.match(check.runtimeProvenance.artifacts.cliEntrypointPath, /dist[\/]cli[\/]index\.js$/);
+  assert.equal(check.runtimeProvenance.artifacts.cliEntrypointStatus, "known");
+  assert.equal(check.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.equal(check.runtimeProvenance.package.status, "unknown");
+  assert.equal(check.runtimeProvenance.package.name, undefined);
+  assert.equal(check.runtimeProvenance.package.version, undefined);
+  assert.match(check.runtimeProvenance.package.reason, /package\.json ancestor not found/);
+  assert.equal(check.runtimeProvenance.artifacts.sourceOperatorCheckPath, undefined);
+  assert.equal(check.runtimeProvenance.artifacts.sourceNewerThanOperatorCheckModule, undefined);
+  assert.equal(check.runtimeProvenance.artifacts.freshnessStatus, "unknown");
+  assert.match(check.runtimeProvenance.artifacts.freshnessReason, /freshness comparison unavailable/);
+  assert.equal(check.runtimeProvenance.git.headStatus, "known");
+  assert.equal(check.runtimeProvenance.git.branchStatus, "known");
+  assert.deepEqual(check.blockers, []);
 });
 
 test("root built CLI check treats tmux socket ENOENT as absent server, not a blocker", () => {
