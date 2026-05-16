@@ -1796,6 +1796,30 @@ test("operator check classifies eight legacy review worktrees as stale manual-re
     snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.classification === "active"),
     false,
   );
+  const cleanupReviewGuard = snapshot.activeWorkReceipts.legacyReviewResidueCleanupReviewGuard;
+  assert.equal(cleanupReviewGuard.issue, "#895");
+  assert.equal(cleanupReviewGuard.readOnly, true);
+  assert.equal(cleanupReviewGuard.cleanupReviewEvidence.legacyReviewWorktreeResidueCount, 8);
+  assert.equal(cleanupReviewGuard.cleanupReviewEvidence.legacyLocalResidueCleanupReviewRowCount, OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT);
+  assert.equal(cleanupReviewGuard.cleanupReviewEvidence.classification, "operator-cleanup-review-evidence");
+  assert.equal(cleanupReviewGuard.cleanupReviewEvidence.actionableOperatorResidue, true);
+  assert.deepEqual(cleanupReviewGuard.currentActiveAnchorEvidence, {
+    openIssueCount: 0,
+    openPullRequestCount: 0,
+    mappedFooksTmuxProcSessionCount: 0,
+    activeArtifactReceiptCount: 0,
+    activeAnchorPresent: false,
+  });
+  assert.equal(cleanupReviewGuard.auditProvenanceBoundary.command, "worktree:audit");
+  assert.equal(cleanupReviewGuard.auditProvenanceBoundary.linkedIssue, "#854");
+  assert.equal(cleanupReviewGuard.auditProvenanceBoundary.triageLinkedIssue, "#711");
+  assert.equal(cleanupReviewGuard.auditProvenanceBoundary.staleReviewCandidatesZeroMeansNoActiveAnchor, false);
+  assert.equal(cleanupReviewGuard.auditProvenanceBoundary.entriesKeepRootMeansCurrentActiveWork, false);
+  assert.equal(cleanupReviewGuard.residueSatisfiesActiveAnchorRequirement, false);
+  assert.equal(cleanupReviewGuard.cleanupReviewEvidenceIsActiveWork, false);
+  assert.match(cleanupReviewGuard.nudgeRediscoveryRule, /actionable cleanup-review evidence/);
+  assert.match(cleanupReviewGuard.nudgeRediscoveryRule, /must not be rediscovered as current active work/);
+
 
   const receiptJson = JSON.stringify(snapshot.activeWorkReceipts);
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
