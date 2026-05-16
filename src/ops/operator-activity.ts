@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { isTmuxNoServerRunningError } from "./tmux-errors";
 import {
   ARTIFACT_AUDIT_CLAIM_BOUNDARY,
   ARTIFACT_AUDIT_COMMAND,
@@ -330,6 +331,14 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
   try {
     output = runner("tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}\t#{pane_current_command}"], cwd, DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS);
   } catch (error) {
+    if (isTmuxNoServerRunningError(error)) {
+      return {
+        available: true,
+        command: OPERATOR_ACTIVITY_TMUX_COMMAND,
+        sessions: [],
+        blockers: [],
+      };
+    }
     blockers.push(`tmux activity unavailable: ${errorDetail(error)}`);
     return {
       available: false,

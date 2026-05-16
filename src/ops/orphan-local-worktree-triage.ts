@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { isTmuxNoServerRunningError } from "./tmux-errors";
 import { parseAndSummarizeWorktreeStatus } from "../core/worktree-status";
 
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_SCHEMA_VERSION = 2;
@@ -181,10 +182,19 @@ function remoteBranchName(remoteRef: string): string {
   return firstSlash >= 0 ? normalized.slice(firstSlash + 1) : normalized;
 }
 
-function readOptional(runner: OrphanLocalWorktreeCommandRunner, command: string, args: string[], cwd: string, blockers: string[], label: string): string {
+function readOptional(
+  runner: OrphanLocalWorktreeCommandRunner,
+  command: string,
+  args: string[],
+  cwd: string,
+  blockers: string[],
+  label: string,
+  options: { ignoreTmuxNoServer?: boolean } = {},
+): string {
   try {
     return runner(command, args, cwd);
   } catch (error) {
+    if (options.ignoreTmuxNoServer && isTmuxNoServerRunningError(error)) return "";
     blockers.push(`${label} unavailable: ${errorDetail(error)}`);
     return "";
   }
@@ -587,7 +597,7 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
   const worktreeOutput = readOptional(runner, "git", ["worktree", "list", "--porcelain"], cwd, blockers, "git worktree list");
   const baseRef = resolveBaseRef(runner, cwd, blockers);
   const remoteBranches = parseOrphanLocalWorktreeRemoteBranches(readOptional(runner, "git", ["branch", "-r", "--format=%(refname:short)"], cwd, blockers, "git remote branch list"));
-  const tmuxOutput = readOptional(runner, "tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"], cwd, blockers, "tmux pane list");
+  const tmuxOutput = readOptional(runner, "tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"], cwd, blockers, "tmux pane list", { ignoreTmuxNoServer: true });
   const pullRequestIndex = readOpenPullRequestIndex(runner, cwd);
   if (pullRequestIndex.blocker) blockers.push(pullRequestIndex.blocker);
   const closedPullRequestIndex = readClosedPullRequestIndex(runner, cwd);
