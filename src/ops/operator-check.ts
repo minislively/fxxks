@@ -14,6 +14,7 @@ import {
   triageOrphanLocalWorktrees,
   type OrphanLocalWorktreeEntry,
 } from "./orphan-local-worktree-triage";
+import { STALE_WORKTREE_AUDIT_COMMAND, STALE_WORKTREE_AUDIT_ISSUE } from "./stale-worktree-audit";
 import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
@@ -27,6 +28,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSI
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
@@ -44,6 +46,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE = "#86
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE = "#867";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE = "#869";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE = "#885";
+export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE = "#895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -52,6 +55,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL = 
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE_URL = "https://github.com/minislively/fooks/issues/867";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/869";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL = "https://github.com/minislively/fooks/issues/885";
+export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL = "https://github.com/minislively/fooks/issues/895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE = "operator/check legacy local residue cleanup-review projection";
@@ -61,6 +65,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE = "op
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SOURCE = "operator/check post-receipt dogfood nudge anchor projection";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE = "operator/check receipt-only dogfood nudge loop boundary projection";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SOURCE = "operator/check issue #885 handoff artifact evidence projection";
+export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
@@ -79,6 +84,8 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #869 dogfood receipt-only nudge loop artifact; after PR #868 receipt-only closeout, the next nudge report must name newly created or adopted issue evidence plus mapped OMX session evidence, not the last merged commit, main CI run, or release receipt.";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_CLAIM_BOUNDARY =
   "Read-only issue #885 fooks-check handoff artifact; adopt live issue, PR, mapped session, or live non-main worktree evidence when present, otherwise require exactly one run-created issue, branch, or session evidence report without mutating runtime/provider behavior.";
+export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
+  "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -314,6 +321,38 @@ export type OperatorCheckLegacyReviewWorktreeResidueBoundary = {
   nudgeRule: string;
 };
 
+export type OperatorCheckLegacyReviewResidueCleanupReviewGuard = {
+  schemaVersion: typeof OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY;
+  readOnly: true;
+  cleanupReviewEvidence: {
+    legacyReviewWorktreeResidueCount: number;
+    legacyLocalResidueCleanupReviewRowCount: number;
+    classification: "operator-cleanup-review-evidence";
+    actionableOperatorResidue: true;
+  };
+  currentActiveAnchorEvidence: {
+    openIssueCount?: number;
+    openPullRequestCount?: number;
+    mappedFooksTmuxProcSessionCount: number;
+    activeArtifactReceiptCount: number;
+    activeAnchorPresent: boolean;
+  };
+  auditProvenanceBoundary: {
+    command: typeof STALE_WORKTREE_AUDIT_COMMAND;
+    linkedIssue: typeof STALE_WORKTREE_AUDIT_ISSUE;
+    triageLinkedIssue: typeof ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE;
+    staleReviewCandidatesZeroMeansNoActiveAnchor: false;
+    entriesKeepRootMeansCurrentActiveWork: false;
+  };
+  residueSatisfiesActiveAnchorRequirement: false;
+  cleanupReviewEvidenceIsActiveWork: false;
+  nudgeRediscoveryRule: string;
+};
+
 export type OperatorCheckPostReceiptNudgeAnchorBoundary = {
   schemaVersion: typeof OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SCHEMA_VERSION;
   issue: typeof OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE;
@@ -441,6 +480,7 @@ export type OperatorCheckActiveWorkReceipts = {
   localOnlyResidueActiveBoundary: OperatorCheckLocalOnlyResidueActiveBoundary;
   staleResidueActiveBoundary: OperatorCheckStaleResidueActiveBoundary;
   legacyReviewWorktreeResidueBoundary: OperatorCheckLegacyReviewWorktreeResidueBoundary;
+  legacyReviewResidueCleanupReviewGuard: OperatorCheckLegacyReviewResidueCleanupReviewGuard;
   postReceiptNudgeAnchorBoundary: OperatorCheckPostReceiptNudgeAnchorBoundary;
   receiptOnlyNudgeLoopBoundary: OperatorCheckReceiptOnlyNudgeLoopBoundary;
   handoffArtifactEvidence: OperatorCheckHandoffArtifactEvidence;
@@ -872,6 +912,55 @@ function buildLegacyReviewWorktreeResidueBoundary(
   };
 }
 
+function buildLegacyReviewResidueCleanupReviewGuard(
+  activity: OperatorActivitySnapshot,
+  legacyLocalResidueCleanupReviewRowCount: number,
+  activeArtifactReceiptCount: number,
+): OperatorCheckLegacyReviewResidueCleanupReviewGuard {
+  const openIssueCount = activity.currentRunEvidence.evidence.openIssues;
+  const openPullRequestCount = activity.currentRunEvidence.evidence.openPullRequests;
+  const mappedFooksTmuxProcSessionCount = activity.currentRunEvidence.evidence.fooksSessionCount;
+  const activeAnchorPresent = activeArtifactReceiptCount > 0
+    || (typeof openIssueCount === "number" && openIssueCount > 0)
+    || (typeof openPullRequestCount === "number" && openPullRequestCount > 0)
+    || mappedFooksTmuxProcSessionCount > 0
+    || Boolean(activity.worktree.branch && activity.worktree.branch !== "main");
+
+  return {
+    schemaVersion: OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE,
+    issueUrl: OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL,
+    source: OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE,
+    claimBoundary: OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY,
+    readOnly: true,
+    cleanupReviewEvidence: {
+      legacyReviewWorktreeResidueCount: activity.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount,
+      legacyLocalResidueCleanupReviewRowCount,
+      classification: "operator-cleanup-review-evidence",
+      actionableOperatorResidue: true,
+    },
+    currentActiveAnchorEvidence: {
+      openIssueCount,
+      openPullRequestCount,
+      mappedFooksTmuxProcSessionCount,
+      activeArtifactReceiptCount,
+      activeAnchorPresent,
+    },
+    auditProvenanceBoundary: {
+      command: STALE_WORKTREE_AUDIT_COMMAND,
+      linkedIssue: STALE_WORKTREE_AUDIT_ISSUE,
+      triageLinkedIssue: ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE,
+      staleReviewCandidatesZeroMeansNoActiveAnchor: false,
+      entriesKeepRootMeansCurrentActiveWork: false,
+    },
+    residueSatisfiesActiveAnchorRequirement: false,
+    cleanupReviewEvidenceIsActiveWork: false,
+    nudgeRediscoveryRule: activeAnchorPresent
+      ? "Legacy review/refresh worktree residue remains cleanup-review evidence; report active work from the separate live anchor evidence already present."
+      : "Legacy review/refresh worktree residue remains actionable cleanup-review evidence, but with open PR/issue/tmux/proc anchors at zero it must not be rediscovered as current active work; name a distinct live issue, branch, session, PR, proc target, or concrete blocker before claiming active development.",
+  };
+}
+
 function buildPostReceiptNudgeAnchorBoundary(
   activity: OperatorActivitySnapshot,
 ): OperatorCheckPostReceiptNudgeAnchorBoundary {
@@ -1228,6 +1317,11 @@ function buildActiveWorkReceipts(
       activeArtifactReceiptCount,
     ),
     legacyReviewWorktreeResidueBoundary: buildLegacyReviewWorktreeResidueBoundary(activity.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount),
+    legacyReviewResidueCleanupReviewGuard: buildLegacyReviewResidueCleanupReviewGuard(
+      activity,
+      legacyLocalResidueCleanupReview.rowCount,
+      activeArtifactReceiptCount,
+    ),
     postReceiptNudgeAnchorBoundary: buildPostReceiptNudgeAnchorBoundary(activity),
     receiptOnlyNudgeLoopBoundary: buildReceiptOnlyNudgeLoopBoundary(activity),
     handoffArtifactEvidence: buildHandoffArtifactEvidence(activity, receipts),
