@@ -132,9 +132,10 @@ process.exit(2);
   return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
 }
 
-function tmuxNoServerError(socket = "/tmp/tmux-1000/default") {
-  const error = new Error(`Command failed: tmux list-panes -a -F #{session_name}\t#{pane_current_path}\nno server running on ${socket}`);
-  error.stderr = `no server running on ${socket}\n`;
+function tmuxNoServerError(socket = "/tmp/tmux-1000/default", stream = "stderr") {
+  const error = new Error(`Command failed: tmux list-panes -a -F #{session_name}\t#{pane_current_path}`);
+  const output = `no server running on ${socket}\n`;
+  error[stream] = stream === "output" ? [null, output, ""] : output;
   error.code = 1;
   return error;
 }
@@ -739,6 +740,7 @@ test("operator check treats absent tmux server as zero mapped sessions and keeps
   assert.equal(snapshot.activity.currentRunEvidence.activeWorkEvidence, false);
   assert.deepEqual(snapshot.activity.currentRunEvidence.blockers, []);
   assert.deepEqual(snapshot.activity.blockers, []);
+  assert.deepEqual(snapshot.blockers, []);
   assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
   assert.equal(snapshot.postMergeMainCiEvidence.available, false);
   assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), /GitHub Actions run list unavailable: gh run list timed out/);
@@ -772,6 +774,48 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.deepEqual(activity.tmux.blockers, []);
   assert.deepEqual(activity.blockers, []);
   assert.equal(activity.currentRunEvidence.mainEchoEvidence, true);
+});
+
+test("operator check suppresses no-server tmux output from top-level blockers", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T04:22:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") throw tmuxNoServerError("/tmp/tmux-1000/default", "output");
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD no-tmux-stdout-main", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "no-tmux-stdout-main\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.activity.tmux.available, true);
+  assert.deepEqual(snapshot.activity.tmux.blockers, []);
+  assert.deepEqual(snapshot.activity.blockers, []);
+  assert.deepEqual(snapshot.blockers, []);
+  assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
+  assert.equal(snapshot.activeWorkReceipts.blockers.join("\n").includes("no server running"), false);
+  assert.equal(JSON.stringify(snapshot).includes("tmux activity unavailable: no server running"), false);
 });
 
 test("operator check preserves true tmux failures as blockers", () => {
