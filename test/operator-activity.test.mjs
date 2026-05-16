@@ -54,12 +54,12 @@ function writeExecutable(filePath, body) {
   fs.writeFileSync(filePath, body, { mode: 0o755 });
 }
 
-function makeNoTmuxServerCliFixture() {
+function makeNoTmuxServerCliFixture(tmuxError = "no server running on /tmp/tmux-1000/default\n") {
   const tempDir = makeTempProject();
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-no-tmux-bin-"));
   const mainHead = "no-tmux-cli-main-head";
   writeExecutable(path.join(binDir, "tmux"), `#!/usr/bin/env node
-process.stderr.write("no server running on /tmp/tmux-1000/default\\n");
+process.stderr.write(${JSON.stringify(tmuxError)});
 process.exit(1);
 `);
   writeExecutable(path.join(binDir, "gh"), `#!/usr/bin/env node
@@ -107,6 +107,14 @@ if (joined === "worktree list --porcelain") {
 }
 if (joined === "rev-parse --verify origin/main") {
   process.stdout.write(mainHead + "\\n");
+  process.exit(0);
+}
+if (joined === "rev-parse HEAD") {
+  process.stdout.write(mainHead + "\\n");
+  process.exit(0);
+}
+if (joined === "branch --show-current") {
+  process.stdout.write("main\\n");
   process.exit(0);
 }
 if (joined === "branch --format=%(refname:short)") {
@@ -770,6 +778,13 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.equal(check.blockers.includes("tmux activity unavailable: no server running on /tmp/tmux-1000/default"), false);
   assert.equal(JSON.stringify(check).includes("tmux activity unavailable"), false);
   assert.equal(check.postMergeMainCiEvidence.summary.unknownCount, 2);
+  assert.equal(check.runtimeProvenance.schemaVersion, 1);
+  assert.equal(check.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.match(check.runtimeProvenance.artifacts.operatorCheckModulePath, /dist[\\/]ops[\\/]operator-check\.js$/);
+  assert.match(check.runtimeProvenance.artifacts.cliEntrypointPath, /dist[\\/]cli[\\/]index\.js$/);
+  assert.match(check.runtimeProvenance.artifacts.sourceOperatorCheckPath, /src[\\/]ops[\\/]operator-check\.ts$/);
+  assert.equal(check.runtimeProvenance.git.head, "no-tmux-cli-main-head");
+  assert.equal(check.runtimeProvenance.git.branch, "main");
 
   const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
   assert.equal(activity.tmux.available, true);
@@ -777,6 +792,23 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.deepEqual(activity.tmux.blockers, []);
   assert.deepEqual(activity.blockers, []);
   assert.equal(activity.currentRunEvidence.mainEchoEvidence, true);
+});
+
+test("root built CLI check treats tmux socket ENOENT as absent server, not a blocker", () => {
+  const { tempDir, env } = makeNoTmuxServerCliFixture("error connecting to /tmp/fooks-empty-tmux/tmux-1000/default (No such file or directory)\n");
+
+  const check = run(["check", "--json"], tempDir, env);
+  assert.equal(check.verdict, "idleRequiresActiveArtifact");
+  assert.deepEqual(check.blockers, []);
+  assert.equal(check.activity.tmux.available, true);
+  assert.deepEqual(check.activity.tmux.sessions, []);
+  assert.deepEqual(check.activity.tmux.blockers, []);
+  assert.equal(check.activeWorkReceipts.classification, "mainEcho");
+  assert.deepEqual(check.activeWorkReceipts.blockers, []);
+  assert.equal(check.activeWorkReceipts.reportLine.includes("blocked"), false);
+  assert.equal(JSON.stringify(check).includes("tmux activity unavailable"), false);
+  assert.equal(JSON.stringify(check).includes("tmux pane list unavailable"), false);
+  assert.equal(check.runtimeProvenance.artifacts.executionKind, "built-dist");
 });
 
 test("operator check suppresses no-server tmux output from top-level blockers", () => {

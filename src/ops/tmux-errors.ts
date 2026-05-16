@@ -37,7 +37,8 @@ function errorTextParts(value: unknown, seen = new Set<unknown>()): string[] {
 }
 
 export function isTmuxNoServerRunningError(error: unknown): boolean {
-  return /no server running on\b/i.test(errorTextParts(error).join("\n"));
+  const text = errorTextParts(error).join("\n");
+  return /no server running on\b/i.test(text) || /error connecting to\b[\s\S]*\bNo such file or directory\b/i.test(text);
 }
 
 export function isTmuxActivityNoServerBlocker(blocker: string): boolean {

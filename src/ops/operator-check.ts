@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import {
   readOperatorActivitySnapshot,
   type OperatorActivityOptions,
@@ -22,6 +24,7 @@ export const OPERATOR_CHECK_COMMAND = "check";
 export const OPERATOR_CHECK_CLAIM_BOUNDARY =
   "Read-only operator/check artifact for the post-merge main echo versus active work boundary; it requires a concrete issue, PR, or mapped session artifact when the checkout is otherwise idle.";
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
+export const OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
@@ -487,6 +490,40 @@ export type OperatorCheckActiveWorkReceipts = {
   blockers: string[];
 };
 
+export type OperatorCheckRuntimeProvenance = {
+  schemaVersion: typeof OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION;
+  source: "operator/check runtime provenance";
+  claimBoundary: "Runtime provenance is diagnostic only; it distinguishes the executing entrypoint/build artifact from current source files and does not prove functional freshness by itself.";
+  package: {
+    name?: string;
+    version?: string;
+    packageJsonPath?: string;
+  };
+  git: {
+    head?: string;
+    branch?: string;
+    source: "local git refs only; no fetch performed";
+    blockers: string[];
+  };
+  runtime: {
+    node: string;
+    platform: NodeJS.Platform;
+    arch: string;
+    argv1?: string;
+    cwd: string;
+  };
+  artifacts: {
+    operatorCheckModulePath: string;
+    operatorCheckModuleMtimeMs?: number;
+    cliEntrypointPath?: string;
+    cliEntrypointMtimeMs?: number;
+    sourceOperatorCheckPath?: string;
+    sourceOperatorCheckMtimeMs?: number;
+    sourceNewerThanOperatorCheckModule?: boolean;
+    executionKind: "built-dist" | "source-or-non-dist" | "unknown";
+  };
+};
+
 export type OperatorCheckSnapshot = {
   schemaVersion: typeof OPERATOR_CHECK_SCHEMA_VERSION;
   command: typeof OPERATOR_CHECK_COMMAND;
@@ -495,6 +532,7 @@ export type OperatorCheckSnapshot = {
   claimBoundary: typeof OPERATOR_CHECK_CLAIM_BOUNDARY;
   readOnly: true;
   source: typeof OPERATOR_CHECK_SOURCE;
+  runtimeProvenance: OperatorCheckRuntimeProvenance;
   verdict: OperatorCheckVerdict;
   postMergeMainEchoBoundary: {
     explicit: true;
@@ -556,6 +594,109 @@ function readRepoIdentifier(cwd: string, options: OperatorActivityOptions): { re
     const detail = error instanceof Error ? error.message : String(error);
     return { blockers: [`repo identifier unavailable: ${detail}`] };
   }
+}
+
+function readJsonFile(filePath: string): { name?: string; version?: string } | undefined {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as { name?: string; version?: string };
+  } catch {
+    return undefined;
+  }
+}
+
+function fileMtimeMs(filePath: string | undefined): number | undefined {
+  if (!filePath) return undefined;
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
+function firstExistingAncestorPackageJson(startPath: string): string | undefined {
+  let current = path.dirname(path.resolve(startPath));
+  while (true) {
+    const candidate = path.join(current, "package.json");
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
+function readGitField(cwd: string, args: string[]): { value?: string; blocker?: string } {
+  try {
+    return {
+      value: execFileSync("git", args, {
+        cwd,
+        encoding: "utf8",
+        timeout: 1000,
+        maxBuffer: 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      }).trim() || undefined,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { blocker: `git ${args.join(" ")} unavailable: ${detail}` };
+  }
+}
+
+function readOperatorCheckRuntimeProvenance(cwd: string): OperatorCheckRuntimeProvenance {
+  const modulePath = __filename;
+  const packageJsonPath = firstExistingAncestorPackageJson(modulePath);
+  const packageJson = packageJsonPath ? readJsonFile(packageJsonPath) : undefined;
+  const repoRoot = packageJsonPath ? path.dirname(packageJsonPath) : undefined;
+  const sourceOperatorCheckPath = repoRoot ? path.join(repoRoot, "src", "ops", "operator-check.ts") : undefined;
+  const cliEntrypointPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
+  const operatorCheckModuleMtimeMs = fileMtimeMs(modulePath);
+  const sourceOperatorCheckMtimeMs = fileMtimeMs(sourceOperatorCheckPath);
+  const head = readGitField(cwd, ["rev-parse", "HEAD"]);
+  const branch = readGitField(cwd, ["branch", "--show-current"]);
+  const blockers = [head.blocker, branch.blocker].filter((item): item is string => Boolean(item));
+  const normalizedModulePath = path.normalize(modulePath);
+  const executionKind = normalizedModulePath.includes(`${path.sep}dist${path.sep}`)
+    ? "built-dist"
+    : normalizedModulePath.includes(`${path.sep}src${path.sep}`)
+      ? "source-or-non-dist"
+      : "unknown";
+
+  return {
+    schemaVersion: OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION,
+    source: "operator/check runtime provenance",
+    claimBoundary:
+      "Runtime provenance is diagnostic only; it distinguishes the executing entrypoint/build artifact from current source files and does not prove functional freshness by itself.",
+    package: {
+      name: packageJson?.name,
+      version: packageJson?.version,
+      packageJsonPath,
+    },
+    git: {
+      head: head.value,
+      branch: branch.value,
+      source: "local git refs only; no fetch performed",
+      blockers,
+    },
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      argv1: cliEntrypointPath,
+      cwd,
+    },
+    artifacts: {
+      operatorCheckModulePath: modulePath,
+      operatorCheckModuleMtimeMs,
+      cliEntrypointPath,
+      cliEntrypointMtimeMs: fileMtimeMs(cliEntrypointPath),
+      sourceOperatorCheckPath,
+      sourceOperatorCheckMtimeMs,
+      sourceNewerThanOperatorCheckModule: sourceOperatorCheckMtimeMs !== undefined && operatorCheckModuleMtimeMs !== undefined
+        ? sourceOperatorCheckMtimeMs > operatorCheckModuleMtimeMs
+        : undefined,
+      executionKind,
+    },
+  };
 }
 
 function baseReceiptIdentifiers(
@@ -1391,6 +1532,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     claimBoundary: OPERATOR_CHECK_CLAIM_BOUNDARY,
     readOnly: true,
     source: OPERATOR_CHECK_SOURCE,
+    runtimeProvenance: readOperatorCheckRuntimeProvenance(cwd),
     verdict,
     postMergeMainEchoBoundary: {
       explicit: true,
