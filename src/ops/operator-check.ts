@@ -495,14 +495,20 @@ export type OperatorCheckRuntimeProvenance = {
   source: "operator/check runtime provenance";
   claimBoundary: "Runtime provenance is diagnostic only; it distinguishes the executing entrypoint/build artifact from current source files and does not prove functional freshness by itself.";
   package: {
+    status: "known" | "unknown";
     name?: string;
     version?: string;
     packageJsonPath?: string;
+    reason?: string;
   };
   git: {
+    scope: "invocation-cwd";
+    cwd: string;
     head?: string;
+    headStatus: "known" | "unknown";
     branch?: string;
-    source: "local git refs only; no fetch performed";
+    branchStatus: "known" | "unknown";
+    source: "local git refs only for invocation cwd; no fetch performed";
     blockers: string[];
   };
   runtime: {
@@ -510,17 +516,24 @@ export type OperatorCheckRuntimeProvenance = {
     platform: NodeJS.Platform;
     arch: string;
     argv1?: string;
+    argv1Status: "known" | "unknown";
     cwd: string;
   };
   artifacts: {
     operatorCheckModulePath: string;
+    operatorCheckModuleRealPath?: string;
     operatorCheckModuleMtimeMs?: number;
     cliEntrypointPath?: string;
+    cliEntrypointRealPath?: string;
+    cliEntrypointStatus: "known" | "unknown";
     cliEntrypointMtimeMs?: number;
     sourceOperatorCheckPath?: string;
     sourceOperatorCheckMtimeMs?: number;
     sourceNewerThanOperatorCheckModule?: boolean;
+    freshnessStatus: "known" | "unknown";
+    freshnessReason?: string;
     executionKind: "built-dist" | "source-or-non-dist" | "unknown";
+    executionKindStatus: "known" | "unknown";
   };
 };
 
@@ -596,9 +609,15 @@ function readRepoIdentifier(cwd: string, options: OperatorActivityOptions): { re
   }
 }
 
-function readJsonFile(filePath: string): { name?: string; version?: string } | undefined {
+type OperatorCheckPackageJson = {
+  name?: string;
+  version?: string;
+  bin?: string | Record<string, string>;
+};
+
+function readJsonFile(filePath: string): OperatorCheckPackageJson | undefined {
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as { name?: string; version?: string };
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as OperatorCheckPackageJson;
   } catch {
     return undefined;
   }
@@ -613,6 +632,15 @@ function fileMtimeMs(filePath: string | undefined): number | undefined {
   }
 }
 
+function realPathIfExists(filePath: string | undefined): string | undefined {
+  if (!filePath) return undefined;
+  try {
+    return fs.realpathSync.native(filePath);
+  } catch {
+    return undefined;
+  }
+}
+
 function firstExistingAncestorPackageJson(startPath: string): string | undefined {
   let current = path.dirname(path.resolve(startPath));
   while (true) {
@@ -622,6 +650,20 @@ function firstExistingAncestorPackageJson(startPath: string): string | undefined
     if (parent === current) return undefined;
     current = parent;
   }
+}
+
+function packageBinPath(packageJson: OperatorCheckPackageJson | undefined): string | undefined {
+  if (!packageJson?.bin) return undefined;
+  return typeof packageJson.bin === "string" ? packageJson.bin : packageJson.bin.fooks;
+}
+
+function packageOwnsCliArtifact(packageJson: OperatorCheckPackageJson | undefined, packageJsonPath: string | undefined, cliEntrypointPath: string | undefined): boolean {
+  if (!packageJson || packageJson.name !== "fxxk-frontend-hooks") return false;
+  if (!packageJsonPath || !cliEntrypointPath) return false;
+  const binPath = packageBinPath(packageJson);
+  if (!binPath) return false;
+  const expectedCliPath = path.resolve(path.dirname(packageJsonPath), binPath);
+  return path.normalize(expectedCliPath) === path.normalize(cliEntrypointPath);
 }
 
 function readGitField(cwd: string, args: string[]): { value?: string; blocker?: string } {
@@ -644,22 +686,34 @@ function readGitField(cwd: string, args: string[]): { value?: string; blocker?: 
 
 function readOperatorCheckRuntimeProvenance(cwd: string): OperatorCheckRuntimeProvenance {
   const modulePath = __filename;
-  const packageJsonPath = firstExistingAncestorPackageJson(modulePath);
-  const packageJson = packageJsonPath ? readJsonFile(packageJsonPath) : undefined;
+  const moduleRealPath = realPathIfExists(modulePath);
+  const cliEntrypointPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
+  const cliEntrypointRealPath = realPathIfExists(cliEntrypointPath);
+  const packageSearchStart = cliEntrypointRealPath ?? moduleRealPath ?? cliEntrypointPath ?? modulePath;
+  const candidatePackageJsonPath = firstExistingAncestorPackageJson(packageSearchStart);
+  const candidatePackageJson = candidatePackageJsonPath ? readJsonFile(candidatePackageJsonPath) : undefined;
+  const packageIsOwned = packageOwnsCliArtifact(candidatePackageJson, candidatePackageJsonPath, cliEntrypointRealPath ?? cliEntrypointPath);
+  const packageJsonPath = packageIsOwned ? candidatePackageJsonPath : undefined;
+  const packageJson = packageIsOwned ? candidatePackageJson : undefined;
   const repoRoot = packageJsonPath ? path.dirname(packageJsonPath) : undefined;
   const sourceOperatorCheckPath = repoRoot ? path.join(repoRoot, "src", "ops", "operator-check.ts") : undefined;
-  const cliEntrypointPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
-  const operatorCheckModuleMtimeMs = fileMtimeMs(modulePath);
+  const operatorCheckModuleMtimeMs = fileMtimeMs(moduleRealPath ?? modulePath);
   const sourceOperatorCheckMtimeMs = fileMtimeMs(sourceOperatorCheckPath);
+  const sourceNewerThanOperatorCheckModule = sourceOperatorCheckMtimeMs !== undefined && operatorCheckModuleMtimeMs !== undefined
+    ? sourceOperatorCheckMtimeMs > operatorCheckModuleMtimeMs
+    : undefined;
   const head = readGitField(cwd, ["rev-parse", "HEAD"]);
   const branch = readGitField(cwd, ["branch", "--show-current"]);
   const blockers = [head.blocker, branch.blocker].filter((item): item is string => Boolean(item));
-  const normalizedModulePath = path.normalize(modulePath);
+  const normalizedModulePath = path.normalize(moduleRealPath ?? modulePath);
   const executionKind = normalizedModulePath.includes(`${path.sep}dist${path.sep}`)
     ? "built-dist"
     : normalizedModulePath.includes(`${path.sep}src${path.sep}`)
       ? "source-or-non-dist"
       : "unknown";
+  const freshnessReason = sourceNewerThanOperatorCheckModule === undefined
+    ? "source/dist freshness comparison unavailable: source or executing module mtime could not be read"
+    : undefined;
 
   return {
     schemaVersion: OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION,
@@ -667,14 +721,26 @@ function readOperatorCheckRuntimeProvenance(cwd: string): OperatorCheckRuntimePr
     claimBoundary:
       "Runtime provenance is diagnostic only; it distinguishes the executing entrypoint/build artifact from current source files and does not prove functional freshness by itself.",
     package: {
+      status: packageJsonPath && packageJson ? "known" : "unknown",
       name: packageJson?.name,
       version: packageJson?.version,
       packageJsonPath,
+      reason: packageIsOwned
+        ? undefined
+        : candidatePackageJsonPath
+          ? candidatePackageJson
+            ? "package.json ancestor does not match fooks CLI artifact ownership"
+            : "package.json could not be parsed"
+          : "package.json ancestor not found from invoked CLI/module artifact",
     },
     git: {
+      scope: "invocation-cwd",
+      cwd,
       head: head.value,
+      headStatus: head.value ? "known" : "unknown",
       branch: branch.value,
-      source: "local git refs only; no fetch performed",
+      branchStatus: branch.value ? "known" : "unknown",
+      source: "local git refs only for invocation cwd; no fetch performed",
       blockers,
     },
     runtime: {
@@ -682,19 +748,24 @@ function readOperatorCheckRuntimeProvenance(cwd: string): OperatorCheckRuntimePr
       platform: process.platform,
       arch: process.arch,
       argv1: cliEntrypointPath,
+      argv1Status: cliEntrypointPath ? "known" : "unknown",
       cwd,
     },
     artifacts: {
       operatorCheckModulePath: modulePath,
+      operatorCheckModuleRealPath: moduleRealPath,
       operatorCheckModuleMtimeMs,
       cliEntrypointPath,
-      cliEntrypointMtimeMs: fileMtimeMs(cliEntrypointPath),
+      cliEntrypointRealPath,
+      cliEntrypointStatus: cliEntrypointPath ? "known" : "unknown",
+      cliEntrypointMtimeMs: fileMtimeMs(cliEntrypointRealPath ?? cliEntrypointPath),
       sourceOperatorCheckPath,
       sourceOperatorCheckMtimeMs,
-      sourceNewerThanOperatorCheckModule: sourceOperatorCheckMtimeMs !== undefined && operatorCheckModuleMtimeMs !== undefined
-        ? sourceOperatorCheckMtimeMs > operatorCheckModuleMtimeMs
-        : undefined,
+      sourceNewerThanOperatorCheckModule,
+      freshnessStatus: sourceNewerThanOperatorCheckModule === undefined ? "unknown" : "known",
+      freshnessReason,
       executionKind,
+      executionKindStatus: executionKind === "unknown" ? "unknown" : "known",
     },
   };
 }
