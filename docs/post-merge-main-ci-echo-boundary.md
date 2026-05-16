@@ -148,6 +148,19 @@ receipt-only report is not an active development anchor.
   PR/issues and live OMX are zero, the nudge must spawn/adopt one current
   issue/branch/session target and report `delta`, `ahead`, and `proc` evidence
   instead of answering with the prior CI receipt.
+- `docs/dogfood/session-whip-final-receipt-artifact-875.md` is the issue #875
+  session-whip final-receipt artifact. It keeps PR #874 final `main` CI receipts
+  receipt-only and documents that idle-forbidden whips must create/adopt one
+  live issue/branch/session/PR target with worktree, `delta`, `ahead`, `proc`,
+  and `pane` evidence instead of answering with the prior receipt or an empty
+  state.
+- `docs/dogfood/semantic-duplicate-nudge-guard-877.md` is the issue #877
+  recent-closed-chain guard artifact. It inspects closed dogfood issues
+  #863/#865/#867/#869/#871/#873/#875, cuts semantic duplicates on the
+  receipt-vs-active-anchor axis, and documents that a fresh nudge must answer
+  with exactly one distinct current pain target: issue #877, the non-`main`
+  branch/worktree, mapped OMX session, and `delta`, `ahead`, and `proc`
+  evidence.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
