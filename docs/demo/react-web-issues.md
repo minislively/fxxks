@@ -136,6 +136,19 @@ Agent handoff:
 4. Do **not** generate final label copy automatically.
 5. If the target is a custom component or the source no longer matches, stop and read the file normally.
 
+Operator-facing handoff card:
+
+```text
+First inspect: fixtures/compressed/FormControls.tsx:23 (native input)
+Next action: reopen the current source, confirm the reported input still matches, then continue the requested feature work.
+Human/source decision: choose the final accessible label/name from local JSX evidence.
+Preserve: decision, claimBoundary, humanDecisionNeeded, doNotDo, autoApply=false.
+Do not: auto-apply patches, generate final label/name copy, infer custom-component semantics, run a codemod, or widen this into a broad accessibility audit.
+Fallback: if source freshness fails or the target is not supported native React Web evidence, stop using the compact handoff and read the source normally.
+```
+
+This card is the demo-facing shape of the first-minute work order. It is meant for operator review or agent prompts, not as a new source of edit authority.
+
 ## Dry-run and safe-preview split (`--dry-run-json`)
 
 Migration planners can request candidate rows, but the projection is still dry-run-only.
