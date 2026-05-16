@@ -161,6 +161,13 @@ receipt-only report is not an active development anchor.
   with exactly one distinct current pain target: issue #877, the non-`main`
   branch/worktree, mapped OMX session, and `delta`, `ahead`, and `proc`
   evidence.
+- `docs/dogfood/closed-audit-id-anchor-guard-881.md` is the issue #881
+  closed-audit-ID anchor guard artifact. It keeps `worktree:audit`
+  `linkedIssue` #854 and nested orphan-triage `linkedIssue` #711 as closed audit
+  provenance only when open PR/issues, mapped tmux sessions, and mapped `/proc`
+  evidence are zero. Clean-slate nudges must not answer with #854 or #711 as the
+  current active development anchor; they must adopt or name a distinct live
+  issue/branch/session/PR/proc target before describing active development.
 - `npm run --silent ci:alerts -- --alerts <file> --branch main --json` marks a
   current completed `main` success as `verdict: "current-main-echo"`,
   `echo: true`, and `disposition: "verification-only"`.
