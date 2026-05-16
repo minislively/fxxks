@@ -50,6 +50,88 @@ function makeTempProject() {
   return tempDir;
 }
 
+function writeExecutable(filePath, body) {
+  fs.writeFileSync(filePath, body, { mode: 0o755 });
+}
+
+function makeNoTmuxServerCliFixture() {
+  const tempDir = makeTempProject();
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-no-tmux-bin-"));
+  const mainHead = "no-tmux-cli-main-head";
+  writeExecutable(path.join(binDir, "tmux"), `#!/usr/bin/env node
+process.stderr.write("no server running on /tmp/tmux-1000/default\\n");
+process.exit(1);
+`);
+  writeExecutable(path.join(binDir, "gh"), `#!/usr/bin/env node
+const args = process.argv.slice(2).join(" ");
+if (args.startsWith("issue list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+if (args.startsWith("pr list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+if (args.startsWith("run list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+process.stderr.write("unexpected gh " + args + "\\n");
+process.exit(2);
+`);
+  writeExecutable(path.join(binDir, "git"), `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const joined = args.join(" ");
+const cwd = process.cwd();
+const mainHead = ${JSON.stringify(mainHead)};
+if (joined === "status --porcelain=v1 -z") process.exit(0);
+if (joined === "symbolic-ref --quiet --short HEAD") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+  process.stdout.write("origin/main\\n");
+  process.exit(0);
+}
+if (joined === "rev-list --left-right --count HEAD...@{u}") {
+  process.stdout.write("0\\t0\\n");
+  process.exit(0);
+}
+if (joined === "config --get remote.origin.url") {
+  process.stdout.write("git@github.com:minislively/fooks.git\\n");
+  process.exit(0);
+}
+if (joined === "worktree list --porcelain") {
+  process.stdout.write(["worktree " + cwd, "HEAD " + mainHead, "branch refs/heads/main", ""].join("\\n"));
+  process.exit(0);
+}
+if (joined === "rev-parse --verify origin/main") {
+  process.stdout.write(mainHead + "\\n");
+  process.exit(0);
+}
+if (joined === "branch --format=%(refname:short)") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "branch -r --format=%(refname:short)") {
+  process.stdout.write("origin/main\\n");
+  process.exit(0);
+}
+if (joined === "branch --merged origin/main") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "diff --shortstat origin/main...HEAD") process.exit(0);
+if (joined === "rev-list --left-right --count origin/main...HEAD") {
+  process.stdout.write("0 0\\n");
+  process.exit(0);
+}
+process.stderr.write("unexpected git " + joined + "\\n");
+process.exit(2);
+`);
+  return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
+}
+
 function tmuxNoServerError(socket = "/tmp/tmux-1000/default") {
   const error = new Error(`Command failed: tmux list-panes -a -F #{session_name}\t#{pane_current_path}\nno server running on ${socket}`);
   error.stderr = `no server running on ${socket}\n`;
@@ -663,6 +745,33 @@ test("operator check treats absent tmux server as zero mapped sessions and keeps
   assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 2);
   assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
   assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence.mappedFooksTmuxProcSessionCount, 0);
+});
+
+test("CLI check and status activity treat absent tmux server as zero mapped sessions without top-level blockers", () => {
+  const { tempDir, env } = makeNoTmuxServerCliFixture();
+
+  const check = run(["check", "--json"], tempDir, env);
+  assert.equal(check.verdict, "idleRequiresActiveArtifact");
+  assert.deepEqual(check.blockers, []);
+  assert.equal(check.activity.tmux.available, true);
+  assert.deepEqual(check.activity.tmux.sessions, []);
+  assert.deepEqual(check.activity.tmux.blockers, []);
+  assert.deepEqual(check.activity.blockers, []);
+  assert.equal(check.activity.currentRunEvidence.classification, "mainEchoNonActive");
+  assert.deepEqual(check.activity.currentRunEvidence.blockers, []);
+  assert.equal(check.requiredActiveArtifact.required, true);
+  assert.equal(check.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(check.activeWorkReceipts.classification, "mainEcho");
+  assert.equal(check.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence.mappedFooksTmuxProcSessionCount, 0);
+  assert.equal(JSON.stringify(check).includes("tmux activity unavailable"), false);
+  assert.equal(check.postMergeMainCiEvidence.summary.unknownCount, 2);
+
+  const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
+  assert.equal(activity.tmux.available, true);
+  assert.deepEqual(activity.tmux.sessions, []);
+  assert.deepEqual(activity.tmux.blockers, []);
+  assert.deepEqual(activity.blockers, []);
+  assert.equal(activity.currentRunEvidence.mainEchoEvidence, true);
 });
 
 test("operator check preserves true tmux failures as blockers", () => {
