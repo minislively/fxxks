@@ -764,7 +764,10 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.equal(check.requiredActiveArtifact.required, true);
   assert.equal(check.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
   assert.equal(check.activeWorkReceipts.classification, "mainEcho");
+  assert.deepEqual(check.activeWorkReceipts.blockers, []);
+  assert.equal(check.activeWorkReceipts.reportLine.includes("blocked"), false);
   assert.equal(check.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence.mappedFooksTmuxProcSessionCount, 0);
+  assert.equal(check.blockers.includes("tmux activity unavailable: no server running on /tmp/tmux-1000/default"), false);
   assert.equal(JSON.stringify(check).includes("tmux activity unavailable"), false);
   assert.equal(check.postMergeMainCiEvidence.summary.unknownCount, 2);
 
@@ -815,6 +818,51 @@ test("operator check suppresses no-server tmux output from top-level blockers", 
   assert.deepEqual(snapshot.blockers, []);
   assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
   assert.equal(snapshot.activeWorkReceipts.blockers.join("\n").includes("no server running"), false);
+  assert.equal(JSON.stringify(snapshot).includes("tmux activity unavailable: no server running"), false);
+});
+
+test("operator check suppresses no-server tmux failures from nonstandard error renderings", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T04:24:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") {
+        throw {
+          toString() {
+            return "tmux activity unavailable: no server running on /tmp/tmux-1000/default";
+          },
+        };
+      }
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD no-tmux-rendered-main", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "no-tmux-rendered-main\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.deepEqual(snapshot.blockers, []);
+  assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
+  assert.deepEqual(snapshot.activeWorkReceipts.blockers, []);
   assert.equal(JSON.stringify(snapshot).includes("tmux activity unavailable: no server running"), false);
 });
 

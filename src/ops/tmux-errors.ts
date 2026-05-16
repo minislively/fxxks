@@ -12,17 +12,34 @@ function errorTextParts(value: unknown, seen = new Set<unknown>()): string[] {
     stderr?: unknown;
     stdout?: unknown;
     output?: unknown;
+    shortMessage?: unknown;
+    originalMessage?: unknown;
+    all?: unknown;
     cause?: unknown;
   };
-  return [
+  const parts = [
     ...errorTextParts(record.stderr, seen),
     ...errorTextParts(record.stdout, seen),
     ...errorTextParts(record.output, seen),
+    ...errorTextParts(record.shortMessage, seen),
+    ...errorTextParts(record.originalMessage, seen),
+    ...errorTextParts(record.all, seen),
     ...errorTextParts(record.message, seen),
     ...errorTextParts(record.cause, seen),
   ];
+  try {
+    const rendered = String(value);
+    if (rendered && rendered !== "[object Object]") parts.push(rendered);
+  } catch {
+    // Ignore hostile error renderers; structured fields above remain the source of truth.
+  }
+  return parts;
 }
 
 export function isTmuxNoServerRunningError(error: unknown): boolean {
   return /no server running on\b/i.test(errorTextParts(error).join("\n"));
+}
+
+export function isTmuxActivityNoServerBlocker(blocker: string): boolean {
+  return blocker.startsWith("tmux activity unavailable:") && isTmuxNoServerRunningError(blocker);
 }
