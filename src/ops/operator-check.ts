@@ -14,6 +14,7 @@ import {
   triageOrphanLocalWorktrees,
   type OrphanLocalWorktreeEntry,
 } from "./orphan-local-worktree-triage";
+import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -535,6 +536,10 @@ function baseReceiptIdentifiers(
 
 function withRepoBlockers(blockers: string[], repoBlockers: string[]): string[] {
   return uniqueSorted([...blockers, ...repoBlockers]);
+}
+
+function checkProjectionBlockers(blockers: string[]): string[] {
+  return blockers.filter((blocker) => !isTmuxActivityNoServerBlocker(blocker));
 }
 
 function receiptReportLine(
@@ -1181,12 +1186,12 @@ function buildActiveWorkReceipts(
   const legacyLocalResidueCleanupReview = buildLegacyLocalResidueCleanupReview(activity.legacyWorktreeEvidence);
   receipts.push(...siblingReceipts.receipts);
 
-  const blockers = uniqueSorted([
+  const blockers = checkProjectionBlockers(uniqueSorted([
     ...baseBlockers,
     ...activity.blockers,
     ...siblingReceipts.blockers,
     ...receipts.flatMap((receipt) => receipt.blockers),
-  ]);
+  ]));
   const classification = overallReceiptClassification(receipts, blockers);
   const activeArtifactReceiptCount = receipts.filter((receipt) =>
     receipt.classification === "active"
@@ -1273,7 +1278,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const activity = readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true });
   const activeArtifacts = activeArtifactsFrom(activity);
   const activeWorkReceipts = buildActiveWorkReceipts(cwd, activity, options);
-  const blockers = [...activity.blockers];
+  const blockers = checkProjectionBlockers([...activity.blockers]);
   const hasActiveArtifact = activeArtifacts.length > 0;
   const optionalCountBlockers = activity.optionalCounts.enabled ? activity.optionalCounts.blockers : [];
   const blocked = activity.currentRunEvidence.blockers.length > 0 || optionalCountBlockers.length > 0 || !activity.tmux.available;
