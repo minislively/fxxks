@@ -50,6 +50,13 @@ function makeTempProject() {
   return tempDir;
 }
 
+function tmuxNoServerError(socket = "/tmp/tmux-1000/default") {
+  const error = new Error(`Command failed: tmux list-panes -a -F #{session_name}\t#{pane_current_path}\nno server running on ${socket}`);
+  error.stderr = `no server running on ${socket}\n`;
+  error.code = 1;
+  return error;
+}
+
 test("operator reminder docs require a blocker or active artifact after clean CI/React echoes", () => {
   const boundaryDoc = fs.readFileSync(path.join(repoRoot, "docs", "post-merge-main-ci-echo-boundary.md"), "utf8");
   const dogfoodDoc = fs.readFileSync(path.join(repoRoot, "docs", "dogfood", "clean-merge-reminder-action-803.md"), "utf8");
@@ -601,6 +608,107 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
   assert.deepEqual(snapshot.blockers, []);
+});
+
+
+test("operator check treats absent tmux server as zero mapped sessions and keeps CI uncertainty separate", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "no-tmux-main-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T04:20:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") throw tmuxNoServerError();
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") throw new Error("gh run list timed out");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.activity.tmux.available, true);
+  assert.deepEqual(snapshot.activity.tmux.sessions, []);
+  assert.deepEqual(snapshot.activity.tmux.blockers, []);
+  assert.equal(snapshot.activity.currentRunEvidence.available, true);
+  assert.equal(snapshot.activity.currentRunEvidence.classification, "mainEchoNonActive");
+  assert.equal(snapshot.activity.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.activity.currentRunEvidence.activeWorkEvidence, false);
+  assert.deepEqual(snapshot.activity.currentRunEvidence.blockers, []);
+  assert.deepEqual(snapshot.activity.blockers, []);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(snapshot.postMergeMainCiEvidence.available, false);
+  assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), /GitHub Actions run list unavailable: gh run list timed out/);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 2);
+  assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
+  assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence.mappedFooksTmuxProcSessionCount, 0);
+});
+
+test("operator check preserves true tmux failures as blockers", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T04:25:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") {
+        const error = new Error("tmux permission denied");
+        error.stderr = "permission denied opening tmux socket\n";
+        error.code = 1;
+        throw error;
+      }
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.verdict, "blocked");
+  assert.equal(snapshot.activity.tmux.available, false);
+  assert.match(snapshot.activity.tmux.blockers.join("\n"), /tmux activity unavailable: permission denied opening tmux socket/);
+  assert.match(snapshot.activity.currentRunEvidence.blockers.join("\n"), /tmux session evidence unavailable/);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "blocked");
+  assert.match(snapshot.blockers.join("\n"), /tmux activity unavailable: permission denied opening tmux socket/);
 });
 
 test("operator check treats issue, PR, or mapped session as the concrete active boundary", () => {

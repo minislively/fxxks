@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { isTmuxNoServerRunningError } from "./tmux-errors";
 
 export const ARTIFACT_AUDIT_SCHEMA_VERSION = 1;
 export const ARTIFACT_AUDIT_COMMAND = "status artifacts";
@@ -308,10 +309,19 @@ export function parseTmuxPaneList(output: string): ParsedPane[] {
     .filter((entry): entry is ParsedPane => Boolean(entry));
 }
 
-function readOptional(runner: ArtifactAuditCommandRunner, command: string, args: string[], cwd: string, blockers: string[], label: string): string {
+function readOptional(
+  runner: ArtifactAuditCommandRunner,
+  command: string,
+  args: string[],
+  cwd: string,
+  blockers: string[],
+  label: string,
+  options: { ignoreTmuxNoServer?: boolean } = {},
+): string {
   try {
     return runner(command, args, cwd);
   } catch (error) {
+    if (options.ignoreTmuxNoServer && isTmuxNoServerRunningError(error)) return "";
     blockers.push(`${label} unavailable: ${errorDetail(error)}`);
     return "";
   }
@@ -351,7 +361,7 @@ export function auditArtifacts(cwd = process.cwd(), options: ArtifactAuditOption
   const branchOutput = readOptional(runner, "git", ["branch", "--format=%(refname:short)"], cwd, blockers, "git branch list");
   const mergedOutput = baseRef ? readOptional(runner, "git", ["branch", "--merged", baseRef], cwd, blockers, `git branch --merged ${baseRef}`) : "";
   const blockersBeforeTmux = blockers.length;
-  const tmuxOutput = readOptional(runner, "tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"], cwd, blockers, "tmux pane list");
+  const tmuxOutput = readOptional(runner, "tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"], cwd, blockers, "tmux pane list", { ignoreTmuxNoServer: true });
   const tmuxAvailable = blockers.length === blockersBeforeTmux;
 
   const parsedWorktrees = parseGitWorktreePorcelain(worktreeOutput);
