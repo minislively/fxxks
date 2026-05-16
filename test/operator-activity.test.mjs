@@ -346,7 +346,7 @@ test("operator activity reports exact-head post-merge main CI and release-report
     includeRemoteCounts: true,
     now: () => "2026-05-12T10:10:00.000Z",
     runner: () => "",
-    gitRunner: (_cwd, args) => {
+    gitRunner: /** @param {string} _cwd @param {string[]} args */ (_cwd, args) => {
       if (args[0] === "symbolic-ref") return "main\n";
       if (args[0] === "rev-parse") return "origin/main\n";
       if (args[0] === "rev-list") return "0\t0\n";
@@ -411,7 +411,7 @@ test("operator check keeps missing exact-head workflow evidence unknown instead 
       if (args[0] === "rev-list") return "0\t0\n";
       throw new Error(`unexpected git ${args.join(" ")}`);
     },
-    commandRunner: (command, args) => {
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
       const joined = args.join(" ");
       if (command === "tmux") return "";
       if (command === "gh" && args[0] === "issue") return "[]";
@@ -537,7 +537,7 @@ test("operator check forces a concrete active artifact when post-merge main echo
       if (args[0] === "rev-list") return "0\t0\n";
       throw new Error(`unexpected git ${args.join(" ")}`);
     },
-    commandRunner: (command, args) => {
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
       const joined = args.join(" ");
       if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
       if (command === "gh" && args[0] === "issue") return "[]";
@@ -1821,6 +1821,196 @@ test("operator check satisfies #869 only when issue and OMX session evidence are
   assert.equal(boundary.satisfiesNudgeReportAnchorRequirement, true);
   assert.equal(boundary.repeatedReceiptOnlyReportAllowed, false);
   assert.match(boundary.nudgeRule, /may proceed only by naming the newly created\/adopted issue evidence and mapped OMX session evidence/);
+});
+
+
+test("operator check exposes issue #885 handoff artifact evidence rule", () => {
+  const tempDir = makeTempProject();
+  const idleSnapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T06:20:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-885-idle-head", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "issue-885-idle-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  const idleBoundary = idleSnapshot.activeWorkReceipts.handoffArtifactEvidence;
+  assert.equal(idleBoundary.issue, "#885");
+  assert.equal(idleBoundary.readOnly, true);
+  assert.equal(idleBoundary.handoffRule, "adopt-live-artifact-else-create-exactly-one");
+  assert.deepEqual(idleBoundary.adoptableLiveArtifacts, [
+    "open GitHub issue",
+    "open GitHub pull request",
+    "mapped fooks tmux session",
+    "live non-main worktree",
+  ]);
+  assert.deepEqual(idleBoundary.currentEvidence, {
+    openIssueCount: 0,
+    openPullRequestCount: 0,
+    mappedFooksTmuxSessionCount: 0,
+    liveMappedFooksTmuxSessionCount: 0,
+    liveNonMainWorktreePresent: false,
+    activeReceiptCount: 0,
+  });
+  assert.equal(idleBoundary.adoptedLiveArtifactPresent, false);
+  assert.equal(idleBoundary.runCreatedArtifactRequirement.required, true);
+  assert.equal(idleBoundary.runCreatedArtifactRequirement.exactlyOne, true);
+  assert.deepEqual(idleBoundary.runCreatedArtifactRequirement.allowedArtifactKinds, ["issue", "branch", "session"]);
+  assert.match(idleBoundary.nextReportRule, /create exactly one issue, branch, or session/);
+  assert.match(idleBoundary.claimBoundary, /issue #885/);
+
+  const worktreeOnlySnapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T06:22:00.000Z",
+    runner: () => "",
+    gitRunner: /** @param {string} _cwd @param {string[]} args */ (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "dogfood/issue-885-worktree-only\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "1\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-885-worktree-only-head", "branch refs/heads/dogfood/issue-885-worktree-only", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\ndogfood/issue-885-worktree-only\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return " 1 file changed, 5 insertions(+)\n";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "1 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  const worktreeOnlyBoundary = worktreeOnlySnapshot.activeWorkReceipts.handoffArtifactEvidence;
+  assert.equal(worktreeOnlySnapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(worktreeOnlySnapshot.requiredActiveArtifact.required, true);
+  assert.equal(worktreeOnlyBoundary.adoptedLiveArtifactPresent, true);
+  assert.equal(worktreeOnlyBoundary.runCreatedArtifactRequirement.required, false);
+  assert.equal(worktreeOnlyBoundary.currentEvidence.liveNonMainWorktreePresent, true);
+  assert.match(worktreeOnlyBoundary.nextReportRule, /separate from the top-level requiredActiveArtifact issue\/PR\/session contract/);
+
+  const staleSessionWorktree = path.join(tempDir, ".omx-worktrees", "issue-885-stale-session");
+  const staleSessionOnlySnapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T06:23:00.000Z",
+    runner: () => "",
+    gitRunner: /** @param {string} _cwd @param {string[]} args */ (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return `fooks-issue-885-stale\t${staleSessionWorktree} (deleted)\tzsh\n`;
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-885-stale-session-head", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "issue-885-stale-session-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  const staleSessionOnlyBoundary = staleSessionOnlySnapshot.activeWorkReceipts.handoffArtifactEvidence;
+  assert.equal(staleSessionOnlyBoundary.currentEvidence.mappedFooksTmuxSessionCount, 1);
+  assert.equal(staleSessionOnlyBoundary.currentEvidence.liveMappedFooksTmuxSessionCount, 0);
+  assert.equal(staleSessionOnlyBoundary.adoptedLiveArtifactPresent, false);
+  assert.equal(staleSessionOnlyBoundary.runCreatedArtifactRequirement.required, true);
+  assert.equal(staleSessionOnlyBoundary.satisfiesHandoffRule, false);
+
+  const activeSnapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-16T06:25:00.000Z",
+    runner: () => " M docs/dogfood/fooks-check-handoff-artifact-evidence-885.md\0",
+    gitRunner: /** @param {string} _cwd @param {string[]} args */ (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "dogfood/issue-885-fooks-check-artifact-evidence\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "1\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return `fooks-dogfood-issue-885-fooks-check-artifact-evidence\t${tempDir}\tnode\n`;
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[{\"number\":885}]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-885-active-head", "branch refs/heads/dogfood/issue-885-fooks-check-artifact-evidence", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\ndogfood/issue-885-fooks-check-artifact-evidence\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return " M docs/dogfood/fooks-check-handoff-artifact-evidence-885.md\0";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return " 1 file changed, 20 insertions(+)\n";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "1 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  const activeBoundary = activeSnapshot.activeWorkReceipts.handoffArtifactEvidence;
+  assert.equal(activeBoundary.adoptedLiveArtifactPresent, true);
+  assert.equal(activeBoundary.runCreatedArtifactRequirement.required, false);
+  assert.equal(activeBoundary.satisfiesHandoffRule, true);
+  assert.equal(activeBoundary.currentEvidence.openIssueCount, 1);
+  assert.equal(activeBoundary.currentEvidence.mappedFooksTmuxSessionCount, 1);
+  assert.equal(activeBoundary.currentEvidence.liveMappedFooksTmuxSessionCount, 1);
+  assert.equal(activeBoundary.currentEvidence.liveNonMainWorktreePresent, true);
+  assert.match(activeBoundary.nextReportRule, /Adopt the live issue, PR, mapped fooks tmux session, or live non-main worktree/);
+
+  const receiptJson = JSON.stringify(activeSnapshot.activeWorkReceipts);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
 });
 
 test("operator activity keeps legacy worktree inference conservative when tmux is unavailable", () => {

@@ -25,6 +25,7 @@ export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
@@ -41,6 +42,7 @@ export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_ISSUE = "#853";
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE = "#865";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE = "#867";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE = "#869";
+export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE = "#885";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -48,6 +50,7 @@ export const OPERATOR_CHECK_LOCAL_ONLY_RESIDUE_ACTIVE_BOUNDARY_ISSUE_URL = "http
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/865";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE_URL = "https://github.com/minislively/fooks/issues/867";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/869";
+export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL = "https://github.com/minislively/fooks/issues/885";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_SOURCE = "operator/check legacy local residue cleanup-review projection";
@@ -56,6 +59,7 @@ export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SOURCE = "operator/che
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE = "operator/check legacy review-worktree residue clean-slate boundary projection";
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SOURCE = "operator/check post-receipt dogfood nudge anchor projection";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE = "operator/check receipt-only dogfood nudge loop boundary projection";
+export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SOURCE = "operator/check issue #885 handoff artifact evidence projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
@@ -72,6 +76,8 @@ export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_CLAIM_BOUNDARY =
   "Read-only issue #867 dogfood post-receipt nudge artifact; treats the #866 main CI/release success and closed legacy worktree bucket as receipts only, and requires the next nudge to name a fresh issue, branch, session, PR anchor, or concrete blocker.";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #869 dogfood receipt-only nudge loop artifact; after PR #868 receipt-only closeout, the next nudge report must name newly created or adopted issue evidence plus mapped OMX session evidence, not the last merged commit, main CI run, or release receipt.";
+export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_CLAIM_BOUNDARY =
+  "Read-only issue #885 fooks-check handoff artifact; adopt live issue, PR, mapped session, or live non-main worktree evidence when present, otherwise require exactly one run-created issue, branch, or session evidence report without mutating runtime/provider behavior.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
@@ -370,6 +376,44 @@ export type OperatorCheckReceiptOnlyNudgeLoopBoundary = {
   nudgeRule: string;
 };
 
+export type OperatorCheckHandoffArtifactEvidence = {
+  schemaVersion: typeof OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_CLAIM_BOUNDARY;
+  readOnly: true;
+  handoffRule: "adopt-live-artifact-else-create-exactly-one";
+  adoptableLiveArtifacts: [
+    "open GitHub issue",
+    "open GitHub pull request",
+    "mapped fooks tmux session",
+    "live non-main worktree",
+  ];
+  currentEvidence: {
+    openIssueCount?: number;
+    openPullRequestCount?: number;
+    mappedFooksTmuxSessionCount: number;
+    liveMappedFooksTmuxSessionCount: number;
+    liveNonMainWorktreePresent: boolean;
+    activeReceiptCount: number;
+  };
+  adoptedLiveArtifactPresent: boolean;
+  runCreatedArtifactRequirement: {
+    required: boolean;
+    exactlyOne: true;
+    allowedArtifactKinds: ["issue", "branch", "session"];
+    concreteEvidenceRequired: [
+      "artifact kind",
+      "artifact identifier",
+      "creation/adoption source",
+      "worktree delta/ahead/proc evidence",
+    ];
+  };
+  satisfiesHandoffRule: boolean;
+  nextReportRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -398,6 +442,7 @@ export type OperatorCheckActiveWorkReceipts = {
   legacyReviewWorktreeResidueBoundary: OperatorCheckLegacyReviewWorktreeResidueBoundary;
   postReceiptNudgeAnchorBoundary: OperatorCheckPostReceiptNudgeAnchorBoundary;
   receiptOnlyNudgeLoopBoundary: OperatorCheckReceiptOnlyNudgeLoopBoundary;
+  handoffArtifactEvidence: OperatorCheckHandoffArtifactEvidence;
   blockers: string[];
 };
 
@@ -916,6 +961,64 @@ function buildReceiptOnlyNudgeLoopBoundary(
   };
 }
 
+function buildHandoffArtifactEvidence(
+  activity: OperatorActivitySnapshot,
+  receipts: OperatorCheckActiveWorkReceipt[],
+): OperatorCheckHandoffArtifactEvidence {
+  const openIssueCount = activity.currentRunEvidence.evidence.openIssues;
+  const openPullRequestCount = activity.currentRunEvidence.evidence.openPullRequests;
+  const mappedFooksTmuxSessionCount = activity.currentRunEvidence.evidence.fooksSessionCount;
+  const liveMappedFooksTmuxSessionCount = activity.tmux.sessions.filter((session) => session.status !== "staleRuntimeCandidate").length;
+  const liveNonMainWorktreePresent = Boolean(activity.worktree.branch && activity.worktree.branch !== "main");
+  const activeReceiptCount = receipts.filter((receipt) => receipt.classification === "active").length;
+  const adoptedLiveArtifactPresent = Boolean(
+    (typeof openIssueCount === "number" && openIssueCount > 0)
+    || (typeof openPullRequestCount === "number" && openPullRequestCount > 0)
+    || liveMappedFooksTmuxSessionCount > 0
+    || liveNonMainWorktreePresent,
+  );
+
+  return {
+    schemaVersion: OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE,
+    issueUrl: OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL,
+    source: OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SOURCE,
+    claimBoundary: OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_CLAIM_BOUNDARY,
+    readOnly: true,
+    handoffRule: "adopt-live-artifact-else-create-exactly-one",
+    adoptableLiveArtifacts: [
+      "open GitHub issue",
+      "open GitHub pull request",
+      "mapped fooks tmux session",
+      "live non-main worktree",
+    ],
+    currentEvidence: {
+      openIssueCount,
+      openPullRequestCount,
+      mappedFooksTmuxSessionCount,
+      liveMappedFooksTmuxSessionCount,
+      liveNonMainWorktreePresent,
+      activeReceiptCount,
+    },
+    adoptedLiveArtifactPresent,
+    runCreatedArtifactRequirement: {
+      required: !adoptedLiveArtifactPresent,
+      exactlyOne: true,
+      allowedArtifactKinds: ["issue", "branch", "session"],
+      concreteEvidenceRequired: [
+        "artifact kind",
+        "artifact identifier",
+        "creation/adoption source",
+        "worktree delta/ahead/proc evidence",
+      ],
+    },
+    satisfiesHandoffRule: adoptedLiveArtifactPresent,
+    nextReportRule: adoptedLiveArtifactPresent
+      ? "Adopt the live issue, PR, mapped fooks tmux session, or live non-main worktree already present in this #885 fooks-check handoff report; report its concrete evidence instead of creating another artifact. This nested #885 handoff report is separate from the top-level requiredActiveArtifact issue/PR/session contract."
+      : "No live PR/issue/session/worktree is present in this #885 fooks-check handoff report; create exactly one issue, branch, or session for this run, then report concrete run-created artifact evidence with delta/ahead/proc evidence before claiming active work. This nested #885 handoff report is separate from the top-level requiredActiveArtifact issue/PR/session contract.",
+  };
+}
+
 function buildLocalOnlyResidueActiveBoundary(
   activity: OperatorActivitySnapshot,
   siblingStaleResidueCount: number,
@@ -1122,6 +1225,7 @@ function buildActiveWorkReceipts(
     legacyReviewWorktreeResidueBoundary: buildLegacyReviewWorktreeResidueBoundary(activity.legacyWorktreeEvidence.staleClosedArtifactWorktreeCount),
     postReceiptNudgeAnchorBoundary: buildPostReceiptNudgeAnchorBoundary(activity),
     receiptOnlyNudgeLoopBoundary: buildReceiptOnlyNudgeLoopBoundary(activity),
+    handoffArtifactEvidence: buildHandoffArtifactEvidence(activity, receipts),
     blockers,
   };
 }
