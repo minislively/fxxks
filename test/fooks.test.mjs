@@ -5084,6 +5084,10 @@ test("React Web first-minute work-order docs stay discoverable and boundary-scop
   assert.match(demo, /react-web\.duplicate-literal-id/);
   assert.match(demo, /react-web\.conflicting-label-association/);
   assert.match(demo, /read-only review aid/);
+  assert.match(demo, /Operator-facing handoff card/);
+  assert.match(demo, /Preserve: decision, claimBoundary, humanDecisionNeeded, doNotDo, autoApply=false/);
+  assert.match(demo, /continue the requested feature work/);
+  assert.match(demo, /source freshness fails/);
   assert.match(demo, /Do \*\*not\*\* generate final label copy automatically/);
   assert.match(demo, /No broad accessibility audit/);
   assert.match(demo, /No RN\/WebView\/TUI expansion/);
