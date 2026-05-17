@@ -45,6 +45,9 @@ const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_RUN_LIST_ARGS = [
   "--json",
   "databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,event,name,workflowName,url",
 ] as const;
+const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_API_WORKFLOW_RUNS_SOURCE =
+  "GitHub REST API workflow-runs fallback for exact local origin/main head; read-only and no fetch performed";
+const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_API_WORKFLOW_RUNS_SURFACE = "gh api actions workflow-runs";
 const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_REMOTE_FRESHNESS_CAVEAT =
   "remote freshness not verified; local origin/main was not fetched before this read-only lookup";
 
@@ -183,9 +186,9 @@ export type OperatorActivityPostMergeMainWorkflowDiagnosticReason =
   | "missing-conclusion";
 
 export type OperatorActivityPostMergeMainWorkflowDiagnostic = {
-  source: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE;
+  source: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE | typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_API_WORKFLOW_RUNS_SOURCE;
   command: string;
-  apiSurface: "gh run list";
+  apiSurface: "gh run list" | typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_API_WORKFLOW_RUNS_SURFACE;
   lookup: string;
   reason: OperatorActivityPostMergeMainWorkflowDiagnosticReason;
   remoteFreshnessCaveat: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_REMOTE_FRESHNESS_CAVEAT;
@@ -204,6 +207,8 @@ export type OperatorActivityPostMergeMainWorkflowEvidence = {
   updatedAt?: string;
   reason: string;
   diagnostic: OperatorActivityPostMergeMainWorkflowDiagnostic;
+  primaryDiagnostic?: OperatorActivityPostMergeMainWorkflowDiagnostic;
+  fallbackDiagnostic?: OperatorActivityPostMergeMainWorkflowDiagnostic;
 };
 
 export type OperatorActivityPostMergeMainCiEvidence = {
@@ -751,6 +756,27 @@ type GhRunListEntry = {
   url?: string;
 };
 
+type GhWorkflowRunEntry = {
+  id?: number;
+  name?: string;
+  display_title?: string;
+  status?: string;
+  conclusion?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  head_branch?: string;
+  head_sha?: string;
+  event?: string;
+  html_url?: string;
+  url?: string;
+};
+
+type PostMergeMainCiFallbackResult = {
+  runs: GhRunListEntry[];
+  repo?: string;
+  blocker?: string;
+};
+
 function readLocalOriginMainHead(cwd: string, options: OperatorActivityOptions): { head?: string; blockers: string[] } {
   const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
   try {
@@ -771,6 +797,52 @@ function parseGhRunList(output: string): { runs: GhRunListEntry[]; blocker?: str
   }
 }
 
+function parseGithubRepoIdentifier(remoteUrl: string): string | undefined {
+  const trimmed = remoteUrl.trim().replace(/\.git$/u, "");
+  const sshMatch = /^git@github\.com:([^/]+\/[^/]+)$/u.exec(trimmed);
+  if (sshMatch) return sshMatch[1];
+  const httpsMatch = /^https?:\/\/github\.com\/([^/]+\/[^/]+)$/u.exec(trimmed);
+  if (httpsMatch) return httpsMatch[1];
+  return undefined;
+}
+
+function readGithubRepoIdentifier(cwd: string, options: OperatorActivityOptions): { repo?: string; blocker?: string } {
+  const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
+  try {
+    const remoteUrl = runner("git", ["config", "--get", "remote.origin.url"], cwd, DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS);
+    const repo = parseGithubRepoIdentifier(remoteUrl);
+    return repo ? { repo } : { blocker: "GitHub Actions workflow-runs fallback unavailable: remote.origin.url is not a GitHub repository URL" };
+  } catch (error) {
+    return { blocker: `GitHub Actions workflow-runs fallback unavailable: ${errorDetail(error)}` };
+  }
+}
+
+function parseGhWorkflowRuns(output: string): { runs: GhRunListEntry[]; blocker?: string } {
+  try {
+    const parsed = JSON.parse(output) as unknown;
+    const maybeRuns = parsed && typeof parsed === "object" ? (parsed as { workflow_runs?: unknown }).workflow_runs : undefined;
+    if (!Array.isArray(maybeRuns)) return { runs: [], blocker: "GitHub Actions workflow-runs fallback unavailable: gh api returned non-array workflow_runs JSON" };
+    const runs = maybeRuns
+      .filter((item): item is GhWorkflowRunEntry => Boolean(item) && typeof item === "object")
+      .map((run) => ({
+        databaseId: run.id,
+        status: run.status,
+        conclusion: run.conclusion ?? undefined,
+        createdAt: run.created_at,
+        updatedAt: run.updated_at,
+        headBranch: run.head_branch,
+        headSha: run.head_sha,
+        event: run.event,
+        name: run.name || run.display_title,
+        workflowName: run.name,
+        url: run.html_url || run.url,
+      }));
+    return { runs };
+  } catch (error) {
+    return { runs: [], blocker: `GitHub Actions workflow-runs fallback unavailable: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
 function postMergeMainCiCommandLabel(): string {
   return `gh ${OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_RUN_LIST_ARGS.join(" ")}`;
 }
@@ -788,16 +860,64 @@ function postMergeMainCiDiagnostic(
   workflow: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS[number],
   mainHead: string | undefined,
   reason: OperatorActivityPostMergeMainWorkflowDiagnosticReason,
+  overrides: Partial<Pick<OperatorActivityPostMergeMainWorkflowDiagnostic, "source" | "command" | "apiSurface">> = {},
 ): OperatorActivityPostMergeMainWorkflowDiagnostic {
   const headFilter = mainHead ? `headSha=${mainHead}` : "headSha unavailable";
   return {
-    source: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE,
-    command: postMergeMainCiCommandLabel(),
-    apiSurface: "gh run list",
+    source: overrides.source ?? OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE,
+    command: overrides.command ?? postMergeMainCiCommandLabel(),
+    apiSurface: overrides.apiSurface ?? "gh run list",
     lookup: `branch=main, workflowName=${workflow}, ${headFilter}; no git fetch or mutation performed`,
     reason,
     remoteFreshnessCaveat: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_REMOTE_FRESHNESS_CAVEAT,
   };
+}
+
+function postMergeMainCiFallbackDiagnostic(
+  workflow: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS[number],
+  mainHead: string | undefined,
+  repo: string,
+  reason: OperatorActivityPostMergeMainWorkflowDiagnosticReason,
+): OperatorActivityPostMergeMainWorkflowDiagnostic {
+  return postMergeMainCiDiagnostic(workflow, mainHead, reason, {
+    source: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_API_WORKFLOW_RUNS_SOURCE,
+    command: `gh api --method GET repos/${repo}/actions/runs -f branch=main -f head_sha=${mainHead ?? ""} -f per_page=100`,
+    apiSurface: OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_API_WORKFLOW_RUNS_SURFACE,
+  });
+}
+
+function readPostMergeMainCiWorkflowRunsFallback(
+  cwd: string,
+  options: OperatorActivityOptions,
+  mainHead: string | undefined,
+): PostMergeMainCiFallbackResult {
+  if (!mainHead) return { runs: [] };
+  const repoResult = readGithubRepoIdentifier(cwd, options);
+  if (!repoResult.repo) return { runs: [], blocker: repoResult.blocker };
+  const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
+  const args = [
+    "api",
+    "--method",
+    "GET",
+    `repos/${repoResult.repo}/actions/runs`,
+    "-f",
+    "branch=main",
+    "-f",
+    `head_sha=${mainHead}`,
+    "-f",
+    "per_page=100",
+  ];
+  try {
+    const output = runner("gh", args, cwd, DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS);
+    const parsed = parseGhWorkflowRuns(output);
+    if (parsed.blocker) {
+      return { runs: [], blocker: parsed.blocker, repo: repoResult.repo };
+    }
+    return { runs: parsed.runs, repo: repoResult.repo };
+  } catch (error) {
+    const detail = errorDetail(error);
+    return { runs: [], blocker: `GitHub Actions workflow-runs fallback unavailable: ${detail}`, repo: repoResult.repo };
+  }
 }
 
 function workflowNameOf(run: GhRunListEntry): string {
@@ -812,11 +932,25 @@ function latestRunForWorkflow(runs: GhRunListEntry[], workflow: typeof OPERATOR_
     .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? "").localeCompare(String(left.updatedAt ?? left.createdAt ?? "")))[0];
 }
 
+function diagnosticReasonFromRun(run: GhRunListEntry | undefined, fallbackBlocker?: string): OperatorActivityPostMergeMainWorkflowDiagnosticReason {
+  if (!run) return fallbackBlocker ? classifyPostMergeMainCiDiagnosticReason(fallbackBlocker) : "empty-run";
+  if (run.status !== "completed") return "pending";
+  if (run.conclusion === "success") return "success";
+  if (run.conclusion) return "failure";
+  return "missing-conclusion";
+}
+
+type PostMergeMainCiDiagnosticOverrides = {
+  primaryDiagnostic?: OperatorActivityPostMergeMainWorkflowDiagnostic;
+  fallbackDiagnostic?: OperatorActivityPostMergeMainWorkflowDiagnostic;
+};
+
 function workflowEvidenceFromRun(
   workflow: typeof OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS[number],
   mainHead: string | undefined,
   run: GhRunListEntry | undefined,
   unavailableReason?: OperatorActivityPostMergeMainWorkflowDiagnosticReason,
+  diagnosticOverrides: PostMergeMainCiDiagnosticOverrides = {},
 ): OperatorActivityPostMergeMainWorkflowEvidence {
   if (!mainHead) {
     const diagnosticReason = unavailableReason ?? "origin-main-head-unavailable";
@@ -828,10 +962,15 @@ function workflowEvidenceFromRun(
           ? "remote workflow evidence disabled; exact-head workflow evidence was not inspected"
           : "origin/main head is unavailable; exact-head workflow evidence cannot be evaluated",
       diagnostic: postMergeMainCiDiagnostic(workflow, mainHead, diagnosticReason),
+      ...diagnosticOverrides,
     };
   }
   if (!run) {
     const diagnosticReason = unavailableReason ?? "empty-run";
+    const diagnostic =
+      diagnosticOverrides.fallbackDiagnostic && !unavailableReason
+        ? diagnosticOverrides.fallbackDiagnostic
+        : postMergeMainCiDiagnostic(workflow, mainHead, diagnosticReason);
     return {
       workflow,
       status: "unknown",
@@ -840,12 +979,17 @@ function workflowEvidenceFromRun(
         diagnosticReason === "empty-run"
           ? `no ${workflow} run was found for the exact origin/main head`
           : `GitHub Actions run list unavailable (${diagnosticReason}); ${workflow} exact-head workflow evidence cannot be evaluated`,
-      diagnostic: postMergeMainCiDiagnostic(workflow, mainHead, diagnosticReason),
+      diagnostic,
+      ...diagnosticOverrides,
     };
   }
 
   const runStatus = run.status;
   const conclusion = run.conclusion;
+  const successDiagnostic = diagnosticOverrides.fallbackDiagnostic ?? postMergeMainCiDiagnostic(workflow, mainHead, "success");
+  const pendingDiagnostic = diagnosticOverrides.fallbackDiagnostic ?? postMergeMainCiDiagnostic(workflow, mainHead, "pending");
+  const failureDiagnostic = diagnosticOverrides.fallbackDiagnostic ?? postMergeMainCiDiagnostic(workflow, mainHead, "failure");
+  const missingConclusionDiagnostic = diagnosticOverrides.fallbackDiagnostic ?? postMergeMainCiDiagnostic(workflow, mainHead, "missing-conclusion");
   const base = {
     workflow,
     conclusion,
@@ -856,13 +1000,14 @@ function workflowEvidenceFromRun(
     headBranch: run.headBranch,
     event: run.event,
     updatedAt: run.updatedAt,
+    ...diagnosticOverrides,
   };
   if (runStatus !== "completed") {
     return {
       ...base,
       status: "pending",
       reason: `${workflow} run for the exact origin/main head is ${runStatus ?? "not completed"}`,
-      diagnostic: postMergeMainCiDiagnostic(workflow, mainHead, "pending"),
+      diagnostic: pendingDiagnostic,
     };
   }
   if (conclusion === "success") {
@@ -870,7 +1015,7 @@ function workflowEvidenceFromRun(
       ...base,
       status: "success",
       reason: `${workflow} run completed successfully for the exact origin/main head`,
-      diagnostic: postMergeMainCiDiagnostic(workflow, mainHead, "success"),
+      diagnostic: successDiagnostic,
     };
   }
   if (conclusion) {
@@ -878,14 +1023,14 @@ function workflowEvidenceFromRun(
       ...base,
       status: "failure",
       reason: `${workflow} run for the exact origin/main head completed with conclusion ${conclusion}`,
-      diagnostic: postMergeMainCiDiagnostic(workflow, mainHead, "failure"),
+      diagnostic: failureDiagnostic,
     };
   }
   return {
     ...base,
     status: "unknown",
     reason: `${workflow} run for the exact origin/main head is completed but has no conclusion`,
-    diagnostic: postMergeMainCiDiagnostic(workflow, mainHead, "missing-conclusion"),
+    diagnostic: missingConclusionDiagnostic,
   };
 }
 
@@ -939,6 +1084,7 @@ function readPostMergeMainCiEvidence(cwd: string, options: OperatorActivityOptio
   let runs: GhRunListEntry[] = [];
 
   let unavailableReason: OperatorActivityPostMergeMainWorkflowDiagnosticReason | undefined;
+  let primaryFailureDetail: string | undefined;
   try {
     const output = runner(
       "gh",
@@ -950,22 +1096,47 @@ function readPostMergeMainCiEvidence(cwd: string, options: OperatorActivityOptio
     runs = parsed.runs;
     if (parsed.blocker) {
       blockers.push(parsed.blocker);
+      primaryFailureDetail = parsed.blocker;
       unavailableReason = classifyPostMergeMainCiDiagnosticReason(parsed.blocker);
     }
   } catch (error) {
     const detail = errorDetail(error);
-    blockers.push(`GitHub Actions run list unavailable: ${detail}`);
+    const blocker = `GitHub Actions run list unavailable: ${detail}`;
+    blockers.push(blocker);
+    primaryFailureDetail = detail;
     unavailableReason = classifyPostMergeMainCiDiagnosticReason(detail);
   }
 
-  const workflowEvidence = OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS.map((workflow) =>
-    workflowEvidenceFromRun(
+  const fallback = unavailableReason ? readPostMergeMainCiWorkflowRunsFallback(cwd, options, mainHeadResult.head) : undefined;
+  if (fallback?.blocker) blockers.push(fallback.blocker);
+  if (fallback && !fallback.blocker) {
+    runs = fallback.runs;
+    blockers.splice(0, blockers.length, ...blockers.filter((blocker) => !blocker.startsWith("GitHub Actions run list unavailable")));
+    unavailableReason = undefined;
+  }
+
+  const workflowEvidence = OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS.map((workflow) => {
+    const run = mainHeadResult.head ? latestRunForWorkflow(runs, workflow, mainHeadResult.head) : undefined;
+    const primaryDiagnostic = primaryFailureDetail ? postMergeMainCiDiagnostic(workflow, mainHeadResult.head, classifyPostMergeMainCiDiagnosticReason(primaryFailureDetail)) : undefined;
+    const fallbackDiagnostic = fallback?.repo
+      ? postMergeMainCiFallbackDiagnostic(
+          workflow,
+          mainHeadResult.head,
+          fallback.repo,
+          diagnosticReasonFromRun(run, fallback.blocker),
+        )
+      : undefined;
+    return workflowEvidenceFromRun(
       workflow,
       mainHeadResult.head,
-      mainHeadResult.head ? latestRunForWorkflow(runs, workflow, mainHeadResult.head) : undefined,
+      run,
       unavailableReason,
-    )
-  );
+      {
+        ...(primaryDiagnostic ? { primaryDiagnostic } : {}),
+        ...(fallbackDiagnostic ? { fallbackDiagnostic } : {}),
+      },
+    );
+  });
 
   return {
     available: blockers.length === 0,
