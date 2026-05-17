@@ -262,3 +262,14 @@ export type {
   ReactWebDecisionStopBenchmarkEntry,
   ReactWebDecisionStopHandoff,
 } from "./core/react-web-decision-handoff-benchmark";
+export {
+  WORK_ITEM_DASHBOARD_SCHEMA_VERSION,
+  WORK_ITEM_DASHBOARD_SOURCE,
+  WORK_ITEM_DASHBOARD_CLAIM_BOUNDARY,
+  buildWorkItemDashboard,
+  type WorkItem,
+  type WorkItemEvidence,
+  type WorkItemNextAction,
+  type WorkItemDashboard,
+  type WorkItemArchitectureAudit,
+} from "./core/work-item-dashboard";
