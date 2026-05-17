@@ -645,7 +645,7 @@ Everyday commands:
   ${displayCliName} run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
-  ${displayCliName} explain <status|work-item|sample|current> [--json]
+  ${displayCliName} explain <status|work-item|sample|current> [--json|--help]
   ${displayCliName} inspect evidence <id> [--json]
   ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
@@ -676,13 +676,18 @@ CLI command: ${displayCliName}`);
 }
 
 
-function parseExplainArgs(args: string[]): { artifact: "status" | "work-item" | "sample" | "current"; json: boolean } {
+function parseExplainArgs(args: string[]): { artifact: "status" | "work-item" | "sample" | "current"; json: boolean; help: boolean } {
   let artifact: "status" | "work-item" | "sample" | "current" | undefined;
   let json = false;
+  let help = false;
 
   for (const arg of args) {
     if (arg === "--json") {
       json = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      help = true;
       continue;
     }
     if (arg === "status" || arg === "work-item" || arg === "sample" || arg === "current") {
@@ -695,7 +700,33 @@ function parseExplainArgs(args: string[]): { artifact: "status" | "work-item" | 
     throw new Error(`Unexpected explain argument: ${arg}`);
   }
 
-  return { artifact: artifact ?? "current", json };
+  return { artifact: artifact ?? "current", json, help };
+}
+
+function explainHelp(displayCliName: string): string {
+  return `Usage: ${displayCliName} explain [status|work-item|sample|current] [--json|--help]
+
+Explain the docs-backed WorkItem artifact for the current checkout.
+
+Artifacts:
+  status     Explain the same WorkItem selected by ${displayCliName} status.
+  work-item  Alias for the current repository WorkItem artifact.
+  current    Default; explain the current repository WorkItem artifact.
+  sample     Show a static sample explanation without reading live repository evidence.
+
+Options:
+  --json     Print the machine-readable explanation contract.
+  --help, -h Show this help.
+
+Discovery:
+  Start with '${displayCliName} explain sample' to see the shape safely, then run
+  '${displayCliName} explain status' in a repository to inspect live WorkItem evidence.
+
+Boundary:
+  CLI/operator explanation only; does not change provider/runtime behavior,
+  detector scope, merge-gate policy, React Web/RN/TUI/WebView behavior,
+  performance claims, or product claims.
+`;
 }
 
 function parseExtractArgs(args: string[]): { filePath: string; modelPayload: boolean } {
@@ -1335,7 +1366,19 @@ async function run(): Promise<void> {
       return;
     }
     case "explain": {
-      const { artifact, json } = parseExplainArgs(rest);
+      let options: ReturnType<typeof parseExplainArgs>;
+      try {
+        options = parseExplainArgs(rest);
+      } catch (error) {
+        console.error(`fooks explain: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(explainHelp(displayCliName));
+        process.exitCode = 1;
+        return;
+      }
+      if (options.help) {
+        process.stdout.write(explainHelp(displayCliName));
+        return;
+      }
       const [{ readProjectMetricSummary }, { buildWorkItemDashboard }, { buildWorkItemExplain, renderWorkItemExplainText }] = await Promise.all([
         import("../core/session-metrics.js"),
         import("../core/work-item-dashboard.js"),
@@ -1343,8 +1386,8 @@ async function run(): Promise<void> {
       ]);
       const metricStatus = readProjectMetricSummary(process.cwd());
       const dashboard = buildWorkItemDashboard(process.cwd(), metricStatus);
-      const explanation = buildWorkItemExplain(artifact, dashboard);
-      if (json) {
+      const explanation = buildWorkItemExplain(options.artifact, dashboard);
+      if (options.json) {
         print(explanation);
       } else {
         process.stdout.write(renderWorkItemExplainText(explanation));

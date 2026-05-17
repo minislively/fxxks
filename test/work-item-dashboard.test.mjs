@@ -304,3 +304,24 @@ test("fooks explain current defaults to the current repository WorkItem artifact
   assert.equal(implicit.workItem.id, "work-item-922");
   assert.equal(explicit.nextAction.kind, "open-pr");
 });
+
+test("fooks explain exposes command help without reading live WorkItem evidence", () => {
+  const help = execFileSync(process.execPath, [cli, "explain", "--help"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+
+  assert.match(help, /^Usage: fooks explain \[status\|work-item\|sample\|current\] \[--json\|--help\]/m);
+  assert.match(help, /Start with 'fooks explain sample'/);
+  assert.match(help, /fooks explain status/);
+  assert.match(help, /CLI\/operator explanation only/);
+  assert.match(help, /does not change provider\/runtime behavior/);
+  assert.doesNotMatch(help, /Unexpected explain argument/);
+  assert.doesNotMatch(help, /^# fooks explain/m);
+
+  const shortHelp = execFileSync(process.execPath, [cli, "explain", "-h"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(shortHelp, help);
+});
