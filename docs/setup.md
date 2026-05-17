@@ -92,6 +92,13 @@ Good signs:
 - Check status reports a read-only post-merge main echo boundary; if there is no open issue, no open PR, and no mapped fooks tmux session, it requires a concrete active artifact instead of treating idle main echoes as work.
 - Activity status reports a compact read-only operator snapshot: current worktree branch/divergence/current dirty-path delta plus active fooks-like tmux panes when tmux is available. Open issue/PR counts are omitted unless `--include-remote-counts` is passed.
 
+From a source checkout after `npm run build`, maintainers may use the npm aliases
+`npm run -s check -- --json` and `npm run -s status:activity -- --json`.
+They are thin routes to the same built `dist/cli/index.js` `fooks check` and
+`fooks status activity` behavior, so they do not change provider/runtime behavior,
+merge-gate policy, detector scope, React/RN/TUI/WebView behavior, or
+product/performance claims.
+
 `fooks doctor [codex|claude] [--json]` is read-only. Human output starts with status, why, first blocker, and next action, while `--json` exposes the same readiness summary for tools. It checks local fooks setup artifacts, runtime manifests, hook event installation, Codex trust status, cache health, and supported source-file presence. Focused `fooks doctor claude` also includes an optional TypeScript language server host-tooling check as warning-only. It does not mutate `.fooks/`, Codex hooks, Claude project-local settings, or runtime-home manifests. It also does not prove live provider health; it is not a ccusage replacement and not provider usage/billing-token telemetry, invoices, dashboards, or charged costs.
 
 For source checkouts, fresh clones, and temporary git worktrees, `fooks doctor` may be `unhealthy` before activation because project-local adapters and runtime manifests are intentionally not committed as universal defaults. Treat that as a setup reminder, not package corruption: run `fooks setup` in the checkout you plan to use, then rerun `fooks doctor` for the real dogfood readiness verdict.

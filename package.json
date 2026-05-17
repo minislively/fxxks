@@ -8,6 +8,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "npm run build && node dist/cli/index.js check",
+    "status:activity": "npm run build && node dist/cli/index.js status activity",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:integration": "npm run build && node --test test/*.test.mjs",
     "bench:cache": "npm run build && node scripts/benchmark-cache.mjs",

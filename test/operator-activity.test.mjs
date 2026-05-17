@@ -48,6 +48,10 @@ function runText(args, cwd) {
   return execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
+function runNpmScript(script, args = []) {
+  return JSON.parse(execFileSync("npm", ["run", "-s", script, "--", ...args], { cwd: repoRoot, encoding: "utf8" }));
+}
+
 function makeTempProject() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-activity-"));
   fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
@@ -3038,4 +3042,22 @@ test("status activity CLI route preserves existing status contracts", () => {
   }
   assert.match(output, /Unexpected status activity argument/);
   assert.match(OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG, /--include-remote-counts/);
+});
+
+test("source checkout npm operator aliases route to built CLI behavior", () => {
+  const check = runNpmScript("check", ["--json"]);
+  assert.equal(check.command, OPERATOR_CHECK_COMMAND);
+  assert.equal(check.readOnly, true);
+  assert.equal(check.activity.optionalCounts.enabled, true);
+  assert.equal(check.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.match(check.runtimeProvenance.artifacts.cliEntrypointPath, /dist[\\/]cli[\\/]index\.js$/);
+  assert.match(check.runtimeProvenance.artifacts.operatorCheckModulePath, /dist[\\/]ops[\\/]operator-check\.js$/);
+
+  const activity = runNpmScript("status:activity", ["--json"]);
+  assert.equal(activity.command, OPERATOR_ACTIVITY_COMMAND);
+  assert.equal(activity.readOnly, true);
+  assert.equal(activity.optionalCounts.enabled, false);
+  assert.equal(activity.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.match(activity.runtimeProvenance.artifacts.cliEntrypointPath, /dist[\\/]cli[\\/]index\.js$/);
+  assert.match(activity.runtimeProvenance.artifacts.operatorActivityModulePath, /dist[\\/]ops[\\/]operator-activity\.js$/);
 });
