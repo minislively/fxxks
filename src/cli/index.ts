@@ -626,7 +626,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|run|scan|extract|compare|decide|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -645,6 +645,7 @@ Everyday commands:
   ${displayCliName} run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
   ${displayCliName} compare <file> [--json]
+  ${displayCliName} explain <status|work-item|sample|current> [--json]
   ${displayCliName} inspect evidence <id> [--json]
   ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
@@ -672,6 +673,29 @@ Everyday commands:
 
 Install: npm install -g fxxk-frontend-hooks
 CLI command: ${displayCliName}`);
+}
+
+
+function parseExplainArgs(args: string[]): { artifact: "status" | "work-item" | "sample" | "current"; json: boolean } {
+  let artifact: "status" | "work-item" | "sample" | "current" | undefined;
+  let json = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "status" || arg === "work-item" || arg === "sample" || arg === "current") {
+      if (artifact) {
+        throw new Error("explain accepts at most one artifact: status, work-item, sample, or current");
+      }
+      artifact = arg;
+      continue;
+    }
+    throw new Error(`Unexpected explain argument: ${arg}`);
+  }
+
+  return { artifact: artifact ?? "current", json };
 }
 
 function parseExtractArgs(args: string[]): { filePath: string; modelPayload: boolean } {
@@ -1308,6 +1332,23 @@ async function run(): Promise<void> {
         tuiSourceMetadata,
         reactNativeSourceAnchorBeta,
       }));
+      return;
+    }
+    case "explain": {
+      const { artifact, json } = parseExplainArgs(rest);
+      const [{ readProjectMetricSummary }, { buildWorkItemDashboard }, { buildWorkItemExplain, renderWorkItemExplainText }] = await Promise.all([
+        import("../core/session-metrics.js"),
+        import("../core/work-item-dashboard.js"),
+        import("../core/work-item-explain.js"),
+      ]);
+      const metricStatus = readProjectMetricSummary(process.cwd());
+      const dashboard = buildWorkItemDashboard(process.cwd(), metricStatus);
+      const explanation = buildWorkItemExplain(artifact, dashboard);
+      if (json) {
+        print(explanation);
+      } else {
+        process.stdout.write(renderWorkItemExplainText(explanation));
+      }
       return;
     }
     case "inspect": {

@@ -230,3 +230,77 @@ test("ambient session alone does not make a clean unlinked checkout active work"
     else process.env.FOOKS_SESSION_ID = previousFooksSession;
   }
 });
+
+test("fooks explain status renders WorkItem evidence, rejected evidence, and next action", () => {
+  const tempDir = makeRepo();
+  const text = execFileSync(process.execPath, [cli, "explain", "status"], {
+    cwd: tempDir,
+    encoding: "utf8",
+    env: { ...process.env, OMX_SESSION_ID: "omx-explain-test" },
+  });
+
+  assert.match(text, /^# fooks explain status/m);
+  assert.match(text, /CLI-only WorkItem evidence explanation/);
+  assert.match(text, /## Why/);
+  assert.match(text, /artifact 'status' resolves to WorkItem 'work-item-922' in state 'active-work'/);
+  assert.match(text, /## Evidence/);
+  assert.match(text, /Source evidence\/architectureDoc/);
+  assert.match(text, /## Rejected evidence \/ non-claims/);
+  assert.match(text, /provider usage, billing tokens/);
+  assert.match(text, /## Next action/);
+  assert.match(text, /kind: open-pr/);
+});
+
+test("fooks explain work-item --json exposes machine-readable WorkItem explanation", () => {
+  const tempDir = makeRepo();
+  const explanation = JSON.parse(execFileSync(process.execPath, [cli, "explain", "work-item", "--json"], {
+    cwd: tempDir,
+    encoding: "utf8",
+    env: { ...process.env, FOOOKS_UNUSED: "ignored" },
+  }));
+
+  assert.equal(explanation.schemaVersion, 1);
+  assert.equal(explanation.command, "explain");
+  assert.equal(explanation.artifact, "work-item");
+  assert.equal(explanation.readOnly, true);
+  assert.equal(explanation.workItem.id, "work-item-922");
+  assert.equal(explanation.workItem.state, "active-work");
+  assert.ok(explanation.why.some((line) => line.includes("next action:")));
+  assert.ok(explanation.evidence.some((item) => item.kind === "worktree"));
+  assert.ok(explanation.rejectedEvidence.some((item) => item.reason.includes("provider usage")));
+  assert.equal(explanation.nextAction.kind, "open-pr");
+  assert.ok(explanation.claimBoundary.includes("without changing provider/runtime behavior"));
+});
+
+test("fooks explain sample is static and does not claim live repository evidence", () => {
+  const explanation = JSON.parse(execFileSync(process.execPath, [cli, "explain", "sample", "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }));
+
+  assert.equal(explanation.artifact, "sample");
+  assert.equal(explanation.workItem.id, "work-item-sample");
+  assert.equal(explanation.workItem.state, "uninspected");
+  assert.equal(explanation.nextAction.command, "fooks explain status");
+  assert.ok(explanation.rejectedEvidence.some((item) => item.reason.includes("current repository status")));
+  assert.ok(explanation.nonClaims.some((item) => item.includes("does not prove current repository readiness")));
+});
+
+
+test("fooks explain current defaults to the current repository WorkItem artifact", () => {
+  const tempDir = makeRepo();
+  const explicit = JSON.parse(execFileSync(process.execPath, [cli, "explain", "current", "--json"], {
+    cwd: tempDir,
+    encoding: "utf8",
+  }));
+  const implicit = JSON.parse(execFileSync(process.execPath, [cli, "explain", "--json"], {
+    cwd: tempDir,
+    encoding: "utf8",
+  }));
+
+  assert.equal(explicit.artifact, "current");
+  assert.equal(implicit.artifact, "current");
+  assert.equal(explicit.workItem.id, "work-item-922");
+  assert.equal(implicit.workItem.id, "work-item-922");
+  assert.equal(explicit.nextAction.kind, "open-pr");
+});

@@ -273,3 +273,12 @@ export {
   type WorkItemDashboard,
   type WorkItemArchitectureAudit,
 } from "./core/work-item-dashboard";
+export {
+  WORK_ITEM_EXPLAIN_SCHEMA_VERSION,
+  WORK_ITEM_EXPLAIN_CLAIM_BOUNDARY,
+  buildWorkItemExplain,
+  renderWorkItemExplainText,
+  type WorkItemExplainArtifact,
+  type WorkItemExplainRejectedEvidence,
+  type WorkItemExplainResult,
+} from "./core/work-item-explain";
