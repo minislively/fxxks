@@ -1274,7 +1274,9 @@ function buildHandoffArtifactEvidence(
   const openIssueCount = activity.currentRunEvidence.evidence.openIssues;
   const openPullRequestCount = activity.currentRunEvidence.evidence.openPullRequests;
   const mappedFooksTmuxSessionCount = activity.currentRunEvidence.evidence.fooksSessionCount;
-  const liveMappedFooksTmuxSessionCount = activity.tmux.sessions.filter((session) => session.status !== "staleRuntimeCandidate").length;
+  const liveMappedFooksTmuxSessionCount = activity.tmux.sessions.filter((session) =>
+    session.status !== "staleRuntimeCandidate" && session.status !== "stagedPromptOnly"
+  ).length;
   const liveNonMainWorktreePresent = Boolean(activity.worktree.branch && activity.worktree.branch !== "main");
   const activeReceiptCount = receipts.filter((receipt) => receipt.classification === "active").length;
   const adoptedLiveArtifactPresent = Boolean(
@@ -1448,7 +1450,8 @@ function buildActiveWorkReceipts(
   }
 
   for (const session of activity.tmux.sessions) {
-    const classification: OperatorCheckActiveWorkReceiptClassification = session.status === "staleRuntimeCandidate" ? "closedOrStale" : "active";
+    const classification: OperatorCheckActiveWorkReceiptClassification =
+      session.status === "staleRuntimeCandidate" || session.status === "stagedPromptOnly" ? "closedOrStale" : "active";
     receipts.push({
       kind: "session",
       classification,
@@ -1550,8 +1553,9 @@ function activeArtifactsFrom(activity: OperatorActivitySnapshot): OperatorCheckA
   if (counts.enabled && typeof counts.openPullRequests === "number" && counts.openPullRequests > 0) {
     artifacts.push({ kind: "pullRequest", count: counts.openPullRequests, source: counts.source });
   }
-  if (activity.tmux.sessions.length > 0) {
-    artifacts.push({ kind: "session", count: activity.tmux.sessions.length, source: activity.tmux.command });
+  const activeTmuxSessions = activity.tmux.sessions.filter((session) => session.status !== "stagedPromptOnly");
+  if (activeTmuxSessions.length > 0) {
+    artifacts.push({ kind: "session", count: activeTmuxSessions.length, source: activity.tmux.command });
   }
   return artifacts;
 }
