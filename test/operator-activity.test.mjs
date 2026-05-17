@@ -22,6 +22,7 @@ const {
   OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE,
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
   OPERATOR_ACTIVITY_REMOTE_SOURCE,
+  OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE,
   OPERATOR_ACTIVITY_TMUX_COMMAND,
   OPERATOR_ACTIVITY_LEGACY_WORKTREE_ENTRY_LIMIT,
   parseOperatorActivityTmuxPanes,
@@ -1467,6 +1468,102 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
     "open GitHub pull request",
     "mapped fooks tmux session",
   ]);
+});
+
+test("operator check does not treat staged unsubmitted OMX prompt pane as active session evidence for #910", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-17T06:30:00.000Z",
+    runner: () => "?? .fooks-session-task.txt\0",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "dogfood/issue-910-staged-omx-prompt-active-evidence\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux" && args[0] === "list-panes") return `omx-issue-910\t${tempDir}\tnode\t%1\n`;
+      if (command === "tmux" && args[0] === "capture-pane") {
+        assert.equal(joined, "capture-pane -pt %1 -S -200");
+        return "› Pain point: fooks status/check can count an OMX tmux pane as active work\n";
+      }
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-910-head", "branch refs/heads/dogfood/issue-910-staged-omx-prompt-active-evidence", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "issue-910-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\ndogfood/issue-910-staged-omx-prompt-active-evidence\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\ndogfood/issue-910-staged-omx-prompt-active-evidence\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "?? .fooks-session-task.txt\0";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.activity.stagedOmxPromptEvidence.source, OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE);
+  assert.equal(snapshot.activity.stagedOmxPromptEvidence.classification, "stagedPromptOnly");
+  assert.equal(snapshot.activity.stagedOmxPromptEvidence.preventsActiveWorkEvidence, true);
+  assert.deepEqual(snapshot.activity.stagedOmxPromptEvidence.conditions, {
+    onlyFooksSessionTaskDelta: true,
+    aheadZero: true,
+    requiresNoSubmittedPromptOrWorkEvidence: true,
+    requiresCurrentOmxPane: true,
+  });
+  assert.deepEqual(snapshot.activity.stagedOmxPromptEvidence.sessionNames, ["omx-issue-910"]);
+  assert.equal(snapshot.activity.tmux.sessions[0].status, "stagedPromptOnly");
+  assert.equal(snapshot.activity.currentRunEvidence.evidence.fooksSessionCount, 0);
+  assert.equal(snapshot.activity.currentRunEvidence.activeWorkEvidence, false);
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.equal(snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.kind === "session" && receipt.classification === "active"), false);
+});
+
+test("operator activity keeps OMX pane active when submitted prompt or work evidence is captured", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-17T06:35:00.000Z",
+    runner: () => "?? .fooks-session-task.txt\0",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "dogfood/issue-910-staged-omx-prompt-active-evidence\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux" && args[0] === "list-panes") return `omx-issue-910\t${tempDir}\tnode\t%2\n`;
+      if (command === "tmux" && args[0] === "capture-pane") return "UserPromptSubmit accepted\nWorking\n";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD issue-910-head", "branch refs/heads/dogfood/issue-910-staged-omx-prompt-active-evidence", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "issue-910-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\ndogfood/issue-910-staged-omx-prompt-active-evidence\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\ndogfood/issue-910-staged-omx-prompt-active-evidence\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "?? .fooks-session-task.txt\0";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.stagedOmxPromptEvidence.classification, "activeOrUnknown");
+  assert.equal(snapshot.tmux.sessions[0].status, "current");
+  assert.equal(snapshot.currentRunEvidence.evidence.fooksSessionCount, 1);
+  assert.equal(snapshot.currentRunEvidence.activeWorkEvidence, true);
 });
 
 

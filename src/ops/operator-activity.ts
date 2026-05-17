@@ -22,7 +22,7 @@ export const OPERATOR_ACTIVITY_COMMAND = "status activity";
 export const OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG = "--include-remote-counts";
 export const OPERATOR_ACTIVITY_CLAIM_BOUNDARY =
   "Local read-only fooks operator activity snapshot; no provider messaging, no backlog invention, no git fetch, and remote issue/PR counts only when explicitly enabled.";
-export const OPERATOR_ACTIVITY_TMUX_COMMAND = "tmux list-panes -a -F #{session_name}\\t#{pane_current_path}\\t#{pane_current_command}";
+export const OPERATOR_ACTIVITY_TMUX_COMMAND = "tmux list-panes -a -F #{session_name}\\t#{pane_current_path}\\t#{pane_current_command}\\t#{pane_id}";
 export const OPERATOR_ACTIVITY_REMOTE_SOURCE = "GitHub CLI gh issue/pr list; explicit opt-in only";
 export const DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS = 1000;
 export const DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS = 1500;
@@ -34,6 +34,11 @@ export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE =
   "GitHub Actions run list for exact local origin/main head; read-only and no fetch performed";
 export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY =
   "Read-only post-merge main CI evidence for the exact local origin/main head only; missing exact-head workflow evidence stays unknown or pending and never becomes success.";
+export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE = "#910";
+export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE = "operator/activity issue #910 staged OMX prompt pane evidence";
+export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY =
+  "Read-only issue #910 operator artifact; a current OMX pane with only a staged prompt placeholder, no submitted/working/tool-output evidence, only .fooks-session-task.txt delta, and ahead=0 is not active development proof.";
+export const OPERATOR_ACTIVITY_TMUX_CAPTURE_COMMAND = "tmux capture-pane -pt <pane_id> -S -200";
 export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS = ["CI", "React Web Release Report"] as const;
 const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_RUN_LIST_ARGS = [
   "run",
@@ -82,15 +87,25 @@ export type OperatorActivityWorktree = {
   blockers: string[];
 };
 
+export type OperatorActivityPanePromptEvidence = {
+  inspected: boolean;
+  source: typeof OPERATOR_ACTIVITY_TMUX_CAPTURE_COMMAND;
+  classification: "submittedOrWorkingEvidence" | "stagedPromptOnly" | "unavailable";
+  submittedOrWorkingEvidence: boolean;
+  reasons: string[];
+};
+
 export type OperatorActivityTmuxPane = {
   path: string;
   exists: boolean;
   deleted: boolean;
   current: boolean;
   command?: string;
+  paneId?: string;
+  promptEvidence?: OperatorActivityPanePromptEvidence;
 };
 
-export type OperatorActivityTmuxSessionStatus = "current" | "activeOrUnknown" | "staleRuntimeCandidate";
+export type OperatorActivityTmuxSessionStatus = "current" | "activeOrUnknown" | "staleRuntimeCandidate" | "stagedPromptOnly";
 
 export type OperatorActivityTmuxSession = {
   session: string;
@@ -146,6 +161,24 @@ export type OperatorActivityRemoteCounts =
     };
 
 export type OperatorActivityCurrentRunClassification = "mainEchoNonActive" | "activeOrUnknown";
+
+export type OperatorActivityStagedOmxPromptEvidence = {
+  issue: typeof OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE;
+  source: typeof OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE;
+  claimBoundary: typeof OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY;
+  readOnly: true;
+  classification: "stagedPromptOnly" | "activeOrUnknown";
+  stagedPromptOnlySessionCount: number;
+  preventsActiveWorkEvidence: boolean;
+  conditions: {
+    onlyFooksSessionTaskDelta: boolean;
+    aheadZero: boolean;
+    requiresNoSubmittedPromptOrWorkEvidence: true;
+    requiresCurrentOmxPane: true;
+  };
+  sessionNames: string[];
+  reasons: string[];
+};
 
 export type OperatorActivityCurrentRunEvidence = {
   available: boolean;
@@ -292,6 +325,7 @@ export type OperatorActivitySnapshot = {
   tmux: OperatorActivityTmux;
   optionalCounts: OperatorActivityRemoteCounts;
   legacyWorktreeEvidence: OperatorActivityLegacyWorktreeEvidence;
+  stagedOmxPromptEvidence: OperatorActivityStagedOmxPromptEvidence;
   currentRunEvidence: OperatorActivityCurrentRunEvidence;
   postMergeMainCiEvidence: OperatorActivityPostMergeMainCiEvidence;
   blockers: string[];
@@ -301,6 +335,7 @@ type ParsedTmuxPane = {
   session: string;
   path: string;
   command?: string;
+  paneId?: string;
 };
 
 function nowIso(): string {
@@ -526,13 +561,13 @@ export function parseOperatorActivityTmuxPanes(output: string): ParsedTmuxPane[]
     .map((line) => line.trimEnd())
     .filter(Boolean)
     .map((line) => {
-      const [session, panePath, ...commandParts] = line.split("\t");
+      const [session, panePath, commandRaw, paneIdRaw] = line.split("\t");
       if (!session || !panePath) return undefined;
-      const command = commandParts.join("\t").trim();
+      const command = commandRaw?.trim();
+      const paneId = paneIdRaw?.trim();
       const entry: ParsedTmuxPane = { session, path: panePath };
-      if (command) {
-        entry.command = command;
-      }
+      if (command) entry.command = command;
+      if (paneId) entry.paneId = paneId;
       return entry;
     })
     .filter((entry): entry is ParsedTmuxPane => Boolean(entry));
@@ -572,14 +607,62 @@ function buildWorktreeSnapshot(status: WorktreeCurrentStatus): OperatorActivityW
   };
 }
 
-function readTmuxActivity(cwd: string, options: OperatorActivityOptions): OperatorActivityTmux {
+function hasOnlyFooksSessionTaskDelta(worktree: OperatorActivityWorktree): boolean {
+  return worktree.delta.changedPathCount === 1 && worktree.delta.changedPaths[0] === ".fooks-session-task.txt";
+}
+
+function hasOmxSignal(pane: ParsedTmuxPane, cleanPanePath: string): boolean {
+  const haystack = [pane.session, cleanPanePath, pane.command ?? ""].join("\n").replace(/\\/g, "/").toLowerCase();
+  return haystack.includes("omx");
+}
+
+function hasSubmittedPromptOrWorkEvidence(capturedPane: string): boolean {
+  return /\bUserPromptSubmit\b|\bWorking\b|tool[- ]output|tool[- ]call|hookEventName["': ]+UserPromptSubmit/iu.test(capturedPane);
+}
+
+function inspectPanePromptEvidence(
+  cwd: string,
+  runner: OperatorActivityCommandRunner,
+  pane: ParsedTmuxPane,
+  cleanPanePath: string,
+  current: boolean,
+  worktree: OperatorActivityWorktree,
+): OperatorActivityPanePromptEvidence | undefined {
+  const onlyTaskDelta = hasOnlyFooksSessionTaskDelta(worktree);
+  const aheadZero = worktree.ahead === 0;
+  if (!current || !pane.paneId || !hasOmxSignal(pane, cleanPanePath) || !onlyTaskDelta || !aheadZero) return undefined;
+
+  try {
+    const capturedPane = runner("tmux", ["capture-pane", "-pt", pane.paneId, "-S", "-200"], cwd, DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS);
+    const submittedOrWorkingEvidence = hasSubmittedPromptOrWorkEvidence(capturedPane);
+    return {
+      inspected: true,
+      source: OPERATOR_ACTIVITY_TMUX_CAPTURE_COMMAND,
+      classification: submittedOrWorkingEvidence ? "submittedOrWorkingEvidence" : "stagedPromptOnly",
+      submittedOrWorkingEvidence,
+      reasons: submittedOrWorkingEvidence
+        ? ["captured pane includes UserPromptSubmit, Working, or tool-output evidence"]
+        : ["captured pane lacks UserPromptSubmit, Working, and tool-output evidence while only .fooks-session-task.txt is dirty and ahead=0"],
+    };
+  } catch {
+    return {
+      inspected: false,
+      source: OPERATOR_ACTIVITY_TMUX_CAPTURE_COMMAND,
+      classification: "unavailable",
+      submittedOrWorkingEvidence: false,
+      reasons: ["tmux pane capture unavailable; staged prompt-only classification was not applied"],
+    };
+  }
+}
+
+function readTmuxActivity(cwd: string, worktree: OperatorActivityWorktree, options: OperatorActivityOptions): OperatorActivityTmux {
   const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
   const pathExists = options.pathExists ?? fs.existsSync;
   const blockers: string[] = [];
   let output = "";
 
   try {
-    output = runner("tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}\t#{pane_current_command}"], cwd, DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS);
+    output = runner("tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}\t#{pane_current_command}\t#{pane_id}"], cwd, DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS);
   } catch (error) {
     if (isTmuxNoServerRunningError(error)) {
       return {
@@ -607,7 +690,16 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
     const current = exists && (pathContainsCwd(cleanPanePath, currentCwd) || pathContainsCwd(currentCwd, cleanPanePath));
     if (!includesFooksSignal(pane.session, cwd) && !includesFooksSignal(cleanPanePath, cwd) && !current) continue;
     const panes = panesBySession.get(pane.session) ?? [];
-    panes.push({ path: pane.path, exists, deleted, current, command: pane.command });
+    const promptEvidence = inspectPanePromptEvidence(cwd, runner, pane, cleanPanePath, current, worktree);
+    panes.push({
+      path: pane.path,
+      exists,
+      deleted,
+      current,
+      ...(pane.command ? { command: pane.command } : {}),
+      ...(pane.paneId ? { paneId: pane.paneId } : {}),
+      ...(promptEvidence ? { promptEvidence } : {}),
+    });
     panesBySession.set(pane.session, panes);
   }
 
@@ -619,12 +711,24 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
       .map(([session, panes]) => {
         const current = panes.some((pane) => pane.current);
         const allPanesMissing = panes.length > 0 && panes.every((pane) => pane.deleted || !pane.exists);
-        const status: OperatorActivityTmuxSessionStatus = current ? "current" : allPanesMissing ? "staleRuntimeCandidate" : "activeOrUnknown";
-        const reasons = status === "current"
-          ? ["session has a pane at the current working directory"]
-          : status === "staleRuntimeCandidate"
-            ? ["all panes point at missing or deleted paths"]
-            : ["session has live panes away from the current working directory; activity is unknown"];
+        const stagedPromptOnly = current && panes.some((pane) => pane.current) && panes.every((pane) => {
+          if (!pane.current) return pane.deleted || !pane.exists;
+          return pane.promptEvidence?.classification === "stagedPromptOnly";
+        });
+        const status: OperatorActivityTmuxSessionStatus = stagedPromptOnly
+          ? "stagedPromptOnly"
+          : current
+            ? "current"
+            : allPanesMissing
+              ? "staleRuntimeCandidate"
+              : "activeOrUnknown";
+        const reasons = status === "stagedPromptOnly"
+          ? ["current OMX pane has only staged prompt-placeholder evidence; no UserPromptSubmit, Working, or tool-output evidence was captured"]
+          : status === "current"
+            ? ["session has a pane at the current working directory"]
+            : status === "staleRuntimeCandidate"
+              ? ["all panes point at missing or deleted paths"]
+              : ["session has live panes away from the current working directory; activity is unknown"];
         const manualCleanupCommands = status === "staleRuntimeCandidate" ? [`tmux kill-session -t ${shellQuote(session)}`] : [];
         const cleanupOrder = status === "staleRuntimeCandidate"
           ? [
@@ -645,6 +749,44 @@ function readTmuxActivity(cwd: string, options: OperatorActivityOptions): Operat
         };
       }),
     blockers: uniqueSorted(blockers),
+  };
+}
+
+function buildStagedOmxPromptEvidence(
+  worktree: OperatorActivityWorktree,
+  tmux: OperatorActivityTmux,
+): OperatorActivityStagedOmxPromptEvidence {
+  const stagedSessions = tmux.sessions.filter((session) => session.status === "stagedPromptOnly");
+  const onlyFooksSessionTaskDelta = hasOnlyFooksSessionTaskDelta(worktree);
+  const aheadZero = worktree.ahead === 0;
+  const reasons: string[] = [];
+
+  if (onlyFooksSessionTaskDelta) reasons.push("only .fooks-session-task.txt is dirty in the current worktree delta");
+  else reasons.push("current worktree delta is not limited to .fooks-session-task.txt");
+  if (aheadZero) reasons.push("local ahead count is zero");
+  else reasons.push(worktree.ahead === undefined ? "local ahead count is unavailable" : "local ahead count is non-zero");
+  if (stagedSessions.length > 0) {
+    reasons.push(`${stagedSessions.length} current OMX session(s) were classified as staged prompt-only evidence`);
+  } else {
+    reasons.push("no current OMX session met the staged prompt-only evidence boundary");
+  }
+
+  return {
+    issue: OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE,
+    source: OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE,
+    claimBoundary: OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY,
+    readOnly: true,
+    classification: stagedSessions.length > 0 ? "stagedPromptOnly" : "activeOrUnknown",
+    stagedPromptOnlySessionCount: stagedSessions.length,
+    preventsActiveWorkEvidence: stagedSessions.length > 0,
+    conditions: {
+      onlyFooksSessionTaskDelta,
+      aheadZero,
+      requiresNoSubmittedPromptOrWorkEvidence: true,
+      requiresCurrentOmxPane: true,
+    },
+    sessionNames: stagedSessions.map((session) => session.session),
+    reasons,
   };
 }
 
@@ -1162,7 +1304,8 @@ function buildCurrentRunEvidence(
 ): OperatorActivityCurrentRunEvidence {
   const blockers: string[] = [];
   const reasons: string[] = [];
-  const fooksSessionCount = tmux.sessions.length;
+  const fooksSessionCount = tmux.sessions.filter((session) => session.status !== "stagedPromptOnly").length;
+  const stagedPromptOnlySessionCount = tmux.sessions.filter((session) => session.status === "stagedPromptOnly").length;
   const remoteCountsAvailable = optionalCounts.enabled && optionalCounts.openIssues !== undefined && optionalCounts.openPullRequests !== undefined;
   const openIssues = optionalCounts.enabled ? optionalCounts.openIssues : undefined;
   const openPullRequests = optionalCounts.enabled ? optionalCounts.openPullRequests : undefined;
@@ -1188,6 +1331,9 @@ function buildCurrentRunEvidence(
   else reasons.push(localDivergenceKnown ? "local tracking divergence is non-zero" : "local tracking divergence is unavailable");
   if (noSessions) reasons.push("no fooks-like tmux sessions are mapped to this snapshot");
   else reasons.push(`${fooksSessionCount} fooks-like tmux session(s) are mapped to this snapshot`);
+  if (stagedPromptOnlySessionCount > 0) {
+    reasons.push(`${stagedPromptOnlySessionCount} staged OMX prompt-only session(s) were not counted as active work evidence`);
+  }
   if (zeroRemoteCounts) reasons.push("open issue and pull request counts are both zero");
   if (legacyWorktreeEvidence.staleClosedArtifactWorktreeCount > 0) {
     reasons.push("legacy closed-artifact worktree evidence is separated from active current-run evidence");
@@ -1195,7 +1341,7 @@ function buildCurrentRunEvidence(
 
   const mainEchoEvidence = blockers.length === 0 && onMain && clean && noLocalDivergence && noSessions && zeroRemoteCounts;
   const activeWorkEvidence =
-    worktree.clean === false ||
+    (worktree.clean === false && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     fooksSessionCount > 0 ||
     (optionalCounts.enabled && ((openIssues ?? 0) > 0 || (openPullRequests ?? 0) > 0));
 
@@ -1227,9 +1373,10 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
   const generatedAt = options.now?.() ?? nowIso();
   const worktreeStatus = currentWorktreeEvidenceStatus(cwd, { ...options, now: () => generatedAt });
   const worktree = buildWorktreeSnapshot(worktreeStatus);
-  const tmux = readTmuxActivity(cwd, options);
+  const tmux = readTmuxActivity(cwd, worktree, options);
   const optionalCounts = readRemoteCounts(cwd, options);
   const legacyWorktreeEvidence = readLegacyWorktreeEvidence(cwd, options, generatedAt);
+  const stagedOmxPromptEvidence = buildStagedOmxPromptEvidence(worktree, tmux);
   const currentRunEvidence = buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence);
   const postMergeMainCiEvidence = readPostMergeMainCiEvidence(cwd, options);
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
@@ -1246,6 +1393,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     tmux,
     optionalCounts,
     legacyWorktreeEvidence,
+    stagedOmxPromptEvidence,
     currentRunEvidence,
     postMergeMainCiEvidence,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
