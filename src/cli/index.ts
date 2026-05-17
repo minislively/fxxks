@@ -1432,8 +1432,15 @@ async function run(): Promise<void> {
     }
     case "status": {
       if (!arg1) {
-        const { readProjectMetricSummary } = await import("../core/session-metrics.js");
-        print(readProjectMetricSummary(process.cwd()));
+        const [{ readProjectMetricSummary }, { buildWorkItemDashboard }] = await Promise.all([
+          import("../core/session-metrics.js"),
+          import("../core/work-item-dashboard.js"),
+        ]);
+        const metricStatus = readProjectMetricSummary(process.cwd());
+        print({
+          ...metricStatus,
+          workItemDashboard: buildWorkItemDashboard(process.cwd(), metricStatus),
+        });
         return;
       }
       if (arg1 === "codex") {
