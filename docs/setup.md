@@ -92,10 +92,11 @@ Good signs:
 - Check status reports a read-only post-merge main echo boundary; if there is no open issue, no open PR, and no mapped fooks tmux session, it requires a concrete active artifact instead of treating idle main echoes as work.
 - Activity status reports a compact read-only operator snapshot: current worktree branch/divergence/current dirty-path delta plus active fooks-like tmux panes when tmux is available. Open issue/PR counts are omitted unless `--include-remote-counts` is passed.
 
-From a source checkout after `npm run build`, maintainers may use the npm aliases
-`npm run -s check -- --json` and `npm run -s status:activity -- --json`.
-They are thin routes to the same built `dist/cli/index.js` `fooks check` and
-`fooks status activity` behavior, so they do not change provider/runtime behavior,
+From a source checkout, maintainers may use the npm aliases
+`npm run -s check -- --json`, `npm run -s status:activity -- --json`, and
+`npm run -s explain -- status --json`. They are thin build-and-run routes to the
+same built `dist/cli/index.js` `fooks check`, `fooks status activity`, and
+`fooks explain` behavior, so they do not change provider/runtime behavior,
 merge-gate policy, detector scope, React/RN/TUI/WebView behavior, or
 product/performance claims.
 

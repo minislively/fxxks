@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run build && node dist/cli/index.js check",
     "status:activity": "npm run build && node dist/cli/index.js status activity",
+    "explain": "npm run build && node dist/cli/index.js explain",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:integration": "npm run build && node --test test/*.test.mjs",
     "bench:cache": "npm run build && node scripts/benchmark-cache.mjs",
