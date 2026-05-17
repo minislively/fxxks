@@ -893,6 +893,29 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.equal(check.runtimeProvenance.git.branchStatus, "known");
 
   const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
+  assert.equal(activity.runtimeProvenance.schemaVersion, 1);
+  assert.notEqual(activity.runtimeProvenance, null);
+  assert.equal(activity.runtimeProvenance.package.status, "known");
+  assert.equal(activity.runtimeProvenance.package.name, "fxxk-frontend-hooks");
+  assert.equal(activity.runtimeProvenance.package.version, "0.1.3");
+  assert.equal(activity.runtimeProvenance.runtime.cwd, tempDir);
+  assert.equal(activity.runtimeProvenance.runtime.argv1Status, "known");
+  assert.equal(activity.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.equal(activity.runtimeProvenance.artifacts.executionKindStatus, "known");
+  assert.equal(activity.runtimeProvenance.artifacts.cliEntrypointStatus, "known");
+  assert.equal(activity.runtimeProvenance.artifacts.freshnessStatus, "known");
+  assert.match(activity.runtimeProvenance.artifacts.operatorActivityModulePath, /dist[\\/]ops[\\/]operator-activity\.js$/);
+  assert.match(activity.runtimeProvenance.artifacts.operatorActivityModuleRealPath, /dist[\\/]ops[\\/]operator-activity\.js$/);
+  assert.match(activity.runtimeProvenance.artifacts.cliEntrypointPath, /dist[\\/]cli[\\/]index\.js$/);
+  assert.match(activity.runtimeProvenance.artifacts.cliEntrypointRealPath, /dist[\\/]cli[\\/]index\.js$/);
+  assert.match(activity.runtimeProvenance.artifacts.sourceOperatorActivityPath, /src[\\/]ops[\\/]operator-activity\.ts$/);
+  assert.equal(typeof activity.runtimeProvenance.artifacts.sourceNewerThanOperatorActivityModule, "boolean");
+  assert.equal(activity.runtimeProvenance.git.scope, "invocation-cwd");
+  assert.equal(activity.runtimeProvenance.git.cwd, tempDir);
+  assert.equal(activity.runtimeProvenance.git.head, "no-tmux-cli-main-head");
+  assert.equal(activity.runtimeProvenance.git.headStatus, "known");
+  assert.equal(activity.runtimeProvenance.git.branch, "main");
+  assert.equal(activity.runtimeProvenance.git.branchStatus, "known");
   assert.equal(activity.tmux.available, true);
   assert.deepEqual(activity.tmux.sessions, []);
   assert.deepEqual(activity.tmux.blockers, []);
@@ -2628,6 +2651,10 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.equal(activity.command, OPERATOR_ACTIVITY_COMMAND);
   assert.equal(activity.optionalCounts.enabled, false);
   assert.equal(activity.readOnly, true);
+  assert.equal(activity.runtimeProvenance.schemaVersion, 1);
+  assert.notEqual(activity.runtimeProvenance, null);
+  assert.equal(activity.runtimeProvenance.artifacts.executionKind, "built-dist");
+  assert.match(activity.runtimeProvenance.artifacts.operatorActivityModulePath, /dist[\\/]ops[\\/]operator-activity\.js$/);
   assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
 
   const bare = run(["status"], tempDir);
