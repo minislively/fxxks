@@ -17,6 +17,7 @@ import {
 } from "../reporting/worktree-evidence";
 
 export const OPERATOR_ACTIVITY_SCHEMA_VERSION = 1;
+export const OPERATOR_ACTIVITY_PROVENANCE_SCHEMA_VERSION = 1;
 export const OPERATOR_ACTIVITY_COMMAND = "status activity";
 export const OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG = "--include-remote-counts";
 export const OPERATOR_ACTIVITY_CLAIM_BOUNDARY =
@@ -227,6 +228,53 @@ export type OperatorActivityPostMergeMainCiEvidence = {
   blockers: string[];
 };
 
+export type OperatorActivityRuntimeProvenance = {
+  schemaVersion: typeof OPERATOR_ACTIVITY_PROVENANCE_SCHEMA_VERSION;
+  source: "operator/activity runtime provenance";
+  claimBoundary: "Runtime provenance is diagnostic only; it distinguishes the executing entrypoint/build artifact from current source files and does not prove functional freshness by itself.";
+  package: {
+    status: "known" | "unknown";
+    name?: string;
+    version?: string;
+    packageJsonPath?: string;
+    reason?: string;
+  };
+  git: {
+    scope: "invocation-cwd";
+    cwd: string;
+    head?: string;
+    headStatus: "known" | "unknown";
+    branch?: string;
+    branchStatus: "known" | "unknown";
+    source: "local git refs only for invocation cwd; no fetch performed";
+    blockers: string[];
+  };
+  runtime: {
+    node: string;
+    platform: NodeJS.Platform;
+    arch: string;
+    argv1?: string;
+    argv1Status: "known" | "unknown";
+    cwd: string;
+  };
+  artifacts: {
+    operatorActivityModulePath: string;
+    operatorActivityModuleRealPath?: string;
+    operatorActivityModuleMtimeMs?: number;
+    cliEntrypointPath?: string;
+    cliEntrypointRealPath?: string;
+    cliEntrypointStatus: "known" | "unknown";
+    cliEntrypointMtimeMs?: number;
+    sourceOperatorActivityPath?: string;
+    sourceOperatorActivityMtimeMs?: number;
+    sourceNewerThanOperatorActivityModule?: boolean;
+    freshnessStatus: "known" | "unknown";
+    freshnessReason?: string;
+    executionKind: "built-dist" | "source-or-non-dist" | "unknown";
+    executionKindStatus: "known" | "unknown";
+  };
+};
+
 export type OperatorActivitySnapshot = {
   schemaVersion: typeof OPERATOR_ACTIVITY_SCHEMA_VERSION;
   command: typeof OPERATOR_ACTIVITY_COMMAND;
@@ -234,6 +282,7 @@ export type OperatorActivitySnapshot = {
   cwd: string;
   claimBoundary: typeof OPERATOR_ACTIVITY_CLAIM_BOUNDARY;
   readOnly: true;
+  runtimeProvenance: OperatorActivityRuntimeProvenance;
   worktree: OperatorActivityWorktree;
   tmux: OperatorActivityTmux;
   optionalCounts: OperatorActivityRemoteCounts;
@@ -256,6 +305,12 @@ function nowIso(): string {
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
+
+type OperatorActivityPackageJson = {
+  name?: string;
+  version?: string;
+  bin?: string | Record<string, string>;
+};
 
 function errorDetail(error: unknown): string {
   const maybeError = error && typeof error === "object" ? (error as { message?: unknown; stderr?: unknown; signal?: unknown; code?: unknown }) : {};
@@ -303,6 +358,161 @@ export function defaultOperatorActivityCommandRunner(command: string, args: stri
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
+}
+
+function readJsonFile(filePath: string): OperatorActivityPackageJson | undefined {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as OperatorActivityPackageJson;
+  } catch {
+    return undefined;
+  }
+}
+
+function fileMtimeMs(filePath: string | undefined): number | undefined {
+  if (!filePath) return undefined;
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
+function realPathIfExists(filePath: string | undefined): string | undefined {
+  if (!filePath) return undefined;
+  try {
+    return fs.realpathSync.native(filePath);
+  } catch {
+    return undefined;
+  }
+}
+
+function firstExistingAncestorPackageJson(startPath: string): string | undefined {
+  let current = path.dirname(path.resolve(startPath));
+  while (true) {
+    const candidate = path.join(current, "package.json");
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
+function packageBinPath(packageJson: OperatorActivityPackageJson | undefined): string | undefined {
+  if (!packageJson?.bin) return undefined;
+  return typeof packageJson.bin === "string" ? packageJson.bin : packageJson.bin.fooks;
+}
+
+function packageOwnsCliArtifact(packageJson: OperatorActivityPackageJson | undefined, packageJsonPath: string | undefined, cliEntrypointPath: string | undefined): boolean {
+  if (!packageJson || packageJson.name !== "fxxk-frontend-hooks") return false;
+  if (!packageJsonPath || !cliEntrypointPath) return false;
+  const binPath = packageBinPath(packageJson);
+  if (!binPath) return false;
+  const expectedCliPath = path.resolve(path.dirname(packageJsonPath), binPath);
+  return path.normalize(expectedCliPath) === path.normalize(cliEntrypointPath);
+}
+
+function readGitField(cwd: string, args: string[]): { value?: string; blocker?: string } {
+  try {
+    return {
+      value: execFileSync("git", args, {
+        cwd,
+        encoding: "utf8",
+        timeout: DEFAULT_OPERATOR_ACTIVITY_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      }).trim() || undefined,
+    };
+  } catch (error) {
+    return { blocker: `git ${args.join(" ")} unavailable: ${errorDetail(error)}` };
+  }
+}
+
+function readOperatorActivityRuntimeProvenance(cwd: string): OperatorActivityRuntimeProvenance {
+  const modulePath = __filename;
+  const moduleRealPath = realPathIfExists(modulePath);
+  const cliEntrypointPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
+  const cliEntrypointRealPath = realPathIfExists(cliEntrypointPath);
+  const packageSearchStart = cliEntrypointRealPath ?? moduleRealPath ?? cliEntrypointPath ?? modulePath;
+  const candidatePackageJsonPath = firstExistingAncestorPackageJson(packageSearchStart);
+  const candidatePackageJson = candidatePackageJsonPath ? readJsonFile(candidatePackageJsonPath) : undefined;
+  const packageIsOwned = packageOwnsCliArtifact(candidatePackageJson, candidatePackageJsonPath, cliEntrypointRealPath ?? cliEntrypointPath);
+  const packageJsonPath = packageIsOwned ? candidatePackageJsonPath : undefined;
+  const packageJson = packageIsOwned ? candidatePackageJson : undefined;
+  const repoRoot = packageJsonPath ? path.dirname(packageJsonPath) : undefined;
+  const sourceOperatorActivityPath = repoRoot ? path.join(repoRoot, "src", "ops", "operator-activity.ts") : undefined;
+  const operatorActivityModuleMtimeMs = fileMtimeMs(moduleRealPath ?? modulePath);
+  const sourceOperatorActivityMtimeMs = fileMtimeMs(sourceOperatorActivityPath);
+  const sourceNewerThanOperatorActivityModule =
+    sourceOperatorActivityMtimeMs !== undefined && operatorActivityModuleMtimeMs !== undefined
+      ? sourceOperatorActivityMtimeMs > operatorActivityModuleMtimeMs
+      : undefined;
+  const head = readGitField(cwd, ["rev-parse", "HEAD"]);
+  const branch = readGitField(cwd, ["branch", "--show-current"]);
+  const blockers = [head.blocker, branch.blocker].filter((item): item is string => Boolean(item));
+  const normalizedModulePath = path.normalize(moduleRealPath ?? modulePath);
+  const executionKind = normalizedModulePath.includes(`${path.sep}dist${path.sep}`)
+    ? "built-dist"
+    : normalizedModulePath.includes(`${path.sep}src${path.sep}`)
+      ? "source-or-non-dist"
+      : "unknown";
+  const freshnessReason = sourceNewerThanOperatorActivityModule === undefined
+    ? "source/dist freshness comparison unavailable: source or executing module mtime could not be read"
+    : undefined;
+
+  return {
+    schemaVersion: OPERATOR_ACTIVITY_PROVENANCE_SCHEMA_VERSION,
+    source: "operator/activity runtime provenance",
+    claimBoundary:
+      "Runtime provenance is diagnostic only; it distinguishes the executing entrypoint/build artifact from current source files and does not prove functional freshness by itself.",
+    package: {
+      status: packageJsonPath && packageJson ? "known" : "unknown",
+      name: packageJson?.name,
+      version: packageJson?.version,
+      packageJsonPath,
+      reason: packageIsOwned
+        ? undefined
+        : candidatePackageJsonPath
+          ? candidatePackageJson
+            ? "package.json ancestor does not match fooks CLI artifact ownership"
+            : "package.json could not be parsed"
+          : "package.json ancestor not found from invoked CLI/module artifact",
+    },
+    git: {
+      scope: "invocation-cwd",
+      cwd,
+      head: head.value,
+      headStatus: head.value ? "known" : "unknown",
+      branch: branch.value,
+      branchStatus: branch.value ? "known" : "unknown",
+      source: "local git refs only for invocation cwd; no fetch performed",
+      blockers,
+    },
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      argv1: cliEntrypointPath,
+      argv1Status: cliEntrypointPath ? "known" : "unknown",
+      cwd,
+    },
+    artifacts: {
+      operatorActivityModulePath: modulePath,
+      operatorActivityModuleRealPath: moduleRealPath,
+      operatorActivityModuleMtimeMs,
+      cliEntrypointPath,
+      cliEntrypointRealPath,
+      cliEntrypointStatus: cliEntrypointPath ? "known" : "unknown",
+      cliEntrypointMtimeMs: fileMtimeMs(cliEntrypointRealPath ?? cliEntrypointPath),
+      sourceOperatorActivityPath,
+      sourceOperatorActivityMtimeMs,
+      sourceNewerThanOperatorActivityModule,
+      freshnessStatus: sourceNewerThanOperatorActivityModule === undefined ? "unknown" : "known",
+      freshnessReason,
+      executionKind,
+      executionKindStatus: executionKind === "unknown" ? "unknown" : "known",
+    },
+  };
 }
 
 export function parseOperatorActivityTmuxPanes(output: string): ParsedTmuxPane[] {
@@ -860,6 +1070,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     cwd,
     claimBoundary: OPERATOR_ACTIVITY_CLAIM_BOUNDARY,
     readOnly: true,
+    runtimeProvenance: readOperatorActivityRuntimeProvenance(cwd),
     worktree,
     tmux,
     optionalCounts,
