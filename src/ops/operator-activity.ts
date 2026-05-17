@@ -100,12 +100,13 @@ export type OperatorActivityTmuxPane = {
   exists: boolean;
   deleted: boolean;
   current: boolean;
+  ancestorOfCurrentCwd?: boolean;
   command?: string;
   paneId?: string;
   promptEvidence?: OperatorActivityPanePromptEvidence;
 };
 
-export type OperatorActivityTmuxSessionStatus = "current" | "activeOrUnknown" | "staleRuntimeCandidate" | "stagedPromptOnly";
+export type OperatorActivityTmuxSessionStatus = "current" | "activeOrUnknown" | "staleRuntimeCandidate" | "stagedPromptOnly" | "ancestorMaintenance";
 
 export type OperatorActivityTmuxSession = {
   session: string;
@@ -687,7 +688,9 @@ function readTmuxActivity(cwd: string, worktree: OperatorActivityWorktree, optio
     const cleanPanePath = panePathWithoutDeletedMarker(pane.path);
     const deleted = panePathDeleted(pane.path);
     const exists = !deleted && pathExists(cleanPanePath);
-    const current = exists && (pathContainsCwd(cleanPanePath, currentCwd) || pathContainsCwd(currentCwd, cleanPanePath));
+    const paneInsideCurrentCwd = exists && pathContainsCwd(currentCwd, cleanPanePath);
+    const ancestorOfCurrentCwd = exists && !paneInsideCurrentCwd && pathContainsCwd(cleanPanePath, currentCwd);
+    const current = paneInsideCurrentCwd;
     if (!includesFooksSignal(pane.session, cwd) && !includesFooksSignal(cleanPanePath, cwd) && !current) continue;
     const panes = panesBySession.get(pane.session) ?? [];
     const promptEvidence = inspectPanePromptEvidence(cwd, runner, pane, cleanPanePath, current, worktree);
@@ -696,6 +699,7 @@ function readTmuxActivity(cwd: string, worktree: OperatorActivityWorktree, optio
       exists,
       deleted,
       current,
+      ...(ancestorOfCurrentCwd ? { ancestorOfCurrentCwd: true } : {}),
       ...(pane.command ? { command: pane.command } : {}),
       ...(pane.paneId ? { paneId: pane.paneId } : {}),
       ...(promptEvidence ? { promptEvidence } : {}),
@@ -711,6 +715,7 @@ function readTmuxActivity(cwd: string, worktree: OperatorActivityWorktree, optio
       .map(([session, panes]) => {
         const current = panes.some((pane) => pane.current);
         const allPanesMissing = panes.length > 0 && panes.every((pane) => pane.deleted || !pane.exists);
+        const ancestorMaintenance = !current && panes.length > 0 && panes.some((pane) => pane.ancestorOfCurrentCwd) && panes.every((pane) => pane.ancestorOfCurrentCwd || pane.deleted || !pane.exists);
         const stagedPromptOnly = current && panes.some((pane) => pane.current) && panes.every((pane) => {
           if (!pane.current) return pane.deleted || !pane.exists;
           return pane.promptEvidence?.classification === "stagedPromptOnly";
@@ -721,14 +726,18 @@ function readTmuxActivity(cwd: string, worktree: OperatorActivityWorktree, optio
             ? "current"
             : allPanesMissing
               ? "staleRuntimeCandidate"
-              : "activeOrUnknown";
+              : ancestorMaintenance
+                ? "ancestorMaintenance"
+                : "activeOrUnknown";
         const reasons = status === "stagedPromptOnly"
           ? ["current OMX pane has only staged prompt-placeholder evidence; no UserPromptSubmit, Working, or tool-output evidence was captured"]
           : status === "current"
             ? ["session has a pane at the current working directory"]
             : status === "staleRuntimeCandidate"
               ? ["all panes point at missing or deleted paths"]
-              : ["session has live panes away from the current working directory; activity is unknown"];
+              : status === "ancestorMaintenance"
+                ? ["session pane is at an ancestor of the current checkout; ancestor maintenance panes do not prove active work for this repo"]
+                : ["session has live panes away from the current working directory; activity is unknown"];
         const manualCleanupCommands = status === "staleRuntimeCandidate" ? [`tmux kill-session -t ${shellQuote(session)}`] : [];
         const cleanupOrder = status === "staleRuntimeCandidate"
           ? [
@@ -1304,8 +1313,9 @@ function buildCurrentRunEvidence(
 ): OperatorActivityCurrentRunEvidence {
   const blockers: string[] = [];
   const reasons: string[] = [];
-  const fooksSessionCount = tmux.sessions.filter((session) => session.status !== "stagedPromptOnly").length;
+  const fooksSessionCount = tmux.sessions.filter((session) => session.status !== "stagedPromptOnly" && session.status !== "ancestorMaintenance").length;
   const stagedPromptOnlySessionCount = tmux.sessions.filter((session) => session.status === "stagedPromptOnly").length;
+  const ancestorMaintenanceSessionCount = tmux.sessions.filter((session) => session.status === "ancestorMaintenance").length;
   const remoteCountsAvailable = optionalCounts.enabled && optionalCounts.openIssues !== undefined && optionalCounts.openPullRequests !== undefined;
   const openIssues = optionalCounts.enabled ? optionalCounts.openIssues : undefined;
   const openPullRequests = optionalCounts.enabled ? optionalCounts.openPullRequests : undefined;
@@ -1333,6 +1343,9 @@ function buildCurrentRunEvidence(
   else reasons.push(`${fooksSessionCount} fooks-like tmux session(s) are mapped to this snapshot`);
   if (stagedPromptOnlySessionCount > 0) {
     reasons.push(`${stagedPromptOnlySessionCount} staged OMX prompt-only session(s) were not counted as active work evidence`);
+  }
+  if (ancestorMaintenanceSessionCount > 0) {
+    reasons.push(`${ancestorMaintenanceSessionCount} ancestor maintenance tmux session(s) were not counted as active work evidence`);
   }
   if (zeroRemoteCounts) reasons.push("open issue and pull request counts are both zero");
   if (legacyWorktreeEvidence.staleClosedArtifactWorktreeCount > 0) {
