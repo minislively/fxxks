@@ -1,7 +1,7 @@
 import type { WorkItem, WorkItemDashboard, WorkItemEvidence, WorkItemNextAction } from "./work-item-dashboard";
 import { WORK_ITEM_DASHBOARD_CLAIM_BOUNDARY } from "./work-item-dashboard";
 
-export const WORK_ITEM_EXPLAIN_SCHEMA_VERSION = 1;
+export const WORK_ITEM_EXPLAIN_SCHEMA_VERSION = 2;
 export const WORK_ITEM_EXPLAIN_CLAIM_BOUNDARY =
   "CLI-only WorkItem evidence explanation: explains current status/work-item/sample artifacts from the docs-backed WorkItem model without changing provider/runtime behavior, detector scope, merge-gate policy, TUI, React Web, React Native, or WebView behavior.";
 
@@ -24,6 +24,7 @@ export type WorkItemExplainResult = {
     id: string;
     title: string;
     state: WorkItem["state"];
+    frontendDomain: WorkItem["frontendDomain"];
   };
   why: string[];
   evidence: WorkItemEvidence[];
@@ -40,7 +41,7 @@ function sampleEvidence(): WorkItemEvidence[] {
       observed: "sample artifact demonstrates WorkItem/Evidence/NextAction explanation shape",
       source: "fooks explain sample",
       fresh: true,
-      supports: "CLI formatting and machine-readable explanation contract for the WorkItem evidence model",
+      supports: "CLI formatting and machine-readable explanation contract for the WorkItem evidence model, including frontend domain representation",
       doesNotSupport: "provider/runtime behavior changes, detector expansion, merge-gate approval, TUI rewrite, or product/performance claims",
     },
     {
@@ -68,6 +69,7 @@ function sampleWorkItem(): WorkItem {
     id: "work-item-sample",
     title: "Sample WorkItem evidence explanation",
     state: "uninspected",
+    frontendDomain: "unknown",
     observed: evidence.map((item) => item.observed),
     inferred: [
       "The sample is static and read-only.",
@@ -97,6 +99,7 @@ function evidenceForArtifact(artifact: WorkItemExplainArtifact, dashboard: WorkI
       id: "work-item-missing",
       title: "Missing WorkItem evidence",
       state: "blocked",
+      frontendDomain: "unknown",
       observed: [],
       inferred: ["No work item was available in the dashboard artifact."],
       requiredNextAction: nextAction,
@@ -109,7 +112,7 @@ function evidenceForArtifact(artifact: WorkItemExplainArtifact, dashboard: WorkI
 
 function whyFor(item: WorkItem, dashboard: WorkItemDashboard, artifact: WorkItemExplainArtifact): string[] {
   return [
-    `artifact '${artifact}' resolves to WorkItem '${item.id}' in state '${item.state}'`,
+    `artifact '${artifact}' resolves to WorkItem '${item.id}' in state '${item.state}' for frontend domain '${item.frontendDomain}'`,
     ...item.observed.map((observed) => `observed: ${observed}`),
     ...item.inferred.map((inferred) => `inferred: ${inferred}`),
     `next action: ${item.requiredNextAction.label} because ${item.requiredNextAction.reason}`,
@@ -142,6 +145,7 @@ export function buildWorkItemExplain(artifact: WorkItemExplainArtifact, dashboar
       id: item.id,
       title: item.title,
       state: item.state,
+      frontendDomain: item.frontendDomain,
     },
     why: whyFor(item, dashboard, artifact),
     evidence: item.evidence,
@@ -166,5 +170,5 @@ export function renderWorkItemExplainText(explain: WorkItemExplainResult): strin
     : "- none";
   const commandLine = explain.nextAction.command ? `\n- command: ${explain.nextAction.command}` : "";
 
-  return `# fooks explain ${explain.artifact}\n\n${explain.claimBoundary}\n\n## Work item\n\n- id: ${explain.workItem.id}\n- title: ${explain.workItem.title}\n- state: ${explain.workItem.state}\n\n## Why\n\n${bulletList(explain.why)}\n\n## Evidence\n\n${evidence}\n\n## Rejected evidence / non-claims\n\n${rejected}\n\n## Next action\n\n- kind: ${explain.nextAction.kind}\n- label: ${explain.nextAction.label}${commandLine}\n- reason: ${explain.nextAction.reason}\n- closes when: ${explain.nextAction.closesWhen}\n\n## Non-claims\n\n${bulletList(explain.nonClaims)}\n`;
+  return `# fooks explain ${explain.artifact}\n\n${explain.claimBoundary}\n\n## Work item\n\n- id: ${explain.workItem.id}\n- title: ${explain.workItem.title}\n- state: ${explain.workItem.state}\n- frontend domain: ${explain.workItem.frontendDomain}\n\n## Why\n\n${bulletList(explain.why)}\n\n## Evidence\n\n${evidence}\n\n## Rejected evidence / non-claims\n\n${rejected}\n\n## Next action\n\n- kind: ${explain.nextAction.kind}\n- label: ${explain.nextAction.label}${commandLine}\n- reason: ${explain.nextAction.reason}\n- closes when: ${explain.nextAction.closesWhen}\n\n## Non-claims\n\n${bulletList(explain.nonClaims)}\n`;
 }
