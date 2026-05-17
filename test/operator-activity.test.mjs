@@ -950,6 +950,46 @@ test("operator activity marks clean current main with zero counts and no session
   assert.deepEqual(snapshot.currentRunEvidence.blockers, []);
 });
 
+test("operator activity does not count ancestor tmux panes as current active work for nested checkouts", () => {
+  const tempDir = makeTempProject();
+  const ancestorDir = path.dirname(path.dirname(tempDir));
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-17T11:30:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux" && args[0] === "list-panes") return `omx-fooks-maintenance\t${ancestorDir}\tbash\t%13\n`;
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD 111", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir || targetPath === ancestorDir,
+  });
+
+  assert.equal(snapshot.tmux.sessions.length, 1);
+  assert.equal(snapshot.tmux.sessions[0].status, "ancestorMaintenance");
+  assert.equal(snapshot.tmux.sessions[0].current, false);
+  assert.equal(snapshot.tmux.sessions[0].panes[0].ancestorOfCurrentCwd, true);
+  assert.equal(snapshot.currentRunEvidence.evidence.fooksSessionCount, 0);
+  assert.equal(snapshot.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.currentRunEvidence.activeWorkEvidence, false);
+  assert.match(snapshot.currentRunEvidence.reasons.join("\n"), /ancestor maintenance tmux session\(s\) were not counted as active work evidence/);
+});
+
 test("operator check forces a concrete active artifact when post-merge main echo is idle", () => {
   const tempDir = makeTempProject();
   const snapshot = readOperatorCheckSnapshot(tempDir, {

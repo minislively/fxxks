@@ -1275,7 +1275,7 @@ function buildHandoffArtifactEvidence(
   const openPullRequestCount = activity.currentRunEvidence.evidence.openPullRequests;
   const mappedFooksTmuxSessionCount = activity.currentRunEvidence.evidence.fooksSessionCount;
   const liveMappedFooksTmuxSessionCount = activity.tmux.sessions.filter((session) =>
-    session.status !== "staleRuntimeCandidate" && session.status !== "stagedPromptOnly"
+    session.status !== "staleRuntimeCandidate" && session.status !== "stagedPromptOnly" && session.status !== "ancestorMaintenance"
   ).length;
   const liveNonMainWorktreePresent = Boolean(activity.worktree.branch && activity.worktree.branch !== "main");
   const activeReceiptCount = receipts.filter((receipt) => receipt.classification === "active").length;
@@ -1451,7 +1451,7 @@ function buildActiveWorkReceipts(
 
   for (const session of activity.tmux.sessions) {
     const classification: OperatorCheckActiveWorkReceiptClassification =
-      session.status === "staleRuntimeCandidate" || session.status === "stagedPromptOnly" ? "closedOrStale" : "active";
+      session.status === "staleRuntimeCandidate" || session.status === "stagedPromptOnly" || session.status === "ancestorMaintenance" ? "closedOrStale" : "active";
     receipts.push({
       kind: "session",
       classification,
@@ -1553,7 +1553,7 @@ function activeArtifactsFrom(activity: OperatorActivitySnapshot): OperatorCheckA
   if (counts.enabled && typeof counts.openPullRequests === "number" && counts.openPullRequests > 0) {
     artifacts.push({ kind: "pullRequest", count: counts.openPullRequests, source: counts.source });
   }
-  const activeTmuxSessions = activity.tmux.sessions.filter((session) => session.status !== "stagedPromptOnly");
+  const activeTmuxSessions = activity.tmux.sessions.filter((session) => session.status !== "stagedPromptOnly" && session.status !== "ancestorMaintenance");
   if (activeTmuxSessions.length > 0) {
     artifacts.push({ kind: "session", count: activeTmuxSessions.length, source: activity.tmux.command });
   }
