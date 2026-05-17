@@ -144,6 +144,57 @@ process.exit(2);
   return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
 }
 
+function assertPostMergeMainCiDiagnostic(item, { workflow, reason, headSha }) {
+  assert.equal(item.workflow, workflow);
+  assert.equal(item.diagnostic.source, OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE);
+  assert.equal(item.diagnostic.apiSurface, "gh run list");
+  assert.match(item.diagnostic.command, /^gh run list --branch main --limit 50 --json /);
+  assert.match(item.diagnostic.lookup, new RegExp(`workflowName=${workflow.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.match(item.diagnostic.lookup, /branch=main/);
+  assert.match(item.diagnostic.lookup, /no git fetch or mutation performed/);
+  if (headSha) assert.match(item.diagnostic.lookup, new RegExp(`headSha=${headSha}`));
+  assert.equal(item.diagnostic.reason, reason);
+  assert.match(item.diagnostic.remoteFreshnessCaveat, /remote freshness not verified/);
+  assert.match(item.diagnostic.remoteFreshnessCaveat, /not fetched/);
+}
+
+function readOperatorActivitySnapshotWithGhRunListError(detail) {
+  const tempDir = makeTempProject();
+  const mainHead = `main-head-${detail.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-12T11:30:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") throw new Error(detail);
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+  return { snapshot, mainHead };
+}
+
 function tmuxNoServerError(socket = "/tmp/tmux-1000/default", stream = "stderr") {
   const error = new Error(`Command failed: tmux list-panes -a -F #{session_name}\t#{pane_current_path}`);
   const output = `no server running on ${socket}\n`;
@@ -559,11 +610,37 @@ test("operator check keeps missing exact-head workflow evidence unknown instead 
     ["CI", "unknown"],
     ["React Web Release Report", "pending"],
   ]);
+  assertPostMergeMainCiDiagnostic(snapshot.postMergeMainCiEvidence.workflowEvidence[0], {
+    workflow: "CI",
+    reason: "empty-run",
+    headSha: mainHead,
+  });
+  assertPostMergeMainCiDiagnostic(snapshot.postMergeMainCiEvidence.workflowEvidence[1], {
+    workflow: "React Web Release Report",
+    reason: "pending",
+    headSha: mainHead,
+  });
   assert.equal(snapshot.postMergeMainCiEvidence.summary.successCount, 0);
   assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 1);
   assert.equal(snapshot.postMergeMainCiEvidence.summary.pendingCount, 1);
   assert.equal(snapshot.postMergeMainCiEvidence.summary.allExactHeadConclusionsSuccessful, false);
   assert.equal(snapshot.activity.postMergeMainCiEvidence, snapshot.postMergeMainCiEvidence);
+});
+
+test("operator activity diagnoses unavailable exact-head workflow lookups by bounded failure reason", () => {
+  for (const { detail, reason } of [
+    { detail: "HTTP 401 Bad credentials", reason: "auth" },
+    { detail: "HTTP 429 API rate limit exceeded", reason: "rate-limit" },
+  ]) {
+    const { snapshot, mainHead } = readOperatorActivitySnapshotWithGhRunListError(detail);
+    assert.equal(snapshot.postMergeMainCiEvidence.available, false);
+    assert.equal(snapshot.postMergeMainCiEvidence.summary.exactHeadWorkflowCount, 0);
+    assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 2);
+    assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    for (const item of snapshot.postMergeMainCiEvidence.workflowEvidence) {
+      assertPostMergeMainCiDiagnostic(item, { workflow: item.workflow, reason, headSha: mainHead });
+    }
+  }
 });
 
 test("operator activity marks clean current main with zero counts and no sessions as non-active main echo evidence", () => {
@@ -757,6 +834,10 @@ test("operator check treats absent tmux server as zero mapped sessions and keeps
   assert.equal(snapshot.postMergeMainCiEvidence.available, false);
   assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), /GitHub Actions run list unavailable: gh run list timed out/);
   assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 2);
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.workflowEvidence.map((item) => item.diagnostic.reason), ["timeout", "timeout"]);
+  for (const item of snapshot.postMergeMainCiEvidence.workflowEvidence) {
+    assertPostMergeMainCiDiagnostic(item, { workflow: item.workflow, reason: "timeout", headSha: mainHead });
+  }
   assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
   assert.equal(snapshot.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence.mappedFooksTmuxProcSessionCount, 0);
 });
@@ -781,7 +862,12 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.equal(check.activeWorkReceipts.localOnlyResidueActiveBoundary.activeRequirementEvidence.mappedFooksTmuxProcSessionCount, 0);
   assert.equal(check.blockers.includes("tmux activity unavailable: no server running on /tmp/tmux-1000/default"), false);
   assert.equal(JSON.stringify(check).includes("tmux activity unavailable"), false);
+  assert.equal(check.postMergeMainCiEvidence.summary.exactHeadWorkflowCount, 0);
   assert.equal(check.postMergeMainCiEvidence.summary.unknownCount, 2);
+  assert.deepEqual(check.postMergeMainCiEvidence.workflowEvidence.map((item) => item.diagnostic.reason), ["empty-run", "empty-run"]);
+  for (const item of check.postMergeMainCiEvidence.workflowEvidence) {
+    assertPostMergeMainCiDiagnostic(item, { workflow: item.workflow, reason: "empty-run", headSha: "no-tmux-cli-main-head" });
+  }
   assert.equal(check.runtimeProvenance.schemaVersion, 1);
   assert.notEqual(check.runtimeProvenance, null);
   assert.equal(check.runtimeProvenance.package.status, "known");
