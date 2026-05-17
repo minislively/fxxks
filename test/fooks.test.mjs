@@ -3857,6 +3857,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(pkg.scripts?.["smoke:domain-detector"], /inspect-domain test\/fixtures\/frontend-domain-expectations\/webview-boundary-basic\.tsx --json/);
   assert.equal(pkg.scripts?.check, "npm run build && node dist/cli/index.js check");
   assert.equal(pkg.scripts?.["status:activity"], "npm run build && node dist/cli/index.js status activity");
+  assert.equal(pkg.scripts?.explain, "npm run build && node dist/cli/index.js explain");
   assert.equal(pkg.scripts?.postinstall, undefined);
   assert.equal(pkg.scripts?.preinstall, undefined);
   assert.equal(pkg.scripts?.prepare, undefined);
