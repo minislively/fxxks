@@ -643,6 +643,253 @@ test("operator activity diagnoses unavailable exact-head workflow lookups by bou
   }
 });
 
+test("operator check falls back to read-only workflow-runs API when gh run list times out", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "fallback-main-head-success";
+  const calls = [];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-17T02:15:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      calls.push(`${command} ${joined}`);
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") throw new Error("gh run list timed out");
+      if (command === "gh" && joined === `api --method GET repos/minislively/fooks/actions/runs -f branch=main -f head_sha=${mainHead} -f per_page=100`) {
+        return JSON.stringify({
+          total_count: 2,
+          workflow_runs: [
+            {
+              id: 90601,
+              name: "CI",
+              status: "completed",
+              conclusion: "success",
+              updated_at: "2026-05-17T02:10:00Z",
+              head_branch: "main",
+              head_sha: mainHead,
+              event: "push",
+              html_url: "https://github.com/minislively/fooks/actions/runs/90601",
+            },
+            {
+              id: 90602,
+              name: "React Web Release Report",
+              status: "completed",
+              conclusion: "success",
+              updated_at: "2026-05-17T02:11:00Z",
+              head_branch: "main",
+              head_sha: mainHead,
+              event: "push",
+              html_url: "https://github.com/minislively/fooks/actions/runs/90602",
+            },
+          ],
+        });
+      }
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.postMergeMainCiEvidence.available, true);
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.blockers, []);
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.summary, {
+    exactHeadWorkflowCount: 2,
+    successCount: 2,
+    pendingCount: 0,
+    unknownCount: 0,
+    failureCount: 0,
+    allExactHeadConclusionsSuccessful: true,
+  });
+  assert.equal(calls.some((call) => /fetch|delete|push/.test(call)), false);
+  assert.equal(calls.some((call) => call.startsWith("gh api --method GET repos/minislively/fooks/actions/runs")), true);
+  for (const item of snapshot.postMergeMainCiEvidence.workflowEvidence) {
+    assert.equal(item.status, "success");
+    assert.equal(item.diagnostic.apiSurface, "gh api actions workflow-runs");
+    assert.equal(item.diagnostic.source, "GitHub REST API workflow-runs fallback for exact local origin/main head; read-only and no fetch performed");
+    assert.equal(item.diagnostic.reason, "success");
+    assert.equal(item.primaryDiagnostic.apiSurface, "gh run list");
+    assert.equal(item.primaryDiagnostic.reason, "timeout");
+    assert.equal(item.fallbackDiagnostic.apiSurface, "gh api actions workflow-runs");
+    assert.match(item.fallbackDiagnostic.command, new RegExp(`head_sha=${mainHead}`));
+    assert.match(item.fallbackDiagnostic.lookup, /no git fetch or mutation performed/);
+  }
+});
+
+test("operator check treats an empty workflow-runs fallback as exact-head empty evidence", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "fallback-main-head-empty";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-17T02:18:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") throw new Error("gh run list timed out");
+      if (command === "gh" && joined === `api --method GET repos/minislively/fooks/actions/runs -f branch=main -f head_sha=${mainHead} -f per_page=100`) {
+        return JSON.stringify({ total_count: 0, workflow_runs: [] });
+      }
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.postMergeMainCiEvidence.available, true);
+  assert.deepEqual(snapshot.postMergeMainCiEvidence.blockers, []);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.exactHeadWorkflowCount, 0);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 2);
+  for (const item of snapshot.postMergeMainCiEvidence.workflowEvidence) {
+    assert.equal(item.status, "unknown");
+    assert.equal(item.diagnostic.apiSurface, "gh api actions workflow-runs");
+    assert.equal(item.diagnostic.reason, "empty-run");
+    assert.equal(item.primaryDiagnostic.reason, "timeout");
+    assert.equal(item.fallbackDiagnostic.reason, "empty-run");
+  }
+});
+
+test("operator check reports fallback unavailable when gh run list times out and workflow-runs fallback fails", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "fallback-main-head-unavailable";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-17T02:20:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") throw new Error("gh run list timed out");
+      if (command === "gh" && args[0] === "api") throw new Error("HTTP 503 workflow runs unavailable");
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.postMergeMainCiEvidence.available, false);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.exactHeadWorkflowCount, 0);
+  assert.equal(snapshot.postMergeMainCiEvidence.summary.unknownCount, 2);
+  assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), /GitHub Actions run list unavailable: gh run list timed out/);
+  assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), /GitHub Actions workflow-runs fallback unavailable: HTTP 503 workflow runs unavailable/);
+  for (const item of snapshot.postMergeMainCiEvidence.workflowEvidence) {
+    assert.equal(item.status, "unknown");
+    assert.equal(item.diagnostic.apiSurface, "gh run list");
+    assert.equal(item.diagnostic.reason, "timeout");
+    assert.equal(item.fallbackDiagnostic.apiSurface, "gh api actions workflow-runs");
+    assert.equal(item.fallbackDiagnostic.reason, "unavailable");
+  }
+});
+
+
+test("operator check keeps workflow-runs fallback diagnostics truthful when API JSON is malformed", () => {
+  const tempDir = makeTempProject();
+  const mainHead = "fallback-main-head-malformed";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-17T02:22:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") throw new Error("gh run list timed out");
+      if (command === "gh" && joined === `api --method GET repos/minislively/fooks/actions/runs -f branch=main -f head_sha=${mainHead} -f per_page=100`) {
+        return JSON.stringify({ total_count: 1, workflow_runs: null });
+      }
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${mainHead}`, "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.postMergeMainCiEvidence.available, false);
+  assert.match(snapshot.postMergeMainCiEvidence.blockers.join("\n"), /non-array workflow_runs JSON/);
+  for (const item of snapshot.postMergeMainCiEvidence.workflowEvidence) {
+    assert.equal(item.status, "unknown");
+    assert.equal(item.diagnostic.apiSurface, "gh run list");
+    assert.equal(item.fallbackDiagnostic.apiSurface, "gh api actions workflow-runs");
+    assert.equal(item.fallbackDiagnostic.reason, "parse-error");
+    assert.match(item.fallbackDiagnostic.command, /repos\/minislively\/fooks\/actions\/runs/);
+    assert.doesNotMatch(item.fallbackDiagnostic.command, /unknown\/unknown/);
+  }
+});
+
 test("operator activity marks clean current main with zero counts and no sessions as non-active main echo evidence", () => {
   const tempDir = makeTempProject();
   const snapshot = readOperatorActivitySnapshot(tempDir, {
