@@ -178,6 +178,24 @@ export function buildWorkItemExplain(artifact: WorkItemExplainArtifact, dashboar
   };
 }
 
+
+function displayFrontendDomain(frontendDomain: WorkItem["frontendDomain"]): string {
+  switch (frontendDomain) {
+    case "react-web":
+      return "React Web";
+    case "react-native":
+      return "React Native";
+    case "webview":
+      return "WebView";
+    case "tui":
+      return "TUI";
+    case "shared":
+      return "Shared";
+    case "unknown":
+      return "Unknown-domain";
+  }
+}
+
 function bulletList(items: string[]): string {
   return items.length > 0 ? items.map((item) => `- ${item}`).join("\n") : "- none";
 }
@@ -192,6 +210,9 @@ export function renderWorkItemExplainText(explain: WorkItemExplainResult): strin
     ? explain.rejectedEvidence.map((item) => `- ${item.evidence}\n  rejected for: ${item.reason}`).join("\n")
     : "- none";
   const commandLine = explain.nextAction.command ? `\n- command: ${explain.nextAction.command}` : "";
+  const domainLabel = displayFrontendDomain(explain.workItem.frontendDomain);
+  const judgmentAction = explain.workItem.domainJudgment.nextAction;
+  const judgmentCommandLine = judgmentAction.command ? `\n- domain command: ${judgmentAction.command}` : "";
 
-  return `# fooks explain ${explain.artifact}\n\n${explain.claimBoundary}\n\n## Work item\n\n- id: ${explain.workItem.id}\n- title: ${explain.workItem.title}\n- state: ${explain.workItem.state}\n- frontend domain: ${explain.workItem.frontendDomain}\n- domain judgment: ${explain.workItem.domainJudgment.recommendedState} / ${explain.workItem.domainJudgment.nextAction.kind} (${explain.workItem.domainJudgment.confidence} confidence)\n\n## Why\n\n${bulletList(explain.why)}\n\n## Evidence\n\n${evidence}\n\n## Rejected evidence / non-claims\n\n${rejected}\n\n## Domain judgment\n\n- rationale: ${explain.workItem.domainJudgment.rationale}\n- evidence focus: ${explain.workItem.domainJudgment.evidenceFocus.join(", ")}\n- required evidence: ${explain.workItem.domainJudgment.requiredEvidence.join(", ")}\n- recommended next action: ${explain.workItem.domainJudgment.nextAction.label}\n\n## Next action\n\n- kind: ${explain.nextAction.kind}\n- label: ${explain.nextAction.label}${commandLine}\n- reason: ${explain.nextAction.reason}\n- closes when: ${explain.nextAction.closesWhen}\n\n## Non-claims\n\n${bulletList(explain.nonClaims)}\n`;
+  return `# fooks explain ${explain.artifact}\n\n${explain.claimBoundary}\n\n## Work item\n\n- id: ${explain.workItem.id}\n- title: ${explain.workItem.title}\n- state: ${explain.workItem.state}\n- frontend domain: ${domainLabel} (${explain.workItem.frontendDomain})\n- domain judgment: ${explain.workItem.domainJudgment.recommendedState} / ${judgmentAction.kind} (${explain.workItem.domainJudgment.confidence} confidence)\n\n## Why\n\n${bulletList(explain.why)}\n\n## Evidence\n\n${evidence}\n\n## Rejected evidence / non-claims\n\n${rejected}\n\n## Domain judgment\n\n- frontend domain: ${domainLabel} (${explain.workItem.domainJudgment.frontendDomain})\n- recommended state: ${explain.workItem.domainJudgment.recommendedState}\n- confidence: ${explain.workItem.domainJudgment.confidence}\n- rationale: ${explain.workItem.domainJudgment.rationale}\n- evidence focus: ${explain.workItem.domainJudgment.evidenceFocus.join(", ")}\n- required evidence: ${explain.workItem.domainJudgment.requiredEvidence.join(", ")}\n- domain next action kind: ${judgmentAction.kind}\n- domain next action: ${judgmentAction.label}${judgmentCommandLine}\n- domain reason: ${judgmentAction.reason}\n- domain closes when: ${judgmentAction.closesWhen}\n\n## Next action\n\n- kind: ${explain.nextAction.kind}\n- label: ${explain.nextAction.label}${commandLine}\n- reason: ${explain.nextAction.reason}\n- closes when: ${explain.nextAction.closesWhen}\n\n## Non-claims\n\n${bulletList(explain.nonClaims)}\n`;
 }
