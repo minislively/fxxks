@@ -13,7 +13,7 @@ const { FRONTEND_DOMAIN_PROFILE_REGISTRY } = require(path.join(repoRoot, "dist",
 const { FRONTEND_PAYLOAD_POLICY_REGISTRY } = require(path.join(repoRoot, "dist", "core", "payload-policy", "registry.js"));
 
 const FALLBACK_POLICY_LANE_COVERAGE = {
-  fallback: ["mixed", "unknown"],
+  fallback: ["mixed", "shared", "unknown"],
 };
 
 function listSourceFiles(directory) {

@@ -1,4 +1,4 @@
-export type DomainLabel = "react-web" | "react-native" | "webview" | "tui-ink" | "mixed" | "unknown";
+export type DomainLabel = "react-web" | "react-native" | "webview" | "tui-ink" | "shared" | "mixed" | "unknown";
 export type FrontendDomainClassification = DomainLabel;
 export type FrontendDomainOutcome = "extract" | "fallback" | "deferred" | "unsupported";
 export type FrontendDomainProfileClaimStatus = "current-supported-lane" | "evidence-only" | "fallback-boundary" | "deferred";

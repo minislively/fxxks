@@ -4,6 +4,7 @@ import type { FrontendPayloadPolicyDecision } from "./types";
 
 export const MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY = "mixed-frontend-boundary-fallback";
 export const UNKNOWN_FRONTEND_DEFERRED_PAYLOAD_POLICY = "unknown-frontend-deferred-fallback";
+export const SHARED_FRONTEND_EVIDENCE_ONLY_PAYLOAD_POLICY = "shared-frontend-evidence-only-fallback";
 export const UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON = "unsupported-frontend-domain-profile";
 
 export function assessFallbackPayloadPolicy(domainDetection: DomainDetectionResult): FrontendPayloadPolicyDecision | undefined {
@@ -12,6 +13,14 @@ export function assessFallbackPayloadPolicy(domainDetection: DomainDetectionResu
       name: MIXED_FRONTEND_BOUNDARY_PAYLOAD_POLICY,
       allowed: false,
       reason: domainDetection.reason ?? FRONTEND_DOMAIN_BOUNDARY_REASON,
+    };
+  }
+
+  if (domainDetection.classification === "shared") {
+    return {
+      name: SHARED_FRONTEND_EVIDENCE_ONLY_PAYLOAD_POLICY,
+      allowed: false,
+      reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
     };
   }
 

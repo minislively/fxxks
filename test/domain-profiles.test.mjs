@@ -67,7 +67,7 @@ test("React Native profile owns the primitive/input signal taxonomy contract", (
 test("domain profile registry exposes behavior-neutral lane ownership metadata", () => {
   assert.deepEqual(
     FRONTEND_DOMAIN_PROFILE_REGISTRY.map((profile) => profile.lane),
-    ["react-web", "react-native", "webview", "tui-ink", "mixed", "unknown"],
+    ["react-web", "react-native", "webview", "tui-ink", "shared", "mixed", "unknown"],
   );
 
   assert.deepEqual(getDomainProfileDefinition("react-web"), {
@@ -82,6 +82,7 @@ test("domain profile registry exposes behavior-neutral lane ownership metadata",
   assert.equal(getDomainProfileDefinition("react-native").boundaryReason, "unsupported-react-native-webview-boundary");
   assert.equal(getDomainProfileDefinition("webview").fallbackFirst, true);
   assert.equal(getDomainProfileDefinition("tui-ink").claimStatus, "evidence-only");
+  assert.equal(getDomainProfileDefinition("shared").claimStatus, "evidence-only");
 });
 
 test("domain profile registry preserves existing detector classification outcomes", () => {
@@ -90,12 +91,14 @@ test("domain profile registry preserves existing detector classification outcome
   assert.equal(resolveDomainClassification(evidence("react-native"), false), "react-native");
   assert.equal(resolveDomainClassification(evidence("webview"), false), "webview");
   assert.equal(resolveDomainClassification(evidence("tui-ink"), false), "tui-ink");
+  assert.equal(resolveDomainClassification(evidence("shared"), false), "shared");
   assert.equal(resolveDomainClassification(evidence("react-native"), true), "mixed");
   assert.equal(resolveDomainClassification([...evidence("react-native"), ...evidence("webview")], false), "mixed");
 
   assert.deepEqual(outcomeForClassification("react-web"), { outcome: "extract" });
   assert.deepEqual(outcomeForClassification("react-native"), { outcome: "fallback", reason: "unsupported-react-native-webview-boundary" });
   assert.deepEqual(outcomeForClassification("webview"), { outcome: "fallback", reason: "unsupported-react-native-webview-boundary" });
+  assert.deepEqual(outcomeForClassification("shared"), { outcome: "extract" });
   assert.deepEqual(outcomeForClassification("mixed"), { outcome: "fallback", reason: "unsupported-react-native-webview-boundary" });
   assert.deepEqual(outcomeForClassification("unknown"), { outcome: "deferred" });
 });
@@ -137,6 +140,7 @@ test("domain profile metadata remains evidence and policy boundary, not support 
     "src/core/domain-profiles/react-native.ts",
     "src/core/domain-profiles/webview.ts",
     "src/core/domain-profiles/tui-ink.ts",
+    "src/core/domain-profiles/shared.ts",
   ]) {
     assert.doesNotMatch(fs.readFileSync(path.join(repoRoot, file), "utf8"), forbiddenSupportClaims, `${file} must not add support claims`);
   }
