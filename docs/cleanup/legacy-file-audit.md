@@ -160,7 +160,7 @@ Test failure summary from `npm run test`:
 
 ## Recommended follow-up backlog
 
-1. Decide whether `.fooks/evidence/**` should be archived, compressed, or kept as dogfood evidence.
+1. `.fooks/evidence/**` retention policy documented in `docs/cleanup/fooks-evidence-retention-policy.md` for issue #946. Future cleanup must follow that keep/archive/delete proof boundary; no evidence deletion was performed in the policy pass.
 2. Review the 20 medium-risk tracked legacy/archive docs listed above; delete only after deciding whether historical context is still needed.
 3. Investigate the 7 pre-existing/environment-sensitive test failures separately from cleanup.
 4. Prune `.omx/` only after this active workflow is complete, because it contains current context/spec/plan/log artifacts.
