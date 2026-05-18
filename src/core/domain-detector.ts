@@ -21,6 +21,8 @@ const RN_MODULE = "react-native";
 const RN_NAVIGATION_MODULE = "@react-navigation/native";
 const WEBVIEW_MODULE = "react-native-webview";
 const INK_MODULE = "ink";
+const REACT_WEB_MODULES = new Set(["react-dom", "react-router-dom", "next", "next/link", "next/navigation"]);
+const SHARED_PATH_SEGMENTS = new Set(["shared", "common", "design-system", "tokens", "contracts", "schemas"]);
 const WEBVIEW_BRIDGE_MARKERS = [
   ["ReactNativeWebView.postMessage", "ReactNativeWebView.postMessage"],
   ["window.ReactNativeWebView", "window.ReactNativeWebView"],
@@ -50,6 +52,9 @@ const RN_API_CALLS = new Map([
 const RN_NAVIGATION_HOOKS = new Set(["useNavigation", "useRoute"]);
 const TUI_PRIMITIVES = new Set(["Box", "Text"]);
 const TUI_HOOKS = new Set(["useInput"]);
+const TUI_MODULES = new Set(["ink", "blessed", "readline", "readline/promises", "cli-table3"]);
+const TUI_TEXT_MARKERS = ["process.stdin", "process.stdout", "process.stderr", "isTTY", "setRawMode", "readline.emitKeypressEvents", "stdin.on(\"keypress", "stdout.write", "stderr.write"] as const;
+const SHARED_TEXT_MARKERS = ["design token", "designTokens", "createTheme", "api contract", "ApiContract", "shared state", "createStore"] as const;
 
 function getScriptKind(filePath: string): ts.ScriptKind {
   const ext = path.extname(filePath).toLowerCase();
@@ -126,6 +131,17 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
   const evidence: FrontendDomainEvidence[] = [];
   let hasReactWebEvidence = false;
 
+  const normalizedPathSegments = filePath.toLowerCase().split(/[\\/_.-]+/u).filter(Boolean);
+  if (normalizedPathSegments.some((segment) => SHARED_PATH_SEGMENTS.has(segment))) {
+    addEvidence(evidence, "shared", "path-segment", normalizedPathSegments.find((segment) => SHARED_PATH_SEGMENTS.has(segment)) ?? "shared");
+  }
+  if (/\b(?:ios|android)\b/iu.test(filePath)) {
+    addEvidence(evidence, "react-native", "platform-path", /\bios\b/iu.test(filePath) ? "ios" : "android");
+  }
+  if (/metro\.config\.[cm]?[jt]s$/iu.test(filePath)) {
+    addEvidence(evidence, "react-native", "metro-config", path.basename(filePath));
+  }
+
   function rememberImportedName(moduleName: string, name: string): void {
     const names = importedNamesByModule.get(moduleName) ?? new Set<string>();
     names.add(name);
@@ -151,6 +167,14 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       if (moduleName === INK_MODULE) {
         addEvidence(evidence, "tui-ink", "import", moduleName);
       }
+      // React Web framework imports are remembered below, but imports alone are concern evidence;
+      // they become domain evidence only when paired with DOM JSX, browser globals, or JSX component use.
+      if (TUI_MODULES.has(moduleName)) {
+        addEvidence(evidence, "tui-ink", "terminal-import", moduleName);
+      }
+      if (/\b(?:tokens|design-system|shared|contracts)\b/iu.test(moduleName)) {
+        addEvidence(evidence, "shared", "shared-import", moduleName);
+      }
 
       const importClause = node.importClause;
       if (importClause?.name) rememberImportedName(moduleName, importClause.name.text);
@@ -168,6 +192,7 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
         if (moduleName === RN_MODULE || moduleName.startsWith(`${RN_MODULE}/`)) addEvidence(evidence, "react-native", "require", moduleName);
         if (moduleName === WEBVIEW_MODULE) addEvidence(evidence, "webview", "require", moduleName);
         if (moduleName === INK_MODULE) addEvidence(evidence, "tui-ink", "require", moduleName);
+        if (TUI_MODULES.has(moduleName)) addEvidence(evidence, "tui-ink", "terminal-require", moduleName);
       }
     }
 
@@ -181,6 +206,12 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
         if (WEB_DOM_TAGS.has(tag)) {
           hasReactWebEvidence = true;
           addEvidence(evidence, "react-web", "dom-tag", tag);
+        }
+        for (const moduleName of REACT_WEB_MODULES) {
+          if (hasImportedName(moduleName, tag)) {
+            hasReactWebEvidence = true;
+            addEvidence(evidence, "react-web", "framework-component", `${moduleName}:${tag}`);
+          }
         }
       }
     }
@@ -221,6 +252,26 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       if (hasEvidence(evidence, "webview") && property === "postMessage") {
         addEvidence(evidence, "webview", "bridge-call", "postMessage");
       }
+      if (ts.isIdentifier(expression) && expression.text === "Linking" && property === "openURL" && hasEvidence(evidence, "webview")) {
+        addEvidence(evidence, "webview", "deeplink-call", "Linking.openURL");
+      }
+      if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === "process") {
+        const stream = expression.name.text;
+        if ((stream === "stdout" || stream === "stderr" || stream === "stdin") && (property === "write" || property === "on")) {
+          addEvidence(evidence, "tui-ink", "terminal-api", `process.${stream}.${property}`);
+        }
+      }
+    }
+
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "process") {
+      const property = node.name.text;
+      if (property === "stdout" || property === "stderr" || property === "stdin") {
+        addEvidence(evidence, "tui-ink", "terminal-stream", `process.${property}`);
+      }
+    }
+
+    if (ts.isPropertyAccessExpression(node) && node.name.text === "isTTY") {
+      addEvidence(evidence, "tui-ink", "terminal-tty", "isTTY");
     }
 
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
@@ -252,8 +303,26 @@ export function detectDomainFromSource(sourceText: string, filePath = "source.ts
       addEvidence(evidence, "tui-ink", "hook", node.text);
     }
 
+    if (ts.isIdentifier(node) && (node.text === "window" || node.text === "document" || node.text === "localStorage")) {
+      hasReactWebEvidence = true;
+      addEvidence(evidence, "react-web", "browser-global", node.text);
+    }
+
+    if (ts.isIdentifier(node) && /^(?:tokens|designTokens|theme|contract|sharedState|ApiContract)$/u.test(node.text)) {
+      addEvidence(evidence, "shared", "shared-identifier", node.text);
+    }
+
     if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       addWebViewBridgeMarkerEvidence(evidence, node.text);
+      for (const marker of TUI_TEXT_MARKERS) {
+        if (node.text.includes(marker)) addEvidence(evidence, "tui-ink", "terminal-marker", marker);
+      }
+      if (hasEvidence(evidence, "webview") && /(?:deeplink|deep link|session handoff|app container|[a-z][a-z0-9+.-]*:\/\/)/iu.test(node.text)) {
+        addEvidence(evidence, "webview", "handoff-marker", node.text.includes("://") ? "uri-scheme" : "handoff-text");
+      }
+      for (const marker of SHARED_TEXT_MARKERS) {
+        if (node.text.includes(marker)) addEvidence(evidence, "shared", "shared-marker", marker);
+      }
     }
 
     ts.forEachChild(node, visit);

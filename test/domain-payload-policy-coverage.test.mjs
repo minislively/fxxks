@@ -44,6 +44,12 @@ const DOMAIN_PROFILE_PAYLOAD_POLICY_COVERAGE = {
     policyConstant: "TUI_INK_EVIDENCE_ONLY_PAYLOAD_POLICY",
     preReadDelegationAssertion: "preRead.assessFrontendPayloadPolicy(domainDetection)",
   },
+  shared: {
+    profileSource: "src/core/domain-profiles/shared.ts",
+    policySource: null,
+    policyTest: "test/domain-profiles.test.mjs",
+    terminalProfileReason: "shared frontend evidence is pre-ingestion work-item guidance only; no compact payload is authorized without domain-specific consumer receipts",
+  },
   mixed: {
     profileSource: "src/core/domain-profiles/registry.ts",
     policySource: null,

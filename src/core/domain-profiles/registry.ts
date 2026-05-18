@@ -1,6 +1,7 @@
 import { REACT_NATIVE_DOMAIN_PROFILE } from "./react-native";
 import { REACT_WEB_DOMAIN_PROFILE } from "./react-web";
 import { TUI_INK_DOMAIN_PROFILE } from "./tui-ink";
+import { SHARED_DOMAIN_PROFILE } from "./shared";
 import {
   FRONTEND_DOMAIN_BOUNDARY_REASON,
   type DomainLabel,
@@ -33,11 +34,12 @@ export const FRONTEND_DOMAIN_PROFILE_REGISTRY = [
   REACT_NATIVE_DOMAIN_PROFILE,
   WEBVIEW_DOMAIN_PROFILE,
   TUI_INK_DOMAIN_PROFILE,
+  SHARED_DOMAIN_PROFILE,
   MIXED_DOMAIN_PROFILE,
   UNKNOWN_DOMAIN_PROFILE,
 ] as const;
 
-const EVIDENCE_DOMAINS = ["react-native", "webview", "tui-ink"] as const;
+const EVIDENCE_DOMAINS = ["react-native", "webview", "tui-ink", "shared"] as const;
 const profilesByLane = new Map<DomainLabel, DomainProfileDefinition>(
   FRONTEND_DOMAIN_PROFILE_REGISTRY.map((profile) => [profile.lane, profile]),
 );

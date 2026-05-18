@@ -34,6 +34,28 @@ function runStatus(cwd, env = {}) {
   return JSON.parse(execFileSync(process.execPath, [cli, "status"], { cwd, encoding: "utf8", env: { ...process.env, ...env } }));
 }
 
+function testMetricStatus() {
+  return {
+    schemaVersion: 1,
+    metricTier: "estimated",
+    updatedAt: new Date(0).toISOString(),
+    sessionCount: 0,
+    latestSessionCount: 0,
+    eventCount: 0,
+    comparableEventCount: 0,
+    injectCount: 0,
+    fallbackCount: 0,
+    recordCount: 0,
+    noopCount: 0,
+    observedOpportunityCount: 0,
+    observedOriginalEstimatedBytes: 0,
+    observedOriginalEstimatedTokens: 0,
+    totals: { originalEstimatedBytes: 0, actualEstimatedBytes: 0, savedEstimatedBytes: 0, originalEstimatedTokens: 0, actualEstimatedTokens: 0, savedEstimatedTokens: 0, savingsRatio: 0 },
+    breakdown: { byRuntime: {}, byMeasurementSource: {}, byRuntimeAndSource: {} },
+    claimBoundary: "test metric boundary",
+  };
+}
+
 test("bare status includes docs-backed WorkItem dashboard while preserving metric status shape", () => {
   const tempDir = makeRepo();
   const status = runStatus(tempDir, { OMX_SESSION_ID: "omx-test-session" });
@@ -405,4 +427,95 @@ test("WorkItem dashboard keeps unknown branch domain explicit and non-source", (
   assert.equal(dashboard.workItems[0].title, "Active Unknown-domain work #934");
   assert.ok(dashboard.workItems[0].evidence.some((item) => item.kind === "domainHint" && item.evidenceClass === "Workflow evidence"));
   assert.equal(dashboard.workItems[0].evidence.some((item) => item.kind === "domainHint" && item.evidenceClass === "Source evidence"), false);
+});
+
+
+test("WorkItem dashboard maps domain-aware judgment to evidence focus, recommended state, and next action", () => {
+  const { buildWorkItemDashboard } = require(path.join(repoRoot, "dist", "core", "work-item-dashboard.js"));
+
+  const cases = [
+    {
+      branch: "feature/issue-935-react-web-routes",
+      file: "src/pages/account/settings.tsx",
+      domain: "react-web",
+      state: "evidence-ready",
+      action: "verify",
+      focus: "browser UI behavior",
+    },
+    {
+      branch: "feature/issue-935-react-native-ios-platform",
+      file: "ios/ProfileView.tsx",
+      domain: "react-native",
+      state: "fallback-required",
+      action: "fallback",
+      focus: "ios/android platform evidence",
+    },
+    {
+      branch: "feature/issue-935-webview-session-handoff",
+      file: "src/mobile/CheckoutWebView.tsx",
+      domain: "webview",
+      state: "fallback-required",
+      action: "fallback",
+      focus: "bridge message flow",
+    },
+    {
+      branch: "feature/issue-935-tui-keyboard-golden",
+      file: "src/cli/StatusBoard.tsx",
+      domain: "tui",
+      state: "evidence-ready",
+      action: "verify",
+      focus: "keyboard navigation",
+    },
+    {
+      branch: "feature/issue-935-shared-api-contract",
+      file: "src/shared/contracts/settings.ts",
+      domain: "shared",
+      state: "evidence-ready",
+      action: "verify",
+      focus: "API contract/schema",
+    },
+    {
+      branch: "feature/issue-935-maintenance",
+      file: "README.md",
+      domain: "unknown",
+      state: "fallback-required",
+      action: "inspect",
+      focus: "explicit domain evidence",
+    },
+  ];
+
+  for (const item of cases) {
+    const tempDir = makeRepo();
+    git(tempDir, ["checkout", "-b", item.branch]);
+    const target = path.join(tempDir, item.file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, "// changed domain fixture\n");
+
+    const dashboard = buildWorkItemDashboard(tempDir, testMetricStatus());
+    const workItem = dashboard.workItems[0];
+    assert.equal(workItem.frontendDomain, item.domain, item.domain);
+    assert.equal(workItem.domainJudgment.frontendDomain, item.domain, item.domain);
+    assert.equal(workItem.domainJudgment.recommendedState, item.state, item.domain);
+    assert.equal(workItem.domainJudgment.nextAction.kind, item.action, item.domain);
+    assert.ok(workItem.domainJudgment.evidenceFocus.some((focus) => focus.includes(item.focus)), item.domain);
+    assert.ok(workItem.inferred.some((line) => line.includes(`Domain judgment recommends state ${item.state}`)), item.domain);
+    assert.ok(workItem.nonClaims.some((line) => line.includes("pre-ingestion guidance")), item.domain);
+  }
+});
+
+test("fooks explain surfaces machine-readable domain judgment details", () => {
+  const tempDir = makeRepo();
+  git(tempDir, ["checkout", "-b", "feature/issue-935-webview-deeplink-bridge"]);
+  fs.mkdirSync(path.join(tempDir, "src", "mobile"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, "src", "mobile", "CheckoutWebView.tsx"), "// WebView bridge fixture\n");
+
+  const explanation = JSON.parse(execFileSync(process.execPath, [cli, "explain", "status", "--json"], {
+    cwd: tempDir,
+    encoding: "utf8",
+  }));
+
+  assert.equal(explanation.workItem.frontendDomain, "webview");
+  assert.equal(explanation.workItem.domainJudgment.recommendedState, "fallback-required");
+  assert.equal(explanation.workItem.domainJudgment.nextAction.kind, "fallback");
+  assert.ok(explanation.workItem.domainJudgment.requiredEvidence.some((line) => /bridge.*handoff/i.test(line)));
 });
