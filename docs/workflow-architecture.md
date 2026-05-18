@@ -33,7 +33,7 @@ The workflow starts with source context and ends with a receipt. It should not b
 
 The first-minute workflow is the preferred product shape for frontend feature work:
 
-1. identify the user-requested frontend source or scope;
+1. identify the user-requested frontend source or scope, including React Web, React Native, WebView, TUI, Shared, or Unknown targets;
 2. inspect the current file or named source surface;
 3. produce bounded findings and next-inspection guidance;
 4. tell the agent what not to assume;
@@ -42,7 +42,7 @@ The first-minute workflow is the preferred product shape for frontend feature wo
 
 Issue cards, summaries, and dry-run previews are advisory context. They are not automatic edits, not final accessibility copy, not broad audits, and not permission to change task scope.
 
-Evidence model selects the required proof before a workflow state can authorize the next action.
+Evidence model selects the required proof before a workflow state can authorize the next action. TUI next actions should be terminal-specific when relevant: run a TTY smoke check, verify keyboard flow, check stdout/stderr behavior, and confirm the non-interactive fallback.
 
 ## Workflow states
 
@@ -86,4 +86,4 @@ A PR that changes runtime/provider behavior, merge gates, detector logic, CI wor
 
 ## Architecture pass boundary
 
-This docs architecture pass fixes language before implementation issues. It does not create a symptom-fix PR and does not authorize implementation work beyond the five architecture documents and their doc regression test.
+This docs architecture pass fixes language before implementation issues. This architecture boundary keeps user-project frontend domains separate from fooks' own operator UI. Adding TUI as a work domain must not redesign the fooks TUI board or broaden the evidence engine.

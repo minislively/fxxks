@@ -44,7 +44,7 @@ test("bare status includes docs-backed WorkItem dashboard while preserving metri
   assert.equal("latestSessionKeys" in status, false);
 
   const dashboard = status.workItemDashboard;
-  assert.equal(dashboard.schemaVersion, 1);
+  assert.equal(dashboard.schemaVersion, 2);
   assert.equal(dashboard.readOnly, true);
   assert.match(dashboard.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(dashboard.claimBoundary, /Docs-backed active-work dashboard projection only/);
@@ -259,7 +259,7 @@ test("fooks explain work-item --json exposes machine-readable WorkItem explanati
     env: { ...process.env, FOOOKS_UNUSED: "ignored" },
   }));
 
-  assert.equal(explanation.schemaVersion, 1);
+  assert.equal(explanation.schemaVersion, 2);
   assert.equal(explanation.command, "explain");
   assert.equal(explanation.artifact, "work-item");
   assert.equal(explanation.readOnly, true);
@@ -324,4 +324,85 @@ test("fooks explain exposes command help without reading live WorkItem evidence"
     encoding: "utf8",
   });
   assert.equal(shortHelp, help);
+});
+
+test("WorkItem dashboard represents TUI as a first-class frontend work domain", () => {
+  const { buildWorkItemDashboard } = require(path.join(repoRoot, "dist", "core", "work-item-dashboard.js"));
+  const tempDir = makeRepo();
+  git(tempDir, ["checkout", "-b", "feature/issue-933-tui-frontend-domain"]);
+  const dashboard = buildWorkItemDashboard(tempDir, {
+    schemaVersion: 1,
+    metricTier: "estimated",
+    updatedAt: new Date(0).toISOString(),
+    sessionCount: 0,
+    latestSessionCount: 0,
+    eventCount: 0,
+    comparableEventCount: 0,
+    injectCount: 0,
+    fallbackCount: 0,
+    recordCount: 0,
+    noopCount: 0,
+    observedOpportunityCount: 0,
+    observedOriginalEstimatedBytes: 0,
+    observedOriginalEstimatedTokens: 0,
+    totals: { originalEstimatedBytes: 0, actualEstimatedBytes: 0, savedEstimatedBytes: 0, originalEstimatedTokens: 0, actualEstimatedTokens: 0, savedEstimatedTokens: 0, savingsRatio: 0 },
+    breakdown: { byRuntime: {}, byMeasurementSource: {}, byRuntimeAndSource: {} },
+    claimBoundary: "test metric boundary",
+  });
+
+  assert.deepEqual(dashboard.frontendDomainTaxonomy, ["react-web", "react-native", "webview", "tui", "shared", "unknown"]);
+  assert.equal(dashboard.anchors.issue, "#933");
+  assert.equal(dashboard.workItems[0].frontendDomain, "tui");
+  assert.equal(dashboard.workItems[0].title, "Active TUI work #933");
+  assert.ok(dashboard.workItems[0].evidence.some((item) => item.kind === "domainHint" && item.evidenceClass === "Workflow evidence" && /tui frontend work domain hinted by branch/.test(item.observed)));
+  assert.ok(dashboard.workItems[0].nonClaims.some((item) => /user-developed terminal UI target/.test(item)));
+});
+
+test("fooks status and explain expose TUI-domain work item details", () => {
+  const tempDir = makeRepo();
+  git(tempDir, ["checkout", "-b", "feature/issue-933-tui-frontend-domain"]);
+
+  const status = runStatus(tempDir);
+  assert.equal(status.workItemDashboard.workItems[0].frontendDomain, "tui");
+  assert.ok(status.workItemDashboard.workItems[0].evidence.some((item) => item.kind === "domainHint" && item.evidenceClass === "Workflow evidence"));
+
+  const explanation = JSON.parse(execFileSync(process.execPath, [cli, "explain", "status", "--json"], {
+    cwd: tempDir,
+    encoding: "utf8",
+  }));
+  assert.equal(explanation.workItem.id, "work-item-933");
+  assert.equal(explanation.workItem.frontendDomain, "tui");
+  assert.ok(explanation.why.some((line) => line.includes("frontend domain 'tui'")));
+  assert.ok(explanation.rejectedEvidence.some((item) => /fooks' own TUI board/.test(item.reason)));
+});
+
+
+test("WorkItem dashboard keeps unknown branch domain explicit and non-source", () => {
+  const { buildWorkItemDashboard } = require(path.join(repoRoot, "dist", "core", "work-item-dashboard.js"));
+  const tempDir = makeRepo();
+  git(tempDir, ["checkout", "-b", "feature/issue-934-maintenance"]);
+  const dashboard = buildWorkItemDashboard(tempDir, {
+    schemaVersion: 1,
+    metricTier: "estimated",
+    updatedAt: new Date(0).toISOString(),
+    sessionCount: 0,
+    latestSessionCount: 0,
+    eventCount: 0,
+    comparableEventCount: 0,
+    injectCount: 0,
+    fallbackCount: 0,
+    recordCount: 0,
+    noopCount: 0,
+    observedOpportunityCount: 0,
+    observedOriginalEstimatedBytes: 0,
+    observedOriginalEstimatedTokens: 0,
+    totals: { originalEstimatedBytes: 0, actualEstimatedBytes: 0, savedEstimatedBytes: 0, originalEstimatedTokens: 0, actualEstimatedTokens: 0, savedEstimatedTokens: 0, savingsRatio: 0 },
+    breakdown: { byRuntime: {}, byMeasurementSource: {}, byRuntimeAndSource: {} },
+    claimBoundary: "test metric boundary",
+  });
+
+  assert.equal(dashboard.workItems[0].frontendDomain, "unknown");
+  assert.equal(dashboard.workItems[0].title, "Active Unknown-domain work #934");
+  assert.ok(dashboard.workItems[0].evidence.some((item) => item.kind === "domainHint" && item.evidenceClass === "Workflow evidence"));
+  assert.equal(dashboard.workItems[0].evidence.some((item) => item.kind === "domainHint" && item.evidenceClass === "Source evidence"), false);
 });

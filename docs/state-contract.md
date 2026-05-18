@@ -7,7 +7,7 @@ This document defines the product-facing state contract for fooks as a frontend-
 | State category | Owner | Purpose | Claim boundary |
 | --- | --- | --- | --- |
 | Source state | Current project files plus source fingerprint/range metadata. | Tie evidence to the source that was inspected. | Stale when the source changes. |
-| Context state | Prepared packet, first-minute summary, issue cards, warnings, or fallback guidance. | Help the agent inspect and edit within scope. | Advisory unless current source and policy still match. |
+| Context state | Prepared packet, first-minute summary, issue cards, warnings, domain labels or hints, or fallback guidance. | Help the agent inspect and edit within scope. | Advisory unless current source and policy still match. |
 | Policy state | Decision that context is compact, narrow, fallback, or deferred for a measured scope. | Keep permission separate from evidence. | Cannot be inferred from domain or concern evidence alone. |
 | Receipt state | Durable command/test/review output. | Record what happened and what claim it can support. | Time- and scope-bound; not eternal proof. |
 | Active-work state | Open issue, branch, worktree, session, task note, or unverified result. | Show unfinished work and next action. | Not completion evidence. |
@@ -35,10 +35,11 @@ Compatibility state term: `receipt_only` is reserved for operator reports that n
 
 1. **Freshness first.** A context packet or work order is valid only for the source/fingerprint/scope it names.
 2. **Policy before reuse.** Evidence can be observed before policy, but compact or narrow reuse needs a policy decision.
-3. **Fallback is explicit state.** Unsupported, mixed, stale, or boundary-heavy inputs should record why normal source reading is required.
-4. **Receipts are scoped.** A receipt supports only the command, file, issue, or test run it names.
-5. **Active is not done.** Active-work evidence needs a closeout receipt before it becomes completion evidence.
-6. **Internal is not public.** Orchestration files can help local agents, but public product claims must cite product surfaces, tests, or docs.
+3. **Hints are not source evidence.** A branch/work-item label may hint at React Web, React Native, WebView, TUI, Shared, or Unknown work, but source evidence still requires current source inspection.
+4. **Fallback is explicit state.** Unsupported, mixed, stale, or boundary-heavy inputs should record why normal source reading is required. TUI fallback should name whether the missing proof is terminal rendering, keyboard navigation, stdout/stderr, TTY/non-TTY behavior, or snapshot/golden output.
+5. **Receipts are scoped.** A receipt supports only the command, file, issue, or test run it names.
+6. **Active is not done.** Active-work evidence needs a closeout receipt before it becomes completion evidence.
+7. **Internal is not public.** Orchestration files can help local agents, but public product claims must cite product surfaces, tests, or docs.
 
 ## Freshness and fingerprints
 
@@ -52,7 +53,7 @@ Source-derived evidence should carry enough freshness context for a later agent 
 - relevant included/omitted ranges;
 - non-claims.
 
-If a freshness anchor is absent or stale, the safe next action is to read the current source or rerun the relevant fooks command.
+If a freshness anchor is absent or stale, the safe next action is to read the current source or rerun the relevant fooks command. For a TUI work domain, safe next actions can also include a TTY smoke run, keyboard-flow verification, or a non-interactive fallback check when those are the relevant missing receipts.
 
 ## Receipt shape
 

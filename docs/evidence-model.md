@@ -20,7 +20,7 @@ These classes are also referred to as Source evidence, Test evidence, Workflow e
 | --- | --- | --- |
 | Current source evidence | Source-derived frontend facts, source fingerprints, line-aware edit hints. | Runtime UI correctness, cross-file behavior, provider billing. |
 | Local command evidence | What a fooks command emitted for a named input and environment. | Future runs after source or setup changes. |
-| Fixture/test evidence | Regression boundaries for representative cases. | Universal framework behavior. |
+| Fixture/test evidence | Regression boundaries for representative cases, including terminal snapshots or golden output for TUI work. | Universal framework behavior. |
 | Local estimate evidence | Model-facing byte/token estimates under named assumptions. | Provider usage/billing-token, invoice, dashboard, or charged-cost proof. |
 | Benchmark evidence | Repeated local measurements for a named harness. | Unmeasured user projects, stable runtime latency, or provider-wide savings. |
 | Human/review receipt | A decision or review happened. | Automatic correctness of the underlying code. |
@@ -37,7 +37,7 @@ proposed wording
 → public claim only if the measured scope is stable enough
 ```
 
-If any state is missing, use non-claim language and point to the gap. For example, prefer "local estimate evidence" over "savings" when provider billing evidence is absent.
+If any state is missing, use non-claim language and point to the gap. For example, prefer "local estimate evidence" over "savings" when provider billing evidence is absent; prefer "TUI-domain work item" over "terminal UX works" unless terminal rendering, keyboard flow, stdout/stderr, TTY/non-TTY, and snapshot/golden evidence exist for that scope.
 
 ## Receipt rules
 
@@ -71,7 +71,7 @@ Use these substitutions by default:
 | --- | --- |
 | "proves savings" | "reports local model-facing estimate evidence" |
 | "the feature works" | "the named test/command passed for this scope" |
-| "supported domain" | "measured lane" or "evidence lane," depending on the gate |
+| "supported domain" | "measured lane," "frontend work domain," or "evidence lane," depending on the gate |
 | "completed" | "closed by receipt X" |
 | "active branch means active development" | "branch/worktree evidence exists; activity still needs review" |
 

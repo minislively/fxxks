@@ -2,12 +2,14 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import type { FooksProjectMetricStatus } from "./session-metrics";
 
-export const WORK_ITEM_DASHBOARD_SCHEMA_VERSION = 1;
+export const WORK_ITEM_DASHBOARD_SCHEMA_VERSION = 2;
 export const WORK_ITEM_DASHBOARD_SOURCE = "fooks status docs-backed work-item projection";
 export const WORK_ITEM_DASHBOARD_CLAIM_BOUNDARY =
   "Docs-backed active-work dashboard projection only; separates observed local evidence, conservative inference, required next action, and non-claims without changing runtime/provider behavior or rewriting TUI.";
 
-export type WorkItemEvidenceKind = "issue" | "branch" | "session" | "worktree" | "pullRequest" | "metricReceipt" | "architectureDoc";
+export type WorkItemEvidenceKind = "issue" | "branch" | "session" | "worktree" | "pullRequest" | "metricReceipt" | "architectureDoc" | "domainHint";
+export type WorkItemFrontendDomain = "react-web" | "react-native" | "webview" | "tui" | "shared" | "unknown";
+export const WORK_ITEM_FRONTEND_DOMAIN_TAXONOMY: WorkItemFrontendDomain[] = ["react-web", "react-native", "webview", "tui", "shared", "unknown"];
 export type WorkItemEvidenceClass = "Source evidence" | "Local command evidence" | "Workflow evidence" | "Session evidence" | "Receipt evidence";
 export type WorkItemState = "uninspected" | "evidence-ready" | "fallback-required" | "context-issued" | "receipt-recorded" | "active-work" | "blocked";
 export type WorkItemNextActionKind = "inspect" | "verify" | "link" | "open-pr" | "continue" | "fallback";
@@ -34,6 +36,7 @@ export type WorkItem = {
   id: string;
   title: string;
   state: WorkItemState;
+  frontendDomain: WorkItemFrontendDomain;
   observed: string[];
   inferred: string[];
   requiredNextAction: WorkItemNextAction;
@@ -57,7 +60,7 @@ export type WorkItemDashboard = {
   readOnly: true;
   generatedFrom: {
     command: "status";
-    docs: ["docs/product-direction.md", "docs/evidence-model.md", "docs/workflow-architecture.md", "docs/state-contract.md"];
+    docs: ["docs/product-direction.md", "docs/frontend-domains.md", "docs/evidence-model.md", "docs/workflow-architecture.md", "docs/state-contract.md"];
   };
   anchors: {
     repo?: string;
@@ -72,6 +75,7 @@ export type WorkItemDashboard = {
   architectureAudit: WorkItemArchitectureAudit[];
   workItems: WorkItem[];
   nextActions: WorkItemNextAction[];
+  frontendDomainTaxonomy: WorkItemFrontendDomain[];
   tuiCompatibility: {
     modelOnly: true;
     sharedTypes: ["WorkItem", "Evidence", "NextAction"];
@@ -197,6 +201,48 @@ function docsEvidence(): WorkItemEvidence {
   };
 }
 
+function displayFrontendDomain(frontendDomain: WorkItemFrontendDomain): string {
+  switch (frontendDomain) {
+    case "react-web":
+      return "React Web";
+    case "react-native":
+      return "React Native";
+    case "webview":
+      return "WebView";
+    case "tui":
+      return "TUI";
+    case "shared":
+      return "Shared";
+    case "unknown":
+      return "Unknown-domain";
+  }
+}
+
+function frontendDomainFor(snapshot: GitSnapshot): WorkItemFrontendDomain {
+  const branch = snapshot.branch?.toLowerCase() ?? "";
+  if (/(^|[-_/#])react[-_]web($|[-_/#])|(^|[-_/#])web($|[-_/#])/.test(branch)) return "react-web";
+  if (/(^|[-_/#])react[-_]native($|[-_/#])|(^|[-_/#])rn($|[-_/#])/.test(branch)) return "react-native";
+  if (/(^|[-_/#])webview($|[-_/#])/.test(branch)) return "webview";
+  if (/(^|[-_/#])tui($|[-_/#])|(^|[-_/#])terminal[-_]ui($|[-_/#])/.test(branch)) return "tui";
+  if (/(^|[-_/#])shared($|[-_/#])/.test(branch)) return "shared";
+  return "unknown";
+}
+
+function domainHintEvidence(frontendDomain: WorkItemFrontendDomain, snapshot: GitSnapshot): WorkItemEvidence {
+  const observed = frontendDomain === "unknown"
+    ? `no frontend work domain hinted by branch ${snapshot.branch ?? "unknown"}`
+    : `${frontendDomain} frontend work domain hinted by branch ${snapshot.branch ?? "unknown"}`;
+  return {
+    kind: "domainHint",
+    evidenceClass: "Workflow evidence",
+    observed,
+    source: "local branch naming plus WorkItem frontend domain taxonomy",
+    fresh: snapshot.branch ? true : "unknown",
+    supports: "React Web / React Native / WebView / TUI / Shared / Unknown work-domain hint representation in the shared WorkItem model",
+    doesNotSupport: "runtime UI correctness, broad framework support, detector expansion, or changes to fooks' own TUI board",
+  };
+}
+
 function hasActiveWorkAnchor(snapshot: GitSnapshot, anchors: WorkItemDashboard["anchors"]): boolean {
   return Boolean(anchors.issue || anchors.pullRequest || snapshot.clean === false);
 }
@@ -256,7 +302,8 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
     ...pr,
   };
   const action = nextActionFor(snapshot, anchors);
-  const evidence = [docsEvidence(), worktreeEvidence(snapshot, cwd), metricEvidence(metricStatus)];
+  const frontendDomain = frontendDomainFor(snapshot);
+  const evidence = [docsEvidence(), domainHintEvidence(frontendDomain, snapshot), worktreeEvidence(snapshot, cwd), metricEvidence(metricStatus)];
   if (issue) {
     evidence.push({
       kind: "issue",
@@ -288,9 +335,10 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
     readOnly: true,
     generatedFrom: {
       command: "status",
-      docs: ["docs/product-direction.md", "docs/evidence-model.md", "docs/workflow-architecture.md", "docs/state-contract.md"],
+      docs: ["docs/product-direction.md", "docs/frontend-domains.md", "docs/evidence-model.md", "docs/workflow-architecture.md", "docs/state-contract.md"],
     },
     anchors,
+    frontendDomainTaxonomy: WORK_ITEM_FRONTEND_DOMAIN_TAXONOMY,
     architectureAudit: [
       {
         scope: "status",
@@ -309,16 +357,17 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
       {
         scope: "tui",
         currentSurface: "TUI-related code is source/payload metadata and tests, not a rewritten action board",
-        docsBackedTarget: "TUI can consume WorkItem/Evidence/NextAction later without runtime/provider changes",
+        docsBackedTarget: "TUI is represented as a user-project frontend work domain in WorkItem/Evidence/NextAction without runtime/provider changes",
         divergence: "no common board model existed before this pass",
-        firstPassAction: "export shared model types and a model-only TUI compatibility marker; do not rewrite UI",
+        firstPassAction: "export shared model types, include the TUI frontend domain, and do not rewrite fooks' own TUI board",
       },
     ],
     workItems: [
       {
         id: issue ? `work-item-${issue.slice(1)}` : "work-item-unlinked",
-        title: issue ? `Active work ${issue}` : "Unlinked work item candidate",
+        title: issue ? `Active ${displayFrontendDomain(frontendDomain)} work ${issue}` : "Unlinked work item candidate",
         state: workItemStateFor(snapshot, anchors),
+        frontendDomain,
         observed: evidence.map((item) => item.observed),
         inferred: [
           issue ? `${issue} is the local issue anchor inferred from branch naming.` : "No issue anchor was inferred from branch naming.",
@@ -329,6 +378,7 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
         nonClaims: [
           "This dashboard does not prove provider usage or billing-token savings.",
           "This dashboard does not prove runtime UI correctness.",
+          "A TUI-domain work item means a user-developed terminal UI target, not fooks' own rendering surface.",
           "This dashboard does not close active work without test/review/PR receipt evidence.",
         ],
       },
@@ -337,7 +387,7 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
     tuiCompatibility: {
       modelOnly: true,
       sharedTypes: ["WorkItem", "Evidence", "NextAction"],
-      note: "The model is exported for future CLI/TUI sharing; this pass intentionally does not rewrite the TUI.",
+      note: "The model represents TUI as a user-project frontend domain for status/explain consumers; this pass intentionally does not rewrite fooks' own TUI board.",
     },
   };
 }
