@@ -1,4 +1,4 @@
-import type { WorkItem, WorkItemDashboard, WorkItemEvidence, WorkItemNextAction } from "./work-item-dashboard";
+import type { WorkItem, WorkItemDashboard, WorkItemDomainJudgment, WorkItemEvidence, WorkItemNextAction } from "./work-item-dashboard";
 import { WORK_ITEM_DASHBOARD_CLAIM_BOUNDARY } from "./work-item-dashboard";
 
 export const WORK_ITEM_EXPLAIN_SCHEMA_VERSION = 2;
@@ -25,6 +25,7 @@ export type WorkItemExplainResult = {
     title: string;
     state: WorkItem["state"];
     frontendDomain: WorkItem["frontendDomain"];
+    domainJudgment: WorkItemDomainJudgment;
   };
   why: string[];
   evidence: WorkItemEvidence[];
@@ -32,6 +33,23 @@ export type WorkItemExplainResult = {
   nextAction: WorkItemNextAction;
   nonClaims: string[];
 };
+
+
+function unknownDomainJudgment(nextAction: WorkItemNextAction, rationale: string): WorkItemDomainJudgment {
+  return {
+    frontendDomain: "unknown",
+    confidence: "low",
+    recommendedState: "fallback-required",
+    evidenceFocus: ["source inspection", "issue scope", "changed paths", "explicit domain evidence"],
+    requiredEvidence: ["explicit domain evidence before automatic ingestion", "fallback source inspection", "issue or receipt link before active-work claims"],
+    nextAction,
+    rationale,
+    nonClaims: [
+      "Domain judgment is pre-ingestion guidance, not runtime correctness proof.",
+      "Unknown work items do not imply React Web, React Native, WebView, TUI, or Shared support.",
+    ],
+  };
+}
 
 function sampleEvidence(): WorkItemEvidence[] {
   return [
@@ -65,11 +83,13 @@ function sampleWorkItem(): WorkItem {
     closesWhen: "a live status/work-item explanation is generated from the current repository dashboard",
   };
   const evidence = sampleEvidence();
+  const domainJudgment = unknownDomainJudgment(nextAction, "sample artifact has no live branch/path/source domain hints");
   return {
     id: "work-item-sample",
     title: "Sample WorkItem evidence explanation",
     state: "uninspected",
     frontendDomain: "unknown",
+    domainJudgment,
     observed: evidence.map((item) => item.observed),
     inferred: [
       "The sample is static and read-only.",
@@ -95,11 +115,13 @@ function evidenceForArtifact(artifact: WorkItemExplainArtifact, dashboard: WorkI
       reason: "dashboard contains no work item entries",
       closesWhen: "a dashboard work item entry exists or the missing evidence is recorded",
     };
+    const domainJudgment = unknownDomainJudgment(nextAction, "dashboard contains no work item entries");
     return {
       id: "work-item-missing",
       title: "Missing WorkItem evidence",
       state: "blocked",
       frontendDomain: "unknown",
+      domainJudgment,
       observed: [],
       inferred: ["No work item was available in the dashboard artifact."],
       requiredNextAction: nextAction,
@@ -146,6 +168,7 @@ export function buildWorkItemExplain(artifact: WorkItemExplainArtifact, dashboar
       title: item.title,
       state: item.state,
       frontendDomain: item.frontendDomain,
+      domainJudgment: item.domainJudgment,
     },
     why: whyFor(item, dashboard, artifact),
     evidence: item.evidence,
@@ -170,5 +193,5 @@ export function renderWorkItemExplainText(explain: WorkItemExplainResult): strin
     : "- none";
   const commandLine = explain.nextAction.command ? `\n- command: ${explain.nextAction.command}` : "";
 
-  return `# fooks explain ${explain.artifact}\n\n${explain.claimBoundary}\n\n## Work item\n\n- id: ${explain.workItem.id}\n- title: ${explain.workItem.title}\n- state: ${explain.workItem.state}\n- frontend domain: ${explain.workItem.frontendDomain}\n\n## Why\n\n${bulletList(explain.why)}\n\n## Evidence\n\n${evidence}\n\n## Rejected evidence / non-claims\n\n${rejected}\n\n## Next action\n\n- kind: ${explain.nextAction.kind}\n- label: ${explain.nextAction.label}${commandLine}\n- reason: ${explain.nextAction.reason}\n- closes when: ${explain.nextAction.closesWhen}\n\n## Non-claims\n\n${bulletList(explain.nonClaims)}\n`;
+  return `# fooks explain ${explain.artifact}\n\n${explain.claimBoundary}\n\n## Work item\n\n- id: ${explain.workItem.id}\n- title: ${explain.workItem.title}\n- state: ${explain.workItem.state}\n- frontend domain: ${explain.workItem.frontendDomain}\n- domain judgment: ${explain.workItem.domainJudgment.recommendedState} / ${explain.workItem.domainJudgment.nextAction.kind} (${explain.workItem.domainJudgment.confidence} confidence)\n\n## Why\n\n${bulletList(explain.why)}\n\n## Evidence\n\n${evidence}\n\n## Rejected evidence / non-claims\n\n${rejected}\n\n## Domain judgment\n\n- rationale: ${explain.workItem.domainJudgment.rationale}\n- evidence focus: ${explain.workItem.domainJudgment.evidenceFocus.join(", ")}\n- required evidence: ${explain.workItem.domainJudgment.requiredEvidence.join(", ")}\n- recommended next action: ${explain.workItem.domainJudgment.nextAction.label}\n\n## Next action\n\n- kind: ${explain.nextAction.kind}\n- label: ${explain.nextAction.label}${commandLine}\n- reason: ${explain.nextAction.reason}\n- closes when: ${explain.nextAction.closesWhen}\n\n## Non-claims\n\n${bulletList(explain.nonClaims)}\n`;
 }

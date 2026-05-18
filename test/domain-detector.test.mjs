@@ -253,6 +253,62 @@ test("keeps WebView bridge-pair evidence as fallback-only boundary facts", () =>
   assert.ok(result.signals.includes("webview:bridge-call:postMessage"));
 });
 
+
+
+test("detects expanded domain-aware source evidence for web, native, webview, tui, and shared lanes", () => {
+  const web = detectDomainFromSource(
+    `import Link from "next/link";
+     export function AccountRoute() {
+       window.localStorage.setItem("visited", "1");
+       return <div className="route"><Link href="/account"><label htmlFor="account">Account</label></Link></div>;
+     }`,
+    "src/app/account/page.tsx",
+  );
+  assert.equal(web.classification, "react-web");
+  assertSignals(web, ["react-web:framework-component:next/link:Link", "react-web:browser-global:window", "react-web:jsx-attribute:className", "react-web:jsx-attribute:htmlFor"]);
+
+  const native = detectDomainFromSource(
+    `export default { resolver: { sourceExts: ["tsx"] } };`,
+    "metro.config.js",
+  );
+  assert.equal(native.classification, "react-native");
+  assertSignals(native, ["react-native:metro-config:metro.config.js"]);
+
+  const webview = detectDomainFromSource(
+    `import { WebView } from "react-native-webview";
+     import { Linking } from "react-native";
+     export function CheckoutWebView() {
+       return <WebView source={{ uri: "myapp://checkout/session" }} onMessage={() => Linking.openURL("myapp://handoff")} />;
+     }`,
+    "CheckoutWebView.tsx",
+  );
+  assert.equal(webview.classification, "mixed");
+  assertSignals(webview, ["webview:handoff-marker:uri-scheme", "webview:deeplink-call:Linking.openURL"]);
+
+  const tui = detectDomainFromSource(
+    `export function renderStatus() {
+       if (process.stdout.isTTY) process.stdout.write("golden snapshot");
+       process.stderr.write("warning");
+     }`,
+    "src/tui/status-board.ts",
+  );
+  assert.equal(tui.classification, "tui-ink");
+  assertSignals(tui, ["tui-ink:terminal-stream:process.stdout", "tui-ink:terminal-api:process.stdout.write", "tui-ink:terminal-tty:isTTY", "tui-ink:terminal-api:process.stderr.write"]);
+
+  const shared = detectDomainFromSource(
+    `export const designTokens = { color: "red" };
+     export type ApiContract = { id: string };
+     export const schema = "api contract";`,
+    "src/shared/contracts/theme-tokens.ts",
+  );
+  assert.equal(shared.classification, "shared");
+  assert.equal(shared.profile.claimStatus, "evidence-only");
+  assertSignals(shared, ["shared:path-segment:shared", "shared:shared-identifier:designTokens", "shared:shared-identifier:ApiContract", "shared:shared-marker:api contract"]);
+
+  assert.doesNotMatch(JSON.stringify([web, native, webview, tui, shared]), forbiddenSupportClaims);
+});
+
+
 test("selected fixture manifest stays aligned with detector classifications and outcomes", () => {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
