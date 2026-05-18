@@ -48,6 +48,49 @@
   - `docs/worktree-status-parser-branch-archive-327.md`
   - `docs/zombie-session-cleanup-stale-branch-archive-314.md`
 
+
+## Issue #944 legacy/archive docs decision pass
+
+Applied at: 2026-05-18T02:46:00Z
+
+Review policy for this pass:
+
+- Delete only tracked legacy/archive docs that are clearly obsolete, superseded, duplicate, and unreferenced outside this cleanup audit.
+- Keep archive docs that still provide branch-audit suppression evidence, dogfood/operator contract coverage, benchmark interpretation, or unique historical/product/evidence context.
+- Reference checks used `rg` for each candidate path, basename, stem, and title; current architecture/product docs reviewed included `docs/product-direction.md`, `docs/frontend-domains.md`, `docs/evidence-model.md`, `docs/workflow-architecture.md`, `docs/state-contract.md`, `docs/work-item-action-dashboard-audit.md`, `docs/frontend-domain-contract.md`, `docs/frontend-domain-fixture-expectations.md`, `docs/frontend-domain-profiles.md`, `docs/remote-branch-audit.md`, and `docs/branch-audit-closeout-review-2026-05-09.md`.
+
+| Path | Decision | Reference check | Reason |
+| --- | --- | --- | --- |
+| `docs/applied-code-evidence-closeout-branch-archive-306.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence for `codex/applied-code-evidence-closeout-20260425`; not safe to delete without changing audit evidence. |
+| `docs/benchmark-context-policy-branch-archive-331.md` | Keep | Referenced by `docs/remote-branch-audit.md`, `docs/branch-audit-closeout-review-2026-05-09.md`, and `docs/formbricks-n3-quality-branch-archive-334.md`. | Preserves benchmark claim-boundary context and current branch-audit archive evidence. |
+| `docs/branch-archive-codex-ts-js-same-file-beta-2026-05-01.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence for the TS/JS beta stale branch. |
+| `docs/claim-boundary-usage-billing-branch-archive-304.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence and product claim-boundary context. |
+| `docs/codex-worktree-status-parser-branch-archive-337.md` | Delete | Only referenced by this cleanup audit; title had no external refs. | Duplicate stale-branch note for `origin/codex/worktree-status-parser`; the kept `docs/issue-353-worktree-status-parser-branch-archive.md` is the current branch-audit evidence for that branch. |
+| `docs/dogfood/clean-slate-legacy-review-worktree-residue-865.md` | Keep | Referenced by `test/operator-activity.test.mjs`. | Tested dogfood/operator contract; deleting would break focused doc coverage and lose active residue-boundary context. |
+| `docs/dogfood/legacy-review-residue-cleanup-review-guard-895.md` | Keep | Referenced by `test/legacy-review-residue-cleanup-review-guard-doc.test.mjs`. | Tested cleanup-review guard with unique operator semantics. |
+| `docs/fix-pr114-branch-archive-329.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence for `fix-pr114`; also records broad stale-tree risk. |
+| `docs/fooks-dogfood-zombie-cleanup-branch-archive-309.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence for the dogfood zombie cleanup branch. |
+| `docs/formbricks-n3-quality-branch-archive-334.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence plus historical Formbricks exact-file benchmark interpretation. |
+| `docs/formbricks-t4-n3-evidence-branch-archive-336.md` | Keep | Only referenced by this cleanup audit; content cross-checks current benchmark report artifacts. | Preserves unique evidence-equivalence rationale for normalized JSON/path-scrubbed benchmark evidence not fully captured by the current decision report. |
+| `docs/frontend-domain-contract-branch-archive-298.md` | Keep | Referenced by `docs/remote-branch-audit.md`, `docs/branch-audit-closeout-review-2026-05-09.md`, and `docs/frontend-domain-contract-branch-archive-308.md`. | Current branch-audit suppression evidence for `frontend-domain-contract-before-extractor-promotion`. |
+| `docs/frontend-domain-contract-branch-archive-308.md` | Keep | Referenced by `docs/frontend-domain-contract-branch-archive-298.md` and appears in stale-tree delete examples in generated branch-audit docs. | Although duplicate-adjacent, it preserves the issue #308 re-triage against a newer `origin/main` state and keeps generated stale-tree examples coherent. |
+| `docs/frontend-domain-fixture-expectation-lock-branch-archive-340.md` | Keep | Referenced by `docs/dogfood/stale-closed-artifact-worktree-cleanup-review-918.md` and branch-audit stale-tree examples. | Local worktree cleanup-review evidence and fixture expectation historical context. |
+| `docs/frontend-domain-manifest-shape-guard-branch-archive-342.md` | Keep | Referenced by `docs/dogfood/stale-closed-artifact-worktree-cleanup-review-918.md` and branch-audit stale-tree examples. | Local worktree cleanup-review evidence and manifest-shape guard historical context. |
+| `docs/issue-221-branch-audit-stale-valid-branch-archive-312.md` | Delete | Only referenced by this cleanup audit; title had no external refs. | Patch-equivalent stale branch rationale is superseded by current `scripts/audit-remote-branches.mjs` and `test/audit-remote-branches.test.mjs`; no current branch-audit archive evidence depends on this doc. |
+| `docs/issue-353-worktree-status-parser-branch-archive.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current exact branch-audit suppression evidence for `codex/worktree-status-parser`; it supersedes the deleted #327/#337 duplicate notes. |
+| `docs/public-readme-polish-branch-archive-323.md` | Keep | Referenced by `docs/remote-branch-audit.md` and `docs/branch-audit-closeout-review-2026-05-09.md`. | Current branch-audit suppression evidence for the public README polish stale branch. |
+| `docs/worktree-status-parser-branch-archive-327.md` | Delete | Only referenced by this cleanup audit; title had no external refs. | Older duplicate stale-branch note for `origin/codex/worktree-status-parser`; superseded by kept issue #353 archive evidence. |
+| `docs/zombie-session-cleanup-stale-branch-archive-314.md` | Delete | Only referenced by this cleanup audit; title had no external refs. | Patch-equivalent stale branch rationale is superseded by current artifact-audit docs/code/tests and the kept dogfood zombie cleanup archive note. |
+
+Deleted in this pass:
+
+- `docs/codex-worktree-status-parser-branch-archive-337.md`
+- `docs/issue-221-branch-audit-stale-valid-branch-archive-312.md`
+- `docs/worktree-status-parser-branch-archive-327.md`
+- `docs/zombie-session-cleanup-stale-branch-archive-314.md`
+
+Kept all other tracked legacy/archive docs because they are referenced by current tests/generated audits, are current branch-audit suppression evidence, or preserve unique benchmark/product/dogfood context.
+
 ## High-risk report-only areas
 
 - `src/**` — Implementation source: no automatic deletion in first pass.
