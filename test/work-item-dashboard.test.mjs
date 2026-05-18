@@ -519,3 +519,66 @@ test("fooks explain surfaces machine-readable domain judgment details", () => {
   assert.equal(explanation.workItem.domainJudgment.nextAction.kind, "fallback");
   assert.ok(explanation.workItem.domainJudgment.requiredEvidence.some((line) => /bridge.*handoff/i.test(line)));
 });
+
+test("fooks status --json is an alias for bare status JSON", () => {
+  const tempDir = makeRepo();
+  const status = JSON.parse(execFileSync(process.execPath, [cli, "status", "--json"], {
+    cwd: tempDir,
+    encoding: "utf8",
+  }));
+
+  assert.equal(status.schemaVersion, 1);
+  assert.equal(status.workItemDashboard.schemaVersion, 2);
+  assert.equal(status.workItemDashboard.workItems[0].id, "work-item-922");
+});
+
+test("fooks explain text pairs domain labels with slugs and domain action details", () => {
+  const tempDir = makeRepo();
+  git(tempDir, ["checkout", "-b", "feature/issue-948-webview-bridge-ux"]);
+  fs.mkdirSync(path.join(tempDir, "src", "mobile"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, "src", "mobile", "CheckoutWebView.tsx"), "// WebView bridge fixture\n");
+
+  const text = execFileSync(process.execPath, [cli, "explain", "status"], {
+    cwd: tempDir,
+    encoding: "utf8",
+  });
+
+  assert.match(text, /- frontend domain: WebView \(webview\)/);
+  assert.match(text, /## Domain judgment/);
+  assert.match(text, /- recommended state: fallback-required/);
+  assert.match(text, /- confidence: high/);
+  assert.match(text, /- domain next action kind: fallback/);
+  assert.match(text, /- domain reason: WebView work crosses app-container, bridge, deeplink, and session-handoff boundaries/);
+  assert.match(text, /- domain closes when: bridge\/deeplink\/session handoff evidence and a fallback receipt are recorded/);
+});
+
+test("fooks explain JSON preserves domain judgments for every frontend domain", () => {
+  const cases = [
+    { branch: "feature/issue-948-react-web-routes", file: "src/pages/settings.tsx", domain: "react-web", state: "evidence-ready", action: "verify" },
+    { branch: "feature/issue-948-react-native-ios", file: "ios/ProfileView.tsx", domain: "react-native", state: "fallback-required", action: "fallback" },
+    { branch: "feature/issue-948-webview-bridge", file: "src/mobile/CheckoutWebView.tsx", domain: "webview", state: "fallback-required", action: "fallback" },
+    { branch: "feature/issue-948-tui-keyboard", file: "src/cli/StatusBoard.tsx", domain: "tui", state: "evidence-ready", action: "verify" },
+    { branch: "feature/issue-948-shared-contract", file: "src/shared/contracts/settings.ts", domain: "shared", state: "evidence-ready", action: "verify" },
+    { branch: "feature/issue-948-maintenance", file: "README.md", domain: "unknown", state: "fallback-required", action: "inspect" },
+  ];
+
+  for (const item of cases) {
+    const tempDir = makeRepo();
+    git(tempDir, ["checkout", "-b", item.branch]);
+    const target = path.join(tempDir, item.file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, "// changed domain fixture\n");
+
+    const explanation = JSON.parse(execFileSync(process.execPath, [cli, "explain", "status", "--json"], {
+      cwd: tempDir,
+      encoding: "utf8",
+    }));
+
+    assert.equal(explanation.workItem.frontendDomain, item.domain, item.domain);
+    assert.equal(explanation.workItem.domainJudgment.frontendDomain, item.domain, item.domain);
+    assert.equal(explanation.workItem.domainJudgment.recommendedState, item.state, item.domain);
+    assert.equal(explanation.workItem.domainJudgment.nextAction.kind, item.action, item.domain);
+    assert.ok(explanation.workItem.domainJudgment.requiredEvidence.length > 0, item.domain);
+    assert.ok(explanation.rejectedEvidence.some((rejected) => /pre-ingestion guidance|automatic ingestion|runtime UI correctness/.test(rejected.reason)), item.domain);
+  }
+});

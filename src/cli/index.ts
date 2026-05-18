@@ -656,7 +656,7 @@ Everyday commands:
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
   ${displayCliName} codex-pre-read <file> [--json]
-  ${displayCliName} status
+  ${displayCliName} status [--json]
   ${displayCliName} status codex
   ${displayCliName} status claude
   ${displayCliName} status cache
@@ -1515,7 +1515,7 @@ async function run(): Promise<void> {
       return;
     }
     case "status": {
-      if (!arg1) {
+      if (!arg1 || (arg1 === "--json" && rest.length === 1)) {
         const [{ readProjectMetricSummary }, { buildWorkItemDashboard }] = await Promise.all([
           import("../core/session-metrics.js"),
           import("../core/work-item-dashboard.js"),
