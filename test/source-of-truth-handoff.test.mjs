@@ -149,3 +149,30 @@ test("source-of-truth handoff emits narrow issue #960 runtime/token-cost plannin
   });
   assert.deepEqual(nonTargetPacket.planningWarnings, []);
 });
+
+test("source-of-truth handoff emits issue #976 long-run runtime planning warning", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.runtimeProvenance.git.branch = "fooks-issue-976-runtime-planning-warning";
+  snapshot.activity.worktree.branch = "fooks-issue-976-runtime-planning-warning";
+  snapshot.activity.worktree.upstream = "origin/fooks-issue-976-runtime-planning-warning";
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 976 --json number,title,state,url") {
+      return JSON.stringify({ number: 976, title: "runtime planning warning", state: "OPEN", url: "https://github.com/minislively/fooks/issues/976" });
+    }
+    if (key === "gh pr list --head fooks-issue-976-runtime-planning-warning --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return "[]";
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-19T22:02:03.000Z" });
+  assert.equal(packet.planningWarnings.length, 1);
+  assert.equal(packet.planningWarnings[0].issue, "#976");
+  assert.equal(packet.planningWarnings[0].status, "advisory");
+  assert.equal(packet.planningWarnings[0].trigger, "linked-issue-976");
+  assert.match(packet.planningWarnings[0].message, /context quality degrades/);
+  assert.match(packet.planningWarnings[0].forbiddenClaims.join("\n"), /runtime-token savings proof/);
+});

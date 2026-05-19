@@ -3343,3 +3343,48 @@ test("operator check JSON includes narrow issue #960 runtime/token-cost planning
   assert.match(snapshot.planningWarnings[0].message, /#961 preflight, #962 stale-context, and #963 handoff contracts/);
   assert.match(snapshot.planningWarnings[0].claimBoundary, /Advisory planning warning only/);
 });
+
+test("operator check JSON includes narrow issue #976 long-run planning advisory", () => {
+  const tempDir = makeTempProject();
+  const branch = "fooks-issue-976-runtime-planning-warning";
+  const head = "issue-976-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-19T22:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return `${branch}\n`;
+      if (args[0] === "rev-parse") return `${head}\n`;
+      if (args[0] === "rev-list") return "1\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number,title,url --limit 20") {
+        return JSON.stringify([{ number: 976, title: "runtime planning warning", url: "https://github.com/minislively/fooks/issues/976" }]);
+      }
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${head}`, `branch refs/heads/${branch}`, ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return `${branch}\nmain\n`;
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 1\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.planningWarnings.length, 1);
+  assert.equal(snapshot.planningWarnings[0].issue, "#976");
+  assert.equal(snapshot.planningWarnings[0].trigger, "branch-issue-976");
+  assert.match(snapshot.planningWarnings[0].message, /plan\/checkpoint\/compression or handoff review/);
+  assert.match(snapshot.planningWarnings[0].claimBoundary, /issues #960\/#976/);
+});
