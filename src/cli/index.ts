@@ -626,7 +626,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -641,6 +641,9 @@ Everyday commands:
 
   ${displayCliName} check [--json]
       Read-only operator/check artifact for post-merge main echo versus active issue/PR/session evidence.
+
+  ${displayCliName} preflight [--json]
+      Compact read-only agent guidance projected from the existing operator-check/contextTrust snapshot.
 
   ${displayCliName} run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
@@ -1512,6 +1515,21 @@ async function run(): Promise<void> {
       }
       const { readOperatorCheckSnapshot } = await import("../ops/operator-check.js");
       print(readOperatorCheckSnapshot(process.cwd()));
+      return;
+    }
+    case "preflight": {
+      const allowed = new Set(["--json"]);
+      for (const arg of rest) {
+        if (!allowed.has(arg)) {
+          throw new Error(`Unexpected preflight argument: ${arg}`);
+        }
+      }
+      const [{ readOperatorCheckSnapshot }, { buildPreflightPacket }] = await Promise.all([
+        import("../ops/operator-check.js"),
+        import("../ops/preflight.js"),
+      ]);
+      const snapshot = readOperatorCheckSnapshot(process.cwd());
+      print(buildPreflightPacket(snapshot));
       return;
     }
     case "status": {
