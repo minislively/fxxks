@@ -3,6 +3,7 @@ import path from "node:path";
 import type { OperatorCheckSnapshot } from "./operator-check";
 import type { PreflightPacket } from "./preflight";
 import { STALE_CONTEXT_COMMAND } from "./stale-context";
+import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 
 export const SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION = 1;
 export const SOURCE_OF_TRUTH_HANDOFF_COMMAND = "handoff";
@@ -111,6 +112,7 @@ export type SourceOfTruthHandoffPacket = {
     rationale: string;
     suggestedCommands: string[];
   };
+  planningWarnings: RuntimeTokenCostPlanningWarning[];
   blockers: string[];
 };
 
@@ -124,6 +126,7 @@ const AUTHORITATIVE_FILES_AND_DOCS = [
   "src/ops/preflight.ts",
   "src/ops/stale-context.ts",
   "src/ops/source-of-truth-handoff.ts",
+  "src/ops/runtime-token-cost-planning-warning.ts",
   "src/cli/index.ts",
   "docs/research/context-trust-and-stale-evidence-research.md",
   "docs/stale-context.md",
@@ -280,6 +283,8 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
   const changedPaths = readChangedPaths(cwd, options.commandRunner);
   const issue = linkedIssue(cwd, branch, blockers, options.commandRunner);
   const prResult = linkedPullRequest(cwd, branch, blockers, options.commandRunner);
+  const linkedIssueNumber = issue.status === "linked" ? issue.number : undefined;
+  const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch, linkedIssueNumber });
   const workflows = snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
     workflow: workflow.workflow,
     status: workflow.status,
@@ -349,6 +354,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     },
     staleOrHistoricalContextToAvoid: staleAvoidList(snapshot, preflight),
     nextRecommendedAction: nextAction(preflight, issue, prResult.artifact, changedPaths.length),
+    planningWarnings,
     blockers,
   };
 }
