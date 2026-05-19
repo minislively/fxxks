@@ -36,6 +36,11 @@ const {
   readOperatorCheckSnapshot,
 } = require(path.join(repoRoot, "dist", "ops", "operator-check.js"));
 
+const {
+  OPERATOR_CONTEXT_TRUST_RESEARCH_REFERENCE,
+  OPERATOR_CONTEXT_TRUST_SOURCE,
+} = require(path.join(repoRoot, "dist", "ops", "context-trust.js"));
+
 function runWithCli(cliPath, args, cwd, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cliPath, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
 }
@@ -64,7 +69,7 @@ function writeExecutable(filePath, body) {
 }
 
 function makeNoTmuxServerCliFixture(tmuxError = "no server running on /tmp/tmux-1000/default\n") {
-  const tempDir = makeTempProject();
+  const tempDir = fs.realpathSync(makeTempProject());
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-no-tmux-bin-"));
   const mainHead = "no-tmux-cli-main-head";
   writeExecutable(path.join(binDir, "tmux"), `#!/usr/bin/env node
@@ -1071,6 +1076,19 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.activeArtifactReceiptCount, 0);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
+  assert.equal(snapshot.contextTrust.schemaVersion, 1);
+  assert.equal(snapshot.contextTrust.source, OPERATOR_CONTEXT_TRUST_SOURCE);
+  assert.equal(snapshot.contextTrust.researchReference, OPERATOR_CONTEXT_TRUST_RESEARCH_REFERENCE);
+  assert.deepEqual(snapshot.contextTrust.sourceOfTruth.current, []);
+  assert.equal(snapshot.contextTrust.advisoryOnly.some((entry) => entry.kind === "required-active-artifact-guidance"), true);
+  assert.equal(snapshot.contextTrust.nonAuthorizing.some((entry) => entry.kind === "main-echo-boundary" && entry.referenceField === "postMergeMainEchoBoundary"), true);
+  assert.equal(snapshot.contextTrust.nonAuthorizing.find((entry) => entry.kind === "main-echo-boundary")?.contractScope, "main-echo-boundary");
+  assert.equal(snapshot.contextTrust.historicalOnly.some((entry) => entry.kind === "main-echo-boundary"), false);
+  assert.equal(snapshot.contextTrust.historicalOnly.some((entry) => entry.kind === "post-merge-main-ci-receipt"), false);
+  assert.equal(snapshot.contextTrust.historicalOnly.some((entry) => entry.kind === "post-receipt-nudge-anchor"), false);
+  assert.equal(snapshot.contextTrust.historicalOnly.some((entry) => entry.kind === "receipt-only-nudge-loop"), false);
+  assert.equal(snapshot.contextTrust.advisoryOnly.some((entry) => entry.kind === "post-receipt-nudge-anchor-guidance"), true);
+  assert.equal(snapshot.contextTrust.advisoryOnly.some((entry) => entry.kind === "receipt-only-nudge-loop-guidance"), true);
   assert.deepEqual(snapshot.blockers, []);
 });
 
@@ -1512,6 +1530,14 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
     "open GitHub pull request",
     "mapped fooks tmux session",
   ]);
+  const trustCurrentByKind = new Map(snapshot.contextTrust.sourceOfTruth.current.map((entry) => [entry.kind, entry]));
+  assert.equal(trustCurrentByKind.get("issue")?.count, 1);
+  assert.equal(trustCurrentByKind.get("issue")?.authority, "current-work");
+  assert.equal(trustCurrentByKind.get("issue")?.contractScope, "top-level-active-artifact");
+  assert.match(trustCurrentByKind.get("issue")?.reason ?? "", /count-only current-work presence/);
+  assert.equal(trustCurrentByKind.get("pullRequest")?.count, 1);
+  assert.equal(trustCurrentByKind.get("session")?.count, 1);
+  assert.equal("number" in trustCurrentByKind.get("issue"), false);
 });
 
 test("operator check does not treat staged unsubmitted OMX prompt pane as active session evidence for #910", () => {
@@ -1707,6 +1733,11 @@ test("operator check projects sibling worktree adoption receipts without cleanup
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
   assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
   assert.match(snapshot.activeWorkReceipts.staleResidueActiveBoundary.reminder, /require an open issue, open PR, or mapped fooks tmux session/);
+  const staleResidueTrust = snapshot.contextTrust.nonAuthorizing.find((entry) => entry.kind === "stale-residue-active-boundary");
+  assert.equal(staleResidueTrust?.count, 2);
+  assert.equal(staleResidueTrust?.authority, "insufficient");
+  assert.equal(staleResidueTrust?.contractScope, "stale-residue-boundary");
+  assert.equal(snapshot.contextTrust.sourceOfTruth.current.some((entry) => entry.kind === "worktree"), false);
   const byBranch = new Map(worktreeReceipts.map((receipt) => [receipt.identifiers.worktree.branch, receipt]));
   const manifestRowsByBranch = new Map(snapshot.activeWorkReceipts.cleanupReviewManifest.rows.map((row) => [row.branch, row]));
 
@@ -2771,6 +2802,11 @@ test("operator check exposes issue #885 handoff artifact evidence rule", () => {
   assert.equal(worktreeOnlyBoundary.runCreatedArtifactRequirement.required, false);
   assert.equal(worktreeOnlyBoundary.currentEvidence.liveNonMainWorktreePresent, true);
   assert.match(worktreeOnlyBoundary.nextReportRule, /separate from the top-level requiredActiveArtifact issue\/PR\/session contract/);
+  const worktreeOnlyTrust = worktreeOnlySnapshot.contextTrust.nonAuthorizing.find((entry) => entry.kind === "live-non-main-worktree-handoff-candidate");
+  assert.equal(worktreeOnlyTrust?.authority, "handoff-candidate");
+  assert.equal(worktreeOnlyTrust?.contractScope, "handoff-artifact-boundary");
+  assert.equal(worktreeOnlyTrust?.live, true);
+  assert.equal(worktreeOnlySnapshot.contextTrust.sourceOfTruth.current.some((entry) => entry.kind === "worktree"), false);
 
   const staleSessionWorktree = path.join(tempDir, ".omx-worktrees", "issue-885-stale-session");
   const staleSessionOnlySnapshot = readOperatorCheckSnapshot(tempDir, {
@@ -2812,6 +2848,12 @@ test("operator check exposes issue #885 handoff artifact evidence rule", () => {
   assert.equal(staleSessionOnlyBoundary.adoptedLiveArtifactPresent, false);
   assert.equal(staleSessionOnlyBoundary.runCreatedArtifactRequirement.required, true);
   assert.equal(staleSessionOnlyBoundary.satisfiesHandoffRule, false);
+  assert.equal(staleSessionOnlySnapshot.contextTrust.sourceOfTruth.current.find((entry) => entry.kind === "session")?.count, 1);
+  const liveSessionCaveat = staleSessionOnlySnapshot.contextTrust.nonAuthorizing.find((entry) => entry.kind === "mapped-session-live-handoff-caveat");
+  assert.equal(liveSessionCaveat?.count, 1);
+  assert.equal(liveSessionCaveat?.live, false);
+  assert.equal(liveSessionCaveat?.contractScope, "handoff-artifact-boundary");
+  assert.match(liveSessionCaveat?.reason ?? "", /top-level active-artifact\/session-count evidence/);
 
   const activeSnapshot = readOperatorCheckSnapshot(tempDir, {
     now: () => "2026-05-16T06:25:00.000Z",
@@ -3033,6 +3075,9 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.equal(check.command, OPERATOR_CHECK_COMMAND);
   assert.equal(check.readOnly, true);
   assert.equal(check.activity.optionalCounts.enabled, true);
+  assert.equal(check.contextTrust.schemaVersion, 1);
+  assert.equal(check.contextTrust.researchReference, OPERATOR_CONTEXT_TRUST_RESEARCH_REFERENCE);
+  assert.equal(check.contextTrust.advisoryOnly.every((entry) => typeof entry.contractScope === "string"), true);
   assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
 
   const activity = run(["status", "activity"], tempDir);

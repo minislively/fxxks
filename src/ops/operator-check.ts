@@ -18,6 +18,7 @@ import {
 } from "./orphan-local-worktree-triage";
 import { STALE_WORKTREE_AUDIT_COMMAND, STALE_WORKTREE_AUDIT_ISSUE } from "./stale-worktree-audit";
 import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
+import { buildOperatorContextTrust, type OperatorContextTrustPacket } from "./context-trust";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -559,6 +560,7 @@ export type OperatorCheckSnapshot = {
   activeArtifacts: OperatorCheckActiveArtifact[];
   activeWorkReceipts: OperatorCheckActiveWorkReceipts;
   requiredActiveArtifact: OperatorCheckRequiredActiveArtifact;
+  contextTrust: OperatorContextTrustPacket;
   activity: OperatorActivitySnapshot;
   blockers: string[];
 };
@@ -1599,6 +1601,15 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
       ? "activeArtifactPresent"
       : "idleRequiresActiveArtifact";
 
+  const requiredArtifact = requiredActiveArtifact({ blocked, hasActiveArtifact });
+  const contextTrust = buildOperatorContextTrust({
+    activeArtifacts,
+    activeWorkReceipts,
+    requiredActiveArtifact: requiredArtifact,
+    currentRunEvidence: activity.currentRunEvidence,
+    postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
+  });
+
   return {
     schemaVersion: OPERATOR_CHECK_SCHEMA_VERSION,
     command: OPERATOR_CHECK_COMMAND,
@@ -1620,7 +1631,8 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
     activeArtifacts,
     activeWorkReceipts,
-    requiredActiveArtifact: requiredActiveArtifact({ blocked, hasActiveArtifact }),
+    requiredActiveArtifact: requiredArtifact,
+    contextTrust,
     activity,
     blockers,
   };
