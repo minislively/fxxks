@@ -282,3 +282,21 @@ export {
   type WorkItemExplainRejectedEvidence,
   type WorkItemExplainResult,
 } from "./core/work-item-explain";
+
+export {
+  STALE_CONTEXT_CLAIM_BOUNDARY,
+  STALE_CONTEXT_COMMAND,
+  STALE_CONTEXT_RESEARCH_REFERENCE,
+  STALE_CONTEXT_SCHEMA_VERSION,
+  auditStaleContextText,
+  renderStaleContextAuditText,
+} from "./ops/stale-context";
+export type {
+  StaleContextAuditResult,
+  StaleContextAuthority,
+  StaleContextEvidence,
+  StaleContextFreshness,
+  StaleContextSeverity,
+  StaleContextWarning,
+  StaleContextWarningKind,
+} from "./ops/stale-context";

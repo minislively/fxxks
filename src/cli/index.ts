@@ -626,7 +626,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|stale-context|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -644,6 +644,10 @@ Everyday commands:
 
   ${displayCliName} preflight [--json]
       Compact read-only agent guidance projected from the existing operator-check/contextTrust snapshot.
+
+  ${displayCliName} stale-context <prompt-or-handoff.md> [--json]
+  ${displayCliName} stale-context --stdin [--json]
+      Local-only stale-context audit for prompt/handoff text; separates hard conflicts from advisory/suspect warnings.
 
   ${displayCliName} run [--mode auto|raw|hybrid|compressed] [--runner auto|codex|claude] <prompt>
   ${displayCliName} extract <file> [--model-payload] [--json]
@@ -1004,6 +1008,49 @@ function parseStatusReactWebArgs(args: string[]): { json: boolean } {
   }
 
   return { json };
+}
+
+function parseStaleContextArgs(args: string[]): { filePath?: string; stdin: boolean; json: boolean; help: boolean } {
+  let filePath: string | undefined;
+  let stdin = false;
+  let json = false;
+  let help = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--stdin") {
+      stdin = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      help = true;
+      continue;
+    }
+    if (!filePath) {
+      filePath = arg;
+      continue;
+    }
+    throw new Error(`Unexpected stale-context argument: ${arg}`);
+  }
+
+  if (stdin && filePath) {
+    throw new Error("stale-context accepts either --stdin or a file path, not both");
+  }
+
+  return { filePath, stdin, json, help };
+}
+
+function staleContextHelp(displayCliName: string): string {
+  return `Usage: ${displayCliName} stale-context <prompt-or-handoff.md> [--json]
+       ${displayCliName} stale-context --stdin [--json]
+
+Deterministically inspect prompt/handoff text for stale-context risk.
+The audit is local-only: it does not query GitHub, git, tmux, provider runtimes, or CI.
+Warnings separate hard conflicts from advisory/suspect context and include evidence/reason.
+`;
 }
 
 function parseDoctorArgs(args: string[]): { target: "all" | "codex" | "claude"; json: boolean; help: boolean } {
@@ -1515,6 +1562,36 @@ async function run(): Promise<void> {
       }
       const { readOperatorCheckSnapshot } = await import("../ops/operator-check.js");
       print(readOperatorCheckSnapshot(process.cwd()));
+      return;
+    }
+    case "stale-context": {
+      let options: ReturnType<typeof parseStaleContextArgs>;
+      try {
+        options = parseStaleContextArgs(rest);
+      } catch (error) {
+        console.error(`fooks stale-context: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(staleContextHelp(displayCliName));
+        process.exitCode = 1;
+        return;
+      }
+      if (options.help) {
+        process.stdout.write(staleContextHelp(displayCliName));
+        return;
+      }
+      if (!options.stdin && !options.filePath) {
+        console.error("fooks stale-context: missing file path or --stdin");
+        console.error(staleContextHelp(displayCliName));
+        process.exitCode = 1;
+        return;
+      }
+      const { auditStaleContextText, renderStaleContextAuditText } = await import("../ops/stale-context.js");
+      const text = options.stdin ? await readStdinText() : fs.readFileSync(requireFilePath(options.filePath), "utf8");
+      const result = auditStaleContextText(text, { source: options.stdin ? "stdin" : path.relative(process.cwd(), path.resolve(options.filePath!)) });
+      if (options.json) {
+        print(result);
+      } else {
+        process.stdout.write(renderStaleContextAuditText(result));
+      }
       return;
     }
     case "preflight": {
