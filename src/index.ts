@@ -300,3 +300,17 @@ export type {
   StaleContextWarning,
   StaleContextWarningKind,
 } from "./ops/stale-context";
+export {
+  SOURCE_OF_TRUTH_HANDOFF_CLAIM_BOUNDARY,
+  SOURCE_OF_TRUTH_HANDOFF_COMMAND,
+  SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION,
+  SOURCE_OF_TRUTH_HANDOFF_SOURCE,
+  buildSourceOfTruthHandoffPacket,
+} from "./ops/source-of-truth-handoff";
+export type {
+  SourceOfTruthHandoffCommandRunner,
+  SourceOfTruthHandoffOptions,
+  SourceOfTruthHandoffPacket,
+  SourceOfTruthLinkedArtifact,
+  SourceOfTruthPrCheck,
+} from "./ops/source-of-truth-handoff";
