@@ -2,9 +2,9 @@
 
 Issue #674 records the current fooks responsibility map. This page is a maintainer-facing architecture guide, not a runtime behavior change, support promise, benchmark claim, or release-readiness claim.
 
-The current product direction is frontend change intelligence / frontend work cost reduction. The first wedge remains React Web `.tsx` / `.jsx`; the first user-facing surface is an actionable, read-only CLI report over narrow native-control form/accessibility findings, with patch previews only when confidence is high enough for review. Context reduction and caching support that direction by preserving source facts and reducing repeated rediscovery; they are not separate permission to widen support.
+The current product direction is frontend change intelligence / frontend work cost reduction delivered through a runtime context layer for AI coding workflows. The first wedge remains React Web `.tsx` / `.jsx`; the strongest bounded product path is Codex repeated same-file React Web work where source facts can pass policy gates and become compact runtime context. The first reproducible manual report surface is an actionable, read-only CLI report over narrow native-control form/accessibility findings, with patch previews only when confidence is high enough for review. Context reduction and caching support that direction by preserving source facts and reducing repeated rediscovery; they are not separate permission to widen support.
 
-The strongest bounded product path remains Codex repeated same-file React Web `.tsx` / `.jsx` work. React Native, WebView, and TUI / React CLI remain deferred, fallback, candidate, or evidence-only lanes unless a later PR adds explicit fixtures, policy gates, and claim-boundary tests.
+React Native, WebView, and TUI / React CLI remain deferred, fallback, candidate, or evidence-only lanes unless a later PR adds explicit fixtures, policy gates, and claim-boundary tests.
 
 ## Boundary doctrine
 

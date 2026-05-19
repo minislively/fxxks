@@ -1,26 +1,32 @@
 # fooks
 
-Frontend change intelligence for Codex.
+Runtime context layer for AI coding workflows.
 
-`fooks` gives Codex a frontend-aware first minute before React Web edits: it reads source facts, gates the evidence, turns narrow native-control form/accessibility findings into issue cards, and hands agents a compact inspect-first work order. The strongest path today is not “trust a token-savings claim”; it is **run `fooks inspect react-web-issues`, see where the frontend risk is, then edit with the current source open**.
+This is still frontend change intelligence: `fooks` attaches to supported AI coding runtimes so frontend work can start from current, source-grounded evidence instead of repeated rediscovery. In the strongest current Codex path, fooks records the first eligible React Web `.tsx` / `.jsx` target, then on repeated same-file work may inject a compact, policy-gated context packet when the source fingerprint, domain evidence, and readiness checks still match.
+
+Product hierarchy:
+
+1. **Runtime path first:** Codex hook integration is the primary experience for eligible repeated React Web work; it can provide compact context, edit guidance, and receipts without asking the user to run a report each turn.
+2. **CLI as control plane:** `fooks setup`, `doctor`, `inspect`, `compare`, and `status` install, diagnose, reproduce, and prove the same source-intelligence pipeline.
+3. **Reports as projections:** `fooks inspect react-web-issues` produces an actionable manual report for supported React Web files, but reports are not always produced by the runtime path and are not patch authority.
 
 First-minute path:
 
-Scenario: a user asks Codex, “implement the `Form.tsx` feature.” Before editing, fooks should be the first inspect step, not a patch authority:
+Scenario: a user asks Codex, “implement the `Form.tsx` feature.” fooks should guide the runtime only when the supported file, prompt, freshness, and policy gates allow it:
 
 ```text
 user request
-  -> AI starts the task
-  -> fooks preflight on the supported React Web file
-  -> current source is read for JSX / TSX form-control evidence
-  -> issue cards + compact first-minute work order are handed to the AI
+  -> AI runtime receives the task
+  -> fooks hook detects and records the supported React Web file
+  -> repeated eligible same-file work triggers source inspection and policy checks
+  -> compact context / guidance / evidence may be attached to the runtime
   -> AI reopens or reruns against current source if freshness no longer matches
   -> AI keeps the user's feature scope, then edits and verifies normally
 ```
 
-Treat that handoff as advisory context: it tells the agent where to inspect first, what not to assume, and when a human decision is still needed. It is not auto-fix, not auto-apply, not codemod authority, and not permission to turn a feature request into a broad accessibility audit. Unsupported or ambiguous frontend lanes should fall back to normal source reading rather than a compact fooks payload.
+Treat any fooks handoff as advisory context: it tells the agent where to inspect first, what not to assume, and when a human decision is still needed. It is not auto-fix, not auto-apply, not codemod authority, and not permission to turn a feature request into a broad accessibility audit. Unsupported or ambiguous frontend lanes should fall back to normal source reading rather than a compact fooks payload.
 
-Run the first value path on a supported React Web file:
+Use the CLI control plane to activate and reproduce the runtime pipeline on a supported React Web file:
 
 ```bash
 npm install -g fxxk-frontend-hooks
@@ -30,13 +36,11 @@ fooks doctor
 fooks inspect react-web-issues src/components/Form.tsx
 ```
 
-The issue-card output is read-only and actionable: each card explains `problem`, `whyItMatters`, `whereToLook`, `confidence`, and `suggestedAction`. High-confidence native label/control findings can include safe preview shape hints, but fooks does **not** auto-apply patches, invent final accessible-name copy, infer custom-component semantics, or claim a broad accessibility audit. Ambiguous cases stay as manual-review cards with stop reasons.
+The manual issue-card report is read-only and actionable, but not patch authority: high-confidence findings can include safe preview shape hints, while ambiguous cases stay as manual-review cards with stop reasons. For card examples, including `react-web.missing-htmlFor-target`, `react-web.duplicate-literal-id`, and `react-web.conflicting-label-association`, and the detailed `--summary-json` / `--dry-run-json` handoff contract, see [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md) and [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md).
 
-Want to see the product loop before installing it into a real repo? Start with the packaged golden demo: [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md). It includes selected current React Web card-family rows for `react-web.missing-accessible-label`, `react-web.ambiguous-accessible-label`, `react-web.empty-accessible-name`, `react-web.missing-htmlFor-target`, `react-web.unassociated-nearby-label`, `react-web.duplicate-literal-id`, and `react-web.conflicting-label-association` without adding a new API or product claim. For the detailed first-minute handoff contract, including `--summary-json` and `--dry-run-json`, see [`docs/react-web-first-minute-work-orders.md`](docs/react-web-first-minute-work-orders.md).
+Context reduction and caching are supporting mechanisms. `fooks compare` shows local source-vs-payload evidence for one supported file, and `fooks inspect react-web-issues` reproduces the report projection when you need to debug or hand off the same source facts explicitly.
 
-Context reduction and caching are supporting mechanisms. In the strongest current Codex path, repeated work on the same React `.tsx` / `.jsx` file may reuse compact same-file context when the evidence gate says that is safe. `fooks compare` shows local source-vs-payload evidence for one supported file, but the launch-facing habit is simpler: **inspect first, then reuse context only when safe**.
-
-Then open Codex in that repo and work normally with the current source open. After the first issue-card pass, supporting local proof commands are:
+Then open Codex in that repo and work normally with the current source open. Supporting local proof commands are:
 
 ```bash
 fooks inspect react-web-issues src/components/Form.tsx --summary-json
@@ -51,30 +55,28 @@ Best fit: React Web `.tsx` / `.jsx` work where source-derived form and accessibi
 
 ## 30-second version
 
-Use fooks when you want Codex to start React Web work with a compact, source-grounded issue card instead of rediscovering frontend facts from scratch.
+Use fooks when you want supported AI coding runtime work to start with compact, source-grounded frontend context instead of rediscovering React Web facts from scratch.
 
-1. **Inspect first:** `fooks inspect react-web-issues <file>` ranks narrow native JSX label/control risks and tells the agent where to look before editing.
-2. **Handoff safely:** `--summary-json` gives agents `firstMinuteSummary.items[0]`, `decision`, `humanDecisionNeeded`, and `doNotDo` boundaries as advisory inspect-first input rather than edit authority.
-3. **Preview only when safe:** `--dry-run-json` lists migration candidates and preview availability, but remains dry-run-only with `autoApply: false` and human review for final label/name choices.
-4. **Reuse when safe:** repeated same-file Codex work may reuse compact context after evidence gates pass; `fooks compare` is supporting local payload proof, not the headline.
-5. **Prove narrowly:** benchmark and cost numbers are estimate-scoped supporting evidence, not provider invoice, billing-token, stable runtime-token, or Claude/opencode automatic-savings proof.
+1. **Attach at runtime:** after `fooks setup`, the Codex hook path can record eligible targets and inject compact context for repeated same-file work when policy gates pass.
+2. **Keep CLI as control plane:** `fooks inspect react-web-issues <file>` manually reproduces narrow native JSX label/control findings and tells the agent where to look before editing.
+3. **Handoff safely:** `--summary-json` gives agents `firstMinuteSummary.items[0]`, `decision`, `humanDecisionNeeded`, and `doNotDo` boundaries as advisory input rather than edit authority.
+4. **Preview only when safe:** `--dry-run-json` lists migration candidates and preview availability, but remains dry-run-only with `autoApply: false` and human review for final label/name choices.
+5. **Prove narrowly:** `fooks compare` and local status surfaces provide estimate-scoped evidence, not provider invoice, billing-token, stable runtime-token, or Claude/opencode automatic-savings proof.
 
 See the example source, command output, summary handoff, and dry-run boundary in [`docs/demo/react-web-issues.md`](docs/demo/react-web-issues.md).
 
 ## Quick start and local proof
 
-The first-minute path above is the shortest setup/proof loop: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then run `fooks inspect react-web-issues <supported-file>` for actionable React Web issue cards. Agents and tools that only need the compact work-order handoff should use `fooks inspect react-web-issues <supported-file> --summary-json`, read `firstMinuteSummary.items[0]` and its `decision`, and treat the result as advisory inspect-first input rather than edit authority. Migration planners that need candidate rows can use `--dry-run-json`; it remains read-only and dry-run-only. `fooks compare <supported-file>` is supporting local source-vs-payload evidence, not the whole product proof.
+The shortest activation/proof loop is: install the CLI, activate the current repo with `fooks setup`, check readiness with `fooks doctor`, then use Codex normally on supported repeated React Web work. Use `fooks inspect react-web-issues <supported-file>` when you need a reproducible manual report projection, `--summary-json` for advisory inspect-first input rather than edit authority, `--dry-run-json` for read-only migration candidates, and `fooks compare <supported-file>` for supporting one-file source-vs-payload evidence.
 
-`fooks doctor` is the read-only health check for setup/hook readiness; its default output starts with status, why, first blocker, and next action so a new user can recover without reading JSON. `fooks inspect react-web-issues` is the first actionable report surface for narrow native-control form/accessibility findings. `fooks compare` defaults to a concise verdict/next-action summary for one supported file; add `--json` for exact local byte counts, exclusions, and claim boundary text.
-
-If you run `fooks doctor` from a source checkout, new git worktree, or freshly cloned project before `fooks setup`, an `unhealthy` result usually means the project-local adapter/runtime manifests have not been activated yet. That is expected for an unprepared checkout; run `fooks setup`, then rerun `fooks doctor` to verify the dogfood state you will actually use.
+`fooks doctor` is the read-only health check for setup/hook readiness. From a source checkout or freshly cloned project, an `unhealthy` result before `fooks setup` usually means the project-local adapter/runtime manifests have not been activated yet; run `fooks setup`, then rerun `fooks doctor`.
 
 ### First-run checklist
 
 1. Install the package: `npm install -g fxxk-frontend-hooks`.
 2. Confirm the command resolves to the package you expect: `which fooks` and `fooks --help`.
 3. Activate only the repo you are inside: `fooks setup`. The default output should be a short `ready`, `partial`, or `blocked` summary, not a debug JSON wall.
-4. Diagnose locally: `fooks doctor` for readiness, `fooks inspect react-web-issues <file>` for the first actionable React Web form/accessibility report, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file>` for supporting one-file payload proof; add `--json` only when you need exact local byte counts, exclusions, and claim boundary text.
+4. Diagnose and reproduce locally: `fooks doctor` for readiness, `fooks inspect react-web-issues <file>` for the first reproducible React Web form/accessibility report, `fooks status` for local estimated session telemetry, `fooks status artifacts` for a read-only fooks tmux/worktree/branch audit, and `fooks compare <file>` for supporting one-file payload proof; add `--json` only when you need exact local byte counts, exclusions, and claim boundary text.
 5. Use `fooks setup --json` only when you need support/debug paths, runtime manifests, or issue-report evidence.
 
 ## Strongest path / beta path / not today
@@ -196,63 +198,20 @@ The evidence ladder is intentionally split so public wording does not collapse p
 Current public summary:
 
 - Local commands support **model-facing context / prompt-size estimate** wording.
-- The 2026-04-14 Codex-oriented proxy snapshot showed a prepared-context estimate reduction from roughly 2.1M to 450K estimated context tokens in a 5-task sample, with no success-rate regression in that sample.
-- The corrected 2026-04-22 Codex OAuth provider-cost campaign reached launch-grade estimated-cost evidence for the small fixture lane: 3 task classes × 5 accepted matched pairs, 0 command-execution events, 15/15 accepted, an overall median estimated API-cost reduction of 4.171%, and aggregate estimated API cost of `$0.588855` baseline vs `$0.5547775` fooks (`$0.0340775`, 5.787% lower) under the recorded pricing assumption. Provider-reported usage tokens in that campaign were `376,104` baseline vs `372,065` fooks; 4/15 individual pairs still regressed.
-- Larger corrected public-code profiles made the impact easier to see under the same estimate-scoped boundary: the Next.js profile reported 15/15 accepted pairs, 0 regressions, median estimated API-cost reduction of 26.492%, provider-reported usage tokens `446,275` baseline vs `382,139` fooks, and aggregate estimated API cost `$0.88386` vs `$0.64497`; the Tailwind profile reported 15/15 accepted pairs, 0 regressions, median estimated API-cost reduction of 38.238%, provider-reported usage tokens `718,616` baseline vs `381,583` fooks, and aggregate estimated API cost `$1.598875` vs `$0.64853`.
-- These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove invoice/dashboard savings, actual charged-cost savings, provider usage/billing-token outcomes, stable runtime-token savings, or stable wall-clock/latency savings.
+- Corrected Codex OAuth provider-cost benchmark lanes include estimate-scoped reductions for a small fixture lane plus larger Next.js and Tailwind public-code profiles, under explicit pricing assumptions and accepted-pair gates.
+- These provider-cost benchmark lanes are **estimated API cost under explicit pricing assumptions**. They do not prove provider invoice/dashboard savings, actual charged-cost savings, provider usage/billing-token outcomes, stable runtime-token savings, or stable wall-clock/latency savings.
 - Direct runtime-token/time evidence remains unstable or negative in some diagnostics, so fooks does not claim stable runtime-token, wall-clock, or latency wins.
 
-### Provider-cost benchmark snapshot (primary evidence)
-
-This is the main benchmark section most readers should evaluate first: it answers whether matched full-source vs fooks-payload runs used less provider-reported usage and lower estimated API cost under explicit pricing assumptions. These figures are **not OMX-session benchmarks** and not a full interactive
-"install fooks, work normally" session benchmark. They come from a Codex OAuth
-no-tool benchmark harness that compares matched baseline prompts containing
-real full-source context against matched fooks prompts containing real
-`fooks extract --model-payload` context, using isolated Codex workdirs and AB/BA
-pair order.
-
-| Profile / project | Scope | Accepted pairs | Regressions | Median estimated API-cost reduction | Aggregate estimated API cost | Provider-reported usage tokens |
-| --- | --- | ---: | ---: | ---: | --- | --- |
-| Small fixture lane | 3 task classes × 5 pairs | 15/15 | 4/15 pairs | 4.171% | `$0.588855` baseline → `$0.5547775` fooks (`$0.0340775`, 5.787% lower) | `376,104` baseline → `372,065` fooks |
-| Next.js large profile | App Router summary, Layout Router refactor plan, Error Boundary test strategy | 15/15 | 0/15 pairs | 26.492% | `$0.88386` baseline → `$0.64497` fooks (`$0.23889`, 27.028% lower) | `446,275` baseline → `382,139` fooks |
-| Tailwind large profile | Utilities summary, Variants refactor plan, CSS Parser test strategy | 15/15 | 0/15 pairs | 38.238% | `$1.598875` baseline → `$0.64853` fooks (`$0.950345`, 59.438% lower) | `718,616` baseline → `381,583` fooks |
-
-Task-median reductions for the larger profiles were Next.js App Router summary `30.681%`, Layout Router refactor plan `28.699%`, Error Boundary test strategy `19.447%`; Tailwind Utilities summary `78.992%`, Variants refactor plan `38.238%`, CSS Parser test strategy `33.582%`.
-
-### OMX command-surface diagnostic (secondary evidence)
-
-A 2026-04-24 single-pair diagnostic checked whether the same fooks payload advantage survives the [`omx exec`](https://github.com/Yeachan-Heo/oh-my-codex) command surface from [oh-my-codex (OMX)](https://github.com/Yeachan-Heo/oh-my-codex). This is **not** an installed-hook repeated-session benchmark and is **not** stable public runtime evidence yet. It compared one Tailwind large file (`packages/tailwindcss/src/utilities.ts`) as full source (`213,836` bytes) versus real `fooks extract --model-payload` output (`3,517` bytes), with no tool calls, using `gpt-5.4-mini`.
-
-| Surface | Full-source input tokens | Fooks-payload input tokens | Input-token reduction | Total-token reduction |
-| --- | ---: | ---: | ---: | ---: |
-| Plain `codex exec` | `65,497` | `13,593` | 79.246% | 78.996% |
-| `omx exec` | `63,122` | `11,218` | 82.228% | 81.962% |
-
-This is secondary evidence: it explains that the compact payload advantage survives the OMX command surface, but the provider-cost snapshot above is the stronger product-facing evidence. This controlled no-tool Tailwind payload pilot shows fooks' model-facing payload stayed much smaller through both plain Codex and OMX command surfaces. It does **not** prove that ordinary interactive OMX sessions, installed hooks, provider invoices, or stable runtime costs drop by the same amount.
-
-Detailed evidence and current claim boundaries are maintained in the curated benchmark evidence page: https://github.com/minislively/fooks/blob/main/docs/benchmark-evidence.md
-
-The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider usage/billing-token proof, and not a Claude or opencode automatic savings claim.
+Detailed benchmark tables, task medians, OMX command-surface diagnostics, and current claim boundaries are maintained in [`docs/benchmark-evidence.md`](docs/benchmark-evidence.md). The benchmark evidence is not provider invoice/dashboard proof, not actual charged-cost proof, not provider usage/billing-token proof, and not a Claude or opencode automatic savings claim.
 
 ## Common questions
 
-### Does this prove my provider bill will be lower?
+Most scope answers are covered by the support tables above. The high-risk boundaries are:
 
-No. fooks can reduce model-facing prompt/context size in supported cases, and the benchmark docs include estimate-scoped API-cost evidence under explicit pricing assumptions. That is not provider invoice, dashboard, actual charged-cost, or billing-grade proof.
-
-### Is Claude automatic too?
-
-Not at Codex parity. Claude support uses project-local `SessionStart` / `UserPromptSubmit` context hooks plus handoff artifacts. fooks does not intercept Claude `Read` tool calls.
-
-### Does opencode get automatic read interception?
-
-No. opencode support is a project-local `fooks_extract` tool and `/fooks-extract` slash command. It steers explicit tool use; it does not replace opencode's built-in `read` behavior.
-
-### Which files are supported?
-
-The strongest path today is repeated same-file React `.tsx` / `.jsx` work in Codex. Unsupported or unsafe cases fall back to normal full-source behavior.
-
-React Native and embedded WebView files are not supported today. Treat `.tsx` parsing as syntax-level eligibility only; it is not evidence that fooks understands RN primitives, native platform semantics, bridge behavior, or WebView boundaries.
+- Provider benchmarks are estimate-scoped evidence, not provider invoice, dashboard, actual charged-cost, billing-grade, or stable runtime-token proof.
+- Claude support is not Codex parity: it uses project-local context hooks and handoff artifacts, not `Read` interception.
+- opencode support is manual/semi-automatic through `fooks_extract` and `/fooks-extract`, not automatic `read` interception.
+- The strongest file path remains repeated same-file React `.tsx` / `.jsx` work in Codex; React Native, embedded WebView, Vue/SFC, unsupported TS/JS, and unsafe cases fall back to normal source reading.
 
 ## Everyday commands
 
@@ -279,44 +238,15 @@ fooks extract src/components/Button.tsx --model-payload
 fooks scan
 ```
 
-`fooks status` reads local `.fooks/sessions` summaries produced by the Codex automatic hook path and the Claude project-local context-hook path. The values are approximate context-size estimates only; status includes runtime/source breakdowns, omits per-session details, and is not provider usage/billing tokens, invoices, dashboards, charged costs, or a `ccusage` replacement.
-
-Source-checkout dogfood operators should run the repo npm aliases from the checkout: `npm run -s check -- --json` for `fooks check`, and `npm run -s status:activity -- --json` for `fooks status activity`. Those aliases build first and then run the read-only operator command, so source-checkout handoffs should cite the aliases instead of sending maintainers to `docs/setup.md` or a direct `dist/cli/index.js` path.
-
-`fooks check` is a narrow read-only operator/check projection over `fooks status activity --include-remote-counts`. It makes the post-merge `main` echo versus active work boundary explicit: when there is no open issue, no open PR, and no mapped fooks tmux session, the JSON returns `verdict: "idleRequiresActiveArtifact"` and `requiredActiveArtifact.required: true` instead of inventing active work from a successful main CI/release echo. Detached fooks PR review worktree leftovers such as `fooks-pr-727-review` and `fooks-pr-728-review` are reported as non-active cleanup-review noise when they have no mapped session or open PR; this receipt remains read-only and does not delete, push, or mutate local-only commits. The issue #867 `postReceiptNudgeAnchorBoundary` also treats #866 main CI/release success as a receipt only and requires the next nudge to name a fresh issue, branch, session, PR anchor, or concrete blocker. The issue #869 `receiptOnlyNudgeLoopBoundary` prevents repeated receipt-only reports after PR #868 by requiring the report to name newly created/adopted issue evidence plus mapped OMX session evidence, not the last merged commit or CI run. The issue #873 post-success nudge replay artifact keeps PR #872 green CI/release receipts receipt-only; if open PR/issues and live OMX are zero, the nudge must spawn/adopt one issue/branch/session target and report delta/ahead/proc evidence instead of answering with the prior CI receipt. The issue #885 fooks-check handoff artifact makes the adoption rule explicit: adopt live PR/issue/session/worktree evidence when present; otherwise create exactly one issue, branch, or session and report concrete run-created artifact evidence, not another status summary.
-
-`fooks status activity` is a compact read-only dogfood operator snapshot. It preserves the existing bare status, worktree, and artifacts contracts, reports current local worktree branch/divergence and dirty-path delta, lists fooks-like tmux sessions when available, and includes bounded `currentRunEvidence` plus `legacyWorktreeEvidence`. `currentRunEvidence` is the current-run reminder artifact for clean post-merge main echoes: when the branch is `main`, the worktree is clean, local divergence is zero, fooks-like tmux sessions are zero, and opt-in remote issue/PR counts are both zero, it classifies the snapshot as `mainEchoNonActive` instead of active fooks development. `legacyWorktreeEvidence` is projected from `status artifacts` `staleClosedArtifactWorktrees`; it reports counts plus a capped list of old closed-artifact worktrees with local branch-archive evidence and no mapped tmux pane, sets `cleanupCommandsIncluded: false`, and does not include runtime cleanup order or cleanup commands. It does not call GitHub by default; pass `--include-remote-counts` to opt in to non-blocking `gh` open issue/PR counts.
-
-`fooks status artifacts` is a read-only dogfood cleanup audit for local fooks artifacts after PRs merge. It inspects local git worktrees/branches and tmux panes, scopes results to fooks-like names or `.omx-worktrees` paths, and uses conservative labels such as `activeOrUnknown`, `likelyMerged`, `missingPath`, and `candidateCleanup`. The JSON also includes `staleClosedArtifactWorktrees` for existing non-current worktrees whose branch has exact local branch-archive evidence and no mapped tmux pane, so nudges can distinguish old closed-artifact worktrees from active OMX work without deleting anything. The command does not run `git fetch`, `git worktree prune`, `git worktree remove`, `git branch -d`, or `tmux kill-session`; any `manualCleanupCommands` in the JSON are copy/paste suggestions only. Missing worktree paths only suggest `git worktree prune --dry-run` so operators can inspect before deciding whether to run cleanup manually. When tmux panes are still attached to deleted worktree paths, the JSON also includes `staleRuntimeCleanups` with the manual order: verify inactivity, stop the tmux/OMX/Codex session, then run any git worktree prune/remove follow-up. Verify the PR is merged and the session/worktree is inactive before copying any command.
+`fooks status`, `fooks check`, `fooks status activity`, and `fooks status artifacts` are read-only local/operator projections. They report setup, local estimate, activity, branch/worktree/tmux, and artifact evidence without deleting worktrees, pruning branches, proving provider billing, or replacing `ccusage`. Source-checkout dogfood operators should prefer the repo npm aliases (`npm run -s check -- --json`, `npm run -s status:activity -- --json`) when they need built-from-source receipts. Those aliases build first and then run the read-only operator command, so source-checkout handoffs should cite the aliases instead of sending maintainers to `docs/setup.md` or a direct `dist/cli/index.js` path.
 
 ## opencode support
 
-opencode support is **manual/semi-automatic** today. It does not intercept opencode `read` calls and does not claim automatic runtime-token savings.
-
-`fooks setup` installs the project-local opencode bridge when the project has a supported `.tsx` / `.jsx` component. You can also install or repair just that bridge from the project root:
-
-```bash
-fooks install opencode-tool
-```
-
-This creates two project-local opencode artifacts:
-
-```text
-.opencode/tools/fooks_extract.ts
-.opencode/commands/fooks-extract.md
-```
-
-Use `/fooks-extract path/to/File.tsx` or ask opencode to call `fooks_extract` when you want a fooks model-facing payload for a `.tsx` or `.jsx` file. This bridge steers tool selection; it does **not** intercept opencode `read` calls.
+opencode support is **manual/semi-automatic** today. `fooks setup` can prepare the project-local `fooks_extract` tool and `/fooks-extract` slash command for supported `.tsx` / `.jsx` files, or you can repair that bridge with `fooks install opencode-tool`. Use `/fooks-extract path/to/File.tsx` or ask opencode to call `fooks_extract` when you want a fooks model-facing payload; this steers explicit tool use and does **not** intercept opencode `read` calls or claim automatic runtime-token savings. See [`docs/opencode-read-interception.md`](docs/opencode-read-interception.md) for the boundary.
 
 ## Support boundaries
 
-| Environment | Current support | Runtime-token claim |
-| --- | --- | --- |
-| Codex | Automatic repeated-file hook path through `fooks setup` | Model-facing context and estimate-scoped benchmark evidence only; no stable runtime-token or billing-grade claim |
-| Claude | Project-local context hooks for `SessionStart` / `UserPromptSubmit`; the first eligible explicit frontend-file prompt is recorded/prepared, and a repeated same-file prompt may receive bounded context; manual/shared handoff fallback prepared by `fooks setup` when possible | No `Read` interception and no automatic runtime-token savings claim |
-| opencode | Manual/semi-automatic project-local tool and slash command prepared by `fooks setup` when possible | No read interception and no automatic runtime-token savings claim |
-
-`fooks` is not a universal file-read interceptor. Non-frontend files usually fall back to normal source reading.
+The canonical support matrix is the runtime table above. In short: Codex has the strongest automatic repeated-file path; Claude uses project-local context hooks and handoff artifacts without `Read` interception; opencode uses explicit project-local tools without built-in `read` interception. `fooks` is not a universal file-read interceptor, and unsupported or unsafe frontend lanes fall back to normal source reading.
 
 ## Troubleshooting
 
