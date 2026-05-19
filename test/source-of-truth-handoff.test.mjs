@@ -109,3 +109,43 @@ test("handoff CLI emits JSON packet", () => {
   assert.ok(Array.isArray(packet.sourceOfTruth.authoritativeFilesAndDocs));
   assert.ok(packet.currentStatus.operatorCheck.verdict);
 });
+
+test("source-of-truth handoff emits narrow issue #960 runtime/token-cost planning warning only", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.runtimeProvenance.git.branch = "fooks-issue-960-runtime-token-cost-plan";
+  snapshot.activity.worktree.branch = "fooks-issue-960-runtime-token-cost-plan";
+  snapshot.activity.worktree.upstream = "origin/fooks-issue-960-runtime-token-cost-plan";
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 960 --json number,title,state,url") {
+      return JSON.stringify({ number: 960, title: "runtime token cost planning", state: "OPEN", url: "https://github.com/minislively/fooks/issues/960" });
+    }
+    if (key === "gh pr list --head fooks-issue-960-runtime-token-cost-plan --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return "[]";
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-19T01:02:03.000Z" });
+  assert.equal(packet.planningWarnings.length, 1);
+  assert.equal(packet.planningWarnings[0].issue, "#960");
+  assert.equal(packet.planningWarnings[0].status, "advisory");
+  assert.equal(packet.planningWarnings[0].trigger, "linked-issue-960");
+  assert.deepEqual(packet.planningWarnings[0].prerequisiteIssues, ["#961", "#962", "#963"]);
+  assert.match(packet.planningWarnings[0].claimBoundary, /does not change provider\/runtime hooks/);
+  assert.match(packet.planningWarnings[0].forbiddenClaims.join("\n"), /provider usage\/billing-token proof/);
+
+  const nonTargetPacket = buildSourceOfTruthHandoffPacket(baseSnapshot(cwd), basePreflight(), {
+    commandRunner: (command, args) => {
+      const key = `${command} ${args.join(" ")}`;
+      if (key === "git status --porcelain=v1") return "";
+      if (key === "gh issue view 963 --json number,title,state,url") return JSON.stringify({ number: 963, state: "OPEN" });
+      if (key === "gh pr list --head fooks-issue-963-source-of-truth-handoff --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") return "[]";
+      throw new Error(`unexpected command: ${key}`);
+    },
+    now: () => "2026-05-19T01:02:03.000Z",
+  });
+  assert.deepEqual(nonTargetPacket.planningWarnings, []);
+});

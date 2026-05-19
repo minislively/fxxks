@@ -19,6 +19,7 @@ import {
 import { STALE_WORKTREE_AUDIT_COMMAND, STALE_WORKTREE_AUDIT_ISSUE } from "./stale-worktree-audit";
 import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
 import { buildOperatorContextTrust, type OperatorContextTrustPacket } from "./context-trust";
+import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -561,6 +562,7 @@ export type OperatorCheckSnapshot = {
   activeWorkReceipts: OperatorCheckActiveWorkReceipts;
   requiredActiveArtifact: OperatorCheckRequiredActiveArtifact;
   contextTrust: OperatorContextTrustPacket;
+  planningWarnings: RuntimeTokenCostPlanningWarning[];
   activity: OperatorActivitySnapshot;
   blockers: string[];
 };
@@ -1590,6 +1592,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const activity = readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true });
   const activeArtifacts = activeArtifactsFrom(activity);
   const activeWorkReceipts = buildActiveWorkReceipts(cwd, activity, options);
+  const branch = activity.worktree.branch;
   const blockers = checkProjectionBlockers([...activity.blockers]);
   const hasActiveArtifact = activeArtifacts.length > 0;
   const optionalCountBlockers = activity.optionalCounts.enabled ? activity.optionalCounts.blockers : [];
@@ -1633,6 +1636,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     activeWorkReceipts,
     requiredActiveArtifact: requiredArtifact,
     contextTrust,
+    planningWarnings: buildRuntimeTokenCostPlanningWarnings({ branch }),
     activity,
     blockers,
   };
