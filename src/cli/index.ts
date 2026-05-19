@@ -626,7 +626,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|stale-context|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|handoff|stale-context|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -644,6 +644,9 @@ Everyday commands:
 
   ${displayCliName} preflight [--json]
       Compact read-only agent guidance projected from the existing operator-check/contextTrust snapshot.
+
+  ${displayCliName} handoff [--json]
+      Compact source-of-truth handoff packet for fresh agent sessions, bounded to the current branch/worktree.
 
   ${displayCliName} stale-context <prompt-or-handoff.md> [--json]
   ${displayCliName} stale-context --stdin [--json]
@@ -1607,6 +1610,23 @@ async function run(): Promise<void> {
       ]);
       const snapshot = readOperatorCheckSnapshot(process.cwd());
       print(buildPreflightPacket(snapshot));
+      return;
+    }
+    case "handoff": {
+      const allowed = new Set(["--json"]);
+      for (const arg of rest) {
+        if (!allowed.has(arg)) {
+          throw new Error(`Unexpected handoff argument: ${arg}`);
+        }
+      }
+      const [{ readOperatorCheckSnapshot }, { buildPreflightPacket }, { buildSourceOfTruthHandoffPacket }] = await Promise.all([
+        import("../ops/operator-check.js"),
+        import("../ops/preflight.js"),
+        import("../ops/source-of-truth-handoff.js"),
+      ]);
+      const snapshot = readOperatorCheckSnapshot(process.cwd());
+      const preflight = buildPreflightPacket(snapshot);
+      print(buildSourceOfTruthHandoffPacket(snapshot, preflight));
       return;
     }
     case "status": {
