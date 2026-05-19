@@ -4,6 +4,7 @@ Durable research artifacts used to preserve external evidence, product reasoning
 
 ## Index
 
+- [`automatic-preflight-and-instruction-trust.md`](automatic-preflight-and-instruction-trust.md) — Action-based contextTrust preflight design, hook lifecycle research, instructionTrust boundary, risk taxonomy, and phased roadmap for issue #966.
 - [`runtime-token-cost-research-2026-05-19.md`](runtime-token-cost-research-2026-05-19.md) — Runtime token-cost research, external evidence anchors, fooks adoption roadmap, gaps, strengths, and claim-boundary guardrails.
 
 ## Usage rule
