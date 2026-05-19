@@ -41,6 +41,12 @@ const {
   OPERATOR_CONTEXT_TRUST_SOURCE,
 } = require(path.join(repoRoot, "dist", "ops", "context-trust.js"));
 
+const {
+  PREFLIGHT_COMMAND,
+  PREFLIGHT_SOURCE,
+  buildPreflightPacket,
+} = require(path.join(repoRoot, "dist", "ops", "preflight.js"));
+
 function runWithCli(cliPath, args, cwd, envOverrides = {}) {
   return JSON.parse(execFileSync(process.execPath, [cliPath, ...args], { cwd, encoding: "utf8", env: { ...process.env, ...envOverrides } }));
 }
@@ -62,6 +68,25 @@ function makeTempProject() {
   fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
   fs.writeFileSync(path.join(tempDir, "src", "index.ts"), "export const value = 1;\n");
   return tempDir;
+}
+
+function syntheticPreflightSnapshot({ current = [], nonAuthorizing = [], advisoryOnly = [], historicalOnly = [], verdict = "idleRequiresActiveArtifact", blockers = [] } = {}) {
+  return {
+    schemaVersion: 1,
+    command: OPERATOR_CHECK_COMMAND,
+    verdict,
+    blockers,
+    contextTrust: {
+      schemaVersion: 1,
+      source: OPERATOR_CONTEXT_TRUST_SOURCE,
+      researchReference: OPERATOR_CONTEXT_TRUST_RESEARCH_REFERENCE,
+      claimBoundary: "synthetic test contextTrust",
+      sourceOfTruth: { current },
+      advisoryOnly,
+      historicalOnly,
+      nonAuthorizing,
+    },
+  };
 }
 
 function writeExecutable(filePath, body) {
@@ -212,6 +237,94 @@ function tmuxNoServerError(socket = "/tmp/tmux-1000/default", stream = "stderr")
   error.code = 1;
   return error;
 }
+
+test("preflight builder projects synthetic contextTrust without evidence reads", () => {
+  const preflightSource = fs.readFileSync(path.join(repoRoot, "src", "ops", "preflight.ts"), "utf8");
+  const operatorCheckSource = fs.readFileSync(path.join(repoRoot, "src", "ops", "operator-check.ts"), "utf8");
+  assert.doesNotMatch(preflightSource, /node:(?:fs|child_process)/);
+  assert.doesNotMatch(preflightSource, /\bexecFileSync\b|\bspawnSync\b|\breadFileSync\b/);
+  assert.doesNotMatch(operatorCheckSource, /preflight/);
+
+  const mainEchoEntry = {
+    kind: "main-echo-boundary",
+    source: OPERATOR_ACTIVITY_CURRENT_RUN_SOURCE,
+    reason: "main echo only",
+    referenceField: "postMergeMainEchoBoundary",
+    live: true,
+    authority: "insufficient",
+    contractScope: "main-echo-boundary",
+  };
+  const noAuthority = buildPreflightPacket(syntheticPreflightSnapshot({ nonAuthorizing: [mainEchoEntry] }));
+  assert.equal(noAuthority.schemaVersion, 1);
+  assert.equal(noAuthority.command, PREFLIGHT_COMMAND);
+  assert.equal(noAuthority.source, PREFLIGHT_SOURCE);
+  assert.equal(noAuthority.derivedFrom.operatorCheckCommand, OPERATOR_CHECK_COMMAND);
+  assert.equal(noAuthority.derivedFrom.operatorCheckSchemaVersion, 1);
+  assert.equal(noAuthority.derivedFrom.contextTrustSchemaVersion, 1);
+  assert.equal(noAuthority.summary.authorityStatus, "missing");
+  assert.equal(noAuthority.guidance.riskLevel, "high");
+  assert.equal(noAuthority.guidance.recommendedAction, "create-or-link-active-artifact");
+  assert.equal(noAuthority.currentAuthority.length, 0);
+  assert.equal(noAuthority.nonAuthorizing[0].contractScope, "main-echo-boundary");
+
+  const handoff = buildPreflightPacket(syntheticPreflightSnapshot({
+    nonAuthorizing: [
+      {
+        kind: "live-non-main-worktree-handoff-candidate",
+        source: "activeWorkReceipts.handoffArtifactEvidence",
+        reason: "live handoff candidate only",
+        referenceField: "activeWorkReceipts.handoffArtifactEvidence.currentEvidence.liveNonMainWorktreePresent",
+        live: true,
+        authority: "handoff-candidate",
+        contractScope: "handoff-artifact-boundary",
+      },
+    ],
+  }));
+  assert.equal(handoff.summary.authorityStatus, "missing");
+  assert.equal(handoff.guidance.riskLevel, "high");
+  assert.equal(handoff.guidance.recommendedAction, "adopt-or-report-live-handoff");
+  assert.equal(handoff.currentAuthority.some((entry) => entry.kind === "worktree"), false);
+  assert.equal(handoff.nonAuthorizing[0].contractScope, "handoff-artifact-boundary");
+
+  const mappedSessionWithCaveat = buildPreflightPacket(syntheticPreflightSnapshot({
+    current: [
+      {
+        kind: "session",
+        source: OPERATOR_ACTIVITY_TMUX_COMMAND,
+        reason: "mapped session count-only current-work presence",
+        referenceField: "activeArtifacts",
+        count: 1,
+        authority: "current-work",
+        contractScope: "top-level-active-artifact",
+      },
+    ],
+    nonAuthorizing: [
+      {
+        kind: "mapped-session-live-handoff-caveat",
+        source: "activeWorkReceipts.handoffArtifactEvidence",
+        reason: "mapped session lacks live handoff",
+        referenceField: "activeWorkReceipts.handoffArtifactEvidence.currentEvidence.liveMappedFooksTmuxSessionCount",
+        count: 1,
+        live: false,
+        authority: "insufficient",
+        contractScope: "handoff-artifact-boundary",
+      },
+    ],
+  }));
+  assert.equal(mappedSessionWithCaveat.summary.authorityStatus, "present");
+  assert.equal(mappedSessionWithCaveat.guidance.riskLevel, "medium");
+  assert.equal(mappedSessionWithCaveat.guidance.recommendedAction, "continue-with-current-authority");
+  assert.equal(mappedSessionWithCaveat.currentAuthority[0].contractScope, "top-level-active-artifact");
+  assert.equal("number" in mappedSessionWithCaveat.currentAuthority[0], false);
+
+  const blocked = buildPreflightPacket(syntheticPreflightSnapshot({
+    verdict: "blocked",
+    blockers: ["tmux unavailable"],
+  }));
+  assert.equal(blocked.summary.authorityStatus, "blocked");
+  assert.equal(blocked.guidance.riskLevel, "high");
+  assert.equal(blocked.guidance.recommendedAction, "resolve-blockers-first");
+});
 
 test("operator reminder docs require a blocker or active artifact after clean CI/React echoes", () => {
   const boundaryDoc = fs.readFileSync(path.join(repoRoot, "docs", "post-merge-main-ci-echo-boundary.md"), "utf8");
@@ -2807,6 +2920,15 @@ test("operator check exposes issue #885 handoff artifact evidence rule", () => {
   assert.equal(worktreeOnlyTrust?.contractScope, "handoff-artifact-boundary");
   assert.equal(worktreeOnlyTrust?.live, true);
   assert.equal(worktreeOnlySnapshot.contextTrust.sourceOfTruth.current.some((entry) => entry.kind === "worktree"), false);
+  const worktreeOnlyPreflight = buildPreflightPacket(worktreeOnlySnapshot);
+  assert.equal(worktreeOnlyPreflight.summary.authorityStatus, "missing");
+  assert.equal(worktreeOnlyPreflight.guidance.riskLevel, "high");
+  assert.equal(worktreeOnlyPreflight.guidance.recommendedAction, "adopt-or-report-live-handoff");
+  assert.equal(worktreeOnlyPreflight.nonAuthorizing.some((entry) =>
+    entry.authority === "handoff-candidate"
+    && entry.contractScope === "handoff-artifact-boundary"
+    && entry.live === true
+  ), true);
 
   const staleSessionWorktree = path.join(tempDir, ".omx-worktrees", "issue-885-stale-session");
   const staleSessionOnlySnapshot = readOperatorCheckSnapshot(tempDir, {
@@ -2854,6 +2976,11 @@ test("operator check exposes issue #885 handoff artifact evidence rule", () => {
   assert.equal(liveSessionCaveat?.live, false);
   assert.equal(liveSessionCaveat?.contractScope, "handoff-artifact-boundary");
   assert.match(liveSessionCaveat?.reason ?? "", /top-level active-artifact\/session-count evidence/);
+  const staleSessionPreflight = buildPreflightPacket(staleSessionOnlySnapshot);
+  assert.equal(staleSessionPreflight.summary.authorityStatus, "present");
+  assert.equal(staleSessionPreflight.guidance.riskLevel, "medium");
+  assert.equal(staleSessionPreflight.guidance.recommendedAction, "continue-with-current-authority");
+  assert.equal(staleSessionPreflight.currentAuthority.find((entry) => entry.kind === "session")?.contractScope, "top-level-active-artifact");
 
   const activeSnapshot = readOperatorCheckSnapshot(tempDir, {
     now: () => "2026-05-16T06:25:00.000Z",
@@ -3078,6 +3205,22 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.equal(check.contextTrust.schemaVersion, 1);
   assert.equal(check.contextTrust.researchReference, OPERATOR_CONTEXT_TRUST_RESEARCH_REFERENCE);
   assert.equal(check.contextTrust.advisoryOnly.every((entry) => typeof entry.contractScope === "string"), true);
+  assert.equal("preflight" in check, false);
+  assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
+
+  const preflight = run(["preflight", "--json"], tempDir);
+  assert.equal(preflight.command, PREFLIGHT_COMMAND);
+  assert.equal(preflight.source, PREFLIGHT_SOURCE);
+  assert.equal(preflight.derivedFrom.operatorCheckCommand, OPERATOR_CHECK_COMMAND);
+  assert.equal(preflight.derivedFrom.operatorCheckSchemaVersion, 1);
+  assert.equal(preflight.derivedFrom.contextTrustSchemaVersion, 1);
+  assert.equal(typeof preflight.claimBoundary, "string");
+  assert.equal(typeof preflight.summary.authorityStatus, "string");
+  assert.equal(typeof preflight.guidance.riskLevel, "string");
+  assert.equal(typeof preflight.guidance.recommendedAction, "string");
+  assert.equal(Array.isArray(preflight.currentAuthority), true);
+  assert.equal(Array.isArray(preflight.nonAuthorizing), true);
+  assert.equal(preflight.advisoryOnly.every((entry) => typeof entry.contractScope === "string"), true);
   assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
 
   const activity = run(["status", "activity"], tempDir);
@@ -3109,6 +3252,7 @@ test("status activity CLI route preserves existing status contracts", () => {
 
   const help = runText(["--help"], tempDir);
   assert.match(help, /fooks check \[--json\]/);
+  assert.match(help, /fooks preflight \[--json\]/);
   assert.match(help, /fooks status activity \[--include-remote-counts\]/);
 
   let output = "";
@@ -3118,6 +3262,14 @@ test("status activity CLI route preserves existing status contracts", () => {
     output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
   }
   assert.match(output, /Unexpected check argument/);
+
+  output = "";
+  try {
+    runText(["preflight", "--unexpected"], tempDir);
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  assert.match(output, /Unexpected preflight argument/);
 
   output = "";
   try {
