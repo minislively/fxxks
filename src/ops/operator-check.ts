@@ -20,6 +20,7 @@ import { STALE_WORKTREE_AUDIT_COMMAND, STALE_WORKTREE_AUDIT_ISSUE } from "./stal
 import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
 import { buildOperatorContextTrust, type OperatorContextTrustPacket } from "./context-trust";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
+import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -563,6 +564,7 @@ export type OperatorCheckSnapshot = {
   requiredActiveArtifact: OperatorCheckRequiredActiveArtifact;
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
+  combinedReliabilityWarnings: CombinedReliabilityWarning[];
   activity: OperatorActivitySnapshot;
   blockers: string[];
 };
@@ -1612,6 +1614,8 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     currentRunEvidence: activity.currentRunEvidence,
     postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
   });
+  const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch });
+  const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
 
   return {
     schemaVersion: OPERATOR_CHECK_SCHEMA_VERSION,
@@ -1636,7 +1640,8 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     activeWorkReceipts,
     requiredActiveArtifact: requiredArtifact,
     contextTrust,
-    planningWarnings: buildRuntimeTokenCostPlanningWarnings({ branch }),
+    planningWarnings,
+    combinedReliabilityWarnings,
     activity,
     blockers,
   };
