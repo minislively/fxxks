@@ -21,6 +21,27 @@ function baseSnapshot(cwd) {
     verdict: "ready",
     blockers: [],
     runtimeProvenance: { git: { branch: "fooks-issue-963-source-of-truth-handoff", head: "abc123" } },
+    contextTrust: {
+      schemaVersion: 1,
+      source: "fooks check --json operator-check projection",
+      researchReference: "docs/research/context-trust-and-stale-evidence-research.md",
+      claimBoundary: "synthetic test contextTrust",
+      sourceOfTruth: {
+        current: [{ kind: "issue", source: "activeArtifacts", reason: "open issue count", contractScope: "top-level-active-artifact", authority: "current-work" }],
+      },
+      advisoryOnly: [],
+      historicalOnly: [],
+      nonAuthorizing: [
+        {
+          kind: "stale-residue-active-boundary",
+          source: "stale residue",
+          reason: "cleanup-review only",
+          referenceField: "activeWorkReceipts.staleResidueActiveBoundary",
+          contractScope: "stale-residue-boundary",
+          authority: "insufficient",
+        },
+      ],
+    },
     activity: {
       worktree: {
         branch: "fooks-issue-963-source-of-truth-handoff",
@@ -96,6 +117,8 @@ test("source-of-truth handoff packet links inferred issue, current branch PR che
   assert.ok(packet.sourceOfTruth.authoritativeFilesAndDocs.includes("src/ops/source-of-truth-handoff.ts"));
   assert.equal(packet.staleOrHistoricalContextToAvoid.length, 2);
   assert.equal(packet.nextRecommendedAction.action, "continue-implementation-for-linked-issue");
+  assert.deepEqual(packet.planningWarnings, []);
+  assert.deepEqual(packet.combinedReliabilityWarnings, []);
 });
 
 test("handoff CLI emits JSON packet", () => {
@@ -136,6 +159,13 @@ test("source-of-truth handoff emits narrow issue #960 runtime/token-cost plannin
   assert.deepEqual(packet.planningWarnings[0].prerequisiteIssues, ["#961", "#962", "#963"]);
   assert.match(packet.planningWarnings[0].claimBoundary, /does not change provider\/runtime hooks/);
   assert.match(packet.planningWarnings[0].forbiddenClaims.join("\n"), /provider usage\/billing-token proof/);
+  assert.equal(packet.combinedReliabilityWarnings.length, 1);
+  assert.equal(packet.combinedReliabilityWarnings[0].trigger, "context-risk-and-runtime-planning-overlap");
+  assert.deepEqual(packet.combinedReliabilityWarnings[0].recommendedActions, ["reset-context", "compress-current-source-of-truth", "handoff-to-fresh-agent"]);
+  assert.equal(packet.combinedReliabilityWarnings[0].requiredOverlap.contextRisk[0].contractScope, "stale-residue-boundary");
+  assert.equal(packet.combinedReliabilityWarnings[0].requiredOverlap.runtimePlanning[0].issue, "#960");
+  assert.match(packet.combinedReliabilityWarnings[0].claimBoundary, /Advisory-only overlap warning/);
+  assert.match(packet.combinedReliabilityWarnings[0].forbiddenClaims.join("\n"), /runtime-token savings proof/);
 
   const nonTargetPacket = buildSourceOfTruthHandoffPacket(baseSnapshot(cwd), basePreflight(), {
     commandRunner: (command, args) => {
@@ -148,6 +178,28 @@ test("source-of-truth handoff emits narrow issue #960 runtime/token-cost plannin
     now: () => "2026-05-19T01:02:03.000Z",
   });
   assert.deepEqual(nonTargetPacket.planningWarnings, []);
+  assert.deepEqual(nonTargetPacket.combinedReliabilityWarnings, []);
+});
+
+test("source-of-truth handoff does not emit combined reliability warning for runtime-only risk", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.runtimeProvenance.git.branch = "fooks-issue-960-runtime-token-cost-plan";
+  snapshot.activity.worktree.branch = "fooks-issue-960-runtime-token-cost-plan";
+  snapshot.activity.worktree.upstream = "origin/fooks-issue-960-runtime-token-cost-plan";
+  snapshot.contextTrust.nonAuthorizing = [];
+  snapshot.contextTrust.historicalOnly = [];
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 960 --json number,title,state,url") return JSON.stringify({ number: 960, state: "OPEN" });
+    if (key === "gh pr list --head fooks-issue-960-runtime-token-cost-plan --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") return "[]";
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-19T01:02:03.000Z" });
+  assert.equal(packet.planningWarnings.length, 1);
+  assert.deepEqual(packet.combinedReliabilityWarnings, []);
 });
 
 test("source-of-truth handoff emits issue #976 long-run runtime planning warning", () => {
@@ -175,4 +227,6 @@ test("source-of-truth handoff emits issue #976 long-run runtime planning warning
   assert.equal(packet.planningWarnings[0].trigger, "linked-issue-976");
   assert.match(packet.planningWarnings[0].message, /context quality degrades/);
   assert.match(packet.planningWarnings[0].forbiddenClaims.join("\n"), /runtime-token savings proof/);
+  assert.equal(packet.combinedReliabilityWarnings.length, 1);
+  assert.equal(packet.combinedReliabilityWarnings[0].requiredOverlap.runtimePlanning[0].issue, "#976");
 });

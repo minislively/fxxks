@@ -314,3 +314,13 @@ export type {
   SourceOfTruthLinkedArtifact,
   SourceOfTruthPrCheck,
 } from "./ops/source-of-truth-handoff";
+export {
+  COMBINED_RELIABILITY_WARNING_CLAIM_BOUNDARY,
+  COMBINED_RELIABILITY_WARNING_SCHEMA_VERSION,
+  COMBINED_RELIABILITY_WARNING_SOURCE,
+  buildCombinedReliabilityWarnings,
+} from "./ops/combined-reliability-warning";
+export type {
+  CombinedReliabilityWarning,
+  CombinedReliabilityWarningContextRisk,
+} from "./ops/combined-reliability-warning";

@@ -4,6 +4,7 @@ import type { OperatorCheckSnapshot } from "./operator-check";
 import type { PreflightPacket } from "./preflight";
 import { STALE_CONTEXT_COMMAND } from "./stale-context";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
+import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 
 export const SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION = 1;
 export const SOURCE_OF_TRUTH_HANDOFF_COMMAND = "handoff";
@@ -113,6 +114,7 @@ export type SourceOfTruthHandoffPacket = {
     suggestedCommands: string[];
   };
   planningWarnings: RuntimeTokenCostPlanningWarning[];
+  combinedReliabilityWarnings: CombinedReliabilityWarning[];
   blockers: string[];
 };
 
@@ -285,6 +287,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
   const prResult = linkedPullRequest(cwd, branch, blockers, options.commandRunner);
   const linkedIssueNumber = issue.status === "linked" ? issue.number : undefined;
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch, linkedIssueNumber });
+  const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings });
   const workflows = snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
     workflow: workflow.workflow,
     status: workflow.status,
@@ -355,6 +358,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     staleOrHistoricalContextToAvoid: staleAvoidList(snapshot, preflight),
     nextRecommendedAction: nextAction(preflight, issue, prResult.artifact, changedPaths.length),
     planningWarnings,
+    combinedReliabilityWarnings,
     blockers,
   };
 }
