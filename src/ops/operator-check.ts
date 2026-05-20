@@ -21,6 +21,7 @@ import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
 import { buildOperatorContextTrust, type OperatorContextTrustPacket } from "./context-trust";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
+import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -569,6 +570,7 @@ export type OperatorCheckSnapshot = {
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
+  sequentialPlanningHints: SequentialPlanningHint[];
   reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
   activity: OperatorActivitySnapshot;
   blockers: string[];
@@ -1713,6 +1715,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   });
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch });
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
+  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, planningWarnings, combinedReliabilityWarnings });
   const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
     contextTrust,
     planningWarnings,
@@ -1744,6 +1747,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     contextTrust,
     planningWarnings,
     combinedReliabilityWarnings,
+    sequentialPlanningHints,
     reliabilityWarningVisibility,
     activity,
     blockers,
