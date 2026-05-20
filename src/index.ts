@@ -343,3 +343,17 @@ export type {
   CombinedReliabilityWarning,
   CombinedReliabilityWarningContextRisk,
 } from "./ops/combined-reliability-warning";
+export {
+  LONG_RUN_BUDGET_WARNING_CLAIM_BOUNDARY,
+  LONG_RUN_BUDGET_WARNING_EPIC,
+  LONG_RUN_BUDGET_WARNING_ISSUE,
+  LONG_RUN_BUDGET_WARNING_SCHEMA_VERSION,
+  LONG_RUN_BUDGET_WARNING_SOURCE,
+  buildLongRunBudgetWarnings,
+} from "./ops/long-run-budget-warning";
+export type {
+  LongRunBudgetRiskLevel,
+  LongRunBudgetWarning,
+  LongRunBudgetWarningAction,
+  LongRunBudgetWarningTrigger,
+} from "./ops/long-run-budget-warning";

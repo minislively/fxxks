@@ -23,6 +23,7 @@ import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWar
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
 import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
+import { buildLongRunBudgetWarnings, type LongRunBudgetWarning } from "./long-run-budget-warning";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -41,7 +42,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VE
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE = "operator/check reliability warning visibility projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY =
-  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, and combinedReliabilityWarnings fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
+  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, and longRunBudgetWarnings fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
@@ -573,6 +574,7 @@ export type OperatorCheckSnapshot = {
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   sequentialPlanningHints: SequentialPlanningHint[];
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
+  longRunBudgetWarnings: LongRunBudgetWarning[];
   reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
   activity: OperatorActivitySnapshot;
   blockers: string[];
@@ -586,6 +588,7 @@ export type OperatorCheckReliabilityWarningVisibility = {
     existingWarningCount: number;
     planningWarningCount: number;
     combinedReliabilityWarningCount: number;
+    longRunBudgetWarningCount: number;
     contextTrustCurrentAuthorityCount: number;
     contextTrustNonAuthorizingCount: number;
     contextTrustHistoricalOnlyCount: number;
@@ -611,11 +614,25 @@ export type OperatorCheckReliabilityWarningVisibility = {
         forbiddenClaims: CombinedReliabilityWarning["forbiddenClaims"];
         claimBoundary: CombinedReliabilityWarning["claimBoundary"];
       }
+    | {
+        kind: "long-run-budget";
+        issue: LongRunBudgetWarning["issue"];
+        trigger: LongRunBudgetWarning["trigger"];
+        status: LongRunBudgetWarning["status"];
+        riskLevel: LongRunBudgetWarning["riskLevel"];
+        budgetBoundary: LongRunBudgetWarning["budgetBoundary"];
+        message: LongRunBudgetWarning["message"];
+        recommendedActions: LongRunBudgetWarning["recommendedActions"];
+        requiredRechecks: LongRunBudgetWarning["requiredRechecks"];
+        forbiddenClaims: LongRunBudgetWarning["forbiddenClaims"];
+        claimBoundary: LongRunBudgetWarning["claimBoundary"];
+      }
   >;
   derivedFrom: {
     contextTrustSource: OperatorContextTrustPacket["source"];
     planningWarningsField: "planningWarnings";
     combinedReliabilityWarningsField: "combinedReliabilityWarnings";
+    longRunBudgetWarningsField: "longRunBudgetWarnings";
   };
   claimBoundary: typeof OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY;
 };
@@ -1645,6 +1662,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
+  longRunBudgetWarnings: LongRunBudgetWarning[];
 }): OperatorCheckReliabilityWarningVisibility {
   const warnings: OperatorCheckReliabilityWarningVisibility["warnings"] = [
     ...input.planningWarnings.map((warning) => ({
@@ -1667,6 +1685,19 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       forbiddenClaims: warning.forbiddenClaims,
       claimBoundary: warning.claimBoundary,
     })),
+    ...input.longRunBudgetWarnings.map((warning) => ({
+      kind: "long-run-budget" as const,
+      issue: warning.issue,
+      trigger: warning.trigger,
+      status: warning.status,
+      riskLevel: warning.riskLevel,
+      budgetBoundary: warning.budgetBoundary,
+      message: warning.message,
+      recommendedActions: warning.recommendedActions,
+      requiredRechecks: warning.requiredRechecks,
+      forbiddenClaims: warning.forbiddenClaims,
+      claimBoundary: warning.claimBoundary,
+    })),
   ];
 
   return {
@@ -1677,6 +1708,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       existingWarningCount: warnings.length,
       planningWarningCount: input.planningWarnings.length,
       combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
+      longRunBudgetWarningCount: input.longRunBudgetWarnings.length,
       contextTrustCurrentAuthorityCount: input.contextTrust.sourceOfTruth.current.length,
       contextTrustNonAuthorizingCount: input.contextTrust.nonAuthorizing.length,
       contextTrustHistoricalOnlyCount: input.contextTrust.historicalOnly.length,
@@ -1686,6 +1718,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       contextTrustSource: input.contextTrust.source,
       planningWarningsField: "planningWarnings",
       combinedReliabilityWarningsField: "combinedReliabilityWarnings",
+      longRunBudgetWarningsField: "longRunBudgetWarnings",
     },
     claimBoundary: OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY,
   };
@@ -1719,10 +1752,12 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
   const sequentialPlanningHints = buildSequentialPlanningHints({ branch, planningWarnings, combinedReliabilityWarnings });
   const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
+  const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
   const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
     contextTrust,
     planningWarnings,
     combinedReliabilityWarnings,
+    longRunBudgetWarnings,
   });
 
   return {
@@ -1752,6 +1787,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     combinedReliabilityWarnings,
     sequentialPlanningHints,
     planBeforeExecuteGuards,
+    longRunBudgetWarnings,
     reliabilityWarningVisibility,
     activity,
     blockers,
