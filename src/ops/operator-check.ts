@@ -22,6 +22,7 @@ import { buildOperatorContextTrust, type OperatorContextTrustPacket } from "./co
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
+import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -571,6 +572,7 @@ export type OperatorCheckSnapshot = {
   planningWarnings: RuntimeTokenCostPlanningWarning[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   sequentialPlanningHints: SequentialPlanningHint[];
+  planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
   reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
   activity: OperatorActivitySnapshot;
   blockers: string[];
@@ -1716,6 +1718,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch });
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
   const sequentialPlanningHints = buildSequentialPlanningHints({ branch, planningWarnings, combinedReliabilityWarnings });
+  const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
   const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
     contextTrust,
     planningWarnings,
@@ -1748,6 +1751,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     planningWarnings,
     combinedReliabilityWarnings,
     sequentialPlanningHints,
+    planBeforeExecuteGuards,
     reliabilityWarningVisibility,
     activity,
     blockers,

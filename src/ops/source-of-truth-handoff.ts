@@ -6,6 +6,7 @@ import { STALE_CONTEXT_COMMAND } from "./stale-context";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
+import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
 
 export const SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION = 1;
 export const SOURCE_OF_TRUTH_HANDOFF_COMMAND = "handoff";
@@ -117,6 +118,7 @@ export type SourceOfTruthHandoffPacket = {
   planningWarnings: RuntimeTokenCostPlanningWarning[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   sequentialPlanningHints: SequentialPlanningHint[];
+  planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
   blockers: string[];
 };
 
@@ -132,6 +134,7 @@ const AUTHORITATIVE_FILES_AND_DOCS = [
   "src/ops/source-of-truth-handoff.ts",
   "src/ops/runtime-token-cost-planning-warning.ts",
   "src/ops/sequential-planning-hint.ts",
+  "src/ops/plan-before-execute-guard.ts",
   "src/cli/index.ts",
   "docs/research/context-trust-and-stale-evidence-research.md",
   "docs/stale-context.md",
@@ -292,6 +295,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch, linkedIssueNumber });
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings });
   const sequentialPlanningHints = buildSequentialPlanningHints({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings });
+  const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
   const workflows = snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
     workflow: workflow.workflow,
     status: workflow.status,
@@ -364,6 +368,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     planningWarnings,
     combinedReliabilityWarnings,
     sequentialPlanningHints,
+    planBeforeExecuteGuards,
     blockers,
   };
 }
