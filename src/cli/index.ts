@@ -675,7 +675,7 @@ Everyday commands:
   ${displayCliName} status artifacts [--json]
   ${displayCliName} status stale-worktrees [--json]
   ${displayCliName} status orphan-worktrees [--json]
-  ${displayCliName} status activity [--include-remote-counts]
+  ${displayCliName} status activity [--include-remote-counts] [--receipt-json]
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -1011,6 +1011,28 @@ function parseStatusReactWebArgs(args: string[]): { json: boolean } {
   }
 
   return { json };
+}
+
+function parseStatusActivityArgs(args: string[]): { includeRemoteCounts: boolean; receiptJson: boolean } {
+  let includeRemoteCounts = false;
+  let receiptJson = false;
+
+  for (const arg of args) {
+    if (arg === "--include-remote-counts") {
+      includeRemoteCounts = true;
+      continue;
+    }
+    if (arg === "--receipt-json") {
+      receiptJson = true;
+      continue;
+    }
+    if (arg === "--json") {
+      continue;
+    }
+    throw new Error(`Unexpected status activity argument: ${arg}`);
+  }
+
+  return { includeRemoteCounts, receiptJson };
 }
 
 function parseStaleContextArgs(args: string[]): { filePath?: string; stdin: boolean; json: boolean; help: boolean } {
@@ -1716,14 +1738,10 @@ async function run(): Promise<void> {
         return;
       }
       if (arg1 === "activity") {
-        const allowed = new Set(["--include-remote-counts", "--json"]);
-        for (const arg of rest.slice(1)) {
-          if (!allowed.has(arg)) {
-            throw new Error(`Unexpected status activity argument: ${arg}`);
-          }
-        }
+        const options = parseStatusActivityArgs(rest.slice(1));
         const { readOperatorActivitySnapshot } = await import("../ops/operator-activity.js");
-        print(readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: rest.includes("--include-remote-counts") }));
+        const snapshot = readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: options.includeRemoteCounts });
+        print(options.receiptJson ? snapshot.currentRunEvidence.receipt : snapshot);
         return;
       }
       throw new Error("status expects no argument, 'codex', 'claude', 'cache', 'worktree', 'react-web', 'artifacts', 'stale-worktrees', 'orphan-worktrees', or 'activity'");
