@@ -24,6 +24,7 @@ import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } fro
 import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
 import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
 import { buildLongRunBudgetWarnings, type LongRunBudgetWarning } from "./long-run-budget-warning";
+import { buildResetCompactHandoffRecommendations, type ResetCompactHandoffRecommendation } from "./reset-compact-handoff-recommendation";
 
 export const OPERATOR_CHECK_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMMAND = "check";
@@ -44,9 +45,9 @@ export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE = "operator/check reliability warning visibility projection";
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE = "operator/check compact resume handoff projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY =
-  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, and longRunBudgetWarnings fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
+  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, longRunBudgetWarnings, and resetCompactHandoffRecommendations fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY =
-  "Compact advisory/read-only resume handoff projection for issue #992; derived only from existing operator-check contextTrust/source-of-truth, reliability warning visibility, runtime planning, sequential planning, plan-before-execute, and long-run budget fields, and adds no provider/runtime telemetry, CI/merge authority, product claims, or frontend behavior.";
+  "Compact advisory/read-only resume handoff projection for issue #992; derived only from existing operator-check contextTrust/source-of-truth, reliability warning visibility, runtime planning, sequential planning, plan-before-execute, long-run budget, and reset/compact/handoff recommendation fields, and adds no provider/runtime telemetry, CI/merge authority, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
@@ -582,6 +583,7 @@ export type OperatorCheckSnapshot = {
   sequentialPlanningHints: SequentialPlanningHint[];
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
   longRunBudgetWarnings: LongRunBudgetWarning[];
+  resetCompactHandoffRecommendations: ResetCompactHandoffRecommendation[];
   reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
   resumeHandoffProjection: OperatorCheckResumeHandoffProjection;
   activity: OperatorActivitySnapshot;
@@ -597,6 +599,7 @@ export type OperatorCheckReliabilityWarningVisibility = {
     planningWarningCount: number;
     combinedReliabilityWarningCount: number;
     longRunBudgetWarningCount: number;
+    resetCompactHandoffRecommendationCount: number;
     contextTrustCurrentAuthorityCount: number;
     contextTrustNonAuthorizingCount: number;
     contextTrustHistoricalOnlyCount: number;
@@ -635,12 +638,25 @@ export type OperatorCheckReliabilityWarningVisibility = {
         forbiddenClaims: LongRunBudgetWarning["forbiddenClaims"];
         claimBoundary: LongRunBudgetWarning["claimBoundary"];
       }
+    | {
+        kind: "reset-compact-handoff";
+        issue: ResetCompactHandoffRecommendation["issue"];
+        trigger: ResetCompactHandoffRecommendation["trigger"];
+        status: ResetCompactHandoffRecommendation["status"];
+        riskLevel: ResetCompactHandoffRecommendation["riskLevel"];
+        message: ResetCompactHandoffRecommendation["message"];
+        recommendedActions: ResetCompactHandoffRecommendation["recommendedActions"];
+        requiredRechecks: ResetCompactHandoffRecommendation["requiredRechecks"];
+        forbiddenClaims: ResetCompactHandoffRecommendation["forbiddenClaims"];
+        claimBoundary: ResetCompactHandoffRecommendation["claimBoundary"];
+      }
   >;
   derivedFrom: {
     contextTrustSource: OperatorContextTrustPacket["source"];
     planningWarningsField: "planningWarnings";
     combinedReliabilityWarningsField: "combinedReliabilityWarnings";
     longRunBudgetWarningsField: "longRunBudgetWarnings";
+    resetCompactHandoffRecommendationsField: "resetCompactHandoffRecommendations";
   };
   claimBoundary: typeof OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY;
 };
@@ -667,6 +683,7 @@ export type OperatorCheckResumeHandoffProjection = {
       "sequentialPlanningHints",
       "planBeforeExecuteGuards",
       "longRunBudgetWarnings",
+      "resetCompactHandoffRecommendations",
       "reliabilityWarningVisibility",
     ];
   };
@@ -678,6 +695,7 @@ export type OperatorCheckResumeHandoffProjection = {
     sequentialPlanningHintCount: number;
     planBeforeExecuteGuardCount: number;
     longRunBudgetWarningCount: number;
+    resetCompactHandoffRecommendationCount: number;
     reliabilityWarningCount: number;
     stopBeforeMoreExecution: boolean;
   };
@@ -1729,7 +1747,9 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
   planningWarnings: RuntimeTokenCostPlanningWarning[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   longRunBudgetWarnings: LongRunBudgetWarning[];
+  resetCompactHandoffRecommendations?: ResetCompactHandoffRecommendation[];
 }): OperatorCheckReliabilityWarningVisibility {
+  const resetCompactHandoffRecommendations = input.resetCompactHandoffRecommendations ?? [];
   const warnings: OperatorCheckReliabilityWarningVisibility["warnings"] = [
     ...input.planningWarnings.map((warning) => ({
       kind: "runtime-planning" as const,
@@ -1764,6 +1784,18 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       forbiddenClaims: warning.forbiddenClaims,
       claimBoundary: warning.claimBoundary,
     })),
+    ...resetCompactHandoffRecommendations.map((recommendation) => ({
+      kind: "reset-compact-handoff" as const,
+      issue: recommendation.issue,
+      trigger: recommendation.trigger,
+      status: recommendation.status,
+      riskLevel: recommendation.riskLevel,
+      message: recommendation.message,
+      recommendedActions: recommendation.recommendedActions,
+      requiredRechecks: recommendation.requiredRechecks,
+      forbiddenClaims: recommendation.forbiddenClaims,
+      claimBoundary: recommendation.claimBoundary,
+    })),
   ];
 
   return {
@@ -1775,6 +1807,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       planningWarningCount: input.planningWarnings.length,
       combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
       longRunBudgetWarningCount: input.longRunBudgetWarnings.length,
+      resetCompactHandoffRecommendationCount: resetCompactHandoffRecommendations.length,
       contextTrustCurrentAuthorityCount: input.contextTrust.sourceOfTruth.current.length,
       contextTrustNonAuthorizingCount: input.contextTrust.nonAuthorizing.length,
       contextTrustHistoricalOnlyCount: input.contextTrust.historicalOnly.length,
@@ -1785,6 +1818,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       planningWarningsField: "planningWarnings",
       combinedReliabilityWarningsField: "combinedReliabilityWarnings",
       longRunBudgetWarningsField: "longRunBudgetWarnings",
+      resetCompactHandoffRecommendationsField: "resetCompactHandoffRecommendations",
     },
     claimBoundary: OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY,
   };
@@ -1799,8 +1833,10 @@ export function buildOperatorCheckResumeHandoffProjection(input: {
   sequentialPlanningHints: SequentialPlanningHint[];
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
   longRunBudgetWarnings: LongRunBudgetWarning[];
+  resetCompactHandoffRecommendations?: ResetCompactHandoffRecommendation[];
   reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
 }): OperatorCheckResumeHandoffProjection {
+  const resetCompactHandoffRecommendations = input.resetCompactHandoffRecommendations ?? [];
   const currentAuthority = input.contextTrust.sourceOfTruth.current.slice(0, RESUME_HANDOFF_ENTRY_LIMIT);
   const staleHistoricalEntries = [
     ...input.contextTrust.nonAuthorizing,
@@ -1809,6 +1845,7 @@ export function buildOperatorCheckResumeHandoffProjection(input: {
   const staleHistoricalBoundary = staleHistoricalEntries.slice(0, RESUME_HANDOFF_ENTRY_LIMIT);
   const stopBeforeMoreExecution = input.planBeforeExecuteGuards.some((guard) => guard.stopBeforeMoreExecution);
   const requiredRechecks = uniqueSorted([
+    ...resetCompactHandoffRecommendations.flatMap((recommendation) => recommendation.requiredRechecks),
     ...input.longRunBudgetWarnings.flatMap((warning) => warning.requiredRechecks),
     ...input.planBeforeExecuteGuards.flatMap((guard) => guard.requiredRechecks),
     ...input.sequentialPlanningHints.flatMap((hint) => hint.requiredRechecks),
@@ -1816,6 +1853,7 @@ export function buildOperatorCheckResumeHandoffProjection(input: {
     "Run fooks check --json in the new session before treating this projection as current authority.",
   ]);
   const forbiddenClaims = uniqueSorted([
+    ...resetCompactHandoffRecommendations.flatMap((recommendation) => recommendation.forbiddenClaims),
     ...input.longRunBudgetWarnings.flatMap((warning) => warning.forbiddenClaims),
     ...input.planBeforeExecuteGuards.flatMap((guard) => guard.forbiddenClaims),
     ...input.sequentialPlanningHints.flatMap((hint) => hint.forbiddenClaims),
@@ -1849,6 +1887,7 @@ export function buildOperatorCheckResumeHandoffProjection(input: {
         "sequentialPlanningHints",
         "planBeforeExecuteGuards",
         "longRunBudgetWarnings",
+        "resetCompactHandoffRecommendations",
         "reliabilityWarningVisibility",
       ],
     },
@@ -1860,6 +1899,7 @@ export function buildOperatorCheckResumeHandoffProjection(input: {
       sequentialPlanningHintCount: input.sequentialPlanningHints.length,
       planBeforeExecuteGuardCount: input.planBeforeExecuteGuards.length,
       longRunBudgetWarningCount: input.longRunBudgetWarnings.length,
+      resetCompactHandoffRecommendationCount: resetCompactHandoffRecommendations.length,
       reliabilityWarningCount: input.reliabilityWarningVisibility.summary.existingWarningCount,
       stopBeforeMoreExecution,
     },
@@ -1918,11 +1958,13 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const sequentialPlanningHints = buildSequentialPlanningHints({ branch, planningWarnings, combinedReliabilityWarnings });
   const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
   const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
+  const resetCompactHandoffRecommendations = buildResetCompactHandoffRecommendations({ contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings });
   const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
     contextTrust,
     planningWarnings,
     combinedReliabilityWarnings,
     longRunBudgetWarnings,
+    resetCompactHandoffRecommendations,
   });
   const resumeHandoffProjection = buildOperatorCheckResumeHandoffProjection({
     contextTrust,
@@ -1931,6 +1973,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     sequentialPlanningHints,
     planBeforeExecuteGuards,
     longRunBudgetWarnings,
+    resetCompactHandoffRecommendations,
     reliabilityWarningVisibility,
   });
 
@@ -1963,6 +2006,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     sequentialPlanningHints,
     planBeforeExecuteGuards,
     longRunBudgetWarnings,
+    resetCompactHandoffRecommendations,
     reliabilityWarningVisibility,
     resumeHandoffProjection,
     activity,

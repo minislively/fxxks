@@ -3426,10 +3426,10 @@ test("operator check JSON includes narrow issue #960 runtime/token-cost planning
   assert.equal(snapshot.reliabilityWarningVisibility.source, OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE);
   assert.equal(snapshot.reliabilityWarningVisibility.status, "advisory");
   assert.equal(snapshot.reliabilityWarningVisibility.summary.planningWarningCount, 1);
-  assert.equal(snapshot.reliabilityWarningVisibility.summary.existingWarningCount, snapshot.planningWarnings.length + snapshot.combinedReliabilityWarnings.length);
+  assert.equal(snapshot.reliabilityWarningVisibility.summary.existingWarningCount, snapshot.planningWarnings.length + snapshot.combinedReliabilityWarnings.length + snapshot.longRunBudgetWarnings.length + snapshot.resetCompactHandoffRecommendations.length);
   assert.equal(snapshot.reliabilityWarningVisibility.derivedFrom.contextTrustSource, snapshot.contextTrust.source);
   assert.equal(snapshot.reliabilityWarningVisibility.warnings.some((warning) => warning.kind === "runtime-planning" && warning.issue === "#960"), true);
-  assert.match(snapshot.reliabilityWarningVisibility.claimBoundary, /existing contextTrust\/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, and longRunBudgetWarnings fields only/);
+  assert.match(snapshot.reliabilityWarningVisibility.claimBoundary, /existing contextTrust\/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, longRunBudgetWarnings, and resetCompactHandoffRecommendations fields only/);
   assert.deepEqual(snapshot.sequentialPlanningHints, []);
 });
 
@@ -3488,6 +3488,7 @@ test("operator check JSON includes compact issue #992 resume handoff projection"
     "sequentialPlanningHints",
     "planBeforeExecuteGuards",
     "longRunBudgetWarnings",
+    "resetCompactHandoffRecommendations",
     "reliabilityWarningVisibility",
   ]);
   assert.equal(projection.summary.currentAuthorityCount, snapshot.contextTrust.sourceOfTruth.current.length);
@@ -3533,6 +3534,7 @@ test("operator check reliability warning visibility surfaces existing advisory w
     planningWarningCount: 1,
     combinedReliabilityWarningCount: 1,
     longRunBudgetWarningCount: 0,
+    resetCompactHandoffRecommendationCount: 0,
     contextTrustCurrentAuthorityCount: 0,
     contextTrustNonAuthorizingCount: 1,
     contextTrustHistoricalOnlyCount: 0,
@@ -3546,6 +3548,7 @@ test("operator check reliability warning visibility surfaces existing advisory w
     planningWarningsField: "planningWarnings",
     combinedReliabilityWarningsField: "combinedReliabilityWarnings",
     longRunBudgetWarningsField: "longRunBudgetWarnings",
+    resetCompactHandoffRecommendationsField: "resetCompactHandoffRecommendations",
   });
   assert.equal(visibility.claimBoundary, OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY);
   assert.match(visibility.claimBoundary, /adds no telemetry, provider\/runtime hooks, token\/cost accounting, merge-gate policy, product claims, or frontend behavior/);
@@ -3676,6 +3679,7 @@ test("operator check JSON includes narrow issue #976 long-run planning advisory"
   assert.equal(snapshot.longRunBudgetWarnings[0].issue, "#988");
   assert.equal(snapshot.longRunBudgetWarnings[0].riskLevel, "high");
   assert.equal(snapshot.reliabilityWarningVisibility.summary.longRunBudgetWarningCount, 1);
+  assert.equal(snapshot.reliabilityWarningVisibility.summary.resetCompactHandoffRecommendationCount, 0);
   assert.ok(snapshot.reliabilityWarningVisibility.warnings.some((warning) => warning.kind === "long-run-budget"));
 });
 
