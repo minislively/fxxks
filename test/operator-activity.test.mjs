@@ -564,7 +564,7 @@ test("idle activity snapshot remains zero and read-only with opt-in remote count
     claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
     classification: "activeOrUnknown",
     mainEchoEvidence: false,
-    activeWorkEvidence: false,
+    activeWorkEvidence: true,
     remoteCountsRequired: true,
     evidence: {
       branch: "dogfood/issue-428-idle-activity-snapshot",
@@ -576,6 +576,15 @@ test("idle activity snapshot remains zero and read-only with opt-in remote count
       openIssues: 0,
       openPullRequests: 0,
       legacyStaleClosedArtifactWorktreeCount: 0,
+    },
+    receipt: {
+      status: "active",
+      active: true,
+      oneLine: "Current fooks run appears active: branch dogfood/issue-428-idle-activity-snapshot.",
+      evidenceKinds: ["branch"],
+      advisoryOnly: true,
+      readOnly: true,
+      claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
     },
     reasons: [
       "current branch is dogfood/issue-428-idle-activity-snapshot, not main",
@@ -1084,7 +1093,50 @@ test("operator activity marks clean current main with zero counts and no session
     "no fooks-like tmux sessions are mapped to this snapshot",
     "open issue and pull request counts are both zero",
   ]);
+  assert.deepEqual(snapshot.currentRunEvidence.receipt, {
+    status: "idle",
+    active: false,
+    oneLine: "Current fooks run is idle/non-active: clean main, zero divergence, no mapped fooks sessions, zero open issues/PRs.",
+    evidenceKinds: [],
+    advisoryOnly: true,
+    readOnly: true,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  });
   assert.deepEqual(snapshot.currentRunEvidence.blockers, []);
+});
+
+test("operator activity current-run receipt names dirty delta as active dogfood evidence", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-20T12:00:00.000Z",
+    runner: () => " M src/index.ts\0?? notes.md\0",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      if (command === "tmux") return "not-related\t/tmp/no-active-pane\tzsh\n";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      throw new Error(`unexpected command ${command} ${args.join(" ")}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.currentRunEvidence.mainEchoEvidence, false);
+  assert.equal(snapshot.currentRunEvidence.activeWorkEvidence, true);
+  assert.deepEqual(snapshot.currentRunEvidence.receipt, {
+    status: "active",
+    active: true,
+    oneLine: "Current fooks run appears active: dirty worktree with 2 changed paths.",
+    evidenceKinds: ["delta"],
+    advisoryOnly: true,
+    readOnly: true,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  });
 });
 
 test("operator activity does not count ancestor tmux panes as current active work for nested checkouts", () => {
@@ -1632,6 +1684,16 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
     { kind: "session", count: 1, source: OPERATOR_ACTIVITY_TMUX_COMMAND },
   ]);
   assert.equal(snapshot.postMergeMainEchoBoundary.echoOnly, false);
+  assert.deepEqual(snapshot.currentRunReceipt, {
+    status: "active",
+    active: true,
+    oneLine: "Current fooks run appears active: 1 open issue, 1 open PR, branch dogfood/issue-705-post-merge-echo-idle-boundary, 1 mapped fooks session.",
+    evidenceKinds: ["issue", "pullRequest", "branch", "session"],
+    advisoryOnly: true,
+    readOnly: true,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  });
+  assert.deepEqual(snapshot.activeWorkReceipts.currentRunReceipt, snapshot.currentRunReceipt);
 
   assert.equal(snapshot.activeWorkReceipts.schemaVersion, 1);
   assert.equal(snapshot.activeWorkReceipts.readOnly, true);
