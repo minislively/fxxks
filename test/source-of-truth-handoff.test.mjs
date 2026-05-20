@@ -126,6 +126,7 @@ test("source-of-truth handoff packet links inferred issue, current branch PR che
   assert.equal(packet.authoritativeResumePacket.nextSessionAdvisory.action, "continue-implementation-for-linked-issue");
   assert.deepEqual(packet.planningWarnings, []);
   assert.deepEqual(packet.combinedReliabilityWarnings, []);
+  assert.deepEqual(packet.resetCompactHandoffRecommendations, []);
   assert.deepEqual(packet.sequentialPlanningHints, []);
   assert.deepEqual(packet.longRunBudgetWarnings, []);
 });
@@ -165,6 +166,9 @@ test("authoritative resume packet compacts stale/context/reliability overlap bef
   assert.equal(resume.reliabilityBoundary.sequentialPlanningHintCount, 1);
   assert.equal(resume.reliabilityBoundary.planBeforeExecuteGuardCount, 1);
   assert.equal(resume.reliabilityBoundary.longRunBudgetWarningCount, 1);
+  assert.equal(resume.reliabilityBoundary.resetCompactHandoffRecommendationCount, 1);
+  assert.equal(packet.resetCompactHandoffRecommendations.length, 1);
+  assert.deepEqual(packet.resetCompactHandoffRecommendations[0].recommendedActions, ["reset-context", "compact-current-source-of-truth", "handoff-to-fresh-agent"]);
   assert.equal(resume.reliabilityBoundary.longRunBudgetRiskLevel, "high");
   assert.equal(resume.reliabilityBoundary.staleContextReliabilityOverlap, true);
   assert.equal(resume.reliabilityBoundary.stopBeforeMoreExecution, true);
@@ -204,6 +208,8 @@ test("authoritative resume packet stays advisory and clear for ordinary non-risk
   assert.equal(resume.reliabilityBoundary.sequentialPlanningHintCount, 0);
   assert.equal(resume.reliabilityBoundary.planBeforeExecuteGuardCount, 0);
   assert.equal(resume.reliabilityBoundary.longRunBudgetWarningCount, 0);
+  assert.equal(resume.reliabilityBoundary.resetCompactHandoffRecommendationCount, 0);
+  assert.deepEqual(packet.resetCompactHandoffRecommendations, []);
   assert.equal(resume.reliabilityBoundary.longRunBudgetRiskLevel, "clear");
   assert.equal(resume.reliabilityBoundary.stopBeforeMoreExecution, false);
   assert.equal(resume.nextSessionAdvisory.action, "continue-implementation-for-linked-issue");
@@ -244,6 +250,7 @@ test("handoff CLI emits compact authoritative resume packet only", () => {
   assert.equal(resumePacket.reliabilityBoundary.combinedReliabilityWarningCount, fullPacket.combinedReliabilityWarnings.length);
   assert.equal(resumePacket.reliabilityBoundary.sequentialPlanningHintCount, fullPacket.sequentialPlanningHints.length);
   assert.equal(resumePacket.reliabilityBoundary.planBeforeExecuteGuardCount, fullPacket.planBeforeExecuteGuards.length);
+  assert.equal(resumePacket.reliabilityBoundary.resetCompactHandoffRecommendationCount, fullPacket.resetCompactHandoffRecommendations.length);
   assert.equal(Object.hasOwn(resumePacket, "currentStatus"), false);
   assert.equal(Object.hasOwn(resumePacket, "sourceOfTruth"), false);
   assert.match(resumePacket.claimBoundary, /not provider billing\/runtime proof/);
@@ -308,6 +315,7 @@ test("source-of-truth handoff emits narrow issue #960 runtime/token-cost plannin
   });
   assert.deepEqual(nonTargetPacket.planningWarnings, []);
   assert.deepEqual(nonTargetPacket.combinedReliabilityWarnings, []);
+  assert.deepEqual(nonTargetPacket.resetCompactHandoffRecommendations, []);
   assert.deepEqual(nonTargetPacket.sequentialPlanningHints, []);
 });
 
@@ -330,6 +338,7 @@ test("source-of-truth handoff does not emit combined reliability warning for run
   const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-19T01:02:03.000Z" });
   assert.equal(packet.planningWarnings.length, 1);
   assert.deepEqual(packet.combinedReliabilityWarnings, []);
+  assert.deepEqual(packet.resetCompactHandoffRecommendations, []);
 });
 
 test("source-of-truth handoff emits issue #976 long-run runtime planning warning", () => {
@@ -368,6 +377,8 @@ test("source-of-truth handoff emits issue #976 long-run runtime planning warning
   assert.equal(packet.longRunBudgetWarnings[0].issue, "#988");
   assert.equal(packet.longRunBudgetWarnings[0].riskLevel, "high");
   assert.equal(packet.longRunBudgetWarnings[0].trigger, "plan-before-execute-stop-with-runtime-planning");
+  assert.equal(packet.resetCompactHandoffRecommendations.length, 1);
+  assert.equal(packet.resetCompactHandoffRecommendations[0].issue, "#996");
   assert.match(packet.longRunBudgetWarnings[0].claimBoundary, /not provider billing\/token\/runtime proof/);
   assert.match(packet.sequentialPlanningHints[0].claimBoundary, /no provider billing-runtime proof|does not prove provider billing\/runtime token usage/);
 });
@@ -394,6 +405,7 @@ test("source-of-truth handoff emits issue #982 sequential planning hint without 
   const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-20T04:02:03.000Z" });
   assert.deepEqual(packet.planningWarnings, []);
   assert.deepEqual(packet.combinedReliabilityWarnings, []);
+  assert.deepEqual(packet.resetCompactHandoffRecommendations, []);
   assert.equal(packet.sequentialPlanningHints.length, 1);
   assert.equal(packet.sequentialPlanningHints[0].trigger, "linked-issue-982");
   assert.deepEqual(packet.sequentialPlanningHints[0].recommendations, [
