@@ -218,6 +218,44 @@ test("handoff CLI emits JSON packet", () => {
   assert.ok(packet.currentStatus.operatorCheck.verdict);
 });
 
+test("handoff CLI emits compact authoritative resume packet only", () => {
+  const fullStdout = execFileSync(process.execPath, [cli, "handoff", "--json"], { cwd: repoRoot, encoding: "utf8", timeout: 20_000 });
+  const resumeStdout = execFileSync(process.execPath, [cli, "handoff", "--resume-json"], { cwd: repoRoot, encoding: "utf8", timeout: 20_000 });
+  const fullPacket = JSON.parse(fullStdout);
+  const resumePacket = JSON.parse(resumeStdout);
+
+  assert.deepEqual(resumePacket, fullPacket.authoritativeResumePacket);
+  assert.equal(resumePacket.schemaVersion, 1);
+  assert.equal(resumePacket.status, "advisory");
+  assert.equal(resumePacket.compact, true);
+  assert.equal(resumePacket.beforeNewSession, true);
+  assert.equal(resumePacket.derivedFrom.handoffCommand, "handoff");
+  assert.equal(resumePacket.derivedFrom.handoffSchemaVersion, fullPacket.schemaVersion);
+  assert.equal(resumePacket.currentSourceOfTruth.scope.cwd, fullPacket.scope.cwd);
+  assert.equal(resumePacket.currentSourceOfTruth.scope.changedPathCount, fullPacket.scope.changedPathCount);
+  assert.equal(resumePacket.staleHistoricalBoundary.avoidCount, fullPacket.staleOrHistoricalContextToAvoid.length);
+  assert.equal(resumePacket.reliabilityBoundary.planningWarningCount, fullPacket.planningWarnings.length);
+  assert.equal(resumePacket.reliabilityBoundary.combinedReliabilityWarningCount, fullPacket.combinedReliabilityWarnings.length);
+  assert.equal(resumePacket.reliabilityBoundary.sequentialPlanningHintCount, fullPacket.sequentialPlanningHints.length);
+  assert.equal(resumePacket.reliabilityBoundary.planBeforeExecuteGuardCount, fullPacket.planBeforeExecuteGuards.length);
+  assert.equal(Object.hasOwn(resumePacket, "currentStatus"), false);
+  assert.equal(Object.hasOwn(resumePacket, "sourceOfTruth"), false);
+  assert.match(resumePacket.claimBoundary, /not provider billing\/runtime proof/);
+  assert.match(resumePacket.claimBoundary, /not autonomous CI\/merge authority/);
+  assert.match(resumePacket.claimBoundary, /not provider\/runtime hook behavior/);
+  assert.match(resumePacket.claimBoundary, /not product support expansion/);
+  assert.match(resumePacket.claimBoundary, /not frontend behavior change/);
+  assert.match(resumePacket.forbiddenClaims.join("\n"), /provider billing\/runtime proof/);
+  assert.match(resumePacket.forbiddenClaims.join("\n"), /autonomous CI\/merge authority/);
+});
+
+test("handoff CLI rejects ambiguous full and resume JSON projection flags", () => {
+  assert.throws(
+    () => execFileSync(process.execPath, [cli, "handoff", "--json", "--resume-json"], { cwd: repoRoot, encoding: "utf8", timeout: 20_000, stdio: ["ignore", "pipe", "pipe"] }),
+    /handoff accepts either --json or --resume-json, not both/,
+  );
+});
+
 test("source-of-truth handoff emits narrow issue #960 runtime/token-cost planning warning only", () => {
   const cwd = repoRoot;
   const snapshot = baseSnapshot(cwd);

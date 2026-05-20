@@ -645,7 +645,7 @@ Everyday commands:
   ${displayCliName} preflight [--json]
       Compact read-only agent guidance projected from the existing operator-check/contextTrust snapshot.
 
-  ${displayCliName} handoff [--json]
+  ${displayCliName} handoff [--json|--resume-json]
       Compact source-of-truth handoff packet for fresh agent sessions, bounded to the current branch/worktree.
 
   ${displayCliName} stale-context <prompt-or-handoff.md> [--json]
@@ -1613,11 +1613,22 @@ async function run(): Promise<void> {
       return;
     }
     case "handoff": {
-      const allowed = new Set(["--json"]);
+      const allowed = new Set(["--json", "--resume-json"]);
+      let json = false;
+      let resumeJson = false;
       for (const arg of rest) {
         if (!allowed.has(arg)) {
           throw new Error(`Unexpected handoff argument: ${arg}`);
         }
+        if (arg === "--json") {
+          json = true;
+        }
+        if (arg === "--resume-json") {
+          resumeJson = true;
+        }
+      }
+      if (json && resumeJson) {
+        throw new Error("handoff accepts either --json or --resume-json, not both");
       }
       const [{ readOperatorCheckSnapshot }, { buildPreflightPacket }, { buildSourceOfTruthHandoffPacket }] = await Promise.all([
         import("../ops/operator-check.js"),
@@ -1626,7 +1637,8 @@ async function run(): Promise<void> {
       ]);
       const snapshot = readOperatorCheckSnapshot(process.cwd());
       const preflight = buildPreflightPacket(snapshot);
-      print(buildSourceOfTruthHandoffPacket(snapshot, preflight));
+      const packet = buildSourceOfTruthHandoffPacket(snapshot, preflight);
+      print(resumeJson ? packet.authoritativeResumePacket : packet);
       return;
     }
     case "status": {
