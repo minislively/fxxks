@@ -156,6 +156,19 @@ export type {
   OrphanLocalWorktreeTriageResult,
 } from "./ops/orphan-local-worktree-triage";
 export {
+  SEQUENTIAL_PLANNING_HINT_CLAIM_BOUNDARY,
+  SEQUENTIAL_PLANNING_HINT_ISSUE,
+  SEQUENTIAL_PLANNING_HINT_SCHEMA_VERSION,
+  SEQUENTIAL_PLANNING_HINT_SOURCE,
+  buildSequentialPlanningHints,
+} from "./ops/sequential-planning-hint";
+export type {
+  SequentialPlanningHint,
+  SequentialPlanningHintRecommendation,
+  SequentialPlanningHintTrigger,
+} from "./ops/sequential-planning-hint";
+
+export {
   REACT_WEB_STATUS_CLAIM_BOUNDARY,
   REACT_WEB_STATUS_COMMAND,
   REACT_WEB_STATUS_SCHEMA_VERSION,

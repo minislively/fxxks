@@ -115,10 +115,12 @@ test("source-of-truth handoff packet links inferred issue, current branch PR che
   assert.match(packet.claimBoundary, /bounded to the invocation cwd\/current branch\/worktree/);
   assert.ok(packet.sourceOfTruth.authoritativeFilesAndDocs.includes("src/ops/operator-check.ts"));
   assert.ok(packet.sourceOfTruth.authoritativeFilesAndDocs.includes("src/ops/source-of-truth-handoff.ts"));
+  assert.ok(packet.sourceOfTruth.authoritativeFilesAndDocs.includes("src/ops/sequential-planning-hint.ts"));
   assert.equal(packet.staleOrHistoricalContextToAvoid.length, 2);
   assert.equal(packet.nextRecommendedAction.action, "continue-implementation-for-linked-issue");
   assert.deepEqual(packet.planningWarnings, []);
   assert.deepEqual(packet.combinedReliabilityWarnings, []);
+  assert.deepEqual(packet.sequentialPlanningHints, []);
 });
 
 test("handoff CLI emits JSON packet", () => {
@@ -179,6 +181,7 @@ test("source-of-truth handoff emits narrow issue #960 runtime/token-cost plannin
   });
   assert.deepEqual(nonTargetPacket.planningWarnings, []);
   assert.deepEqual(nonTargetPacket.combinedReliabilityWarnings, []);
+  assert.deepEqual(nonTargetPacket.sequentialPlanningHints, []);
 });
 
 test("source-of-truth handoff does not emit combined reliability warning for runtime-only risk", () => {
@@ -229,4 +232,44 @@ test("source-of-truth handoff emits issue #976 long-run runtime planning warning
   assert.match(packet.planningWarnings[0].forbiddenClaims.join("\n"), /runtime-token savings proof/);
   assert.equal(packet.combinedReliabilityWarnings.length, 1);
   assert.equal(packet.combinedReliabilityWarnings[0].requiredOverlap.runtimePlanning[0].issue, "#976");
+  assert.equal(packet.sequentialPlanningHints.length, 1);
+  assert.equal(packet.sequentialPlanningHints[0].issue, "#982");
+  assert.equal(packet.sequentialPlanningHints[0].trigger, "combined-reliability-warning-present");
+  assert.match(packet.sequentialPlanningHints[0].message, /write a bounded plan/);
+  assert.match(packet.sequentialPlanningHints[0].claimBoundary, /no provider billing-runtime proof|does not prove provider billing\/runtime token usage/);
+});
+
+
+test("source-of-truth handoff emits issue #982 sequential planning hint without runtime proof claims", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.runtimeProvenance.git.branch = "fooks-issue-982-sequential-planning-hint";
+  snapshot.activity.worktree.branch = "fooks-issue-982-sequential-planning-hint";
+  snapshot.activity.worktree.upstream = "origin/fooks-issue-982-sequential-planning-hint";
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 982 --json number,title,state,url") {
+      return JSON.stringify({ number: 982, title: "sequential planning hint", state: "OPEN", url: "https://github.com/minislively/fooks/issues/982" });
+    }
+    if (key === "gh pr list --head fooks-issue-982-sequential-planning-hint --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return "[]";
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-20T04:02:03.000Z" });
+  assert.deepEqual(packet.planningWarnings, []);
+  assert.deepEqual(packet.combinedReliabilityWarnings, []);
+  assert.equal(packet.sequentialPlanningHints.length, 1);
+  assert.equal(packet.sequentialPlanningHints[0].trigger, "linked-issue-982");
+  assert.deepEqual(packet.sequentialPlanningHints[0].recommendations, [
+    "write-plan-before-execute",
+    "split-long-work-into-bounded-steps",
+    "checkpoint-or-compress-current-source-of-truth",
+    "handoff-before-burning-another-context-window",
+  ]);
+  assert.match(packet.sequentialPlanningHints[0].claimBoundary, /does not prove provider billing\/runtime token usage/);
+  assert.match(packet.sequentialPlanningHints[0].forbiddenClaims.join("\n"), /autonomous execution authority/);
+  assert.match(packet.sequentialPlanningHints[0].forbiddenClaims.join("\n"), /merge authority or merge-gate policy change/);
 });
