@@ -33,8 +33,19 @@ const {
   OPERATOR_CHECK_CLAIM_BOUNDARY,
   OPERATOR_CHECK_COMMAND,
   OPERATOR_CHECK_SOURCE,
+  OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE,
+  buildOperatorCheckReliabilityWarningVisibility,
   readOperatorCheckSnapshot,
 } = require(path.join(repoRoot, "dist", "ops", "operator-check.js"));
+
+const {
+  buildRuntimeTokenCostPlanningWarnings,
+} = require(path.join(repoRoot, "dist", "ops", "runtime-token-cost-planning-warning.js"));
+
+const {
+  buildCombinedReliabilityWarnings,
+} = require(path.join(repoRoot, "dist", "ops", "combined-reliability-warning.js"));
 
 const {
   OPERATOR_CONTEXT_TRUST_RESEARCH_REFERENCE,
@@ -3342,6 +3353,59 @@ test("operator check JSON includes narrow issue #960 runtime/token-cost planning
   assert.equal(snapshot.planningWarnings[0].trigger, "branch-issue-960");
   assert.match(snapshot.planningWarnings[0].message, /#961 preflight, #962 stale-context, and #963 handoff contracts/);
   assert.match(snapshot.planningWarnings[0].claimBoundary, /Advisory planning warning only/);
+  assert.equal(snapshot.reliabilityWarningVisibility.source, OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE);
+  assert.equal(snapshot.reliabilityWarningVisibility.status, "advisory");
+  assert.equal(snapshot.reliabilityWarningVisibility.summary.planningWarningCount, 1);
+  assert.equal(snapshot.reliabilityWarningVisibility.summary.existingWarningCount, snapshot.planningWarnings.length + snapshot.combinedReliabilityWarnings.length);
+  assert.equal(snapshot.reliabilityWarningVisibility.derivedFrom.contextTrustSource, snapshot.contextTrust.source);
+  assert.equal(snapshot.reliabilityWarningVisibility.warnings.some((warning) => warning.kind === "runtime-planning" && warning.issue === "#960"), true);
+  assert.match(snapshot.reliabilityWarningVisibility.claimBoundary, /existing contextTrust\/source-of-truth, runtime planning advisory, and combinedReliabilityWarnings fields only/);
+});
+
+test("operator check reliability warning visibility surfaces existing planning and combined warnings only", () => {
+  const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch: "fooks-issue-960-runtime-token-cost-plan" });
+  const contextTrust = syntheticPreflightSnapshot({
+    nonAuthorizing: [
+      {
+        kind: "stale-residue-active-boundary",
+        source: "synthetic stale residue",
+        reason: "synthetic stale residue risk",
+        referenceField: "staleResidueActiveBoundary",
+        contractScope: "stale-residue-boundary",
+        authority: "insufficient",
+      },
+    ],
+  }).contextTrust;
+  const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
+
+  const visibility = buildOperatorCheckReliabilityWarningVisibility({
+    contextTrust,
+    planningWarnings,
+    combinedReliabilityWarnings,
+  });
+
+  assert.equal(visibility.schemaVersion, 1);
+  assert.equal(visibility.source, OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE);
+  assert.equal(visibility.status, "advisory");
+  assert.deepEqual(visibility.summary, {
+    existingWarningCount: 2,
+    planningWarningCount: 1,
+    combinedReliabilityWarningCount: 1,
+    contextTrustCurrentAuthorityCount: 0,
+    contextTrustNonAuthorizingCount: 1,
+    contextTrustHistoricalOnlyCount: 0,
+  });
+  assert.equal(visibility.warnings[0].kind, "runtime-planning");
+  assert.equal(visibility.warnings[0].issue, "#960");
+  assert.equal(visibility.warnings[1].kind, "combined-reliability");
+  assert.equal(visibility.warnings[1].trigger, "context-risk-and-runtime-planning-overlap");
+  assert.deepEqual(visibility.derivedFrom, {
+    contextTrustSource: OPERATOR_CONTEXT_TRUST_SOURCE,
+    planningWarningsField: "planningWarnings",
+    combinedReliabilityWarningsField: "combinedReliabilityWarnings",
+  });
+  assert.equal(visibility.claimBoundary, OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY);
+  assert.match(visibility.claimBoundary, /adds no telemetry, provider\/runtime hooks, token\/cost accounting, merge-gate policy, product claims, or frontend behavior/);
 });
 
 test("operator check JSON includes narrow issue #976 long-run planning advisory", () => {
