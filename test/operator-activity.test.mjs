@@ -198,6 +198,94 @@ process.exit(2);
   return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
 }
 
+function makeActiveReceiptCliFixture() {
+  const tempDir = fs.realpathSync(makeTempProject());
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-active-receipt-bin-"));
+  const branch = "dogfood/issue-998-current-run-receipt-cli";
+  const head = "active-receipt-cli-head";
+  writeExecutable(path.join(binDir, "tmux"), `#!/usr/bin/env node
+const cwd = process.cwd();
+process.stdout.write("fooks-998\\t" + cwd + "\\tzsh\\t%98\\n");
+`);
+  writeExecutable(path.join(binDir, "gh"), `#!/usr/bin/env node
+const args = process.argv.slice(2).join(" ");
+if (args.startsWith("issue list")) {
+  process.stdout.write("[{\\"number\\":998}]");
+  process.exit(0);
+}
+if (args.startsWith("pr list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+if (args.startsWith("run list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+process.stderr.write("unexpected gh " + args + "\\n");
+process.exit(2);
+`);
+  writeExecutable(path.join(binDir, "git"), `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const joined = args.join(" ");
+const cwd = process.cwd();
+const branch = ${JSON.stringify(branch)};
+const head = ${JSON.stringify(head)};
+if (joined === "status --porcelain=v1 -z") process.exit(0);
+if (joined === "symbolic-ref --quiet --short HEAD") {
+  process.stdout.write(branch + "\\n");
+  process.exit(0);
+}
+if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+  process.stdout.write("origin/main\\n");
+  process.exit(0);
+}
+if (joined === "rev-list --left-right --count HEAD...@{u}") {
+  process.stdout.write("1\\t0\\n");
+  process.exit(0);
+}
+if (joined === "config --get remote.origin.url") {
+  process.stdout.write("git@github.com:minislively/fooks.git\\n");
+  process.exit(0);
+}
+if (joined === "worktree list --porcelain") {
+  process.stdout.write(["worktree " + cwd, "HEAD " + head, "branch refs/heads/" + branch, ""].join("\\n"));
+  process.exit(0);
+}
+if (joined === "rev-parse --verify origin/main") {
+  process.stdout.write("origin-main-head\\n");
+  process.exit(0);
+}
+if (joined === "rev-parse HEAD") {
+  process.stdout.write(head + "\\n");
+  process.exit(0);
+}
+if (joined === "branch --show-current") {
+  process.stdout.write(branch + "\\n");
+  process.exit(0);
+}
+if (joined === "branch --format=%(refname:short)") {
+  process.stdout.write(branch + "\\nmain\\n");
+  process.exit(0);
+}
+if (joined === "branch -r --format=%(refname:short)") {
+  process.stdout.write("origin/main\\n");
+  process.exit(0);
+}
+if (joined === "branch --merged origin/main") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "diff --shortstat origin/main...HEAD") process.exit(0);
+if (joined === "rev-list --left-right --count origin/main...HEAD") {
+  process.stdout.write("1 0\\n");
+  process.exit(0);
+}
+process.stderr.write("unexpected git " + joined + "\\n");
+process.exit(2);
+`);
+  return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
+}
+
 function assertPostMergeMainCiDiagnostic(item, { workflow, reason, headSha }) {
   assert.equal(item.workflow, workflow);
   assert.equal(item.diagnostic.source, OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE);
@@ -1415,6 +1503,37 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.deepEqual(activity.tmux.blockers, []);
   assert.deepEqual(activity.blockers, []);
   assert.equal(activity.currentRunEvidence.mainEchoEvidence, true);
+  const receipt = run(["status", "activity", "--include-remote-counts", "--receipt-json"], tempDir, env);
+  assert.deepEqual(receipt, activity.currentRunEvidence.receipt);
+  assert.deepEqual(receipt, {
+    status: "idle",
+    active: false,
+    oneLine: "Current fooks run is idle/non-active: clean main, zero divergence, no mapped fooks sessions, zero open issues/PRs.",
+    evidenceKinds: [],
+    advisoryOnly: true,
+    readOnly: true,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  });
+});
+
+test("CLI status activity receipt projection matches full active current-run receipt", () => {
+  const { tempDir, env } = makeActiveReceiptCliFixture();
+
+  const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
+  const receipt = run(["status", "activity", "--include-remote-counts", "--receipt-json"], tempDir, env);
+
+  assert.deepEqual(receipt, activity.currentRunEvidence.receipt);
+  assert.deepEqual(receipt, {
+    status: "active",
+    active: true,
+    oneLine: "Current fooks run appears active: 1 open issue, branch dogfood/issue-998-current-run-receipt-cli, 1 mapped fooks session.",
+    evidenceKinds: ["issue", "branch", "session"],
+    advisoryOnly: true,
+    readOnly: true,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  });
+  assert.equal(activity.currentRunEvidence.activeWorkEvidence, true);
+  assert.equal(activity.currentRunEvidence.receipt.readOnly, true);
 });
 
 
