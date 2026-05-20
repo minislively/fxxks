@@ -118,9 +118,92 @@ test("source-of-truth handoff packet links inferred issue, current branch PR che
   assert.ok(packet.sourceOfTruth.authoritativeFilesAndDocs.includes("src/ops/sequential-planning-hint.ts"));
   assert.equal(packet.staleOrHistoricalContextToAvoid.length, 2);
   assert.equal(packet.nextRecommendedAction.action, "continue-implementation-for-linked-issue");
+  assert.equal(packet.authoritativeResumePacket.issue, "#986");
+  assert.equal(packet.authoritativeResumePacket.compact, true);
+  assert.equal(packet.authoritativeResumePacket.beforeNewSession, true);
+  assert.equal(packet.authoritativeResumePacket.currentSourceOfTruth.authorityStatus, "present");
+  assert.equal(packet.authoritativeResumePacket.staleHistoricalBoundary.status, "present");
+  assert.equal(packet.authoritativeResumePacket.nextSessionAdvisory.action, "continue-implementation-for-linked-issue");
   assert.deepEqual(packet.planningWarnings, []);
   assert.deepEqual(packet.combinedReliabilityWarnings, []);
   assert.deepEqual(packet.sequentialPlanningHints, []);
+});
+
+test("authoritative resume packet compacts stale/context/reliability overlap before new session", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.runtimeProvenance.git.branch = "fooks-issue-976-runtime-planning-warning";
+  snapshot.activity.worktree.branch = "fooks-issue-976-runtime-planning-warning";
+  snapshot.activity.worktree.upstream = "origin/fooks-issue-976-runtime-planning-warning";
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return " M src/ops/source-of-truth-handoff.ts\n M test/source-of-truth-handoff.test.mjs\n";
+    if (key === "gh issue view 976 --json number,title,state,url") {
+      return JSON.stringify({ number: 976, title: "runtime planning warning", state: "OPEN", url: "https://github.com/minislively/fooks/issues/976" });
+    }
+    if (key === "gh pr list --head fooks-issue-976-runtime-planning-warning --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return "[]";
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-20T10:02:03.000Z" });
+  const resume = packet.authoritativeResumePacket;
+  assert.equal(resume.schemaVersion, 1);
+  assert.equal(resume.status, "advisory");
+  assert.match(resume.claimBoundary, /not provider billing\/runtime proof/);
+  assert.match(resume.claimBoundary, /not autonomous CI\/merge authority/);
+  assert.equal(resume.currentSourceOfTruth.linkedArtifacts.issue.number, 976);
+  assert.equal(resume.currentSourceOfTruth.scope.branch, "fooks-issue-976-runtime-planning-warning");
+  assert.deepEqual(resume.currentSourceOfTruth.scope.changedPaths, ["src/ops/source-of-truth-handoff.ts", "test/source-of-truth-handoff.test.mjs"]);
+  assert.equal(resume.staleHistoricalBoundary.status, "present");
+  assert.equal(resume.staleHistoricalBoundary.avoidCount, 2);
+  assert.match(resume.staleHistoricalBoundary.instruction, /Treat listed stale\/historical\/non-authorizing entries as boundaries/);
+  assert.equal(resume.reliabilityBoundary.planningWarningCount, 1);
+  assert.equal(resume.reliabilityBoundary.combinedReliabilityWarningCount, 1);
+  assert.equal(resume.reliabilityBoundary.sequentialPlanningHintCount, 1);
+  assert.equal(resume.reliabilityBoundary.planBeforeExecuteGuardCount, 1);
+  assert.equal(resume.reliabilityBoundary.staleContextReliabilityOverlap, true);
+  assert.equal(resume.reliabilityBoundary.stopBeforeMoreExecution, true);
+  assert.equal(resume.nextSessionAdvisory.action, "stop-before-more-execution");
+  assert.match(resume.nextSessionAdvisory.rationale, /recheck current authority/);
+  assert.ok(resume.nextSessionAdvisory.requiredRechecks.some((line) => /fooks check --json/.test(line)));
+  assert.match(resume.forbiddenClaims.join("\n"), /provider usage\/billing-token proof/);
+  assert.match(resume.forbiddenClaims.join("\n"), /autonomous CI\/merge authority/);
+  assert.match(JSON.stringify(resume), /sourceOfTruth.currentAuthority/);
+});
+
+test("authoritative resume packet stays advisory and clear for ordinary non-risk handoff", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.contextTrust.nonAuthorizing = [];
+  snapshot.contextTrust.historicalOnly = [];
+  const preflight = basePreflight();
+  preflight.historicalOnly = [];
+  preflight.nonAuthorizing = [];
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 963 --json number,title,state,url") return JSON.stringify({ number: 963, title: "source of truth handoff", state: "OPEN" });
+    if (key === "gh pr list --head fooks-issue-963-source-of-truth-handoff --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return JSON.stringify([{ number: 1001, state: "OPEN", headRefName: "fooks-issue-963-source-of-truth-handoff", baseRefName: "main", isDraft: false, statusCheckRollup: [] }]);
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, preflight, { commandRunner: runner, now: () => "2026-05-20T10:03:03.000Z" });
+  const resume = packet.authoritativeResumePacket;
+  assert.equal(resume.staleHistoricalBoundary.status, "clear");
+  assert.equal(resume.staleHistoricalBoundary.avoidCount, 0);
+  assert.equal(resume.reliabilityBoundary.planningWarningCount, 0);
+  assert.equal(resume.reliabilityBoundary.combinedReliabilityWarningCount, 0);
+  assert.equal(resume.reliabilityBoundary.sequentialPlanningHintCount, 0);
+  assert.equal(resume.reliabilityBoundary.planBeforeExecuteGuardCount, 0);
+  assert.equal(resume.reliabilityBoundary.stopBeforeMoreExecution, false);
+  assert.equal(resume.nextSessionAdvisory.action, "continue-implementation-for-linked-issue");
+  assert.match(resume.staleHistoricalBoundary.instruction, /No stale\/historical\/non-authorizing entries/);
+  assert.match(resume.claimBoundary, /preserves the full handoff output/);
+  assert.match(resume.forbiddenClaims.join("\n"), /frontend runtime behavior change/);
 });
 
 test("handoff CLI emits JSON packet", () => {

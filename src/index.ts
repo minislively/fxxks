@@ -314,6 +314,10 @@ export type {
   StaleContextWarningKind,
 } from "./ops/stale-context";
 export {
+  AUTHORITATIVE_RESUME_PACKET_CLAIM_BOUNDARY,
+  AUTHORITATIVE_RESUME_PACKET_ISSUE,
+  AUTHORITATIVE_RESUME_PACKET_SCHEMA_VERSION,
+  AUTHORITATIVE_RESUME_PACKET_SOURCE,
   SOURCE_OF_TRUTH_HANDOFF_CLAIM_BOUNDARY,
   SOURCE_OF_TRUTH_HANDOFF_COMMAND,
   SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION,
@@ -321,6 +325,8 @@ export {
   buildSourceOfTruthHandoffPacket,
 } from "./ops/source-of-truth-handoff";
 export type {
+  AuthoritativeResumePacket,
+  AuthoritativeResumePacketAction,
   SourceOfTruthHandoffCommandRunner,
   SourceOfTruthHandoffOptions,
   SourceOfTruthHandoffPacket,
