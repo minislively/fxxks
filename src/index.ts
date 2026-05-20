@@ -87,6 +87,11 @@ export {
   OPERATOR_CHECK_COMMAND,
   OPERATOR_CHECK_SCHEMA_VERSION,
   OPERATOR_CHECK_SOURCE,
+  OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE,
+  OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SCHEMA_VERSION,
+  OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE,
+  buildOperatorCheckResumeHandoffProjection,
   readOperatorCheckSnapshot,
 } from "./ops/operator-check";
 export type {
@@ -99,6 +104,7 @@ export type {
   OperatorCheckActiveWorkReceipts,
   OperatorCheckPostReceiptNudgeAnchorBoundary,
   OperatorCheckRequiredActiveArtifact,
+  OperatorCheckResumeHandoffProjection,
   OperatorCheckSalvageReviewQueue,
   OperatorCheckSalvageReviewQueueItem,
   OperatorCheckSnapshot,

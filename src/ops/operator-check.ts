@@ -18,7 +18,7 @@ import {
 } from "./orphan-local-worktree-triage";
 import { STALE_WORKTREE_AUDIT_COMMAND, STALE_WORKTREE_AUDIT_ISSUE } from "./stale-worktree-audit";
 import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
-import { buildOperatorContextTrust, type OperatorContextTrustPacket } from "./context-trust";
+import { buildOperatorContextTrust, type OperatorContextTrustEntry, type OperatorContextTrustPacket } from "./context-trust";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
@@ -32,6 +32,7 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
@@ -41,8 +42,11 @@ export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE = "operator/check reliability warning visibility projection";
+export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE = "operator/check compact resume handoff projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY =
   "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, and longRunBudgetWarnings fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
+export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY =
+  "Compact advisory/read-only resume handoff projection for issue #992; derived only from existing operator-check contextTrust/source-of-truth, reliability warning visibility, runtime planning, sequential planning, plan-before-execute, and long-run budget fields, and adds no provider/runtime telemetry, CI/merge authority, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
@@ -60,6 +64,7 @@ export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE = "#867";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE = "#869";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE = "#885";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE = "#895";
+export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE = "#992";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -576,6 +581,7 @@ export type OperatorCheckSnapshot = {
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
   longRunBudgetWarnings: LongRunBudgetWarning[];
   reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
+  resumeHandoffProjection: OperatorCheckResumeHandoffProjection;
   activity: OperatorActivitySnapshot;
   blockers: string[];
 };
@@ -635,6 +641,63 @@ export type OperatorCheckReliabilityWarningVisibility = {
     longRunBudgetWarningsField: "longRunBudgetWarnings";
   };
   claimBoundary: typeof OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY;
+};
+
+export type OperatorCheckResumeHandoffProjection = {
+  schemaVersion: typeof OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE;
+  status: "advisory";
+  compact: true;
+  readOnly: true;
+  source: typeof OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY;
+  derivedFrom: {
+    operatorCheckCommand: typeof OPERATOR_CHECK_COMMAND;
+    operatorCheckSchemaVersion: typeof OPERATOR_CHECK_SCHEMA_VERSION;
+    contextTrustSchemaVersion: OperatorContextTrustPacket["schemaVersion"];
+    contextTrustSource: OperatorContextTrustPacket["source"];
+    fields: [
+      "contextTrust.sourceOfTruth.current",
+      "contextTrust.nonAuthorizing",
+      "contextTrust.historicalOnly",
+      "planningWarnings",
+      "combinedReliabilityWarnings",
+      "sequentialPlanningHints",
+      "planBeforeExecuteGuards",
+      "longRunBudgetWarnings",
+      "reliabilityWarningVisibility",
+    ];
+  };
+  summary: {
+    currentAuthorityCount: number;
+    staleOrHistoricalBoundaryCount: number;
+    planningWarningCount: number;
+    combinedReliabilityWarningCount: number;
+    sequentialPlanningHintCount: number;
+    planBeforeExecuteGuardCount: number;
+    longRunBudgetWarningCount: number;
+    reliabilityWarningCount: number;
+    stopBeforeMoreExecution: boolean;
+  };
+  currentAuthority: {
+    status: "present" | "missing";
+    entries: OperatorContextTrustEntry[];
+    entryLimit: number;
+    omittedCount: number;
+  };
+  staleHistoricalBoundary: {
+    status: "clear" | "present";
+    entries: OperatorContextTrustEntry[];
+    entryLimit: number;
+    omittedCount: number;
+    instruction: string;
+  };
+  nextSessionAdvisory: {
+    action: "recheck-current-authority" | "stop-before-more-execution";
+    rationale: string;
+    requiredRechecks: string[];
+  };
+  forbiddenClaims: string[];
 };
 
 
@@ -1724,6 +1787,105 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
   };
 }
 
+const RESUME_HANDOFF_ENTRY_LIMIT = 8;
+
+export function buildOperatorCheckResumeHandoffProjection(input: {
+  contextTrust: OperatorContextTrustPacket;
+  planningWarnings: RuntimeTokenCostPlanningWarning[];
+  combinedReliabilityWarnings: CombinedReliabilityWarning[];
+  sequentialPlanningHints: SequentialPlanningHint[];
+  planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
+  longRunBudgetWarnings: LongRunBudgetWarning[];
+  reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
+}): OperatorCheckResumeHandoffProjection {
+  const currentAuthority = input.contextTrust.sourceOfTruth.current.slice(0, RESUME_HANDOFF_ENTRY_LIMIT);
+  const staleHistoricalEntries = [
+    ...input.contextTrust.nonAuthorizing,
+    ...input.contextTrust.historicalOnly,
+  ];
+  const staleHistoricalBoundary = staleHistoricalEntries.slice(0, RESUME_HANDOFF_ENTRY_LIMIT);
+  const stopBeforeMoreExecution = input.planBeforeExecuteGuards.some((guard) => guard.stopBeforeMoreExecution);
+  const requiredRechecks = uniqueSorted([
+    ...input.longRunBudgetWarnings.flatMap((warning) => warning.requiredRechecks),
+    ...input.planBeforeExecuteGuards.flatMap((guard) => guard.requiredRechecks),
+    ...input.sequentialPlanningHints.flatMap((hint) => hint.requiredRechecks),
+    ...input.combinedReliabilityWarnings.flatMap((warning) => warning.requiredRechecks),
+    "Run fooks check --json in the new session before treating this projection as current authority.",
+  ]);
+  const forbiddenClaims = uniqueSorted([
+    ...input.longRunBudgetWarnings.flatMap((warning) => warning.forbiddenClaims),
+    ...input.planBeforeExecuteGuards.flatMap((guard) => guard.forbiddenClaims),
+    ...input.sequentialPlanningHints.flatMap((hint) => hint.forbiddenClaims),
+    ...input.combinedReliabilityWarnings.flatMap((warning) => warning.forbiddenClaims),
+    ...input.planningWarnings.flatMap((warning) => warning.forbiddenClaims),
+    "provider/runtime telemetry",
+    "provider billing/runtime proof",
+    "autonomous CI/merge authority",
+    "frontend behavior or product-support change",
+  ]);
+
+  return {
+    schemaVersion: OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE,
+    status: "advisory",
+    compact: true,
+    readOnly: true,
+    source: OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE,
+    claimBoundary: OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY,
+    derivedFrom: {
+      operatorCheckCommand: OPERATOR_CHECK_COMMAND,
+      operatorCheckSchemaVersion: OPERATOR_CHECK_SCHEMA_VERSION,
+      contextTrustSchemaVersion: input.contextTrust.schemaVersion,
+      contextTrustSource: input.contextTrust.source,
+      fields: [
+        "contextTrust.sourceOfTruth.current",
+        "contextTrust.nonAuthorizing",
+        "contextTrust.historicalOnly",
+        "planningWarnings",
+        "combinedReliabilityWarnings",
+        "sequentialPlanningHints",
+        "planBeforeExecuteGuards",
+        "longRunBudgetWarnings",
+        "reliabilityWarningVisibility",
+      ],
+    },
+    summary: {
+      currentAuthorityCount: input.contextTrust.sourceOfTruth.current.length,
+      staleOrHistoricalBoundaryCount: staleHistoricalEntries.length,
+      planningWarningCount: input.planningWarnings.length,
+      combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
+      sequentialPlanningHintCount: input.sequentialPlanningHints.length,
+      planBeforeExecuteGuardCount: input.planBeforeExecuteGuards.length,
+      longRunBudgetWarningCount: input.longRunBudgetWarnings.length,
+      reliabilityWarningCount: input.reliabilityWarningVisibility.summary.existingWarningCount,
+      stopBeforeMoreExecution,
+    },
+    currentAuthority: {
+      status: input.contextTrust.sourceOfTruth.current.length > 0 ? "present" : "missing",
+      entries: currentAuthority,
+      entryLimit: RESUME_HANDOFF_ENTRY_LIMIT,
+      omittedCount: Math.max(0, input.contextTrust.sourceOfTruth.current.length - currentAuthority.length),
+    },
+    staleHistoricalBoundary: {
+      status: staleHistoricalEntries.length > 0 ? "present" : "clear",
+      entries: staleHistoricalBoundary,
+      entryLimit: RESUME_HANDOFF_ENTRY_LIMIT,
+      omittedCount: Math.max(0, staleHistoricalEntries.length - staleHistoricalBoundary.length),
+      instruction: staleHistoricalEntries.length > 0
+        ? "Treat these non-authorizing or historical entries as boundaries to avoid until rechecked from current source-of-truth evidence."
+        : "No non-authorizing or historical contextTrust entries are present; still re-run fooks check before relying on this projection.",
+    },
+    nextSessionAdvisory: {
+      action: stopBeforeMoreExecution ? "stop-before-more-execution" : "recheck-current-authority",
+      rationale: stopBeforeMoreExecution
+        ? "plan-before-execute guard is present; stop for a bounded plan and current-authority recheck before more execution."
+        : "resume from current source-of-truth entries only after rechecking this operator/check projection in the new session.",
+      requiredRechecks,
+    },
+    forbiddenClaims,
+  };
+}
+
 export function readOperatorCheckSnapshot(cwd = process.cwd(), options: OperatorActivityOptions = {}): OperatorCheckSnapshot {
   const activity = readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true });
   const activeArtifacts = activeArtifactsFrom(activity);
@@ -1759,6 +1921,15 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     combinedReliabilityWarnings,
     longRunBudgetWarnings,
   });
+  const resumeHandoffProjection = buildOperatorCheckResumeHandoffProjection({
+    contextTrust,
+    planningWarnings,
+    combinedReliabilityWarnings,
+    sequentialPlanningHints,
+    planBeforeExecuteGuards,
+    longRunBudgetWarnings,
+    reliabilityWarningVisibility,
+  });
 
   return {
     schemaVersion: OPERATOR_CHECK_SCHEMA_VERSION,
@@ -1789,6 +1960,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     planBeforeExecuteGuards,
     longRunBudgetWarnings,
     reliabilityWarningVisibility,
+    resumeHandoffProjection,
     activity,
     blockers,
   };

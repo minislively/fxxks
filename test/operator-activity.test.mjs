@@ -33,8 +33,11 @@ const {
   OPERATOR_CHECK_CLAIM_BOUNDARY,
   OPERATOR_CHECK_COMMAND,
   OPERATOR_CHECK_SOURCE,
+  OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE,
   OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY,
   OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE,
+  buildOperatorCheckResumeHandoffProjection,
   buildOperatorCheckReliabilityWarningVisibility,
   readOperatorCheckSnapshot,
 } = require(path.join(repoRoot, "dist", "ops", "operator-check.js"));
@@ -3368,6 +3371,75 @@ test("operator check JSON includes narrow issue #960 runtime/token-cost planning
   assert.deepEqual(snapshot.sequentialPlanningHints, []);
 });
 
+test("operator check JSON includes compact issue #992 resume handoff projection", () => {
+  const tempDir = makeTempProject();
+  const branch = "fooks-issue-992-operator-check-resume-projection";
+  const head = "issue-992-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-20T14:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return `${branch}\n`;
+      if (args[0] === "rev-parse") return `${head}\n`;
+      if (args[0] === "rev-list") return "1\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number,title,url --limit 20") {
+        return JSON.stringify([{ number: 992, title: "resume projection", url: "https://github.com/minislively/fooks/issues/992" }]);
+      }
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${head}`, `branch refs/heads/${branch}`, ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return `${branch}\nmain\n`;
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 1\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  const projection = snapshot.resumeHandoffProjection;
+  assert.equal(projection.schemaVersion, 1);
+  assert.equal(projection.issue, "#992");
+  assert.equal(projection.status, "advisory");
+  assert.equal(projection.compact, true);
+  assert.equal(projection.readOnly, true);
+  assert.equal(projection.source, OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE);
+  assert.equal(projection.derivedFrom.operatorCheckCommand, OPERATOR_CHECK_COMMAND);
+  assert.deepEqual(projection.derivedFrom.fields, [
+    "contextTrust.sourceOfTruth.current",
+    "contextTrust.nonAuthorizing",
+    "contextTrust.historicalOnly",
+    "planningWarnings",
+    "combinedReliabilityWarnings",
+    "sequentialPlanningHints",
+    "planBeforeExecuteGuards",
+    "longRunBudgetWarnings",
+    "reliabilityWarningVisibility",
+  ]);
+  assert.equal(projection.summary.currentAuthorityCount, snapshot.contextTrust.sourceOfTruth.current.length);
+  assert.equal(projection.summary.staleOrHistoricalBoundaryCount, snapshot.contextTrust.nonAuthorizing.length + snapshot.contextTrust.historicalOnly.length);
+  assert.equal(projection.summary.planningWarningCount, snapshot.planningWarnings.length);
+  assert.equal(projection.summary.combinedReliabilityWarningCount, snapshot.combinedReliabilityWarnings.length);
+  assert.equal(projection.summary.reliabilityWarningCount, snapshot.reliabilityWarningVisibility.summary.existingWarningCount);
+  assert.equal(projection.currentAuthority.status, snapshot.contextTrust.sourceOfTruth.current.length > 0 ? "present" : "missing");
+  assert.match(projection.claimBoundary, /derived only from existing operator-check contextTrust\/source-of-truth/);
+  assert.match(projection.claimBoundary, /adds no provider\/runtime telemetry, CI\/merge authority, product claims, or frontend behavior/);
+  assert.match(projection.forbiddenClaims.join("\n"), /provider\/runtime telemetry/);
+  assert.match(projection.forbiddenClaims.join("\n"), /autonomous CI\/merge authority/);
+});
+
 test("operator check reliability warning visibility surfaces existing advisory warnings", () => {
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch: "fooks-issue-960-runtime-token-cost-plan" });
   const contextTrust = syntheticPreflightSnapshot({
@@ -3415,6 +3487,82 @@ test("operator check reliability warning visibility surfaces existing advisory w
   });
   assert.equal(visibility.claimBoundary, OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY);
   assert.match(visibility.claimBoundary, /adds no telemetry, provider\/runtime hooks, token\/cost accounting, merge-gate policy, product claims, or frontend behavior/);
+});
+
+test("operator check resume handoff projection is bounded and derived from existing reliability fields", () => {
+  const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch: "fooks-issue-976-runtime-planning-warning" });
+  const contextTrust = syntheticPreflightSnapshot({
+    current: [
+      {
+        kind: "issue",
+        source: "synthetic active artifact",
+        reason: "synthetic current issue",
+        referenceField: "activeArtifacts",
+        count: 1,
+        authority: "current-work",
+        contractScope: "top-level-active-artifact",
+      },
+    ],
+    nonAuthorizing: Array.from({ length: 10 }, (_value, index) => ({
+      kind: `synthetic-stale-${index}`,
+      source: "synthetic stale residue",
+      reason: "synthetic stale residue risk",
+      referenceField: "staleResidueActiveBoundary",
+      contractScope: "stale-residue-boundary",
+      authority: "insufficient",
+    })),
+  }).contextTrust;
+  const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
+  const sequentialPlanningHints = buildSequentialPlanningHints({
+    branch: "fooks-issue-982-sequential-planning-hint",
+    planningWarnings,
+    combinedReliabilityWarnings,
+  });
+  const planBeforeExecuteGuards = [
+    {
+      schemaVersion: 1,
+      issue: "#983",
+      status: "advisory",
+      trigger: "synthetic",
+      stopBeforeMoreExecution: true,
+      message: "synthetic guard",
+      recommendedActions: ["write-plan-before-execute"],
+      requiredRechecks: ["synthetic recheck"],
+      forbiddenClaims: ["synthetic merge authority"],
+      claimBoundary: "synthetic claim boundary",
+    },
+  ];
+  const longRunBudgetWarnings = [];
+  const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
+    contextTrust,
+    planningWarnings,
+    combinedReliabilityWarnings,
+    longRunBudgetWarnings,
+  });
+
+  const projection = buildOperatorCheckResumeHandoffProjection({
+    contextTrust,
+    planningWarnings,
+    combinedReliabilityWarnings,
+    sequentialPlanningHints,
+    planBeforeExecuteGuards,
+    longRunBudgetWarnings,
+    reliabilityWarningVisibility,
+  });
+
+  assert.equal(projection.source, OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE);
+  assert.equal(projection.claimBoundary, OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY);
+  assert.equal(projection.summary.stopBeforeMoreExecution, true);
+  assert.equal(projection.summary.reliabilityWarningCount, reliabilityWarningVisibility.summary.existingWarningCount);
+  assert.equal(projection.summary.staleOrHistoricalBoundaryCount, 10);
+  assert.equal(projection.staleHistoricalBoundary.entries.length, 8);
+  assert.equal(projection.staleHistoricalBoundary.entryLimit, 8);
+  assert.equal(projection.staleHistoricalBoundary.omittedCount, 2);
+  assert.equal(projection.nextSessionAdvisory.action, "stop-before-more-execution");
+  assert.ok(projection.nextSessionAdvisory.requiredRechecks.includes("synthetic recheck"));
+  assert.ok(projection.nextSessionAdvisory.requiredRechecks.includes("Run fooks check --json in the new session before treating this projection as current authority."));
+  assert.ok(projection.forbiddenClaims.includes("provider/runtime telemetry"));
+  assert.ok(projection.forbiddenClaims.includes("frontend behavior or product-support change"));
 });
 
 test("operator check JSON includes narrow issue #976 long-run planning advisory", () => {
