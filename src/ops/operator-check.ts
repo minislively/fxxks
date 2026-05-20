@@ -502,6 +502,7 @@ export type OperatorCheckActiveWorkReceipts = {
   postReceiptNudgeAnchorBoundary: OperatorCheckPostReceiptNudgeAnchorBoundary;
   receiptOnlyNudgeLoopBoundary: OperatorCheckReceiptOnlyNudgeLoopBoundary;
   handoffArtifactEvidence: OperatorCheckHandoffArtifactEvidence;
+  currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
   blockers: string[];
 };
 
@@ -573,6 +574,7 @@ export type OperatorCheckSnapshot = {
   postMergeMainCiEvidence: OperatorActivitySnapshot["postMergeMainCiEvidence"];
   activeArtifacts: OperatorCheckActiveArtifact[];
   activeWorkReceipts: OperatorCheckActiveWorkReceipts;
+  currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
   requiredActiveArtifact: OperatorCheckRequiredActiveArtifact;
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
@@ -1677,6 +1679,7 @@ function buildActiveWorkReceipts(
     postReceiptNudgeAnchorBoundary: buildPostReceiptNudgeAnchorBoundary(activity),
     receiptOnlyNudgeLoopBoundary: buildReceiptOnlyNudgeLoopBoundary(activity),
     handoffArtifactEvidence: buildHandoffArtifactEvidence(activity, receipts),
+    currentRunReceipt: activity.currentRunEvidence.receipt,
     blockers,
   };
 }
@@ -1952,6 +1955,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
     activeArtifacts,
     activeWorkReceipts,
+    currentRunReceipt: activity.currentRunEvidence.receipt,
     requiredActiveArtifact: requiredArtifact,
     contextTrust,
     planningWarnings,

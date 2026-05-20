@@ -163,6 +163,16 @@ export type OperatorActivityRemoteCounts =
 
 export type OperatorActivityCurrentRunClassification = "mainEchoNonActive" | "activeOrUnknown";
 
+export type OperatorActivityCurrentRunReceipt = {
+  status: "active" | "idle";
+  active: boolean;
+  oneLine: string;
+  evidenceKinds: Array<"issue" | "pullRequest" | "branch" | "session" | "delta">;
+  advisoryOnly: true;
+  readOnly: true;
+  claimBoundary: typeof OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY;
+};
+
 export type OperatorActivityStagedOmxPromptEvidence = {
   issue: typeof OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE;
   source: typeof OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE;
@@ -200,6 +210,7 @@ export type OperatorActivityCurrentRunEvidence = {
     openPullRequests?: number;
     legacyStaleClosedArtifactWorktreeCount: number;
   };
+  receipt: OperatorActivityCurrentRunReceipt;
   reasons: string[];
   blockers: string[];
 };
@@ -610,6 +621,74 @@ function buildWorktreeSnapshot(status: WorktreeCurrentStatus): OperatorActivityW
 
 function hasOnlyFooksSessionTaskDelta(worktree: OperatorActivityWorktree): boolean {
   return worktree.delta.changedPathCount === 1 && worktree.delta.changedPaths[0] === ".fooks-session-task.txt";
+}
+
+function reportToken(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.replace(/[^A-Za-z0-9._/#:-]+/gu, "-").slice(0, 80);
+}
+
+function plural(count: number, singular: string, pluralValue = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralValue}`;
+}
+
+function buildCurrentRunReceipt(input: {
+  worktree: OperatorActivityWorktree;
+  fooksSessionCount: number;
+  openIssues?: number;
+  openPullRequests?: number;
+  mainEchoEvidence: boolean;
+}): OperatorActivityCurrentRunReceipt {
+  const evidenceKinds: OperatorActivityCurrentRunReceipt["evidenceKinds"] = [];
+  const activeParts: string[] = [];
+  const idleParts: string[] = [];
+
+  if (typeof input.openIssues === "number" && input.openIssues > 0) {
+    evidenceKinds.push("issue");
+    activeParts.push(plural(input.openIssues, "open issue"));
+  }
+  if (typeof input.openPullRequests === "number" && input.openPullRequests > 0) {
+    evidenceKinds.push("pullRequest");
+    activeParts.push(plural(input.openPullRequests, "open PR"));
+  }
+  if (input.worktree.branch && input.worktree.branch !== "main" && !hasOnlyFooksSessionTaskDelta(input.worktree)) {
+    evidenceKinds.push("branch");
+    activeParts.push(`branch ${reportToken(input.worktree.branch) ?? "non-main"}`);
+  }
+  if (input.fooksSessionCount > 0) {
+    evidenceKinds.push("session");
+    activeParts.push(plural(input.fooksSessionCount, "mapped fooks session"));
+  }
+  if (input.worktree.clean === false && !hasOnlyFooksSessionTaskDelta(input.worktree)) {
+    evidenceKinds.push("delta");
+    activeParts.push(`dirty worktree with ${plural(input.worktree.delta.changedPathCount, "changed path")}`);
+  }
+
+  if (input.worktree.branch === "main") idleParts.push("clean main");
+  else if (input.worktree.branch) idleParts.push(`branch ${reportToken(input.worktree.branch)}`);
+  else idleParts.push("unknown branch");
+  if (input.worktree.ahead === 0 && input.worktree.behind === 0) idleParts.push("zero divergence");
+  if (input.fooksSessionCount === 0) idleParts.push("no mapped fooks sessions");
+  if (input.openIssues === 0 && input.openPullRequests === 0) idleParts.push("zero open issues/PRs");
+  if (input.worktree.clean === false && hasOnlyFooksSessionTaskDelta(input.worktree)) {
+    idleParts.push(".fooks-session-task.txt-only delta is not active work proof");
+  }
+
+  const active = evidenceKinds.length > 0 && !input.mainEchoEvidence;
+  const oneLine = active
+    ? `Current fooks run appears active: ${activeParts.join(", ")}.`
+    : `Current fooks run is idle/non-active: ${idleParts.join(", ")}.`;
+
+  return {
+    status: active ? "active" : "idle",
+    active,
+    oneLine,
+    evidenceKinds: [...new Set(evidenceKinds)] as OperatorActivityCurrentRunReceipt["evidenceKinds"],
+    advisoryOnly: true,
+    readOnly: true,
+    claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
+  };
 }
 
 function hasOmxSignal(pane: ParsedTmuxPane, cleanPanePath: string): boolean {
@@ -1354,9 +1433,17 @@ function buildCurrentRunEvidence(
 
   const mainEchoEvidence = blockers.length === 0 && onMain && clean && noLocalDivergence && noSessions && zeroRemoteCounts;
   const activeWorkEvidence =
+    (Boolean(worktree.branch) && worktree.branch !== "main" && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     (worktree.clean === false && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     fooksSessionCount > 0 ||
     (optionalCounts.enabled && ((openIssues ?? 0) > 0 || (openPullRequests ?? 0) > 0));
+  const receipt = buildCurrentRunReceipt({
+    worktree,
+    fooksSessionCount,
+    openIssues,
+    openPullRequests,
+    mainEchoEvidence,
+  });
 
   return {
     available: blockers.length === 0,
@@ -1377,6 +1464,7 @@ function buildCurrentRunEvidence(
       openPullRequests,
       legacyStaleClosedArtifactWorktreeCount: legacyWorktreeEvidence.staleClosedArtifactWorktreeCount,
     },
+    receipt,
     reasons,
     blockers: uniqueSorted(blockers),
   };
