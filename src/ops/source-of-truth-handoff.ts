@@ -13,6 +13,11 @@ export const SOURCE_OF_TRUTH_HANDOFF_COMMAND = "handoff";
 export const SOURCE_OF_TRUTH_HANDOFF_SOURCE = "fooks check/preflight plus current-branch source-of-truth handoff projection";
 export const SOURCE_OF_TRUTH_HANDOFF_CLAIM_BOUNDARY =
   "Compact read-only handoff packet for fresh agent sessions; bounded to the invocation cwd/current branch/worktree, reuses operator-check/preflight contracts, performs only narrow git and gh issue/PR/status reads for linked current artifacts, and does not mutate hooks, provider/runtime behavior, stale detector scope, token/cost planning, product claims, or frontend behavior.";
+export const AUTHORITATIVE_RESUME_PACKET_SCHEMA_VERSION = 1;
+export const AUTHORITATIVE_RESUME_PACKET_ISSUE = "#986";
+export const AUTHORITATIVE_RESUME_PACKET_SOURCE = "compact authoritative resume packet derived from source-of-truth handoff";
+export const AUTHORITATIVE_RESUME_PACKET_CLAIM_BOUNDARY =
+  "Compact advisory/read-only resume packet for issue #986; it reuses existing handoff/source-of-truth/context-trust/reliability warning fields before a new session, preserves the full handoff output, and is not provider billing/runtime proof, not autonomous CI/merge authority, not provider/runtime hook behavior, not product support expansion, and not frontend behavior change.";
 
 export type SourceOfTruthHandoffCommandRunner = (command: string, args: string[], cwd: string, timeoutMs: number) => string;
 
@@ -119,13 +124,93 @@ export type SourceOfTruthHandoffPacket = {
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   sequentialPlanningHints: SequentialPlanningHint[];
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
+  authoritativeResumePacket: AuthoritativeResumePacket;
   blockers: string[];
+};
+
+export type AuthoritativeResumePacketAction =
+  | "stop-before-more-execution"
+  | SourceOfTruthHandoffPacket["nextRecommendedAction"]["action"];
+
+export type AuthoritativeResumePacket = {
+  schemaVersion: typeof AUTHORITATIVE_RESUME_PACKET_SCHEMA_VERSION;
+  issue: typeof AUTHORITATIVE_RESUME_PACKET_ISSUE;
+  status: "advisory";
+  compact: true;
+  beforeNewSession: true;
+  source: typeof AUTHORITATIVE_RESUME_PACKET_SOURCE;
+  claimBoundary: typeof AUTHORITATIVE_RESUME_PACKET_CLAIM_BOUNDARY;
+  derivedFrom: {
+    handoffCommand: typeof SOURCE_OF_TRUTH_HANDOFF_COMMAND;
+    handoffSchemaVersion: typeof SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION;
+    operatorCheckCommand: "check";
+    preflightCommand: "preflight";
+    fields: [
+      "scope",
+      "linkedArtifacts",
+      "currentStatus.operatorCheck",
+      "currentStatus.preflight",
+      "sourceOfTruth.currentAuthority",
+      "sourceOfTruth.authoritativeFilesAndDocs",
+      "staleOrHistoricalContextToAvoid",
+      "nextRecommendedAction",
+      "planningWarnings",
+      "combinedReliabilityWarnings",
+      "sequentialPlanningHints",
+      "planBeforeExecuteGuards",
+    ];
+  };
+  currentSourceOfTruth: {
+    authorityStatus: PreflightPacket["summary"]["authorityStatus"];
+    currentAuthority: PreflightPacket["currentAuthority"];
+    authoritativeFilesAndDocs: string[];
+    scope: {
+      cwd: string;
+      branch?: string;
+      head?: string;
+      upstream?: string;
+      clean: boolean | null;
+      changedPathCount: number;
+      changedPaths: string[];
+      changedPathLimit: number;
+    };
+    linkedArtifacts: {
+      issue: SourceOfTruthLinkedArtifact;
+      pullRequest: SourceOfTruthLinkedArtifact;
+    };
+  };
+  staleHistoricalBoundary: {
+    status: "clear" | "present";
+    avoidCount: number;
+    entries: SourceOfTruthHandoffPacket["staleOrHistoricalContextToAvoid"];
+    entryLimit: number;
+    omittedCount: number;
+    instruction: string;
+  };
+  reliabilityBoundary: {
+    planningWarningCount: number;
+    combinedReliabilityWarningCount: number;
+    sequentialPlanningHintCount: number;
+    planBeforeExecuteGuardCount: number;
+    staleContextReliabilityOverlap: boolean;
+    stopBeforeMoreExecution: boolean;
+  };
+  nextSessionAdvisory: {
+    action: AuthoritativeResumePacketAction;
+    rationale: string;
+    suggestedCommands: string[];
+    requiredRechecks: string[];
+  };
+  forbiddenClaims: string[];
 };
 
 const GIT_SOURCE = "local git for invocation cwd/current branch; no fetch performed";
 const ISSUE_SOURCE = "gh issue view <inferred issue number> --json number,title,state,url";
 const PR_SOURCE = "gh pr list --head <current branch> --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1";
 const CHANGED_PATH_LIMIT = 40;
+const RESUME_CHANGED_PATH_LIMIT = 12;
+const RESUME_AUTHORITATIVE_FILE_LIMIT = 12;
+const RESUME_STALE_ENTRY_LIMIT = 10;
 const AUTHORITATIVE_FILES_AND_DOCS = [
   "src/ops/operator-check.ts",
   "src/ops/context-trust.ts",
@@ -282,6 +367,125 @@ function nextAction(preflight: PreflightPacket, issue: SourceOfTruthLinkedArtifa
   };
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function buildAuthoritativeResumePacket(input: {
+  cwd: string;
+  branch?: string;
+  head?: string;
+  upstream?: string;
+  clean: boolean | null;
+  changedPaths: string[];
+  issue: SourceOfTruthLinkedArtifact;
+  pullRequest: SourceOfTruthLinkedArtifact;
+  preflight: PreflightPacket;
+  staleOrHistoricalContextToAvoid: SourceOfTruthHandoffPacket["staleOrHistoricalContextToAvoid"];
+  nextRecommendedAction: SourceOfTruthHandoffPacket["nextRecommendedAction"];
+  planningWarnings: RuntimeTokenCostPlanningWarning[];
+  combinedReliabilityWarnings: CombinedReliabilityWarning[];
+  sequentialPlanningHints: SequentialPlanningHint[];
+  planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
+}): AuthoritativeResumePacket {
+  const stopBeforeMoreExecution = input.planBeforeExecuteGuards.some((guard) => guard.stopBeforeMoreExecution);
+  const requiredRechecks = uniqueStrings([
+    ...input.planBeforeExecuteGuards.flatMap((guard) => guard.requiredRechecks),
+    ...input.sequentialPlanningHints.flatMap((hint) => hint.requiredRechecks),
+    ...input.combinedReliabilityWarnings.flatMap((warning) => warning.requiredRechecks),
+    "Run fooks check --json in the new session before treating this packet as current authority.",
+    "Run fooks handoff --json again before the next context compression or fresh-agent handoff.",
+  ]);
+  const forbiddenClaims = uniqueStrings([
+    ...input.planBeforeExecuteGuards.flatMap((guard) => guard.forbiddenClaims),
+    ...input.sequentialPlanningHints.flatMap((hint) => hint.forbiddenClaims),
+    ...input.combinedReliabilityWarnings.flatMap((warning) => warning.forbiddenClaims),
+    ...input.planningWarnings.flatMap((warning) => warning.forbiddenClaims),
+    "provider billing/runtime proof",
+    "autonomous CI/merge authority",
+    "frontend runtime behavior change",
+  ]);
+  const staleEntries = input.staleOrHistoricalContextToAvoid.slice(0, RESUME_STALE_ENTRY_LIMIT);
+  const action: AuthoritativeResumePacketAction = stopBeforeMoreExecution ? "stop-before-more-execution" : input.nextRecommendedAction.action;
+  const rationale = stopBeforeMoreExecution
+    ? "plan-before-execute guard is present; a fresh session should recheck current authority and resume from this compact packet before more execution."
+    : input.nextRecommendedAction.rationale;
+
+  return {
+    schemaVersion: AUTHORITATIVE_RESUME_PACKET_SCHEMA_VERSION,
+    issue: AUTHORITATIVE_RESUME_PACKET_ISSUE,
+    status: "advisory",
+    compact: true,
+    beforeNewSession: true,
+    source: AUTHORITATIVE_RESUME_PACKET_SOURCE,
+    claimBoundary: AUTHORITATIVE_RESUME_PACKET_CLAIM_BOUNDARY,
+    derivedFrom: {
+      handoffCommand: SOURCE_OF_TRUTH_HANDOFF_COMMAND,
+      handoffSchemaVersion: SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION,
+      operatorCheckCommand: "check",
+      preflightCommand: "preflight",
+      fields: [
+        "scope",
+        "linkedArtifacts",
+        "currentStatus.operatorCheck",
+        "currentStatus.preflight",
+        "sourceOfTruth.currentAuthority",
+        "sourceOfTruth.authoritativeFilesAndDocs",
+        "staleOrHistoricalContextToAvoid",
+        "nextRecommendedAction",
+        "planningWarnings",
+        "combinedReliabilityWarnings",
+        "sequentialPlanningHints",
+        "planBeforeExecuteGuards",
+      ],
+    },
+    currentSourceOfTruth: {
+      authorityStatus: input.preflight.summary.authorityStatus,
+      currentAuthority: input.preflight.currentAuthority,
+      authoritativeFilesAndDocs: AUTHORITATIVE_FILES_AND_DOCS.map((entry) => path.normalize(entry)).slice(0, RESUME_AUTHORITATIVE_FILE_LIMIT),
+      scope: {
+        cwd: input.cwd,
+        ...(input.branch ? { branch: input.branch } : {}),
+        ...(input.head ? { head: input.head } : {}),
+        ...(input.upstream ? { upstream: input.upstream } : {}),
+        clean: input.clean,
+        changedPathCount: input.changedPaths.length,
+        changedPaths: input.changedPaths.slice(0, RESUME_CHANGED_PATH_LIMIT),
+        changedPathLimit: RESUME_CHANGED_PATH_LIMIT,
+      },
+      linkedArtifacts: {
+        issue: input.issue,
+        pullRequest: input.pullRequest,
+      },
+    },
+    staleHistoricalBoundary: {
+      status: input.staleOrHistoricalContextToAvoid.length > 0 ? "present" : "clear",
+      avoidCount: input.staleOrHistoricalContextToAvoid.length,
+      entries: staleEntries,
+      entryLimit: RESUME_STALE_ENTRY_LIMIT,
+      omittedCount: Math.max(0, input.staleOrHistoricalContextToAvoid.length - staleEntries.length),
+      instruction: input.staleOrHistoricalContextToAvoid.length > 0
+        ? "Treat listed stale/historical/non-authorizing entries as boundaries to avoid until rechecked with fooks check/preflight/stale-context."
+        : "No stale/historical/non-authorizing entries were present in the source handoff; still re-run fooks check before relying on this packet.",
+    },
+    reliabilityBoundary: {
+      planningWarningCount: input.planningWarnings.length,
+      combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
+      sequentialPlanningHintCount: input.sequentialPlanningHints.length,
+      planBeforeExecuteGuardCount: input.planBeforeExecuteGuards.length,
+      staleContextReliabilityOverlap: input.combinedReliabilityWarnings.length > 0,
+      stopBeforeMoreExecution,
+    },
+    nextSessionAdvisory: {
+      action,
+      rationale,
+      suggestedCommands: input.nextRecommendedAction.suggestedCommands,
+      requiredRechecks,
+    },
+    forbiddenClaims,
+  };
+}
+
 export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot, preflight: PreflightPacket, options: SourceOfTruthHandoffOptions = {}): SourceOfTruthHandoffPacket {
   const cwd = snapshot.cwd;
   const blockers = [...snapshot.blockers];
@@ -296,6 +500,25 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings });
   const sequentialPlanningHints = buildSequentialPlanningHints({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings });
   const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
+  const staleOrHistoricalContextToAvoid = staleAvoidList(snapshot, preflight);
+  const nextRecommendedAction = nextAction(preflight, issue, prResult.artifact, changedPaths.length);
+  const authoritativeResumePacket = buildAuthoritativeResumePacket({
+    cwd,
+    branch,
+    head,
+    upstream,
+    clean: snapshot.activity.worktree.clean,
+    changedPaths,
+    issue,
+    pullRequest: prResult.artifact,
+    preflight,
+    staleOrHistoricalContextToAvoid,
+    nextRecommendedAction,
+    planningWarnings,
+    combinedReliabilityWarnings,
+    sequentialPlanningHints,
+    planBeforeExecuteGuards,
+  });
   const workflows = snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
     workflow: workflow.workflow,
     status: workflow.status,
@@ -363,12 +586,13 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
       authoritativeFilesAndDocs: AUTHORITATIVE_FILES_AND_DOCS.map((entry) => path.normalize(entry)),
       currentChangedFiles: changedPaths.slice(0, CHANGED_PATH_LIMIT),
     },
-    staleOrHistoricalContextToAvoid: staleAvoidList(snapshot, preflight),
-    nextRecommendedAction: nextAction(preflight, issue, prResult.artifact, changedPaths.length),
+    staleOrHistoricalContextToAvoid,
+    nextRecommendedAction,
     planningWarnings,
     combinedReliabilityWarnings,
     sequentialPlanningHints,
     planBeforeExecuteGuards,
+    authoritativeResumePacket,
     blockers,
   };
 }
