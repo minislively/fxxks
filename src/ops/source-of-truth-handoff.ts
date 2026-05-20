@@ -7,6 +7,7 @@ import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWar
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
 import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
 import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
+import { buildLongRunBudgetWarnings, type LongRunBudgetWarning } from "./long-run-budget-warning";
 
 export const SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION = 1;
 export const SOURCE_OF_TRUTH_HANDOFF_COMMAND = "handoff";
@@ -124,6 +125,7 @@ export type SourceOfTruthHandoffPacket = {
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   sequentialPlanningHints: SequentialPlanningHint[];
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
+  longRunBudgetWarnings: LongRunBudgetWarning[];
   authoritativeResumePacket: AuthoritativeResumePacket;
   blockers: string[];
 };
@@ -158,6 +160,7 @@ export type AuthoritativeResumePacket = {
       "combinedReliabilityWarnings",
       "sequentialPlanningHints",
       "planBeforeExecuteGuards",
+      "longRunBudgetWarnings",
     ];
   };
   currentSourceOfTruth: {
@@ -192,6 +195,8 @@ export type AuthoritativeResumePacket = {
     combinedReliabilityWarningCount: number;
     sequentialPlanningHintCount: number;
     planBeforeExecuteGuardCount: number;
+    longRunBudgetWarningCount: number;
+    longRunBudgetRiskLevel: "high" | "clear";
     staleContextReliabilityOverlap: boolean;
     stopBeforeMoreExecution: boolean;
   };
@@ -387,9 +392,11 @@ function buildAuthoritativeResumePacket(input: {
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   sequentialPlanningHints: SequentialPlanningHint[];
   planBeforeExecuteGuards: PlanBeforeExecuteGuard[];
+  longRunBudgetWarnings: LongRunBudgetWarning[];
 }): AuthoritativeResumePacket {
   const stopBeforeMoreExecution = input.planBeforeExecuteGuards.some((guard) => guard.stopBeforeMoreExecution);
   const requiredRechecks = uniqueStrings([
+    ...input.longRunBudgetWarnings.flatMap((warning) => warning.requiredRechecks),
     ...input.planBeforeExecuteGuards.flatMap((guard) => guard.requiredRechecks),
     ...input.sequentialPlanningHints.flatMap((hint) => hint.requiredRechecks),
     ...input.combinedReliabilityWarnings.flatMap((warning) => warning.requiredRechecks),
@@ -397,6 +404,7 @@ function buildAuthoritativeResumePacket(input: {
     "Run fooks handoff --json again before the next context compression or fresh-agent handoff.",
   ]);
   const forbiddenClaims = uniqueStrings([
+    ...input.longRunBudgetWarnings.flatMap((warning) => warning.forbiddenClaims),
     ...input.planBeforeExecuteGuards.flatMap((guard) => guard.forbiddenClaims),
     ...input.sequentialPlanningHints.flatMap((hint) => hint.forbiddenClaims),
     ...input.combinedReliabilityWarnings.flatMap((warning) => warning.forbiddenClaims),
@@ -437,6 +445,7 @@ function buildAuthoritativeResumePacket(input: {
         "combinedReliabilityWarnings",
         "sequentialPlanningHints",
         "planBeforeExecuteGuards",
+        "longRunBudgetWarnings",
       ],
     },
     currentSourceOfTruth: {
@@ -473,6 +482,8 @@ function buildAuthoritativeResumePacket(input: {
       combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
       sequentialPlanningHintCount: input.sequentialPlanningHints.length,
       planBeforeExecuteGuardCount: input.planBeforeExecuteGuards.length,
+      longRunBudgetWarningCount: input.longRunBudgetWarnings.length,
+      longRunBudgetRiskLevel: input.longRunBudgetWarnings.length > 0 ? "high" : "clear",
       staleContextReliabilityOverlap: input.combinedReliabilityWarnings.length > 0,
       stopBeforeMoreExecution,
     },
@@ -500,6 +511,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings });
   const sequentialPlanningHints = buildSequentialPlanningHints({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings });
   const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
+  const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
   const staleOrHistoricalContextToAvoid = staleAvoidList(snapshot, preflight);
   const nextRecommendedAction = nextAction(preflight, issue, prResult.artifact, changedPaths.length);
   const authoritativeResumePacket = buildAuthoritativeResumePacket({
@@ -518,6 +530,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     combinedReliabilityWarnings,
     sequentialPlanningHints,
     planBeforeExecuteGuards,
+    longRunBudgetWarnings,
   });
   const workflows = snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
     workflow: workflow.workflow,
@@ -592,6 +605,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     combinedReliabilityWarnings,
     sequentialPlanningHints,
     planBeforeExecuteGuards,
+    longRunBudgetWarnings,
     authoritativeResumePacket,
     blockers,
   };

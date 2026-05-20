@@ -127,6 +127,7 @@ test("source-of-truth handoff packet links inferred issue, current branch PR che
   assert.deepEqual(packet.planningWarnings, []);
   assert.deepEqual(packet.combinedReliabilityWarnings, []);
   assert.deepEqual(packet.sequentialPlanningHints, []);
+  assert.deepEqual(packet.longRunBudgetWarnings, []);
 });
 
 test("authoritative resume packet compacts stale/context/reliability overlap before new session", () => {
@@ -163,11 +164,14 @@ test("authoritative resume packet compacts stale/context/reliability overlap bef
   assert.equal(resume.reliabilityBoundary.combinedReliabilityWarningCount, 1);
   assert.equal(resume.reliabilityBoundary.sequentialPlanningHintCount, 1);
   assert.equal(resume.reliabilityBoundary.planBeforeExecuteGuardCount, 1);
+  assert.equal(resume.reliabilityBoundary.longRunBudgetWarningCount, 1);
+  assert.equal(resume.reliabilityBoundary.longRunBudgetRiskLevel, "high");
   assert.equal(resume.reliabilityBoundary.staleContextReliabilityOverlap, true);
   assert.equal(resume.reliabilityBoundary.stopBeforeMoreExecution, true);
   assert.equal(resume.nextSessionAdvisory.action, "stop-before-more-execution");
   assert.match(resume.nextSessionAdvisory.rationale, /recheck current authority/);
   assert.ok(resume.nextSessionAdvisory.requiredRechecks.some((line) => /fooks check --json/.test(line)));
+  assert.ok(resume.nextSessionAdvisory.requiredRechecks.some((line) => /budget-risk boundary/.test(line)));
   assert.match(resume.forbiddenClaims.join("\n"), /provider usage\/billing-token proof/);
   assert.match(resume.forbiddenClaims.join("\n"), /autonomous CI\/merge authority/);
   assert.match(JSON.stringify(resume), /sourceOfTruth.currentAuthority/);
@@ -199,6 +203,8 @@ test("authoritative resume packet stays advisory and clear for ordinary non-risk
   assert.equal(resume.reliabilityBoundary.combinedReliabilityWarningCount, 0);
   assert.equal(resume.reliabilityBoundary.sequentialPlanningHintCount, 0);
   assert.equal(resume.reliabilityBoundary.planBeforeExecuteGuardCount, 0);
+  assert.equal(resume.reliabilityBoundary.longRunBudgetWarningCount, 0);
+  assert.equal(resume.reliabilityBoundary.longRunBudgetRiskLevel, "clear");
   assert.equal(resume.reliabilityBoundary.stopBeforeMoreExecution, false);
   assert.equal(resume.nextSessionAdvisory.action, "continue-implementation-for-linked-issue");
   assert.match(resume.staleHistoricalBoundary.instruction, /No stale\/historical\/non-authorizing entries/);
@@ -357,6 +363,12 @@ test("source-of-truth handoff emits issue #976 long-run runtime planning warning
   assert.equal(packet.sequentialPlanningHints[0].issue, "#982");
   assert.equal(packet.sequentialPlanningHints[0].trigger, "combined-reliability-warning-present");
   assert.match(packet.sequentialPlanningHints[0].message, /write a bounded plan/);
+  assert.equal(packet.planBeforeExecuteGuards.length, 1);
+  assert.equal(packet.longRunBudgetWarnings.length, 1);
+  assert.equal(packet.longRunBudgetWarnings[0].issue, "#988");
+  assert.equal(packet.longRunBudgetWarnings[0].riskLevel, "high");
+  assert.equal(packet.longRunBudgetWarnings[0].trigger, "plan-before-execute-stop-with-runtime-planning");
+  assert.match(packet.longRunBudgetWarnings[0].claimBoundary, /not provider billing\/token\/runtime proof/);
   assert.match(packet.sequentialPlanningHints[0].claimBoundary, /no provider billing-runtime proof|does not prove provider billing\/runtime token usage/);
 });
 
