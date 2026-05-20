@@ -28,6 +28,7 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
   "Read-only operator/check artifact for the post-merge main echo versus active work boundary; it requires a concrete issue, PR, or mapped session artifact when the checkout is otherwise idle.";
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
@@ -36,6 +37,9 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
+export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE = "operator/check reliability warning visibility projection";
+export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY =
+  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, and combinedReliabilityWarnings fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SOURCE = "operator/check orphan local-ahead salvage-review queue projection";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_CLAIM_BOUNDARY =
@@ -565,8 +569,51 @@ export type OperatorCheckSnapshot = {
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
+  reliabilityWarningVisibility: OperatorCheckReliabilityWarningVisibility;
   activity: OperatorActivitySnapshot;
   blockers: string[];
+};
+
+export type OperatorCheckReliabilityWarningVisibility = {
+  schemaVersion: typeof OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SCHEMA_VERSION;
+  source: typeof OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE;
+  status: "clear" | "advisory";
+  summary: {
+    existingWarningCount: number;
+    planningWarningCount: number;
+    combinedReliabilityWarningCount: number;
+    contextTrustCurrentAuthorityCount: number;
+    contextTrustNonAuthorizingCount: number;
+    contextTrustHistoricalOnlyCount: number;
+  };
+  warnings: Array<
+    | {
+        kind: "runtime-planning";
+        issue: RuntimeTokenCostPlanningWarning["issue"];
+        trigger: RuntimeTokenCostPlanningWarning["trigger"];
+        status: RuntimeTokenCostPlanningWarning["status"];
+        message: RuntimeTokenCostPlanningWarning["message"];
+        requiredRechecks: RuntimeTokenCostPlanningWarning["requiredRechecks"];
+        forbiddenClaims: RuntimeTokenCostPlanningWarning["forbiddenClaims"];
+        claimBoundary: RuntimeTokenCostPlanningWarning["claimBoundary"];
+      }
+    | {
+        kind: "combined-reliability";
+        trigger: CombinedReliabilityWarning["trigger"];
+        status: CombinedReliabilityWarning["status"];
+        message: CombinedReliabilityWarning["message"];
+        recommendedActions: CombinedReliabilityWarning["recommendedActions"];
+        requiredRechecks: CombinedReliabilityWarning["requiredRechecks"];
+        forbiddenClaims: CombinedReliabilityWarning["forbiddenClaims"];
+        claimBoundary: CombinedReliabilityWarning["claimBoundary"];
+      }
+  >;
+  derivedFrom: {
+    contextTrustSource: OperatorContextTrustPacket["source"];
+    planningWarningsField: "planningWarnings";
+    combinedReliabilityWarningsField: "combinedReliabilityWarnings";
+  };
+  claimBoundary: typeof OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY;
 };
 
 
@@ -1590,6 +1637,56 @@ function requiredActiveArtifact(state: { blocked: boolean; hasActiveArtifact: bo
   };
 }
 
+export function buildOperatorCheckReliabilityWarningVisibility(input: {
+  contextTrust: OperatorContextTrustPacket;
+  planningWarnings: RuntimeTokenCostPlanningWarning[];
+  combinedReliabilityWarnings: CombinedReliabilityWarning[];
+}): OperatorCheckReliabilityWarningVisibility {
+  const warnings: OperatorCheckReliabilityWarningVisibility["warnings"] = [
+    ...input.planningWarnings.map((warning) => ({
+      kind: "runtime-planning" as const,
+      issue: warning.issue,
+      trigger: warning.trigger,
+      status: warning.status,
+      message: warning.message,
+      requiredRechecks: warning.requiredRechecks,
+      forbiddenClaims: warning.forbiddenClaims,
+      claimBoundary: warning.claimBoundary,
+    })),
+    ...input.combinedReliabilityWarnings.map((warning) => ({
+      kind: "combined-reliability" as const,
+      trigger: warning.trigger,
+      status: warning.status,
+      message: warning.message,
+      recommendedActions: warning.recommendedActions,
+      requiredRechecks: warning.requiredRechecks,
+      forbiddenClaims: warning.forbiddenClaims,
+      claimBoundary: warning.claimBoundary,
+    })),
+  ];
+
+  return {
+    schemaVersion: OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SCHEMA_VERSION,
+    source: OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE,
+    status: warnings.length > 0 ? "advisory" : "clear",
+    summary: {
+      existingWarningCount: warnings.length,
+      planningWarningCount: input.planningWarnings.length,
+      combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
+      contextTrustCurrentAuthorityCount: input.contextTrust.sourceOfTruth.current.length,
+      contextTrustNonAuthorizingCount: input.contextTrust.nonAuthorizing.length,
+      contextTrustHistoricalOnlyCount: input.contextTrust.historicalOnly.length,
+    },
+    warnings,
+    derivedFrom: {
+      contextTrustSource: input.contextTrust.source,
+      planningWarningsField: "planningWarnings",
+      combinedReliabilityWarningsField: "combinedReliabilityWarnings",
+    },
+    claimBoundary: OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY,
+  };
+}
+
 export function readOperatorCheckSnapshot(cwd = process.cwd(), options: OperatorActivityOptions = {}): OperatorCheckSnapshot {
   const activity = readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true });
   const activeArtifacts = activeArtifactsFrom(activity);
@@ -1616,6 +1713,11 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   });
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch });
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
+  const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
+    contextTrust,
+    planningWarnings,
+    combinedReliabilityWarnings,
+  });
 
   return {
     schemaVersion: OPERATOR_CHECK_SCHEMA_VERSION,
@@ -1642,6 +1744,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     contextTrust,
     planningWarnings,
     combinedReliabilityWarnings,
+    reliabilityWarningVisibility,
     activity,
     blockers,
   };
