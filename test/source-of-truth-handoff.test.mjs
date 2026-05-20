@@ -273,3 +273,35 @@ test("source-of-truth handoff emits issue #982 sequential planning hint without 
   assert.match(packet.sequentialPlanningHints[0].forbiddenClaims.join("\n"), /autonomous execution authority/);
   assert.match(packet.sequentialPlanningHints[0].forbiddenClaims.join("\n"), /merge authority or merge-gate policy change/);
 });
+
+test("source-of-truth handoff emits issue #984 plan-before-execute guard without authority or frontend claims", () => {
+  const cwd = repoRoot;
+  const snapshot = baseSnapshot(cwd);
+  snapshot.runtimeProvenance.git.branch = "fooks-issue-984-plan-before-execute-guard";
+  snapshot.activity.worktree.branch = "fooks-issue-984-plan-before-execute-guard";
+  snapshot.activity.worktree.upstream = "origin/fooks-issue-984-plan-before-execute-guard";
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return " M src/ops/plan-before-execute-guard.ts\n";
+    if (key === "gh issue view 984 --json number,title,state,url") {
+      return JSON.stringify({ number: 984, title: "plan before execute guard", state: "OPEN", url: "https://github.com/minislively/fooks/issues/984" });
+    }
+    if (key === "gh pr list --head fooks-issue-984-plan-before-execute-guard --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return "[]";
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), { commandRunner: runner, now: () => "2026-05-20T08:02:03.000Z" });
+  assert.ok(packet.sourceOfTruth.authoritativeFilesAndDocs.includes("src/ops/plan-before-execute-guard.ts"));
+  assert.equal(packet.planBeforeExecuteGuards.length, 1);
+  assert.equal(packet.planBeforeExecuteGuards[0].issue, "#984");
+  assert.equal(packet.planBeforeExecuteGuards[0].epic, "#960");
+  assert.equal(packet.planBeforeExecuteGuards[0].trigger, "linked-issue-984");
+  assert.equal(packet.planBeforeExecuteGuards[0].stopBeforeMoreExecution, true);
+  assert.match(packet.planBeforeExecuteGuards[0].message, /write or refresh a bounded plan/);
+  assert.match(packet.planBeforeExecuteGuards[0].claimBoundary, /not provider billing\/runtime proof/);
+  assert.match(packet.planBeforeExecuteGuards[0].claimBoundary, /not autonomous execution or merge authority/);
+  assert.match(packet.planBeforeExecuteGuards[0].claimBoundary, /not frontend behavior change/);
+  assert.match(packet.planBeforeExecuteGuards[0].forbiddenClaims.join("\n"), /CI enforcement or blocking merge policy/);
+});
