@@ -69,6 +69,75 @@ function summarizeEntries(empty: string, entries: PreflightEvidenceRef[]): strin
   return `${entries.length} entr${entries.length === 1 ? "y" : "ies"}: ${kinds}`;
 }
 
+function headlineFor(packet: PreflightPacket): string {
+  if (packet.summary.authorityStatus === "blocked" || packet.guidance.recommendedAction === "resolve-blockers-first") {
+    return "Preflight: BLOCK - resolve blockers first";
+  }
+
+  if (packet.guidance.recommendedAction === "continue-with-current-authority") {
+    return packet.guidance.riskLevel === "low"
+      ? "Preflight: OK to continue"
+      : "Preflight: WARN - continue with caution";
+  }
+
+  if (packet.guidance.recommendedAction === "adopt-or-report-live-handoff") {
+    return "Preflight: BLOCK - adopt or report live handoff";
+  }
+
+  return "Preflight: BLOCK - active authority needed";
+}
+
+function formatEvidenceLine(entry: PreflightEvidenceRef): string {
+  const details = [
+    entry.count !== undefined ? `count=${entry.count}` : undefined,
+    entry.live !== undefined ? `live=${entry.live}` : undefined,
+    entry.authority ? `authority=${entry.authority}` : undefined,
+    entry.contractScope ? `scope=${entry.contractScope}` : undefined,
+  ].filter((detail): detail is string => Boolean(detail));
+  return `- ${entry.kind}${details.length > 0 ? ` (${details.join(", ")})` : ""}`;
+}
+
+function appendEvidenceSection(lines: string[], title: string, entries: PreflightEvidenceRef[]): void {
+  if (entries.length === 0) return;
+  lines.push("", `${title}:`);
+  for (const entry of entries) {
+    lines.push(formatEvidenceLine(entry));
+  }
+}
+
+function hasStaleOrLocalOnlyResidue(entries: PreflightEvidenceRef[]): boolean {
+  return entries.some((entry) =>
+    entry.contractScope === "stale-residue-boundary"
+    || entry.contractScope === "cleanup-review-boundary"
+    || entry.kind.includes("stale")
+    || entry.kind.includes("local-only")
+  );
+}
+
+function appendNotes(lines: string[], packet: PreflightPacket): void {
+  const notes: string[] = [];
+
+  if (packet.advisoryOnly.length > 0) {
+    notes.push(`advisory guidance present: ${packet.summary.advisorySummary ?? summarizeEntries("no advisory guidance", packet.advisoryOnly)}`);
+  }
+
+  if (packet.historicalOnly.length > 0) {
+    notes.push(`historical receipts present: ${packet.summary.historicalSummary ?? summarizeEntries("no historical receipts", packet.historicalOnly)}`);
+  }
+
+  if (hasStaleOrLocalOnlyResidue(packet.nonAuthorizing)) {
+    notes.push("stale/local-only residue is cleanup-review context, not active-work authority");
+  }
+
+  notes.push("no cleanup, authority creation, hook enforcement, or new evidence collection was performed");
+
+  if (notes.length === 0) return;
+  lines.push("", "Notes:");
+  for (const note of notes) {
+    lines.push(`- ${note}`);
+  }
+}
+
 function hasLiveHandoffCandidate(entries: PreflightEvidenceRef[]): boolean {
   return entries.some((entry) =>
     entry.authority === "handoff-candidate"
@@ -162,4 +231,20 @@ export function buildPreflightPacket(snapshot: OperatorCheckSnapshot): Preflight
     advisoryOnly,
     historicalOnly,
   };
+}
+
+export function renderPreflightText(packet: PreflightPacket): string {
+  const lines = [
+    headlineFor(packet),
+    `Risk: ${packet.guidance.riskLevel}`,
+    `Action: ${packet.guidance.recommendedAction}`,
+    `Authority: ${packet.summary.authorityStatus}`,
+    `Rationale: ${packet.guidance.rationale}`,
+  ];
+
+  appendEvidenceSection(lines, "Current authority", packet.currentAuthority);
+  appendEvidenceSection(lines, "Do not treat as current", packet.nonAuthorizing);
+  appendNotes(lines, packet);
+
+  return `${lines.join("\n")}\n`;
 }
