@@ -1671,6 +1671,13 @@ async function run(): Promise<void> {
       const readSnapshotStartedAt = performance.now();
       const snapshot = readOperatorCheckSnapshot(process.cwd());
       timingPhases.push({ name: "read-operator-check-snapshot", elapsedMs: roundMs(performance.now() - readSnapshotStartedAt), status: "ok" });
+      for (const phase of snapshot.diagnostics.operatorCheckTiming.phases) {
+        timingPhases.push({
+          name: `operator-check:${phase.name}`,
+          elapsedMs: phase.elapsedMs,
+          status: phase.status,
+        });
+      }
       const buildPreflightStartedAt = performance.now();
       const preflight = buildPreflightPacket(snapshot);
       timingPhases.push({ name: "build-preflight-packet", elapsedMs: roundMs(performance.now() - buildPreflightStartedAt), status: "ok" });
