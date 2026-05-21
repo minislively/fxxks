@@ -4024,6 +4024,28 @@ test("status artifacts route reports read-only audit JSON", () => {
   assert.match(output, /artifacts/);
 });
 
+test("status artifacts drains large JSON stdout before exit", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-status-artifacts-large-"));
+  execFileSync("git", ["init", "--initial-branch=main"], { cwd: tempDir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "fooks@example.invalid"], { cwd: tempDir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "fooks test"], { cwd: tempDir, stdio: "ignore" });
+  fs.writeFileSync(path.join(tempDir, "README.md"), "# fooks status artifacts large stdout fixture\n");
+  execFileSync("git", ["add", "README.md"], { cwd: tempDir, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", "fixture"], { cwd: tempDir, stdio: "ignore" });
+  for (let index = 0; index < 800; index += 1) {
+    execFileSync("git", ["update-ref", `refs/heads/fooks-artifact-${index}`, "HEAD"], { cwd: tempDir, stdio: "ignore" });
+  }
+
+  const output = runText(["status", "artifacts"], tempDir);
+  assert.ok(output.length > 65536, `expected large stdout fixture, got ${output.length} bytes`);
+  const result = JSON.parse(output);
+
+  assert.equal(result.command, "status artifacts");
+  assert.equal(result.scope, "fooks");
+  assert.match(result.claimBoundary, /never deletes/);
+  assert.ok(result.branches.length >= 800);
+});
+
 test("doctor rejects unknown targets and exposes bounded command help", () => {
   const help = runText(["doctor", "--help"]);
   assert.match(help, /Usage: fooks doctor \[codex\|claude\] \[--json\]/);
