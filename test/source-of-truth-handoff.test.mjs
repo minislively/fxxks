@@ -299,6 +299,39 @@ test("source-of-truth handoff packet emits JSON-ready diagnostic timing shape wi
   assert.ok(phaseNames.includes("build-source-of-truth-handoff-packet"));
 });
 
+
+test("source-of-truth handoff surfaces operator-check timing under operator status only", () => {
+  const snapshot = baseSnapshot(repoRoot);
+  snapshot.diagnostics = {
+    operatorCheckTiming: {
+      schemaVersion: 1,
+      source: "fooks check --json operator-check diagnostic timing",
+      status: "diagnostic",
+      claimBoundary: "Diagnostic/read-only operator-check subphase timing only; not current-work authority",
+      readOnly: true,
+      totalMs: 12,
+      phases: [
+        { name: "read-operator-activity-snapshot", elapsedMs: 10, status: "ok" },
+        { name: "build-active-work-receipts", elapsedMs: 2, status: "ok" },
+      ],
+    },
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(snapshot, basePreflight(), {
+    commandRunner: (command, args) => {
+      const key = `${command} ${args.join(" ")}`;
+      if (key === "git status --porcelain=v1") return "";
+      if (key === "gh pr list --head fooks-issue-963-source-of-truth-handoff --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") return "[]";
+      throw new Error(`unexpected command: ${key}`);
+    },
+    nowMs: () => 1,
+  });
+
+  assert.equal(packet.currentStatus.operatorCheck.diagnostics.operatorCheckTiming.status, "diagnostic");
+  assert.ok(packet.currentStatus.operatorCheck.diagnostics.operatorCheckTiming.phases.some((phase) => phase.name === "read-operator-activity-snapshot"));
+  assert.equal(packet.diagnostics.handoffTiming.phases.some((phase) => phase.name === "read-operator-activity-snapshot"), false);
+});
+
 test("handoff compact authoritative resume packet excludes diagnostic timing", () => {
   const cwd = repoRoot;
   const runner = (command, args) => {

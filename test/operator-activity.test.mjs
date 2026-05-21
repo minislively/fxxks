@@ -863,6 +863,107 @@ test("operator activity reports exact-head post-merge main CI and release-report
   assert.equal(calls.some((call) => /fetch|delete/.test(call)), false);
 });
 
+
+test("operator activity snapshot emits read-only subphase timing diagnostics", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-21T08:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "activity-main-head\n";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD activity-main-head", "branch refs/heads/main", ""].join("\n");
+      }
+      throw new Error(`unexpected command: ${command} ${joined}`);
+    },
+  });
+
+  const receipt = snapshot.diagnostics.operatorActivityTiming;
+  assert.equal(receipt.status, "diagnostic");
+  assert.equal(receipt.readOnly, true);
+  assert.match(receipt.claimBoundary, /Diagnostic\/read-only/);
+  assert.match(receipt.claimBoundary, /not current-work authority/);
+  assert.ok(Number.isFinite(receipt.totalMs));
+  assert.ok(receipt.totalMs >= 0);
+  const phaseNames = receipt.phases.map((phase) => phase.name);
+  assert.ok(phaseNames.includes("current-worktree-evidence-status"));
+  assert.ok(phaseNames.includes("read-tmux-activity"));
+  assert.ok(phaseNames.includes("read-remote-counts"));
+  assert.ok(phaseNames.includes("read-legacy-worktree-evidence"));
+  assert.ok(phaseNames.includes("read-post-merge-main-ci-evidence"));
+  for (const phase of receipt.phases) {
+    assert.equal(phase.status, "ok");
+    assert.ok(Number.isFinite(phase.elapsedMs));
+    assert.ok(phase.elapsedMs >= 0);
+  }
+});
+
+test("operator check snapshot emits narrow timing diagnostics without changing authority fields", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-21T08:05:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "check-main-head\n";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD check-main-head", "branch refs/heads/main", ""].join("\n");
+      }
+      throw new Error(`unexpected command: ${command} ${joined}`);
+    },
+  });
+
+  assert.equal(snapshot.schemaVersion, 1);
+  assert.equal(snapshot.command, OPERATOR_CHECK_COMMAND);
+  assert.equal(snapshot.readOnly, true);
+  assert.equal(snapshot.source, OPERATOR_CHECK_SOURCE);
+  assert.equal(snapshot.contextTrust.source, OPERATOR_CONTEXT_TRUST_SOURCE);
+
+  const receipt = snapshot.diagnostics.operatorCheckTiming;
+  assert.equal(receipt.status, "diagnostic");
+  assert.equal(receipt.readOnly, true);
+  assert.match(receipt.claimBoundary, /not current-work authority/);
+  assert.match(receipt.claimBoundary, /not handoff\/source-of-truth authority/);
+  assert.ok(Number.isFinite(receipt.totalMs));
+  assert.ok(receipt.totalMs >= 0);
+  const phaseNames = receipt.phases.map((phase) => phase.name);
+  assert.ok(phaseNames.includes("read-operator-activity-snapshot"));
+  assert.ok(phaseNames.includes("build-active-work-receipts"));
+  assert.ok(phaseNames.includes("read-sequential-planning-prompt"));
+  assert.ok(phaseNames.includes("read-operator-check-runtime-provenance"));
+  assert.ok(snapshot.activity.diagnostics.operatorActivityTiming.phases.some((phase) => phase.name === "read-remote-counts"));
+  assert.ok(snapshot.activity.diagnostics.operatorActivityTiming.phases.some((phase) => phase.name === "read-post-merge-main-ci-evidence"));
+  for (const phase of receipt.phases) {
+    assert.equal(phase.status, "ok");
+    assert.ok(Number.isFinite(phase.elapsedMs));
+    assert.ok(phase.elapsedMs >= 0);
+  }
+});
+
 test("operator check keeps missing exact-head workflow evidence unknown instead of success", () => {
   const tempDir = makeTempProject();
   const mainHead = "new-main-head";
