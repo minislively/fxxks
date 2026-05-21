@@ -64,6 +64,7 @@ const {
   PREFLIGHT_COMMAND,
   PREFLIGHT_SOURCE,
   buildPreflightPacket,
+  renderPreflightText,
 } = require(path.join(repoRoot, "dist", "ops", "preflight.js"));
 
 function runWithCli(cliPath, args, cwd, envOverrides = {}) {
@@ -373,6 +374,13 @@ test("preflight builder projects synthetic contextTrust without evidence reads",
   assert.equal(noAuthority.guidance.recommendedAction, "create-or-link-active-artifact");
   assert.equal(noAuthority.currentAuthority.length, 0);
   assert.equal(noAuthority.nonAuthorizing[0].contractScope, "main-echo-boundary");
+  const noAuthorityText = renderPreflightText(noAuthority);
+  assert.match(noAuthorityText, /Preflight: BLOCK - active authority needed/);
+  assert.match(noAuthorityText, /Risk: high/);
+  assert.match(noAuthorityText, /Action: create-or-link-active-artifact/);
+  assert.match(noAuthorityText, /Do not treat as current:/);
+  assert.match(noAuthorityText, /main-echo-boundary/);
+  assert.match(noAuthorityText, /no cleanup, authority creation, hook enforcement, or new evidence collection was performed/);
 
   const handoff = buildPreflightPacket(syntheticPreflightSnapshot({
     nonAuthorizing: [
@@ -423,6 +431,11 @@ test("preflight builder projects synthetic contextTrust without evidence reads",
   assert.equal(mappedSessionWithCaveat.guidance.recommendedAction, "continue-with-current-authority");
   assert.equal(mappedSessionWithCaveat.currentAuthority[0].contractScope, "top-level-active-artifact");
   assert.equal("number" in mappedSessionWithCaveat.currentAuthority[0], false);
+  const mappedSessionText = renderPreflightText(mappedSessionWithCaveat);
+  assert.match(mappedSessionText, /Preflight: WARN - continue with caution/);
+  assert.match(mappedSessionText, /Current authority:/);
+  assert.match(mappedSessionText, /session \(count=1, authority=current-work, scope=top-level-active-artifact\)/);
+  assert.match(mappedSessionText, /Do not treat as current:/);
 
   const blocked = buildPreflightPacket(syntheticPreflightSnapshot({
     verdict: "blocked",
@@ -431,6 +444,72 @@ test("preflight builder projects synthetic contextTrust without evidence reads",
   assert.equal(blocked.summary.authorityStatus, "blocked");
   assert.equal(blocked.guidance.riskLevel, "high");
   assert.equal(blocked.guidance.recommendedAction, "resolve-blockers-first");
+  assert.match(renderPreflightText(blocked), /Preflight: BLOCK - resolve blockers first/);
+
+  const staleResidue = buildPreflightPacket(syntheticPreflightSnapshot({
+    current: [
+      {
+        kind: "issue",
+        source: "synthetic issue list",
+        reason: "count-only current-work presence",
+        referenceField: "activeArtifacts",
+        count: 3,
+        authority: "current-work",
+        contractScope: "top-level-active-artifact",
+      },
+    ],
+    nonAuthorizing: [
+      {
+        kind: "stale-residue-active-boundary",
+        source: "synthetic stale residue",
+        reason: "cleanup-review context only",
+        referenceField: "activeWorkReceipts.staleResidueActiveBoundary",
+        count: 114,
+        authority: "insufficient",
+        contractScope: "stale-residue-boundary",
+      },
+      {
+        kind: "local-only-residue-active-boundary",
+        source: "synthetic local-only residue",
+        reason: "local-only cleanup-review context only",
+        referenceField: "activeWorkReceipts.localOnlyResidueActiveBoundary",
+        count: 114,
+        authority: "insufficient",
+        contractScope: "cleanup-review-boundary",
+      },
+    ],
+    advisoryOnly: [
+      {
+        kind: "required-active-artifact-guidance",
+        source: "requiredActiveArtifact",
+        reason: "active artifact present",
+        referenceField: "requiredActiveArtifact",
+        authority: "guidance",
+        contractScope: "active-artifact-guidance",
+      },
+    ],
+    historicalOnly: [
+      {
+        kind: "post-merge-main-ci-receipt",
+        source: "synthetic CI receipt",
+        reason: "historical receipt only",
+        referenceField: "postMergeMainCiEvidence",
+        count: 2,
+        authority: "receipt",
+        contractScope: "post-merge-receipt",
+      },
+    ],
+  }));
+  const staleResidueText = renderPreflightText(staleResidue);
+  assert.match(staleResidueText, /Preflight: OK to continue/);
+  assert.match(staleResidueText, /Current authority:/);
+  assert.match(staleResidueText, /issue \(count=3, authority=current-work, scope=top-level-active-artifact\)/);
+  assert.match(staleResidueText, /Do not treat as current:/);
+  assert.match(staleResidueText, /stale-residue-active-boundary \(count=114, authority=insufficient, scope=stale-residue-boundary\)/);
+  assert.match(staleResidueText, /local-only-residue-active-boundary \(count=114, authority=insufficient, scope=cleanup-review-boundary\)/);
+  assert.match(staleResidueText, /Notes:/);
+  assert.match(staleResidueText, /historical receipts present:/);
+  assert.match(staleResidueText, /stale\/local-only residue is cleanup-review context, not active-work authority/);
 });
 
 test("operator reminder docs require a blocker or active artifact after clean CI/React echoes", () => {
@@ -3421,6 +3500,15 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.equal(Array.isArray(preflight.currentAuthority), true);
   assert.equal(Array.isArray(preflight.nonAuthorizing), true);
   assert.equal(preflight.advisoryOnly.every((entry) => typeof entry.contractScope === "string"), true);
+  assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
+
+  const preflightText = runText(["preflight"], tempDir);
+  assert.doesNotMatch(preflightText.trimStart(), /^\{/);
+  assert.match(preflightText, /^Preflight: /);
+  assert.match(preflightText, /Risk: /);
+  assert.match(preflightText, /Action: /);
+  assert.match(preflightText, /Authority: /);
+  assert.match(preflightText, /no cleanup, authority creation, hook enforcement, or new evidence collection was performed/);
   assert.deepEqual(fs.readdirSync(tempDir).sort(), before);
 
   const activity = run(["status", "activity"], tempDir);

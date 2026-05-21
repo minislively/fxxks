@@ -1621,17 +1621,26 @@ async function run(): Promise<void> {
     }
     case "preflight": {
       const allowed = new Set(["--json"]);
+      let json = false;
       for (const arg of rest) {
         if (!allowed.has(arg)) {
           throw new Error(`Unexpected preflight argument: ${arg}`);
         }
+        if (arg === "--json") {
+          json = true;
+        }
       }
-      const [{ readOperatorCheckSnapshot }, { buildPreflightPacket }] = await Promise.all([
+      const [{ readOperatorCheckSnapshot }, { buildPreflightPacket, renderPreflightText }] = await Promise.all([
         import("../ops/operator-check.js"),
         import("../ops/preflight.js"),
       ]);
       const snapshot = readOperatorCheckSnapshot(process.cwd());
-      print(buildPreflightPacket(snapshot));
+      const packet = buildPreflightPacket(snapshot);
+      if (json) {
+        print(packet);
+      } else {
+        process.stdout.write(renderPreflightText(packet));
+      }
       return;
     }
     case "handoff": {
