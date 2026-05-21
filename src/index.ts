@@ -163,10 +163,12 @@ export type {
 } from "./ops/orphan-local-worktree-triage";
 export {
   SEQUENTIAL_PLANNING_HINT_CLAIM_BOUNDARY,
+  SEQUENTIAL_PLANNING_HINT_FOLLOWUP_ISSUE,
   SEQUENTIAL_PLANNING_HINT_ISSUE,
   SEQUENTIAL_PLANNING_HINT_SCHEMA_VERSION,
   SEQUENTIAL_PLANNING_HINT_SOURCE,
   buildSequentialPlanningHints,
+  readSequentialPlanningPrompt,
 } from "./ops/sequential-planning-hint";
 export type {
   SequentialPlanningHint,

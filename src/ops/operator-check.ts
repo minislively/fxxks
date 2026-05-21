@@ -21,7 +21,7 @@ import { isTmuxActivityNoServerBlocker } from "./tmux-errors";
 import { buildOperatorContextTrust, type OperatorContextTrustEntry, type OperatorContextTrustPacket } from "./context-trust";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
-import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
+import { buildSequentialPlanningHints, readSequentialPlanningPrompt, type SequentialPlanningHint } from "./sequential-planning-hint";
 import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
 import { buildLongRunBudgetWarnings, type LongRunBudgetWarning } from "./long-run-budget-warning";
 import { buildResetCompactHandoffRecommendations, type ResetCompactHandoffRecommendation } from "./reset-compact-handoff-recommendation";
@@ -45,7 +45,7 @@ export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE = "operator/check reliability warning visibility projection";
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE = "operator/check compact resume handoff projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY =
-  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, longRunBudgetWarnings, and resetCompactHandoffRecommendations fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
+  "Read-only operator/check visibility projection over existing contextTrust/source-of-truth, runtime planning advisory, sequentialPlanningHints, combinedReliabilityWarnings, longRunBudgetWarnings, and resetCompactHandoffRecommendations fields only; it adds no telemetry, provider/runtime hooks, token/cost accounting, merge-gate policy, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY =
   "Compact advisory/read-only resume handoff projection for issue #992; derived only from existing operator-check contextTrust/source-of-truth, reliability warning visibility, runtime planning, sequential planning, plan-before-execute, long-run budget, and reset/compact/handoff recommendation fields, and adds no provider/runtime telemetry, CI/merge authority, product claims, or frontend behavior.";
 export const OPERATOR_CHECK_SALVAGE_REVIEW_QUEUE_SCHEMA_VERSION = 1;
@@ -598,6 +598,7 @@ export type OperatorCheckReliabilityWarningVisibility = {
     existingWarningCount: number;
     planningWarningCount: number;
     combinedReliabilityWarningCount: number;
+    sequentialPlanningHintCount: number;
     longRunBudgetWarningCount: number;
     resetCompactHandoffRecommendationCount: number;
     contextTrustCurrentAuthorityCount: number;
@@ -614,6 +615,17 @@ export type OperatorCheckReliabilityWarningVisibility = {
         requiredRechecks: RuntimeTokenCostPlanningWarning["requiredRechecks"];
         forbiddenClaims: RuntimeTokenCostPlanningWarning["forbiddenClaims"];
         claimBoundary: RuntimeTokenCostPlanningWarning["claimBoundary"];
+      }
+    | {
+        kind: "sequential-planning";
+        issue: SequentialPlanningHint["issue"];
+        trigger: SequentialPlanningHint["trigger"];
+        status: SequentialPlanningHint["status"];
+        message: SequentialPlanningHint["message"];
+        recommendations: SequentialPlanningHint["recommendations"];
+        requiredRechecks: SequentialPlanningHint["requiredRechecks"];
+        forbiddenClaims: SequentialPlanningHint["forbiddenClaims"];
+        claimBoundary: SequentialPlanningHint["claimBoundary"];
       }
     | {
         kind: "combined-reliability";
@@ -654,6 +666,7 @@ export type OperatorCheckReliabilityWarningVisibility = {
   derivedFrom: {
     contextTrustSource: OperatorContextTrustPacket["source"];
     planningWarningsField: "planningWarnings";
+    sequentialPlanningHintsField: "sequentialPlanningHints";
     combinedReliabilityWarningsField: "combinedReliabilityWarnings";
     longRunBudgetWarningsField: "longRunBudgetWarnings";
     resetCompactHandoffRecommendationsField: "resetCompactHandoffRecommendations";
@@ -1745,11 +1758,13 @@ function requiredActiveArtifact(state: { blocked: boolean; hasActiveArtifact: bo
 export function buildOperatorCheckReliabilityWarningVisibility(input: {
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
+  sequentialPlanningHints?: SequentialPlanningHint[];
   combinedReliabilityWarnings: CombinedReliabilityWarning[];
   longRunBudgetWarnings: LongRunBudgetWarning[];
   resetCompactHandoffRecommendations?: ResetCompactHandoffRecommendation[];
 }): OperatorCheckReliabilityWarningVisibility {
   const resetCompactHandoffRecommendations = input.resetCompactHandoffRecommendations ?? [];
+  const sequentialPlanningHints = input.sequentialPlanningHints ?? [];
   const warnings: OperatorCheckReliabilityWarningVisibility["warnings"] = [
     ...input.planningWarnings.map((warning) => ({
       kind: "runtime-planning" as const,
@@ -1760,6 +1775,17 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       requiredRechecks: warning.requiredRechecks,
       forbiddenClaims: warning.forbiddenClaims,
       claimBoundary: warning.claimBoundary,
+    })),
+    ...sequentialPlanningHints.map((hint) => ({
+      kind: "sequential-planning" as const,
+      issue: hint.issue,
+      trigger: hint.trigger,
+      status: hint.status,
+      message: hint.message,
+      recommendations: hint.recommendations,
+      requiredRechecks: hint.requiredRechecks,
+      forbiddenClaims: hint.forbiddenClaims,
+      claimBoundary: hint.claimBoundary,
     })),
     ...input.combinedReliabilityWarnings.map((warning) => ({
       kind: "combined-reliability" as const,
@@ -1806,6 +1832,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
       existingWarningCount: warnings.length,
       planningWarningCount: input.planningWarnings.length,
       combinedReliabilityWarningCount: input.combinedReliabilityWarnings.length,
+      sequentialPlanningHintCount: sequentialPlanningHints.length,
       longRunBudgetWarningCount: input.longRunBudgetWarnings.length,
       resetCompactHandoffRecommendationCount: resetCompactHandoffRecommendations.length,
       contextTrustCurrentAuthorityCount: input.contextTrust.sourceOfTruth.current.length,
@@ -1816,6 +1843,7 @@ export function buildOperatorCheckReliabilityWarningVisibility(input: {
     derivedFrom: {
       contextTrustSource: input.contextTrust.source,
       planningWarningsField: "planningWarnings",
+      sequentialPlanningHintsField: "sequentialPlanningHints",
       combinedReliabilityWarningsField: "combinedReliabilityWarnings",
       longRunBudgetWarningsField: "longRunBudgetWarnings",
       resetCompactHandoffRecommendationsField: "resetCompactHandoffRecommendations",
@@ -1955,13 +1983,15 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   });
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch });
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
-  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, planningWarnings, combinedReliabilityWarnings });
+  const prompt = readSequentialPlanningPrompt(cwd);
+  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, prompt, planningWarnings, combinedReliabilityWarnings });
   const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
   const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
   const resetCompactHandoffRecommendations = buildResetCompactHandoffRecommendations({ contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings });
   const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
     contextTrust,
     planningWarnings,
+    sequentialPlanningHints,
     combinedReliabilityWarnings,
     longRunBudgetWarnings,
     resetCompactHandoffRecommendations,
