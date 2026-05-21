@@ -8,8 +8,13 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { assertWorktreeCwdForFocusedTest } from "./helpers/worktree-cwd-guard.mjs";
 
-const repoRoot = process.cwd();
+const repoRoot = assertWorktreeCwdForFocusedTest({
+  testFileUrl: import.meta.url,
+  issue: "#1025",
+  command: "npm run build && node --test test/react-web-status-surface.test.mjs",
+});
 const require = createRequire(import.meta.url);
 const { handleCodexRuntimeHook } = require(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const {
