@@ -2443,6 +2443,98 @@ test("operator check receipt marks closed-PR remote worktree residue as non-acti
   assert.equal(calls.some((call) => /fetch|worktree remove|branch -d/.test(call)), false);
 });
 
+test("operator check classifies superseded investigation taskfile-only residue as cleanup evidence for #1021", () => {
+  const tempDir = makeTempProject();
+  const siblingRoot = path.dirname(tempDir);
+  const supersededWorktree = path.join(siblingRoot, "fooks-issue-1011-superseded-investigation");
+  const calls = [];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-21T14:10:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args, cwd) => {
+      calls.push([command, ...args].join(" "));
+      const joined = args.join(" ");
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          "HEAD main-head",
+          "branch refs/heads/main",
+          "",
+          `worktree ${supersededWorktree}`,
+          "HEAD issue-1011-head",
+          "branch refs/heads/fooks-issue-1011-superseded-investigation",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-sha\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\nfooks-issue-1011-superseded-investigation\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return cwd === supersededWorktree ? "?? .fooks-session-task.txt\0" : "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && joined.startsWith("run list ")) return "[]";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => [tempDir, supersededWorktree].includes(targetPath),
+  });
+
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.equal(snapshot.activeWorkReceipts.classification, "closedOrStale");
+  const receipt = snapshot.activeWorkReceipts.receipts.find(
+    (item) => item.kind === "worktree" && item.identifiers.worktree.branch === "fooks-issue-1011-superseded-investigation",
+  );
+  assert.equal(receipt?.classification, "closedOrStale");
+  assert.equal(receipt?.identifiers.siblingWorktree?.category, "safe-cleanup");
+  assert.equal(receipt?.identifiers.siblingWorktree?.dirty, true);
+  assert.equal(receipt?.identifiers.siblingWorktree?.aheadOfBase, 0);
+  assert.equal(receipt?.identifiers.siblingWorktree?.activeTmuxPaneCount, 0);
+  assert.equal(receipt?.identifiers.siblingWorktree?.remoteBranchExists, false);
+  assert.equal(receipt?.identifiers.siblingWorktree?.openPullRequestState, "none");
+  assert.match(receipt?.reasons.join("\n") ?? "", /superseded investigation cleanup evidence/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /closedOrStale=1/);
+  assert.match(snapshot.activeWorkReceipts.reportLine, /staleResidueLedger=1/);
+  assert.equal(snapshot.activeWorkReceipts.salvageReviewQueue.itemCount, 0);
+  assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.counts, {
+    "safe-cleanup": 1,
+    "salvage-review": 0,
+    "manual-review-noise": 0,
+  });
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueCount, 1);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.staleResidueIsActiveWorkEvidence, false);
+  assert.equal(snapshot.activeWorkReceipts.staleResidueActiveBoundary.satisfiesActiveArtifactRequirement, false);
+  assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
+  assert.equal(snapshot.sessionWhipRunReceipt.counts.adoptedWorktrees, 0);
+  assert.equal(snapshot.sessionWhipRunReceipt.counts.staleOrReviewOnly, 1);
+  assert.equal(snapshot.contextTrust.nonAuthorizing.some((entry) =>
+    entry.kind === "stale-residue-active-boundary" &&
+    entry.referenceField === "activeWorkReceipts.staleResidueActiveBoundary"
+  ), true);
+
+  const receiptJson = JSON.stringify([
+    receipt,
+    snapshot.activeWorkReceipts.cleanupReviewManifest,
+    snapshot.sessionWhipRunReceipt,
+  ]);
+  assert.equal(receiptJson.includes(supersededWorktree), false);
+  assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
+  assert.equal(calls.some((call) => /fetch|worktree remove|branch -d|push|kill-session/.test(call)), false);
+});
+
 test("operator check receipt marks detached PR review worktree leftovers as non-active cleanup-review noise", () => {
   const tempDir = makeTempProject();
   const siblingRoot = path.dirname(tempDir);
