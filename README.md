@@ -144,6 +144,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for how these future lanes map to stron
 | `fooks status` | current project inspection | Reads local fooks telemetry/status; it is not a package installer or billing-token report. |
 | `fooks status artifacts` | current project + local git/tmux inspection | Read-only audit of fooks-scoped tmux sessions, git worktrees, and branches that may be merged into the selected base; it does not prove inactivity and never deletes artifacts. |
 | `fooks status activity` | current project + local git/tmux inspection | Compact read-only operator snapshot for dogfood nudges, including bounded current-run and stale closed-artifact worktree evidence; remote issue/PR counts require explicit `--include-remote-counts`. |
+| `fooks status activity --receipt-json` | current project + local git/tmux inspection | Projects only the bounded current-run receipt from `fooks status activity`; read-only/advisory and never creates active work by itself. |
 
 By default, `fooks setup` prints a short readiness summary so the command does not look like a wall of debug JSON. Use `fooks setup --json` when you need the full `scope` object and support/debug paths that show what is project-local versus user-runtime/home scoped.
 
@@ -227,6 +228,7 @@ fooks status claude  # check Claude project-local context hook / handoff health
 fooks status cache   # check local fooks cache health
 fooks status artifacts # read-only fooks tmux/worktree/branch artifact audit
 fooks status activity  # compact read-only operator activity snapshot
+fooks status activity --receipt-json  # current-run receipt projection only; read-only/advisory
 fooks inspect react-web-issues src/components/Form.tsx  # actionable read-only React Web issue report
 fooks compare src/components/Button.tsx --json  # local original-vs-fooks payload estimate
 ```
@@ -238,7 +240,7 @@ fooks extract src/components/Button.tsx --model-payload
 fooks scan
 ```
 
-`fooks status`, `fooks check`, `fooks status activity`, and `fooks status artifacts` are read-only local/operator projections. They report setup, local estimate, activity, branch/worktree/tmux, and artifact evidence without deleting worktrees, pruning branches, proving provider billing, or replacing `ccusage`. Source-checkout dogfood operators should prefer the repo npm aliases (`npm run -s check -- --json`, `npm run -s status:activity -- --json`) when they need built-from-source receipts. Those aliases build first and then run the read-only operator command, so source-checkout handoffs should cite the aliases instead of sending maintainers to `docs/setup.md` or a direct `dist/cli/index.js` path.
+`fooks status`, `fooks check`, `fooks status activity`, and `fooks status artifacts` are read-only local/operator projections. They report setup, local estimate, activity, branch/worktree/tmux, and artifact evidence without deleting worktrees, pruning branches, proving provider billing, or replacing `ccusage`. `fooks status activity --receipt-json` narrows `status activity` to the current-run receipt projection only; it is advisory, read-only, and does not create active work by itself. Source-checkout dogfood operators should prefer the repo npm aliases (`npm run -s check -- --json`, `npm run -s status:activity -- --json`, `npm run -s status:activity -- --receipt-json`) when they need built-from-source receipts. Those aliases build first and then run the read-only operator command, so source-checkout handoffs should cite the aliases instead of sending maintainers to `docs/setup.md` or a direct `dist/cli/index.js` path.
 
 ## opencode support
 
