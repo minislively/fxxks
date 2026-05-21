@@ -1666,9 +1666,26 @@ async function run(): Promise<void> {
         import("../ops/preflight.js"),
         import("../ops/source-of-truth-handoff.js"),
       ]);
+      const timingStartedAtMs = performance.now();
+      const timingPhases: Array<{ name: string; elapsedMs: number; status: "ok" | "skipped" | "unavailable" }> = [];
+      const readSnapshotStartedAt = performance.now();
       const snapshot = readOperatorCheckSnapshot(process.cwd());
+      timingPhases.push({ name: "read-operator-check-snapshot", elapsedMs: roundMs(performance.now() - readSnapshotStartedAt), status: "ok" });
+      const buildPreflightStartedAt = performance.now();
       const preflight = buildPreflightPacket(snapshot);
-      const packet = buildSourceOfTruthHandoffPacket(snapshot, preflight);
+      timingPhases.push({ name: "build-preflight-packet", elapsedMs: roundMs(performance.now() - buildPreflightStartedAt), status: "ok" });
+      const buildHandoffStartedAt = performance.now();
+      const packet = buildSourceOfTruthHandoffPacket(snapshot, preflight, {
+        nowMs: () => performance.now(),
+        timingPhases,
+        timingStartedAtMs,
+      });
+      packet.diagnostics.handoffTiming.phases.push({
+        name: "build-source-of-truth-handoff-packet",
+        elapsedMs: roundMs(performance.now() - buildHandoffStartedAt),
+        status: "ok",
+      });
+      packet.diagnostics.handoffTiming.totalMs = roundMs(performance.now() - timingStartedAtMs);
       print(resumeJson ? packet.authoritativeResumePacket : packet);
       return;
     }

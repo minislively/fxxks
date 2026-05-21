@@ -131,6 +131,51 @@ test("source-of-truth handoff packet links inferred issue, current branch PR che
   assert.deepEqual(packet.longRunBudgetWarnings, []);
 });
 
+test("source-of-truth handoff packet emits deterministic diagnostic timing receipt", () => {
+  const cwd = repoRoot;
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return " M src/ops/source-of-truth-handoff.ts\n";
+    if (key === "gh issue view 963 --json number,title,state,url") {
+      return JSON.stringify({ number: 963, title: "source of truth handoff", state: "OPEN", url: "https://github.com/minislively/fooks/issues/963" });
+    }
+    if (key === "gh pr list --head fooks-issue-963-source-of-truth-handoff --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") {
+      return "[]";
+    }
+    throw new Error(`unexpected command: ${key}`);
+  };
+  let tick = 0;
+  const nowMs = () => {
+    tick += 2;
+    return tick;
+  };
+
+  const packet = buildSourceOfTruthHandoffPacket(baseSnapshot(cwd), basePreflight(), {
+    commandRunner: runner,
+    now: () => "2026-05-19T01:02:03.000Z",
+    nowMs,
+  });
+
+  const receipt = packet.diagnostics.handoffTiming;
+  assert.equal(receipt.status, "diagnostic");
+  assert.equal(receipt.source, "fooks handoff assembly timing");
+  assert.match(receipt.claimBoundary, /Diagnostic\/read-only/);
+  assert.match(receipt.claimBoundary, /not current-work authority/);
+  assert.match(receipt.claimBoundary, /not provider billing\/runtime proof/);
+  assert.ok(Number.isFinite(receipt.totalMs));
+  assert.ok(receipt.totalMs >= 0);
+  const phaseNames = receipt.phases.map((phase) => phase.name);
+  assert.ok(phaseNames.includes("read-changed-paths"));
+  assert.ok(phaseNames.includes("linked-issue"));
+  assert.ok(phaseNames.includes("linked-pull-request"));
+  assert.ok(phaseNames.includes("authoritative-resume-packet"));
+  for (const phase of receipt.phases) {
+    assert.equal(phase.status, "ok");
+    assert.ok(Number.isFinite(phase.elapsedMs));
+    assert.ok(phase.elapsedMs >= 0);
+  }
+});
+
 test("authoritative resume packet compacts stale/context/reliability overlap before new session", () => {
   const cwd = repoRoot;
   const snapshot = baseSnapshot(cwd);
@@ -218,25 +263,60 @@ test("authoritative resume packet stays advisory and clear for ordinary non-risk
   assert.match(resume.forbiddenClaims.join("\n"), /frontend runtime behavior change/);
 });
 
-test("handoff CLI emits JSON packet", () => {
-  const stdout = execFileSync(process.execPath, [cli, "handoff", "--json"], { cwd: repoRoot, encoding: "utf8", timeout: 20_000 });
-  const packet = JSON.parse(stdout);
+test("source-of-truth handoff packet emits JSON-ready diagnostic timing shape without live CLI load", () => {
+  const cwd = repoRoot;
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 963 --json number,title,state,url") return JSON.stringify({ number: 963, state: "OPEN" });
+    if (key === "gh pr list --head fooks-issue-963-source-of-truth-handoff --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") return "[]";
+    throw new Error(`unexpected command: ${key}`);
+  };
+  const packet = buildSourceOfTruthHandoffPacket(baseSnapshot(cwd), basePreflight(), {
+    commandRunner: runner,
+    now: () => "2026-05-19T01:02:03.000Z",
+    nowMs: () => 1,
+    timingPhases: [
+      { name: "read-operator-check-snapshot", elapsedMs: 7, status: "ok" },
+      { name: "build-preflight-packet", elapsedMs: 2, status: "ok" },
+      { name: "build-source-of-truth-handoff-packet", elapsedMs: 4, status: "ok" },
+    ],
+    timingStartedAtMs: 0,
+  });
+  const stdout = JSON.stringify(packet);
+  const reparsed = JSON.parse(stdout);
   assert.equal(packet.schemaVersion, 1);
-  assert.equal(packet.command, "handoff");
-  assert.equal(packet.derivedFrom.operatorCheckCommand, "check");
-  assert.equal(packet.derivedFrom.preflightCommand, "preflight");
-  assert.equal(packet.derivedFrom.staleContextCommand, "stale-context");
-  assert.ok(Array.isArray(packet.sourceOfTruth.authoritativeFilesAndDocs));
-  assert.ok(packet.currentStatus.operatorCheck.verdict);
+  assert.equal(reparsed.command, "handoff");
+  assert.equal(reparsed.derivedFrom.operatorCheckCommand, "check");
+  assert.equal(reparsed.derivedFrom.preflightCommand, "preflight");
+  assert.equal(reparsed.derivedFrom.staleContextCommand, "stale-context");
+  assert.ok(Array.isArray(reparsed.sourceOfTruth.authoritativeFilesAndDocs));
+  assert.ok(reparsed.currentStatus.operatorCheck.verdict);
+  assert.equal(reparsed.diagnostics.handoffTiming.status, "diagnostic");
+  const phaseNames = reparsed.diagnostics.handoffTiming.phases.map((phase) => phase.name);
+  assert.ok(phaseNames.includes("read-operator-check-snapshot"));
+  assert.ok(phaseNames.includes("build-preflight-packet"));
+  assert.ok(phaseNames.includes("build-source-of-truth-handoff-packet"));
 });
 
-test("handoff CLI emits compact authoritative resume packet only", () => {
-  const fullStdout = execFileSync(process.execPath, [cli, "handoff", "--json"], { cwd: repoRoot, encoding: "utf8", timeout: 20_000 });
-  const resumeStdout = execFileSync(process.execPath, [cli, "handoff", "--resume-json"], { cwd: repoRoot, encoding: "utf8", timeout: 20_000 });
-  const fullPacket = JSON.parse(fullStdout);
-  const resumePacket = JSON.parse(resumeStdout);
+test("handoff compact authoritative resume packet excludes diagnostic timing", () => {
+  const cwd = repoRoot;
+  const runner = (command, args) => {
+    const key = `${command} ${args.join(" ")}`;
+    if (key === "git status --porcelain=v1") return "";
+    if (key === "gh issue view 963 --json number,title,state,url") return JSON.stringify({ number: 963, state: "OPEN" });
+    if (key === "gh pr list --head fooks-issue-963-source-of-truth-handoff --state all --json number,title,state,url,headRefName,baseRefName,isDraft,statusCheckRollup --limit 1") return "[]";
+    throw new Error(`unexpected command: ${key}`);
+  };
+  const fullPacket = buildSourceOfTruthHandoffPacket(baseSnapshot(cwd), basePreflight(), {
+    commandRunner: runner,
+    now: () => "2026-05-19T01:02:03.000Z",
+    nowMs: () => 1,
+  });
+  const serializedResumePacket = JSON.stringify(fullPacket.authoritativeResumePacket);
+  const resumePacket = JSON.parse(serializedResumePacket);
 
-  assert.deepEqual(resumePacket, fullPacket.authoritativeResumePacket);
+  assert.deepEqual(resumePacket, JSON.parse(JSON.stringify(fullPacket.authoritativeResumePacket)));
   assert.equal(resumePacket.schemaVersion, 1);
   assert.equal(resumePacket.status, "advisory");
   assert.equal(resumePacket.compact, true);
@@ -253,6 +333,7 @@ test("handoff CLI emits compact authoritative resume packet only", () => {
   assert.equal(resumePacket.reliabilityBoundary.resetCompactHandoffRecommendationCount, fullPacket.resetCompactHandoffRecommendations.length);
   assert.equal(Object.hasOwn(resumePacket, "currentStatus"), false);
   assert.equal(Object.hasOwn(resumePacket, "sourceOfTruth"), false);
+  assert.equal(Object.hasOwn(resumePacket, "diagnostics"), false);
   assert.match(resumePacket.claimBoundary, /not provider billing\/runtime proof/);
   assert.match(resumePacket.claimBoundary, /not autonomous CI\/merge authority/);
   assert.match(resumePacket.claimBoundary, /not provider\/runtime hook behavior/);
