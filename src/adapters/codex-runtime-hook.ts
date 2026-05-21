@@ -13,6 +13,8 @@ import {
   resolveCodexRuntimeSessionKey,
 } from "./codex-runtime-session";
 import type { CodexRuntimeHookDecision, CodexRuntimeHookInput, ContextMode, ModelFacingPayload } from "../core/schema";
+import { decidePreflightAdvisoryIntent } from "../ops/preflight-advisory-intent";
+import type { PreflightAdvisoryDecision, PreflightAdvisoryRuntimeSignals } from "../ops/preflight-advisory-intent";
 import {
   estimateFileBytes,
   estimateTextBytes,
@@ -27,6 +29,10 @@ import { buildReactWebActivationModeFromRuntimeDecision, summarizeReactWebActiva
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const EDIT_GUIDANCE_CONTEXT_MAX_BYTES = 8_192;
+const PREFLIGHT_ADVISORY_CONTEXT_MARKER = "FOOKS PREFLIGHT ADVISORY";
+const PREFLIGHT_ISSUE_OR_PR_PATTERN = /(?:#\d+\b|\b(?:issue|issues|pr|pull\s+request)\s*#?\d+\b)/iu;
+const PREFLIGHT_TEST_COMMAND_PATTERN = /(?:\bnpm\s+(?:run\s+)?test\b|\bnode\s+--test\b|\bpytest\b|\bvitest\b|\bjest\b|테스트)/iu;
+const PREFLIGHT_STACK_OR_ERROR_PATTERN = /(?:\b(?:typeerror|referenceerror|syntaxerror|stack\s+trace|traceback|failed|failure|exception|error)\b|에러|오류|실패|스택|이상한데)/iu;
 
 type RuntimeReactWebContext = NonNullable<ModelFacingPayload["reactWebContext"]>;
 type RuntimeReactWebContextArrayKey = Exclude<{
@@ -170,6 +176,65 @@ function compactRuntimeReactWebContext(
 }
 
 type RuntimeReactWebContextPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebContextPacking"]>;
+type CodexRuntimeDebug = NonNullable<CodexRuntimeHookDecision["debug"]>;
+type PreflightAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["preflightAdvisoryIntent"]>;
+
+function preflightAdvisoryDebugReceipt(decision: PreflightAdvisoryDecision): PreflightAdvisoryDebugReceipt {
+  return {
+    shouldAttach: decision.shouldAttach,
+    confidence: decision.confidence,
+    category: decision.category,
+    score: decision.score,
+    reasons: [...decision.reasons],
+    skipReasons: [...decision.skipReasons],
+  };
+}
+
+function buildPreflightAdvisoryRuntimeSignals(
+  prompt: string,
+  target: string | undefined,
+): PreflightAdvisoryRuntimeSignals {
+  return {
+    hasFilePath: Boolean(target),
+    hasRepoAnchor: Boolean(target),
+    hasIssueOrPrReference: PREFLIGHT_ISSUE_OR_PR_PATTERN.test(prompt),
+    hasTestCommand: PREFLIGHT_TEST_COMMAND_PATTERN.test(prompt),
+    hasStackTraceOrError: PREFLIGHT_STACK_OR_ERROR_PATTERN.test(prompt),
+  };
+}
+
+function renderPreflightAdvisoryContext(decision: PreflightAdvisoryDecision): string | undefined {
+  if (!decision.shouldAttach) return undefined;
+
+  return [
+    PREFLIGHT_ADVISORY_CONTEXT_MARKER,
+    "- Source: local preflight advisory intent scorer; no new evidence collection was performed.",
+    `- Intent: ${decision.category} (confidence: ${decision.confidence}, score: ${decision.score}).`,
+    `- Reasons: ${decision.reasons.length > 0 ? decision.reasons.join(", ") : "none"}.`,
+    "- Boundary: advisory-only; does not block, create authority, run cleanup, run commands, or change provider/tool behavior.",
+    "- Reminder: stale/local-only residue is cleanup-review context, not current-work authority unless separately evidenced.",
+  ].join("\n");
+}
+
+function preflightAdvisoryReasons(advisory: string | undefined): string[] {
+  return advisory ? ["preflight-advisory-attached"] : [];
+}
+
+function attachPreflightAdvisoryDebug(
+  runtimeDecision: CodexRuntimeHookDecision,
+  decision: PreflightAdvisoryDecision,
+): CodexRuntimeHookDecision {
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
+  };
+  runtimeDecision.debug = {
+    ...debug,
+    preflightAdvisoryIntent: preflightAdvisoryDebugReceipt(decision),
+  };
+  return runtimeDecision;
+}
 
 function summarizeRuntimeReactWebContextPacking(
   reactWebContext: PackedRuntimeReactWebContext | undefined,
@@ -490,13 +555,19 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   const target = promptContext.filePath;
   const policy = promptContext.policy;
   const escapeHatchUsed = hasFullReadEscapeHatch(prompt);
+  const preflightAdvisoryIntent = decidePreflightAdvisoryIntent({
+    prompt,
+    runtime: buildPreflightAdvisoryRuntimeSignals(prompt, target),
+  });
+  const preflightAdvisoryContext = renderPreflightAdvisoryContext(preflightAdvisoryIntent);
 
   if (!target) {
     const runtimeDecision: CodexRuntimeHookDecision = {
       runtime: "codex",
       hookEventName,
       action: "noop",
-      reasons: ["no-eligible-file-in-prompt"],
+      reasons: ["no-eligible-file-in-prompt", ...preflightAdvisoryReasons(preflightAdvisoryContext)],
+      additionalContext: preflightAdvisoryContext,
       contextMode: policy.contextMode,
       contextModeReason: policy.contextModeReason,
       contextBudget: policy.contextBudget,
@@ -508,6 +579,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         escapeHatchUsed,
       },
     };
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision);
     return runtimeDecision;
   }
@@ -531,6 +603,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         escapeHatchUsed,
       },
     };
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision);
     return runtimeDecision;
   }
@@ -549,6 +622,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       "escape-hatch-full-read",
       policy,
     );
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
       actualEstimatedBytes: originalEstimatedBytes,
@@ -569,8 +643,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       hookEventName,
       action: "record",
       filePath: target,
-      reasons: ["first-seen-file", "context-mode:no-op"],
+      reasons: ["first-seen-file", "context-mode:no-op", ...preflightAdvisoryReasons(preflightAdvisoryContext)],
       statePath,
+      additionalContext: preflightAdvisoryContext,
       contextMode: "no-op",
       contextModeReason: policy.promptSpecificity === "file-hinted" ? "first-turn-file-hinted-record-only" : "first-turn-exact-file-record-only",
       contextBudget: { ...policy.contextBudget, selectedFiles: 0, totalBytes: 0, skippedFiles: policy.contextBudget.selectedFiles },
@@ -582,8 +657,15 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         escapeHatchUsed: false,
       },
     };
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
       observedOriginalEstimatedBytes: originalEstimatedBytes,
+      ...(preflightAdvisoryContext
+        ? {
+            actualEstimatedBytes: estimateTextBytes(preflightAdvisoryContext),
+            comparableForSavings: false,
+          }
+        : {}),
     });
     return runtimeDecision;
   }
@@ -605,6 +687,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       "payload-build-failed",
       policy,
     );
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
       actualEstimatedBytes: originalEstimatedBytes,
@@ -672,25 +755,27 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         ...(reactWebContextPacking ? { reactWebContextPacking } : {}),
       },
     };
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
 
     if (decision.payload.domainPayload?.domain === "react-web" && !decision.payload.useOriginal) {
       const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
       const promoted =
         activationMode?.profileGate.verdict === "would-activate" || activationMode?.globMatch.verdict === "would-activate";
       if (!activationMode || !promoted) {
+        const activationFallbackBase = fallbackDecision(
+          hookEventName,
+          target,
+          statePath,
+          ["repeated-file", "activation-mode-not-promoted"],
+          true,
+          true,
+          false,
+          "activation-mode-not-promoted",
+          policy,
+          decision,
+        );
         const activationFallback = attachReactWebActivationDebug(
-          fallbackDecision(
-            hookEventName,
-            target,
-            statePath,
-            ["repeated-file", "activation-mode-not-promoted"],
-            true,
-            true,
-            false,
-            "activation-mode-not-promoted",
-            policy,
-            decision,
-          ),
+          attachPreflightAdvisoryDebug(activationFallbackBase, preflightAdvisoryIntent),
           { promoted: false },
           cwd,
         );
@@ -726,6 +811,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     policy,
     decision,
   );
+  attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
   recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
     originalEstimatedBytes,
     actualEstimatedBytes: originalEstimatedBytes,

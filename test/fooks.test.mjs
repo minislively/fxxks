@@ -17,6 +17,7 @@ import { cleanupMetricSessions } from "./metric-cleanup.mjs";
 const repoRoot = process.cwd();
 const cli = path.join(repoRoot, "dist", "cli", "index.js");
 const require = createRequire(import.meta.url);
+const PREFLIGHT_ADVISORY_CONTEXT_MARKER = "FOOKS PREFLIGHT ADVISORY";
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -29,6 +30,7 @@ function readReactWebIssueGoldenText(name) {
 function readReactWebIssueGoldenJson(name) {
   return JSON.parse(fs.readFileSync(path.join(repoRoot, "test", "fixtures", "react-web-issues-golden", name), "utf8"));
 }
+
 const { extractFile } = require(path.join(repoRoot, "dist", "core", "extract.js"));
 const {
   DESIGN_REVIEW_METADATA_ITEM_CAPS,
@@ -2045,6 +2047,91 @@ test("codex runtime hook keeps matching no-target claim-boundary prompts as no-o
   assert.equal("matchReasons" in lastEvent, false);
 });
 
+test("codex runtime hook attaches preflight advisory context for anchored work prompts", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-preflight-advisory-attach-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+
+  const decision = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(decision.action, "record");
+  assert.equal(decision.filePath, target);
+  assert.ok(decision.additionalContext.includes(PREFLIGHT_ADVISORY_CONTEXT_MARKER));
+  assert.ok(decision.reasons.includes("preflight-advisory-attached"));
+  assert.equal(decision.debug.preflightAdvisoryIntent.shouldAttach, true);
+  assert.equal(decision.debug.preflightAdvisoryIntent.category, "implementation");
+  assert.equal(typeof decision.debug.preflightAdvisoryIntent.score, "number");
+  assert.ok(decision.debug.preflightAdvisoryIntent.reasons.includes("repo-anchor"));
+  assert.ok(decision.debug.preflightAdvisoryIntent.reasons.includes("runtime-repo-anchor"));
+  assert.ok(decision.debug.preflightAdvisoryIntent.reasons.includes("work-intent:implementation"));
+  assert.deepEqual(decision.debug.preflightAdvisoryIntent.skipReasons, []);
+});
+
+test("codex runtime hook skips preflight advisory for pure questions and vague unanchored work", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-preflight-advisory-skip-${Date.now()}`;
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+
+  const question = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "이 구조가 뭐야?",
+    },
+    tempDir,
+  );
+  assert.equal(question.action, "noop");
+  assert.equal(question.additionalContext, undefined);
+  assert.equal(question.debug.preflightAdvisoryIntent.shouldAttach, false);
+  assert.equal(question.debug.preflightAdvisoryIntent.category, "question");
+  assert.ok(question.debug.preflightAdvisoryIntent.skipReasons.includes("pure-question"));
+
+  const vagueWork = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: "구현해줘",
+    },
+    tempDir,
+  );
+  assert.equal(vagueWork.action, "noop");
+  assert.equal(vagueWork.additionalContext, undefined);
+  assert.equal(vagueWork.debug.preflightAdvisoryIntent.shouldAttach, false);
+  assert.equal(vagueWork.debug.preflightAdvisoryIntent.category, "implementation");
+  assert.ok(vagueWork.debug.preflightAdvisoryIntent.reasons.includes("work-intent:implementation"));
+  assert.ok(vagueWork.debug.preflightAdvisoryIntent.skipReasons.includes("work-intent-without-anchor"));
+});
+
+test("codex runtime hook lets preflight advisory opt-out win", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-preflight-advisory-optout-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+
+  const decision = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `no preflight, please update ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(decision.action, "record");
+  assert.equal(decision.additionalContext, undefined);
+  assert.equal(decision.debug.preflightAdvisoryIntent.shouldAttach, false);
+  assert.ok(decision.debug.preflightAdvisoryIntent.skipReasons.includes("explicit-opt-out"));
+  assert.equal(decision.reasons.includes("preflight-advisory-attached"), false);
+});
+
 test("codex runtime hook records first matching exact-file prompt without project knowledge and injects it on repeated file", () => {
   const tempDir = makeTempProject();
   writeProjectKnowledgeFixture(tempDir);
@@ -2314,7 +2401,8 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(first.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
   assert.equal(first.contextMode, "no-op");
   assert.equal(first.promptSpecificity, "exact-file");
-  assert.equal(first.additionalContext, undefined);
+  assert.ok(first.additionalContext.includes(PREFLIGHT_ADVISORY_CONTEXT_MARKER));
+  assert.equal(first.debug.preflightAdvisoryIntent.shouldAttach, true);
   assert.match(first.statePath, /\.fooks\/state\/codex-runtime/);
 
   const second = handleCodexRuntimeHook(
@@ -2339,7 +2427,9 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(second.additionalContext.includes("\"editGuidance\""), true);
   assert.equal(second.additionalContext.includes("\"reactWebContext\""), true);
   assert.ok(second.reasons.includes("edit-guidance-opt-in"));
+  assert.equal(second.reasons.includes("preflight-advisory-attached"), false);
   assert.equal(second.debug.repeatedFile, true);
+  assert.equal(second.debug.preflightAdvisoryIntent.shouldAttach, true);
   assert.deepEqual(second.debug.decision.payload.editGuidance.freshness, second.debug.decision.payload.sourceFingerprint);
   assert.ok(second.debug.decision.payload.editGuidance.patchTargets.length <= 12);
   assert.equal(second.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
