@@ -337,10 +337,10 @@ function closedPullRequestEvidence(
     : { state: "none", source: ORPHAN_LOCAL_WORKTREE_TRIAGE_CLOSED_PR_SOURCE };
 }
 
-function worktreeStatus(runner: OrphanLocalWorktreeCommandRunner, worktreePath: string): { dirty: boolean | "unknown"; changedPathCount?: number; blocker?: string } {
+function worktreeStatus(runner: OrphanLocalWorktreeCommandRunner, worktreePath: string): { dirty: boolean | "unknown"; changedPathCount?: number; changedPaths?: string[]; blocker?: string } {
   try {
     const summary = parseAndSummarizeWorktreeStatus(runner("git", ["status", "--porcelain=v1", "-z"], worktreePath), { nulTerminated: true });
-    return { dirty: !summary.clean, changedPathCount: summary.changedPaths.length };
+    return { dirty: !summary.clean, changedPathCount: summary.changedPaths.length, changedPaths: summary.changedPaths };
   } catch (error) {
     return { dirty: "unknown", blocker: `git status unavailable for ${worktreePath}: ${errorDetail(error)}` };
   }
@@ -498,6 +498,7 @@ function classifyEntry(input: {
   exists: boolean;
   branch?: string;
   dirty: boolean | "unknown";
+  changedPaths?: string[];
   ahead?: number;
   remoteBranchExists: boolean | "unknown";
   openPullRequest: OrphanLocalWorktreePullRequestEvidence;
@@ -509,6 +510,7 @@ function classifyEntry(input: {
   const manualCleanupCommands: string[] = [];
   const manualReviewCommands: string[] = [];
   const detachedReviewWorktree = !input.branch && isDetachedReviewWorktreePath(input.path);
+  const onlyFooksSessionTaskResidue = input.changedPaths?.length === 1 && input.changedPaths[0] === ".fooks-session-task.txt";
 
   if (input.current) reasons.push("worktree is the current working directory");
   if (!input.exists) reasons.push("worktree path is missing from the filesystem");
@@ -533,6 +535,9 @@ function classifyEntry(input: {
   if (input.dirty === "unknown") reasons.push("worktree cleanliness is unknown");
   if (input.ahead !== undefined && input.ahead > 0) reasons.push(`HEAD has ${input.ahead} commit(s) not reachable from ${input.baseRef ?? "the selected base"}`);
   if (input.ahead === 0) reasons.push(`HEAD has no commits ahead of ${input.baseRef ?? "the selected base"}`);
+  if (onlyFooksSessionTaskResidue) {
+    reasons.push("only .fooks-session-task.txt residue is present; treat as superseded investigation cleanup evidence, not active development");
+  }
 
   const closedPrRemoteResidue =
     input.remoteBranchExists === true &&
@@ -574,7 +579,13 @@ function classifyEntry(input: {
     return { category: "salvage-review", reasons: uniqueSorted(reasons), manualCleanupCommands, manualReviewCommands: uniqueSorted(manualReviewCommands) };
   }
 
-  if (input.remoteBranchExists === false && input.openPullRequest.state === "none" && input.dirty === false && input.ahead === 0) {
+  if (
+    input.remoteBranchExists === false &&
+    input.openPullRequest.state === "none" &&
+    (input.dirty === false || onlyFooksSessionTaskResidue) &&
+    input.ahead === 0 &&
+    input.activeTmuxPaneCount === 0
+  ) {
     manualCleanupCommands.push("git worktree remove <path>");
     if (input.branch) manualCleanupCommands.push(`git branch -d ${shellQuote(input.branch)}`);
     return { category: "safe-cleanup", reasons: uniqueSorted(reasons), manualCleanupCommands: uniqueSorted(manualCleanupCommands), manualReviewCommands };
@@ -630,6 +641,7 @@ export function triageOrphanLocalWorktrees(cwd = process.cwd(), options: OrphanL
       exists,
       branch,
       dirty: status.dirty,
+      changedPaths: status.changedPaths,
       ahead: divergence.ahead,
       remoteBranchExists,
       openPullRequest,
