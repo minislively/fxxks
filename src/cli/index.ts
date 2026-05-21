@@ -9,6 +9,24 @@ function print(value: unknown): void {
   console.log(JSON.stringify(value));
 }
 
+async function printAndFlush(value: unknown): Promise<void> {
+  const serialized = `${JSON.stringify(value)}\n`;
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error): void => {
+      reject(error);
+    };
+    process.stdout.once("error", onError);
+    process.stdout.write(serialized, (error) => {
+      process.stdout.off("error", onError);
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 function roundMs(value: number): number {
   return Number(value.toFixed(2));
 }
@@ -1745,7 +1763,7 @@ async function run(): Promise<void> {
       if (arg1 === "artifacts") {
         parseStatusArtifactsArgs(rest.slice(1));
         const { auditArtifacts } = await import("../ops/artifact-audit.js");
-        print(auditArtifacts(process.cwd()));
+        await printAndFlush(auditArtifacts(process.cwd()));
         return;
       }
       if (arg1 === "stale-worktrees") {
