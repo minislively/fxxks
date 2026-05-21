@@ -742,6 +742,14 @@ export type CodexRuntimeHookDecision = {
       deferredTriggers: string[];
       blockedReasons: string[];
     };
+    preflightAdvisoryIntent?: {
+      shouldAttach: boolean;
+      confidence: "low" | "medium" | "high";
+      category: string;
+      score: number;
+      reasons: string[];
+      skipReasons: string[];
+    };
   };
   fallback?: {
     action: "full-read";
