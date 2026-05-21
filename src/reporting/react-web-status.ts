@@ -12,15 +12,44 @@ import {
 import { buildReactWebActivationMode, summarizeReactWebActivationMode, type ReactWebActivationModeSummary } from "./react-web-activation-mode";
 import { buildReactWebRankedBundle, summarizeReactWebRankedBundle, type ReactWebRankedBundleSummary } from "./react-web-ranked-bundle";
 import type { SourceFingerprint } from "../core/schema";
+import type { AuthoritativeResumePacket } from "../ops/source-of-truth-handoff";
 
 export const REACT_WEB_STATUS_SCHEMA_VERSION = 1;
 export const REACT_WEB_STATUS_COMMAND = "status react-web";
 export const REACT_WEB_STATUS_CLAIM_BOUNDARY =
   "Local React Web source-context decision status only: summarizes existing bounded evidence artifacts without emitting new artifacts, changing runtime behavior, or broadening support or performance claims.";
+export const REACT_WEB_RELIABILITY_HANDOFF_CLAIM_BOUNDARY =
+  "React Web-facing reliability handoff cue only: projects existing authoritativeResumePacket reliability/reset/compact handoff fields without changing stale-context detector scope, provider/runtime hooks, token or billing proof, merge policy, product claims, or frontend behavior.";
 
 export type ReactWebProfileStatus = "ready" | "partial" | "blocked";
 export type ReactWebBoundaryState = "bounded" | "blocked" | "advisory-only";
 export type ReactWebFreshnessState = "current" | "stale" | "missing-source-file" | "unavailable";
+export type ReactWebReliabilityHandoffStatus = "unavailable" | "clear" | "advisory" | "stop-before-more-execution";
+
+export type ReactWebReliabilityHandoffCue = {
+  available: boolean;
+  status: ReactWebReliabilityHandoffStatus;
+  source: "authoritativeResumePacket" | "not-provided";
+  claimBoundary: typeof REACT_WEB_RELIABILITY_HANDOFF_CLAIM_BOUNDARY;
+  derivedFrom: string[];
+  summary: {
+    planningWarningCount: number;
+    combinedReliabilityWarningCount: number;
+    longRunBudgetWarningCount: number;
+    resetCompactHandoffRecommendationCount: number;
+    staleContextReliabilityOverlap: boolean;
+    longRunBudgetRiskLevel: "high" | "clear" | "unknown";
+    stopBeforeMoreExecution: boolean;
+  };
+  recommendedAction: AuthoritativeResumePacket["nextSessionAdvisory"]["action"] | "run-handoff-resume-json";
+  requiredRechecks: string[];
+  forbiddenClaims: string[];
+  operatorCue: string;
+};
+
+export type ReactWebStatusOptions = {
+  authoritativeResumePacket?: AuthoritativeResumePacket | null;
+};
 
 export type ReactWebStatusResult = {
   schemaVersion: typeof REACT_WEB_STATUS_SCHEMA_VERSION;
@@ -55,6 +84,7 @@ export type ReactWebStatusResult = {
   };
   activationMode: ReactWebActivationModeSummary;
   rankedBundle: ReactWebRankedBundleSummary;
+  reliabilityHandoff: ReactWebReliabilityHandoffCue;
   risks: string[];
 };
 
@@ -74,6 +104,84 @@ function currentSourceFingerprint(filePath: string): SourceFingerprint | null {
   return {
     fileHash: hashText(source),
     lineCount: source.split(/\r?\n/u).length,
+  };
+}
+
+function buildReactWebReliabilityHandoffCue(
+  authoritativeResumePacket: AuthoritativeResumePacket | null | undefined,
+): ReactWebReliabilityHandoffCue {
+  if (!authoritativeResumePacket) {
+    return {
+      available: false,
+      status: "unavailable",
+      source: "not-provided",
+      claimBoundary: REACT_WEB_RELIABILITY_HANDOFF_CLAIM_BOUNDARY,
+      derivedFrom: [
+        "authoritativeResumePacket.reliabilityBoundary",
+        "authoritativeResumePacket.nextSessionAdvisory",
+        "authoritativeResumePacket.forbiddenClaims",
+      ],
+      summary: {
+        planningWarningCount: 0,
+        combinedReliabilityWarningCount: 0,
+        longRunBudgetWarningCount: 0,
+        resetCompactHandoffRecommendationCount: 0,
+        staleContextReliabilityOverlap: false,
+        longRunBudgetRiskLevel: "unknown",
+        stopBeforeMoreExecution: false,
+      },
+      recommendedAction: "run-handoff-resume-json",
+      requiredRechecks: ["Run fooks handoff --resume-json, then pass that packet to status react-web --handoff-resume-json <file> for React Web-facing reliability cues."],
+      forbiddenClaims: [
+        "provider billing/runtime proof",
+        "merge-gate policy change",
+        "frontend runtime behavior change",
+      ],
+      operatorCue: "No compact handoff packet was provided; React Web reliability handoff cues are unavailable on this status run.",
+    };
+  }
+
+  const boundary = authoritativeResumePacket.reliabilityBoundary;
+  const hasReliabilityWarnings =
+    boundary.planningWarningCount > 0 ||
+    boundary.combinedReliabilityWarningCount > 0 ||
+    boundary.longRunBudgetWarningCount > 0 ||
+    boundary.resetCompactHandoffRecommendationCount > 0 ||
+    boundary.staleContextReliabilityOverlap;
+  const status: ReactWebReliabilityHandoffStatus = boundary.stopBeforeMoreExecution
+    ? "stop-before-more-execution"
+    : hasReliabilityWarnings
+      ? "advisory"
+      : "clear";
+  const operatorCue = boundary.stopBeforeMoreExecution
+    ? "Stop before more React Web-oriented execution; use the compact handoff packet, recheck current authority, then resume from fresh context."
+    : hasReliabilityWarnings
+      ? "React Web-oriented execution has reliability handoff advisories; reset context, compact current source of truth, or hand off before another long run when indicated."
+      : "No reliability handoff warnings are present in the provided compact handoff packet.";
+
+  return {
+    available: true,
+    status,
+    source: "authoritativeResumePacket",
+    claimBoundary: REACT_WEB_RELIABILITY_HANDOFF_CLAIM_BOUNDARY,
+    derivedFrom: [
+      "authoritativeResumePacket.reliabilityBoundary",
+      "authoritativeResumePacket.nextSessionAdvisory",
+      "authoritativeResumePacket.forbiddenClaims",
+    ],
+    summary: {
+      planningWarningCount: boundary.planningWarningCount,
+      combinedReliabilityWarningCount: boundary.combinedReliabilityWarningCount,
+      longRunBudgetWarningCount: boundary.longRunBudgetWarningCount,
+      resetCompactHandoffRecommendationCount: boundary.resetCompactHandoffRecommendationCount,
+      staleContextReliabilityOverlap: boundary.staleContextReliabilityOverlap,
+      longRunBudgetRiskLevel: boundary.longRunBudgetRiskLevel,
+      stopBeforeMoreExecution: boundary.stopBeforeMoreExecution,
+    },
+    recommendedAction: authoritativeResumePacket.nextSessionAdvisory.action,
+    requiredRechecks: authoritativeResumePacket.nextSessionAdvisory.requiredRechecks,
+    forbiddenClaims: authoritativeResumePacket.forbiddenClaims,
+    operatorCue,
   };
 }
 
@@ -116,6 +224,7 @@ function buildBlockedNoEvidenceStatus(cwd: string, generatedAt: string): ReactWe
     },
     activationMode: summarizeReactWebActivationMode(null),
     rankedBundle: summarizeReactWebRankedBundle(null),
+    reliabilityHandoff: buildReactWebReliabilityHandoffCue(null),
     risks: [
       `no React Web evidence artifact found at ${path.relative(cwd, latestArtifactIndexPath(cwd)) || ".fooks/artifacts/react-web-evidence/latest.json"}`,
     ],
@@ -236,10 +345,13 @@ function deriveProfileStatus(
   return "ready";
 }
 
-export function readReactWebStatus(cwd = process.cwd()): ReactWebStatusResult {
+export function readReactWebStatus(cwd = process.cwd(), options: ReactWebStatusOptions = {}): ReactWebStatusResult {
   const generatedAt = new Date().toISOString();
   if (!fs.existsSync(latestArtifactIndexPath(cwd))) {
-    return buildBlockedNoEvidenceStatus(cwd, generatedAt);
+    return {
+      ...buildBlockedNoEvidenceStatus(cwd, generatedAt),
+      reliabilityHandoff: buildReactWebReliabilityHandoffCue(options.authoritativeResumePacket),
+    };
   }
 
   const artifact = readReactWebEvidenceArtifact(cwd, "latest");
@@ -279,6 +391,7 @@ export function readReactWebStatus(cwd = process.cwd()): ReactWebStatusResult {
     freshness,
     activationMode: summarizeReactWebActivationMode(activationMode),
     rankedBundle: summarizeReactWebRankedBundle(rankedBundle),
+    reliabilityHandoff: buildReactWebReliabilityHandoffCue(options.authoritativeResumePacket),
     risks,
   };
 }
@@ -292,6 +405,9 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
   const globMatchReasons = status.activationMode.globMatchReasons.length > 0
     ? status.activationMode.globMatchReasons.join(", ")
     : "none";
+  const requiredRechecks = status.reliabilityHandoff.requiredRechecks.length > 0
+    ? status.reliabilityHandoff.requiredRechecks.map((recheck) => `- ${recheck}`).join("\n")
+    : "- none";
   return [
     "# React Web status",
     "",
@@ -313,9 +429,24 @@ export function renderReactWebStatusText(status: ReactWebStatusResult): string {
     `- profile-gate runtime gate: ${status.activationMode.profileGateVerdict} (${profileGateReasons})`,
     `- glob-match runtime gate: ${status.activationMode.globMatchVerdict} (${globMatchReasons})`,
     `- ranked bundle: ${status.rankedBundle.verdict} (${status.rankedBundle.selectedCount}/${status.rankedBundle.budgetLimit ?? 0} selected, ${status.rankedBundle.deferredCount} deferred)`,
+    `- reliability handoff: ${status.reliabilityHandoff.status} (source=${status.reliabilityHandoff.source})`,
     "",
     "## Risks",
     risks,
+    "",
+    "## Reliability handoff",
+    status.reliabilityHandoff.claimBoundary,
+    "",
+    `- available: ${status.reliabilityHandoff.available ? "yes" : "no"}`,
+    `- operator cue: ${status.reliabilityHandoff.operatorCue}`,
+    `- recommended action: ${status.reliabilityHandoff.recommendedAction}`,
+    `- stale/context overlap: ${status.reliabilityHandoff.summary.staleContextReliabilityOverlap ? "yes" : "no"}`,
+    `- long-run budget risk: ${status.reliabilityHandoff.summary.longRunBudgetRiskLevel}`,
+    `- reset/compact handoff recommendations: ${status.reliabilityHandoff.summary.resetCompactHandoffRecommendationCount}`,
+    `- stop before more execution: ${status.reliabilityHandoff.summary.stopBeforeMoreExecution ? "yes" : "no"}`,
+    "",
+    "### Required rechecks",
+    requiredRechecks,
     "",
   ].join("\n");
 }
