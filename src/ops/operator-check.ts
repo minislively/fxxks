@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import {
   readOperatorActivitySnapshot,
   type OperatorActivityOptions,
@@ -32,6 +33,10 @@ export const OPERATOR_CHECK_CLAIM_BOUNDARY =
   "Read-only operator/check artifact for the post-merge main echo versus active work boundary; it requires a concrete issue, PR, or mapped session artifact when the checkout is otherwise idle.";
 export const OPERATOR_CHECK_SOURCE = `status activity ${OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG} projection`;
 export const OPERATOR_CHECK_PROVENANCE_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_TIMING_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_TIMING_SOURCE = "fooks check --json operator-check diagnostic timing";
+export const OPERATOR_CHECK_TIMING_CLAIM_BOUNDARY =
+  "Diagnostic/read-only operator-check subphase timing only; not current-work authority, not cleanup authority, not handoff/source-of-truth authority, not provider billing/runtime proof, and not a semantic input to downstream guidance decisions.";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
@@ -554,6 +559,22 @@ export type OperatorCheckRuntimeProvenance = {
   };
 };
 
+export type OperatorCheckTimingPhase = {
+  name: string;
+  elapsedMs: number;
+  status: "ok" | "skipped" | "unavailable";
+};
+
+export type OperatorCheckTimingReceipt = {
+  schemaVersion: typeof OPERATOR_CHECK_TIMING_SCHEMA_VERSION;
+  source: typeof OPERATOR_CHECK_TIMING_SOURCE;
+  status: "diagnostic";
+  claimBoundary: typeof OPERATOR_CHECK_TIMING_CLAIM_BOUNDARY;
+  readOnly: true;
+  totalMs: number;
+  phases: OperatorCheckTimingPhase[];
+};
+
 export type OperatorCheckSnapshot = {
   schemaVersion: typeof OPERATOR_CHECK_SCHEMA_VERSION;
   command: typeof OPERATOR_CHECK_COMMAND;
@@ -588,6 +609,9 @@ export type OperatorCheckSnapshot = {
   resumeHandoffProjection: OperatorCheckResumeHandoffProjection;
   activity: OperatorActivitySnapshot;
   blockers: string[];
+  diagnostics: {
+    operatorCheckTiming: OperatorCheckTimingReceipt;
+  };
 };
 
 export type OperatorCheckReliabilityWarningVisibility = {
@@ -733,6 +757,39 @@ export type OperatorCheckResumeHandoffProjection = {
   forbiddenClaims: string[];
 };
 
+
+
+function roundDiagnosticMs(value: number): number {
+  return Number(value.toFixed(2));
+}
+
+function timeDiagnosticPhase<T>(
+  phases: OperatorCheckTimingPhase[],
+  name: string,
+  callback: () => T,
+): T {
+  const startedAt = performance.now();
+  try {
+    const value = callback();
+    phases.push({ name, elapsedMs: roundDiagnosticMs(performance.now() - startedAt), status: "ok" });
+    return value;
+  } catch (error) {
+    phases.push({ name, elapsedMs: roundDiagnosticMs(performance.now() - startedAt), status: "unavailable" });
+    throw error;
+  }
+}
+
+function buildOperatorCheckTimingReceipt(phases: OperatorCheckTimingPhase[], totalMs: number): OperatorCheckTimingReceipt {
+  return {
+    schemaVersion: OPERATOR_CHECK_TIMING_SCHEMA_VERSION,
+    source: OPERATOR_CHECK_TIMING_SOURCE,
+    status: "diagnostic",
+    claimBoundary: OPERATOR_CHECK_TIMING_CLAIM_BOUNDARY,
+    readOnly: true,
+    totalMs: roundDiagnosticMs(totalMs),
+    phases: phases.map((phase) => ({ ...phase })),
+  };
+}
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
@@ -1958,11 +2015,13 @@ export function buildOperatorCheckResumeHandoffProjection(input: {
 }
 
 export function readOperatorCheckSnapshot(cwd = process.cwd(), options: OperatorActivityOptions = {}): OperatorCheckSnapshot {
-  const activity = readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true });
-  const activeArtifacts = activeArtifactsFrom(activity);
-  const activeWorkReceipts = buildActiveWorkReceipts(cwd, activity, options);
+  const timingStartedAt = performance.now();
+  const timingPhases: OperatorCheckTimingPhase[] = [];
+  const activity = timeDiagnosticPhase(timingPhases, "read-operator-activity-snapshot", () => readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true }));
+  const activeArtifacts = timeDiagnosticPhase(timingPhases, "active-artifacts", () => activeArtifactsFrom(activity));
+  const activeWorkReceipts = timeDiagnosticPhase(timingPhases, "build-active-work-receipts", () => buildActiveWorkReceipts(cwd, activity, options));
   const branch = activity.worktree.branch;
-  const blockers = checkProjectionBlockers([...activity.blockers]);
+  const blockers = timeDiagnosticPhase(timingPhases, "check-projection-blockers", () => checkProjectionBlockers([...activity.blockers]));
   const hasActiveArtifact = activeArtifacts.length > 0;
   const optionalCountBlockers = activity.optionalCounts.enabled ? activity.optionalCounts.blockers : [];
   const blocked = activity.currentRunEvidence.blockers.length > 0 || optionalCountBlockers.length > 0 || !activity.tmux.available;
@@ -1973,30 +2032,30 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
       ? "activeArtifactPresent"
       : "idleRequiresActiveArtifact";
 
-  const requiredArtifact = requiredActiveArtifact({ blocked, hasActiveArtifact });
-  const contextTrust = buildOperatorContextTrust({
+  const requiredArtifact = timeDiagnosticPhase(timingPhases, "required-active-artifact", () => requiredActiveArtifact({ blocked, hasActiveArtifact }));
+  const contextTrust = timeDiagnosticPhase(timingPhases, "build-operator-context-trust", () => buildOperatorContextTrust({
     activeArtifacts,
     activeWorkReceipts,
     requiredActiveArtifact: requiredArtifact,
     currentRunEvidence: activity.currentRunEvidence,
     postMergeMainCiEvidence: activity.postMergeMainCiEvidence,
-  });
-  const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch });
-  const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust, planningWarnings });
-  const prompt = readSequentialPlanningPrompt(cwd);
-  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, prompt, planningWarnings, combinedReliabilityWarnings });
-  const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
-  const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
-  const resetCompactHandoffRecommendations = buildResetCompactHandoffRecommendations({ contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings });
-  const reliabilityWarningVisibility = buildOperatorCheckReliabilityWarningVisibility({
+  }));
+  const planningWarnings = timeDiagnosticPhase(timingPhases, "runtime-token-cost-planning-warnings", () => buildRuntimeTokenCostPlanningWarnings({ branch }));
+  const combinedReliabilityWarnings = timeDiagnosticPhase(timingPhases, "combined-reliability-warnings", () => buildCombinedReliabilityWarnings({ contextTrust, planningWarnings }));
+  const prompt = timeDiagnosticPhase(timingPhases, "read-sequential-planning-prompt", () => readSequentialPlanningPrompt(cwd));
+  const sequentialPlanningHints = timeDiagnosticPhase(timingPhases, "sequential-planning-hints", () => buildSequentialPlanningHints({ branch, prompt, planningWarnings, combinedReliabilityWarnings }));
+  const planBeforeExecuteGuards = timeDiagnosticPhase(timingPhases, "plan-before-execute-guards", () => buildPlanBeforeExecuteGuards({ branch, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints }));
+  const longRunBudgetWarnings = timeDiagnosticPhase(timingPhases, "long-run-budget-warnings", () => buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards }));
+  const resetCompactHandoffRecommendations = timeDiagnosticPhase(timingPhases, "reset-compact-handoff-recommendations", () => buildResetCompactHandoffRecommendations({ contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings }));
+  const reliabilityWarningVisibility = timeDiagnosticPhase(timingPhases, "reliability-warning-visibility", () => buildOperatorCheckReliabilityWarningVisibility({
     contextTrust,
     planningWarnings,
     sequentialPlanningHints,
     combinedReliabilityWarnings,
     longRunBudgetWarnings,
     resetCompactHandoffRecommendations,
-  });
-  const resumeHandoffProjection = buildOperatorCheckResumeHandoffProjection({
+  }));
+  const resumeHandoffProjection = timeDiagnosticPhase(timingPhases, "resume-handoff-projection", () => buildOperatorCheckResumeHandoffProjection({
     contextTrust,
     planningWarnings,
     combinedReliabilityWarnings,
@@ -2005,7 +2064,8 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     longRunBudgetWarnings,
     resetCompactHandoffRecommendations,
     reliabilityWarningVisibility,
-  });
+  }));
+  const runtimeProvenance = timeDiagnosticPhase(timingPhases, "read-operator-check-runtime-provenance", () => readOperatorCheckRuntimeProvenance(cwd));
 
   return {
     schemaVersion: OPERATOR_CHECK_SCHEMA_VERSION,
@@ -2015,7 +2075,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     claimBoundary: OPERATOR_CHECK_CLAIM_BOUNDARY,
     readOnly: true,
     source: OPERATOR_CHECK_SOURCE,
-    runtimeProvenance: readOperatorCheckRuntimeProvenance(cwd),
+    runtimeProvenance,
     verdict,
     postMergeMainEchoBoundary: {
       explicit: true,
@@ -2041,5 +2101,8 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     resumeHandoffProjection,
     activity,
     blockers,
+    diagnostics: {
+      operatorCheckTiming: buildOperatorCheckTimingReceipt(timingPhases, performance.now() - timingStartedAt),
+    },
   };
 }

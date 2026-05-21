@@ -109,6 +109,7 @@ export type SourceOfTruthHandoffPacket = {
       generatedAt: string;
       blockers: string[];
       source: OperatorCheckSnapshot["source"];
+      diagnostics?: OperatorCheckSnapshot["diagnostics"];
     };
     preflight: PreflightPacket["guidance"] & { authorityStatus: PreflightPacket["summary"]["authorityStatus"] };
     ci: {
@@ -662,6 +663,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
         generatedAt: snapshot.generatedAt,
         blockers: snapshot.blockers,
         source: snapshot.source,
+        ...(snapshot.diagnostics ? { diagnostics: snapshot.diagnostics } : {}),
       },
       preflight: {
         ...preflight.guidance,

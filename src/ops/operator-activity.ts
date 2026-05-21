@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { isTmuxNoServerRunningError } from "./tmux-errors";
 import {
   ARTIFACT_AUDIT_CLAIM_BOUNDARY,
@@ -34,6 +35,10 @@ export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE =
   "GitHub Actions run list for exact local origin/main head; read-only and no fetch performed";
 export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_CLAIM_BOUNDARY =
   "Read-only post-merge main CI evidence for the exact local origin/main head only; missing exact-head workflow evidence stays unknown or pending and never becomes success.";
+export const OPERATOR_ACTIVITY_TIMING_SCHEMA_VERSION = 1;
+export const OPERATOR_ACTIVITY_TIMING_SOURCE = "fooks status activity diagnostic timing";
+export const OPERATOR_ACTIVITY_TIMING_CLAIM_BOUNDARY =
+  "Diagnostic/read-only operator activity subphase timing only; not current-work authority, not cleanup authority, not provider billing/runtime proof, and not a source-of-truth semantic input.";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE = "#910";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE = "operator/activity issue #910 staged OMX prompt pane evidence";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY =
@@ -325,6 +330,22 @@ export type OperatorActivityRuntimeProvenance = {
   };
 };
 
+export type OperatorDiagnosticTimingPhase = {
+  name: string;
+  elapsedMs: number;
+  status: "ok" | "skipped" | "unavailable";
+};
+
+export type OperatorActivityTimingReceipt = {
+  schemaVersion: typeof OPERATOR_ACTIVITY_TIMING_SCHEMA_VERSION;
+  source: typeof OPERATOR_ACTIVITY_TIMING_SOURCE;
+  status: "diagnostic";
+  claimBoundary: typeof OPERATOR_ACTIVITY_TIMING_CLAIM_BOUNDARY;
+  readOnly: true;
+  totalMs: number;
+  phases: OperatorDiagnosticTimingPhase[];
+};
+
 export type OperatorActivitySnapshot = {
   schemaVersion: typeof OPERATOR_ACTIVITY_SCHEMA_VERSION;
   command: typeof OPERATOR_ACTIVITY_COMMAND;
@@ -341,6 +362,9 @@ export type OperatorActivitySnapshot = {
   currentRunEvidence: OperatorActivityCurrentRunEvidence;
   postMergeMainCiEvidence: OperatorActivityPostMergeMainCiEvidence;
   blockers: string[];
+  diagnostics: {
+    operatorActivityTiming: OperatorActivityTimingReceipt;
+  };
 };
 
 type ParsedTmuxPane = {
@@ -352,6 +376,38 @@ type ParsedTmuxPane = {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function roundDiagnosticMs(value: number): number {
+  return Number(value.toFixed(2));
+}
+
+function timeDiagnosticPhase<T>(
+  phases: OperatorDiagnosticTimingPhase[],
+  name: string,
+  callback: () => T,
+): T {
+  const startedAt = performance.now();
+  try {
+    const value = callback();
+    phases.push({ name, elapsedMs: roundDiagnosticMs(performance.now() - startedAt), status: "ok" });
+    return value;
+  } catch (error) {
+    phases.push({ name, elapsedMs: roundDiagnosticMs(performance.now() - startedAt), status: "unavailable" });
+    throw error;
+  }
+}
+
+function buildOperatorActivityTimingReceipt(phases: OperatorDiagnosticTimingPhase[], totalMs: number): OperatorActivityTimingReceipt {
+  return {
+    schemaVersion: OPERATOR_ACTIVITY_TIMING_SCHEMA_VERSION,
+    source: OPERATOR_ACTIVITY_TIMING_SOURCE,
+    status: "diagnostic",
+    claimBoundary: OPERATOR_ACTIVITY_TIMING_CLAIM_BOUNDARY,
+    readOnly: true,
+    totalMs: roundDiagnosticMs(totalMs),
+    phases: phases.map((phase) => ({ ...phase })),
+  };
 }
 
 function uniqueSorted(values: string[]): string[] {
@@ -1471,16 +1527,21 @@ function buildCurrentRunEvidence(
 }
 
 export function readOperatorActivitySnapshot(cwd = process.cwd(), options: OperatorActivityOptions = {}): OperatorActivitySnapshot {
+  const timingStartedAt = performance.now();
+  const timingPhases: OperatorDiagnosticTimingPhase[] = [];
   const generatedAt = options.now?.() ?? nowIso();
-  const worktreeStatus = currentWorktreeEvidenceStatus(cwd, { ...options, now: () => generatedAt });
-  const worktree = buildWorktreeSnapshot(worktreeStatus);
-  const tmux = readTmuxActivity(cwd, worktree, options);
-  const optionalCounts = readRemoteCounts(cwd, options);
-  const legacyWorktreeEvidence = readLegacyWorktreeEvidence(cwd, options, generatedAt);
-  const stagedOmxPromptEvidence = buildStagedOmxPromptEvidence(worktree, tmux);
-  const currentRunEvidence = buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence);
-  const postMergeMainCiEvidence = readPostMergeMainCiEvidence(cwd, options);
+  const worktreeStatus = timeDiagnosticPhase(timingPhases, "current-worktree-evidence-status", () =>
+    currentWorktreeEvidenceStatus(cwd, { ...options, now: () => generatedAt })
+  );
+  const worktree = timeDiagnosticPhase(timingPhases, "build-worktree-snapshot", () => buildWorktreeSnapshot(worktreeStatus));
+  const tmux = timeDiagnosticPhase(timingPhases, "read-tmux-activity", () => readTmuxActivity(cwd, worktree, options));
+  const optionalCounts = timeDiagnosticPhase(timingPhases, "read-remote-counts", () => readRemoteCounts(cwd, options));
+  const legacyWorktreeEvidence = timeDiagnosticPhase(timingPhases, "read-legacy-worktree-evidence", () => readLegacyWorktreeEvidence(cwd, options, generatedAt));
+  const stagedOmxPromptEvidence = timeDiagnosticPhase(timingPhases, "build-staged-omx-prompt-evidence", () => buildStagedOmxPromptEvidence(worktree, tmux));
+  const currentRunEvidence = timeDiagnosticPhase(timingPhases, "build-current-run-evidence", () => buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence));
+  const postMergeMainCiEvidence = timeDiagnosticPhase(timingPhases, "read-post-merge-main-ci-evidence", () => readPostMergeMainCiEvidence(cwd, options));
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
+  const runtimeProvenance = timeDiagnosticPhase(timingPhases, "read-operator-activity-runtime-provenance", () => readOperatorActivityRuntimeProvenance(cwd));
 
   return {
     schemaVersion: OPERATOR_ACTIVITY_SCHEMA_VERSION,
@@ -1489,7 +1550,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     cwd,
     claimBoundary: OPERATOR_ACTIVITY_CLAIM_BOUNDARY,
     readOnly: true,
-    runtimeProvenance: readOperatorActivityRuntimeProvenance(cwd),
+    runtimeProvenance,
     worktree,
     tmux,
     optionalCounts,
@@ -1498,5 +1559,8 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     currentRunEvidence,
     postMergeMainCiEvidence,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
+    diagnostics: {
+      operatorActivityTiming: buildOperatorActivityTimingReceipt(timingPhases, performance.now() - timingStartedAt),
+    },
   };
 }
