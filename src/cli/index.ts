@@ -690,7 +690,7 @@ Everyday commands:
   ${displayCliName} status claude
   ${displayCliName} status cache
   ${displayCliName} status worktree
-  ${displayCliName} status react-web [--json]
+  ${displayCliName} status react-web [--json] [--handoff-resume-json <file>]
   ${displayCliName} status artifacts [--json]
   ${displayCliName} status stale-worktrees [--json]
   ${displayCliName} status orphan-worktrees [--json]
@@ -1018,18 +1018,32 @@ function parseStatusArtifactsArgs(args: string[]): { json: boolean } {
   return { json };
 }
 
-function parseStatusReactWebArgs(args: string[]): { json: boolean } {
+function parseStatusReactWebArgs(args: string[]): { json: boolean; handoffResumeJsonPath?: string } {
   let json = false;
+  let handoffResumeJsonPath: string | undefined;
 
-  for (const arg of args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
     if (arg === "--json") {
       json = true;
+      continue;
+    }
+    if (arg === "--handoff-resume-json") {
+      const value = args[index + 1];
+      if (!value) throw new Error("status react-web --handoff-resume-json requires a file path");
+      handoffResumeJsonPath = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--handoff-resume-json=")) {
+      handoffResumeJsonPath = arg.slice("--handoff-resume-json=".length);
+      if (!handoffResumeJsonPath) throw new Error("status react-web --handoff-resume-json requires a file path");
       continue;
     }
     throw new Error(`Unexpected status react-web argument: ${arg}`);
   }
 
-  return { json };
+  return { json, ...(handoffResumeJsonPath ? { handoffResumeJsonPath } : {}) };
 }
 
 function parseStatusActivityArgs(args: string[]): { includeRemoteCounts: boolean; receiptJson: boolean } {
@@ -1754,9 +1768,12 @@ async function run(): Promise<void> {
         return;
       }
       if (arg1 === "react-web") {
-        const { json } = parseStatusReactWebArgs(rest.slice(1));
+        const { json, handoffResumeJsonPath } = parseStatusReactWebArgs(rest.slice(1));
         const { readReactWebStatus, renderReactWebStatusText } = await import("../reporting/react-web-status.js");
-        const status = readReactWebStatus(process.cwd());
+        const authoritativeResumePacket = handoffResumeJsonPath
+          ? JSON.parse(fs.readFileSync(path.resolve(process.cwd(), handoffResumeJsonPath), "utf8"))
+          : undefined;
+        const status = readReactWebStatus(process.cwd(), { authoritativeResumePacket });
         if (json) {
           print(status);
         } else {
