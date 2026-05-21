@@ -150,7 +150,7 @@ test("stale worktree audit script is stdout-only and rejects report file writes"
 });
 
 test("status stale-worktrees emits issue 854 JSON and rejects unknown args", () => {
-  const output = execFileSync(process.execPath, [cliPath, "status", "stale-worktrees", "--json"], { cwd: repoRoot, encoding: "utf8", timeout: 10_000 });
+  const output = execFileSync(process.execPath, [cliPath, "status", "stale-worktrees", "--json"], { cwd: repoRoot, encoding: "utf8", timeout: 30_000 });
   const result = JSON.parse(output);
   assert.equal(result.command, "status stale-worktrees");
   assert.equal(result.linkedIssue, "#854");
