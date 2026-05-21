@@ -5,7 +5,7 @@ import type { PreflightPacket } from "./preflight";
 import { STALE_CONTEXT_COMMAND } from "./stale-context";
 import { buildRuntimeTokenCostPlanningWarnings, type RuntimeTokenCostPlanningWarning } from "./runtime-token-cost-planning-warning";
 import { buildCombinedReliabilityWarnings, type CombinedReliabilityWarning } from "./combined-reliability-warning";
-import { buildSequentialPlanningHints, type SequentialPlanningHint } from "./sequential-planning-hint";
+import { buildSequentialPlanningHints, readSequentialPlanningPrompt, type SequentialPlanningHint } from "./sequential-planning-hint";
 import { buildPlanBeforeExecuteGuards, type PlanBeforeExecuteGuard } from "./plan-before-execute-guard";
 import { buildLongRunBudgetWarnings, type LongRunBudgetWarning } from "./long-run-budget-warning";
 import { buildResetCompactHandoffRecommendations, type ResetCompactHandoffRecommendation } from "./reset-compact-handoff-recommendation";
@@ -518,7 +518,12 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
   const linkedIssueNumber = issue.status === "linked" ? issue.number : undefined;
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch, linkedIssueNumber });
   const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings });
-  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings });
+  const prompt = (snapshot.sequentialPlanningHints ?? []).some((hint) =>
+    hint.trigger === "prompt-implies-sequential-execution" || hint.trigger === "run-label-implies-sequential-execution"
+  )
+    ? readSequentialPlanningPrompt(cwd)
+    : undefined;
+  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, linkedIssueNumber, prompt, planningWarnings, combinedReliabilityWarnings });
   const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
   const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
   const resetCompactHandoffRecommendations = buildResetCompactHandoffRecommendations({ contextTrust: snapshot.contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings });

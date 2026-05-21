@@ -3636,7 +3636,7 @@ test("operator check JSON includes narrow issue #960 runtime/token-cost planning
   assert.equal(snapshot.reliabilityWarningVisibility.summary.existingWarningCount, snapshot.planningWarnings.length + snapshot.combinedReliabilityWarnings.length + snapshot.longRunBudgetWarnings.length + snapshot.resetCompactHandoffRecommendations.length);
   assert.equal(snapshot.reliabilityWarningVisibility.derivedFrom.contextTrustSource, snapshot.contextTrust.source);
   assert.equal(snapshot.reliabilityWarningVisibility.warnings.some((warning) => warning.kind === "runtime-planning" && warning.issue === "#960"), true);
-  assert.match(snapshot.reliabilityWarningVisibility.claimBoundary, /existing contextTrust\/source-of-truth, runtime planning advisory, combinedReliabilityWarnings, longRunBudgetWarnings, and resetCompactHandoffRecommendations fields only/);
+  assert.match(snapshot.reliabilityWarningVisibility.claimBoundary, /existing contextTrust\/source-of-truth, runtime planning advisory, sequentialPlanningHints, combinedReliabilityWarnings, longRunBudgetWarnings, and resetCompactHandoffRecommendations fields only/);
   assert.deepEqual(snapshot.sequentialPlanningHints, []);
 });
 
@@ -3740,6 +3740,7 @@ test("operator check reliability warning visibility surfaces existing advisory w
     existingWarningCount: 2,
     planningWarningCount: 1,
     combinedReliabilityWarningCount: 1,
+    sequentialPlanningHintCount: 0,
     longRunBudgetWarningCount: 0,
     resetCompactHandoffRecommendationCount: 0,
     contextTrustCurrentAuthorityCount: 0,
@@ -3753,6 +3754,7 @@ test("operator check reliability warning visibility surfaces existing advisory w
   assert.deepEqual(visibility.derivedFrom, {
     contextTrustSource: OPERATOR_CONTEXT_TRUST_SOURCE,
     planningWarningsField: "planningWarnings",
+    sequentialPlanningHintsField: "sequentialPlanningHints",
     combinedReliabilityWarningsField: "combinedReliabilityWarnings",
     longRunBudgetWarningsField: "longRunBudgetWarnings",
     resetCompactHandoffRecommendationsField: "resetCompactHandoffRecommendations",
@@ -3943,6 +3945,55 @@ test("operator check JSON includes narrow issue #982 sequential planning hint", 
   assert.match(snapshot.sequentialPlanningHints[0].forbiddenClaims.join("\n"), /autonomous execution authority/);
 });
 
+test("operator check JSON includes prompt-derived issue #1006 sequential planning hint without blocking execution", () => {
+  const tempDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(tempDir, ".fooks-session-task.txt"),
+    "Implement this in multiple phases: first inspect, then patch, then test, before PR verify build.",
+  );
+  const branch = "feature-normal";
+  const head = "prompt-sequential-head";
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-21T04:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return `${branch}\n`;
+      if (args[0] === "rev-parse") return `${head}\n`;
+      if (args[0] === "rev-list") return "1\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number,title,url --limit 20") return "[]";
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "gh" && args[0] === "pr") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, `HEAD ${head}`, `branch refs/heads/${branch}`, ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "origin-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return `${branch}\nmain\n`;
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 1\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.sequentialPlanningHints.length, 1);
+  assert.equal(snapshot.sequentialPlanningHints[0].issue, "#1006");
+  assert.equal(snapshot.sequentialPlanningHints[0].trigger, "prompt-implies-sequential-execution");
+  assert.equal(snapshot.sequentialPlanningHints[0].derivedFrom.promptEvidence, "sequential-intent");
+  assert.deepEqual(snapshot.planBeforeExecuteGuards, []);
+  assert.ok(snapshot.reliabilityWarningVisibility.warnings.some((warning) => warning.kind === "sequential-planning" && warning.issue === "#1006"));
+  assert.equal(snapshot.reliabilityWarningVisibility.summary.sequentialPlanningHintCount, 1);
+});
+
 test("sequential planning hint builder is deterministic, bounded, and trigger-gated", () => {
   const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch: "fooks-issue-976-runtime-planning-warning" });
   const contextTrust = syntheticPreflightSnapshot({
@@ -3976,12 +4027,14 @@ test("sequential planning hint builder is deterministic, bounded, and trigger-ga
     "checkpoint-or-compress-current-source-of-truth",
     "handoff-before-burning-another-context-window",
   ]);
-  assert.match(hints[0].message, /Before another long or sequential coding run/);
+  assert.match(hints[0].message, /Sequential or multi-phase coding run detected/);
   assert.deepEqual(hints[0].derivedFrom, {
     planningWarningCount: 1,
     combinedReliabilityWarningCount: 1,
     planningWarningsField: "planningWarnings",
     combinedReliabilityWarningsField: "combinedReliabilityWarnings",
+    promptEvidence: "not-provided",
+    runLabelEvidence: "no-sequential-intent",
   });
   assert.equal(hints[0].claimBoundary, SEQUENTIAL_PLANNING_HINT_CLAIM_BOUNDARY);
   assert.match(hints[0].claimBoundary, /does not prove provider billing\/runtime token usage/);
@@ -3998,4 +4051,31 @@ test("sequential planning hint builder is deterministic, bounded, and trigger-ga
   });
   assert.equal(issueHints.length, 1);
   assert.equal(issueHints[0].trigger, "branch-issue-982");
+
+  const promptHints = buildSequentialPlanningHints({
+    prompt: "Implement Issue #1006 in multiple phases: first inspect, then patch, then test, before PR verify build.",
+    planningWarnings: [],
+    combinedReliabilityWarnings: [],
+  });
+  assert.equal(promptHints.length, 1);
+  assert.equal(promptHints[0].issue, "#1006");
+  assert.equal(promptHints[0].trigger, "prompt-implies-sequential-execution");
+  assert.equal(promptHints[0].derivedFrom.promptEvidence, "sequential-intent");
+  assert.equal(promptHints[0].derivedFrom.runLabelEvidence, "not-provided");
+  assert.match(promptHints[0].claimBoundary, /block execution/);
+
+  const runHints = buildSequentialPlanningHints({
+    runLabel: "fooks-issue-1006-sequential-planning-hints",
+    planningWarnings: [],
+    combinedReliabilityWarnings: [],
+  });
+  assert.equal(runHints.length, 1);
+  assert.equal(runHints[0].trigger, "run-label-implies-sequential-execution");
+
+  assert.deepEqual(buildSequentialPlanningHints({
+    prompt: "Explain what a sequence diagram means.",
+    runLabel: "feature-normal-cleanup",
+    planningWarnings: [],
+    combinedReliabilityWarnings: [],
+  }), []);
 });
