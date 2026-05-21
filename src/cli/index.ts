@@ -657,8 +657,9 @@ Everyday commands:
   ${displayCliName} doctor [codex|claude] [--json]
       Read-only local setup and runtime hook readiness diagnostics.
 
-  ${displayCliName} check [--json]
+  ${displayCliName} check [--json] [--receipt-json]
       Read-only operator/check artifact for post-merge main echo versus active issue/PR/session evidence.
+      Use --receipt-json for the compact session-whip run receipt projection only.
 
   ${displayCliName} preflight [--json]
       Compact read-only agent guidance projected from the existing operator-check/contextTrust snapshot.
@@ -1597,14 +1598,17 @@ async function run(): Promise<void> {
       throw new Error("install expects 'codex-hooks', 'claude-hooks', or 'opencode-tool'");
     }
     case "check": {
-      const allowed = new Set(["--json"]);
+      const allowed = new Set(["--json", "--receipt-json"]);
+      let receiptJson = false;
       for (const arg of rest) {
         if (!allowed.has(arg)) {
           throw new Error(`Unexpected check argument: ${arg}`);
         }
+        if (arg === "--receipt-json") receiptJson = true;
       }
       const { readOperatorCheckSnapshot } = await import("../ops/operator-check.js");
-      print(readOperatorCheckSnapshot(process.cwd()));
+      const snapshot = readOperatorCheckSnapshot(process.cwd());
+      print(receiptJson ? snapshot.sessionWhipRunReceipt : snapshot);
       return;
     }
     case "stale-context": {

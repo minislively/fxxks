@@ -40,6 +40,7 @@ export const OPERATOR_CHECK_TIMING_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_STALE_RESIDUE_ACTIVE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SCHEMA_VERSION = 1;
@@ -47,6 +48,7 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
+export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE = "operator/check compact session-whip run receipt projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_SOURCE = "operator/check reliability warning visibility projection";
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE = "operator/check compact resume handoff projection";
 export const OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY =
@@ -111,8 +113,11 @@ export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
   "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
+export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_ISSUE = "#1016";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
   "Bounded local/static active-work receipt for fooks session-whip handling; aggregate issue/PR counts are not per-artifact identity, stale sibling worktree receipts are adoption classifiers only, and report lines omit paths and cleanup commands.";
+export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_CLAIM_BOUNDARY =
+  "Read-only compact receipt for the current session-whip/operator-check run; summarizes existing created/adopted issue, branch, session, PR, and worktree evidence from the current operator-check snapshot only, preserves empty/no-op shape, and never creates, deletes, fetches, pushes, comments, opens PRs/issues, changes tmux, or mutates worktrees during receipt rendering.";
 
 export type OperatorCheckVerdict = "activeArtifactPresent" | "idleRequiresActiveArtifact" | "blocked";
 export type OperatorCheckActiveArtifactKind = "issue" | "pullRequest" | "session";
@@ -509,7 +514,60 @@ export type OperatorCheckActiveWorkReceipts = {
   receiptOnlyNudgeLoopBoundary: OperatorCheckReceiptOnlyNudgeLoopBoundary;
   handoffArtifactEvidence: OperatorCheckHandoffArtifactEvidence;
   currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
+  sessionWhipRunReceipt: OperatorCheckSessionWhipRunReceipt;
   blockers: string[];
+};
+
+
+export type OperatorCheckSessionWhipRunReceiptEvidenceItem = {
+  kind: OperatorCheckActiveWorkReceiptKind;
+  disposition: "created-or-adopted" | "adopted" | "mapped" | "present" | "stale-or-review-only";
+  classification: OperatorCheckActiveWorkReceiptClassification;
+  label: string;
+  count?: number;
+  source: string;
+  reasons: string[];
+};
+
+export type OperatorCheckSessionWhipRunReceipt = {
+  schemaVersion: typeof OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_ISSUE;
+  source: typeof OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_CLAIM_BOUNDARY;
+  readOnly: true;
+  status: "active" | "idle" | "blocked";
+  classification: OperatorCheckActiveWorkReceiptClassification;
+  oneLine: string;
+  noOp: {
+    empty: boolean;
+    reason: string;
+  };
+  counts: {
+    createdOrAdoptedIssues: number;
+    adoptedPullRequests: number;
+    adoptedBranches: number;
+    mappedSessions: number;
+    adoptedWorktrees: number;
+    staleOrReviewOnly: number;
+    mainEchoes: number;
+    blockers: number;
+  };
+  evidence: {
+    issues: OperatorCheckSessionWhipRunReceiptEvidenceItem[];
+    pullRequests: OperatorCheckSessionWhipRunReceiptEvidenceItem[];
+    branches: OperatorCheckSessionWhipRunReceiptEvidenceItem[];
+    sessions: OperatorCheckSessionWhipRunReceiptEvidenceItem[];
+    worktrees: OperatorCheckSessionWhipRunReceiptEvidenceItem[];
+  };
+  mutationBoundary: {
+    createsIssues: false;
+    createsBranches: false;
+    createsSessions: false;
+    createsPullRequests: false;
+    mutatesTmux: false;
+    mutatesWorktrees: false;
+    mutatesGitHub: false;
+  };
 };
 
 export type OperatorCheckRuntimeProvenance = {
@@ -597,6 +655,7 @@ export type OperatorCheckSnapshot = {
   activeArtifacts: OperatorCheckActiveArtifact[];
   activeWorkReceipts: OperatorCheckActiveWorkReceipts;
   currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
+  sessionWhipRunReceipt: OperatorCheckSessionWhipRunReceipt;
   requiredActiveArtifact: OperatorCheckRequiredActiveArtifact;
   contextTrust: OperatorContextTrustPacket;
   planningWarnings: RuntimeTokenCostPlanningWarning[];
@@ -1792,7 +1851,121 @@ function buildActiveWorkReceipts(
     receiptOnlyNudgeLoopBoundary: buildReceiptOnlyNudgeLoopBoundary(activity),
     handoffArtifactEvidence: buildHandoffArtifactEvidence(activity, receipts),
     currentRunReceipt: activity.currentRunEvidence.receipt,
+    sessionWhipRunReceipt: buildSessionWhipRunReceipt({
+      classification,
+      receipts,
+      blockers,
+    }),
     blockers,
+  };
+}
+
+
+function receiptItemLabel(receipt: OperatorCheckActiveWorkReceipt): string {
+  if (receipt.kind === "issue") return receipt.count === 1 ? "1 open issue" : `${receipt.count ?? 0} open issues`;
+  if (receipt.kind === "pullRequest") return receipt.count === 1 ? "1 open pull request" : `${receipt.count ?? 0} open pull requests`;
+  if (receipt.kind === "session") return receipt.identifiers.session?.name ?? "mapped fooks session";
+  const branch = sanitizeReportToken(receipt.identifiers.worktree.branch);
+  if (receipt.kind === "branch") return branch ?? (receipt.classification === "mainEcho" ? "main branch echo" : "branch evidence");
+  return branch ?? "sibling worktree evidence";
+}
+
+function receiptItemDisposition(receipt: OperatorCheckActiveWorkReceipt): OperatorCheckSessionWhipRunReceiptEvidenceItem["disposition"] {
+  if (receipt.classification === "closedOrStale") return "stale-or-review-only";
+  if (receipt.classification === "mainEcho") return "present";
+  if (receipt.kind === "issue") return "created-or-adopted";
+  if (receipt.kind === "pullRequest" || receipt.kind === "branch" || receipt.kind === "worktree") return "adopted";
+  return "mapped";
+}
+
+function compactReceiptItems(receipts: OperatorCheckActiveWorkReceipt[], kind: OperatorCheckActiveWorkReceiptKind): OperatorCheckSessionWhipRunReceiptEvidenceItem[] {
+  return receipts
+    .filter((receipt) => receipt.kind === kind)
+    .map((receipt) => ({
+      kind: receipt.kind,
+      disposition: receiptItemDisposition(receipt),
+      classification: receipt.classification,
+      label: receiptItemLabel(receipt),
+      count: receipt.count,
+      source: receipt.source,
+      reasons: receipt.reasons,
+    }));
+}
+
+function buildSessionWhipRunReceipt(activeWorkReceipts: Pick<OperatorCheckActiveWorkReceipts, "receipts" | "classification" | "blockers">): OperatorCheckSessionWhipRunReceipt {
+  const receipts = activeWorkReceipts.receipts;
+  const issues = compactReceiptItems(receipts, "issue");
+  const pullRequests = compactReceiptItems(receipts, "pullRequest");
+  const branches = compactReceiptItems(receipts, "branch");
+  const sessions = compactReceiptItems(receipts, "session");
+  const worktrees = compactReceiptItems(receipts, "worktree");
+  const activeBranches = branches.filter((item) => item.classification === "active");
+  const activeWorktrees = worktrees.filter((item) => item.classification === "active");
+  const activeSessions = sessions.filter((item) => item.classification === "active");
+  const staleOrReviewOnly = [...branches, ...sessions, ...worktrees].filter((item) => item.classification === "closedOrStale").length;
+  const mainEchoes = branches.filter((item) => item.classification === "mainEcho").length;
+  const createdOrAdoptedIssues = issues
+    .filter((item) => item.classification === "active")
+    .reduce((sum, item) => sum + (item.count ?? 1), 0);
+  const adoptedPullRequests = pullRequests
+    .filter((item) => item.classification === "active")
+    .reduce((sum, item) => sum + (item.count ?? 1), 0);
+  const counts = {
+    createdOrAdoptedIssues,
+    adoptedPullRequests,
+    adoptedBranches: activeBranches.length,
+    mappedSessions: activeSessions.length,
+    adoptedWorktrees: activeWorktrees.length,
+    staleOrReviewOnly,
+    mainEchoes,
+    blockers: activeWorkReceipts.blockers.length,
+  };
+  const actionableCount = counts.createdOrAdoptedIssues + counts.adoptedPullRequests + counts.adoptedBranches + counts.mappedSessions + counts.adoptedWorktrees;
+  const noOpEmpty = actionableCount === 0 && counts.blockers === 0;
+  const status: OperatorCheckSessionWhipRunReceipt["status"] = counts.blockers > 0 ? "blocked" : actionableCount > 0 ? "active" : "idle";
+  const summaryParts = [
+    `issues=${counts.createdOrAdoptedIssues}`,
+    `prs=${counts.adoptedPullRequests}`,
+    `branches=${counts.adoptedBranches}`,
+    `sessions=${counts.mappedSessions}`,
+    `worktrees=${counts.adoptedWorktrees}`,
+  ];
+  if (counts.staleOrReviewOnly > 0) summaryParts.push(`staleOrReviewOnly=${counts.staleOrReviewOnly}`);
+  if (counts.mainEchoes > 0) summaryParts.push(`mainEcho=${counts.mainEchoes}`);
+  if (counts.blockers > 0) summaryParts.push(`blockers=${counts.blockers}`);
+
+  return {
+    schemaVersion: OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_ISSUE,
+    source: OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE,
+    claimBoundary: OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_CLAIM_BOUNDARY,
+    readOnly: true,
+    status,
+    classification: activeWorkReceipts.classification,
+    oneLine: `session-whip run receipt: ${status}; ${summaryParts.join("; ")}`,
+    noOp: {
+      empty: noOpEmpty,
+      reason: noOpEmpty
+        ? "No created/adopted issue, PR, non-main branch, mapped session, or adopted worktree evidence is present in this operator-check snapshot."
+        : "Current operator-check snapshot includes actionable evidence or blockers; see counts and evidence arrays.",
+    },
+    counts,
+    evidence: {
+      issues,
+      pullRequests,
+      branches,
+      sessions,
+      worktrees,
+    },
+    mutationBoundary: {
+      createsIssues: false,
+      createsBranches: false,
+      createsSessions: false,
+      createsPullRequests: false,
+      mutatesTmux: false,
+      mutatesWorktrees: false,
+      mutatesGitHub: false,
+    },
   };
 }
 
@@ -2115,6 +2288,7 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
     activeArtifacts,
     activeWorkReceipts,
     currentRunReceipt: activity.currentRunEvidence.receipt,
+    sessionWhipRunReceipt: activeWorkReceipts.sessionWhipRunReceipt,
     requiredActiveArtifact: requiredArtifact,
     contextTrust,
     planningWarnings,

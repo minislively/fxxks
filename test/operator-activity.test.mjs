@@ -33,6 +33,8 @@ const {
   OPERATOR_CHECK_CLAIM_BOUNDARY,
   OPERATOR_CHECK_COMMAND,
   OPERATOR_CHECK_SOURCE,
+  OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_CLAIM_BOUNDARY,
+  OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE,
   OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_CLAIM_BOUNDARY,
   OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_SOURCE,
   OPERATOR_CHECK_RELIABILITY_WARNING_VISIBILITY_CLAIM_BOUNDARY,
@@ -1517,6 +1519,30 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.equal(snapshot.activeWorkReceipts.receipts[0].kind, "branch");
   assert.equal(snapshot.activeWorkReceipts.receipts[0].classification, "mainEcho");
   assert.match(snapshot.activeWorkReceipts.reportLine, /mainEcho=1/);
+  assert.equal(snapshot.sessionWhipRunReceipt.schemaVersion, 1);
+  assert.equal(snapshot.sessionWhipRunReceipt.source, OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE);
+  assert.equal(snapshot.sessionWhipRunReceipt.claimBoundary, OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_CLAIM_BOUNDARY);
+  assert.equal(snapshot.sessionWhipRunReceipt.readOnly, true);
+  assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
+  assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, true);
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {
+    createdOrAdoptedIssues: 0,
+    adoptedPullRequests: 0,
+    adoptedBranches: 0,
+    mappedSessions: 0,
+    adoptedWorktrees: 0,
+    staleOrReviewOnly: 0,
+    mainEchoes: 1,
+    blockers: 0,
+  });
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.evidence.issues, []);
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.evidence.pullRequests, []);
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.evidence.sessions, []);
+  assert.equal(snapshot.sessionWhipRunReceipt.evidence.branches[0].classification, "mainEcho");
+  assert.equal(snapshot.sessionWhipRunReceipt.mutationBoundary.mutatesGitHub, false);
+  assert.equal(snapshot.sessionWhipRunReceipt.mutationBoundary.mutatesTmux, false);
+  assert.equal(snapshot.sessionWhipRunReceipt.mutationBoundary.mutatesWorktrees, false);
+  assert.equal(snapshot.activeWorkReceipts.sessionWhipRunReceipt, snapshot.sessionWhipRunReceipt);
   assert.equal(snapshot.activeWorkReceipts.reportLine.includes("staleResidueLedger="), false);
   assert.deepEqual(snapshot.activeWorkReceipts.staleResidueLedger.counts, {
     "safe-cleanup": 0,
@@ -1688,6 +1714,12 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   assert.deepEqual(activity.blockers, []);
   assert.equal(activity.currentRunEvidence.mainEchoEvidence, true);
   const receipt = run(["status", "activity", "--include-remote-counts", "--receipt-json"], tempDir, env);
+  const checkReceipt = run(["check", "--receipt-json"], tempDir, env);
+  assert.equal(checkReceipt.status, "idle");
+  assert.equal(checkReceipt.noOp.empty, true);
+  assert.equal(checkReceipt.counts.createdOrAdoptedIssues, 0);
+  assert.equal(checkReceipt.counts.mappedSessions, 0);
+  assert.equal(checkReceipt.mutationBoundary.mutatesGitHub, false);
   assert.deepEqual(receipt, activity.currentRunEvidence.receipt);
   assert.deepEqual(receipt, {
     status: "idle",
@@ -1705,7 +1737,14 @@ test("CLI status activity receipt projection matches full active current-run rec
 
   const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
   const receipt = run(["status", "activity", "--include-remote-counts", "--receipt-json"], tempDir, env);
+  const checkReceipt = run(["check", "--receipt-json"], tempDir, env);
 
+  assert.deepEqual(checkReceipt, run(["check", "--json"], tempDir, env).sessionWhipRunReceipt);
+  assert.equal(checkReceipt.status, "active");
+  assert.equal(checkReceipt.counts.createdOrAdoptedIssues, 1);
+  assert.equal(checkReceipt.counts.adoptedBranches, 1);
+  assert.equal(checkReceipt.counts.mappedSessions, 1);
+  assert.equal(checkReceipt.noOp.empty, false);
   assert.deepEqual(receipt, activity.currentRunEvidence.receipt);
   assert.deepEqual(receipt, {
     status: "active",
@@ -1997,6 +2036,25 @@ test("operator check treats issue, PR, or mapped session as the concrete active 
     claimBoundary: OPERATOR_ACTIVITY_CURRENT_RUN_CLAIM_BOUNDARY,
   });
   assert.deepEqual(snapshot.activeWorkReceipts.currentRunReceipt, snapshot.currentRunReceipt);
+  assert.equal(snapshot.sessionWhipRunReceipt.status, "active");
+  assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, false);
+  assert.match(snapshot.sessionWhipRunReceipt.oneLine, /issues=1; prs=1; branches=1; sessions=1; worktrees=0/);
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {
+    createdOrAdoptedIssues: 1,
+    adoptedPullRequests: 1,
+    adoptedBranches: 1,
+    mappedSessions: 1,
+    adoptedWorktrees: 0,
+    staleOrReviewOnly: 0,
+    mainEchoes: 0,
+    blockers: 0,
+  });
+  assert.equal(snapshot.sessionWhipRunReceipt.evidence.issues[0].disposition, "created-or-adopted");
+  assert.equal(snapshot.sessionWhipRunReceipt.evidence.pullRequests[0].disposition, "adopted");
+  assert.equal(snapshot.sessionWhipRunReceipt.evidence.branches[0].label, "dogfood/issue-705-post-merge-echo-idle-boundary");
+  assert.equal(snapshot.sessionWhipRunReceipt.evidence.sessions[0].label, "fooks-705");
+  assert.equal(snapshot.sessionWhipRunReceipt.mutationBoundary.createsIssues, false);
+  assert.equal(snapshot.sessionWhipRunReceipt.mutationBoundary.createsPullRequests, false);
 
   assert.equal(snapshot.activeWorkReceipts.schemaVersion, 1);
   assert.equal(snapshot.activeWorkReceipts.readOnly, true);
