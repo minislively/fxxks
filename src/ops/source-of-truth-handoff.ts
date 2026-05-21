@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import type { OperatorCheckSnapshot } from "./operator-check";
 import type { PreflightPacket } from "./preflight";
 import { STALE_CONTEXT_COMMAND } from "./stale-context";
@@ -23,9 +24,26 @@ export const AUTHORITATIVE_RESUME_PACKET_CLAIM_BOUNDARY =
 
 export type SourceOfTruthHandoffCommandRunner = (command: string, args: string[], cwd: string, timeoutMs: number) => string;
 
+export type SourceOfTruthHandoffTimingPhase = {
+  name: string;
+  elapsedMs: number;
+  status: "ok" | "skipped" | "unavailable";
+};
+
+export type SourceOfTruthHandoffTimingReceipt = {
+  status: "diagnostic";
+  source: "fooks handoff assembly timing";
+  claimBoundary: string;
+  totalMs: number;
+  phases: SourceOfTruthHandoffTimingPhase[];
+};
+
 export type SourceOfTruthHandoffOptions = {
   commandRunner?: SourceOfTruthHandoffCommandRunner;
   now?: () => string;
+  nowMs?: () => number;
+  timingPhases?: SourceOfTruthHandoffTimingPhase[];
+  timingStartedAtMs?: number;
 };
 
 export type SourceOfTruthLinkedArtifact =
@@ -129,6 +147,9 @@ export type SourceOfTruthHandoffPacket = {
   longRunBudgetWarnings: LongRunBudgetWarning[];
   resetCompactHandoffRecommendations: ResetCompactHandoffRecommendation[];
   authoritativeResumePacket: AuthoritativeResumePacket;
+  diagnostics: {
+    handoffTiming: SourceOfTruthHandoffTimingReceipt;
+  };
   blockers: string[];
 };
 
@@ -233,6 +254,49 @@ const AUTHORITATIVE_FILES_AND_DOCS = [
   "docs/research/context-trust-and-stale-evidence-research.md",
   "docs/stale-context.md",
 ];
+const HANDOFF_TIMING_SOURCE: SourceOfTruthHandoffTimingReceipt["source"] = "fooks handoff assembly timing";
+const HANDOFF_TIMING_CLAIM_BOUNDARY =
+  "Diagnostic/read-only elapsed-time receipt for the local fooks handoff assembly path only; it is not current-work authority, not stale/context-trust authority, not CI/merge proof, not provider billing/runtime proof, not hook behavior, and not a frontend behavior claim.";
+
+function defaultNowMs(): number {
+  return performance.now();
+}
+
+function roundElapsedMs(value: number): number {
+  return Number(Math.max(0, value).toFixed(2));
+}
+
+function timePhase<T>(
+  phases: SourceOfTruthHandoffTimingPhase[],
+  name: string,
+  nowMs: () => number,
+  work: () => T,
+): T {
+  const startedAt = nowMs();
+  try {
+    return work();
+  } finally {
+    phases.push({
+      name,
+      elapsedMs: roundElapsedMs(nowMs() - startedAt),
+      status: "ok",
+    });
+  }
+}
+
+function buildTimingReceipt(
+  phases: SourceOfTruthHandoffTimingPhase[],
+  nowMs: () => number,
+  startedAtMs: number,
+): SourceOfTruthHandoffTimingReceipt {
+  return {
+    status: "diagnostic",
+    source: HANDOFF_TIMING_SOURCE,
+    claimBoundary: HANDOFF_TIMING_CLAIM_BOUNDARY,
+    totalMs: roundElapsedMs(nowMs() - startedAtMs),
+    phases,
+  };
+}
 
 function run(command: string, args: string[], cwd: string, timeoutMs: number, runner?: SourceOfTruthHandoffCommandRunner): string {
   if (runner) return runner(command, args, cwd, timeoutMs);
@@ -507,29 +571,32 @@ function buildAuthoritativeResumePacket(input: {
 }
 
 export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot, preflight: PreflightPacket, options: SourceOfTruthHandoffOptions = {}): SourceOfTruthHandoffPacket {
+  const nowMs = options.nowMs ?? defaultNowMs;
+  const timingStartedAtMs = options.timingStartedAtMs ?? nowMs();
+  const timingPhases = [...(options.timingPhases ?? [])];
   const cwd = snapshot.cwd;
   const blockers = [...snapshot.blockers];
   const branch = snapshot.activity.worktree.branch ?? snapshot.runtimeProvenance.git.branch;
   const head = snapshot.runtimeProvenance.git.head;
   const upstream = snapshot.activity.worktree.upstream;
-  const changedPaths = readChangedPaths(cwd, options.commandRunner);
-  const issue = linkedIssue(cwd, branch, blockers, options.commandRunner);
-  const prResult = linkedPullRequest(cwd, branch, blockers, options.commandRunner);
+  const changedPaths = timePhase(timingPhases, "read-changed-paths", nowMs, () => readChangedPaths(cwd, options.commandRunner));
+  const issue = timePhase(timingPhases, "linked-issue", nowMs, () => linkedIssue(cwd, branch, blockers, options.commandRunner));
+  const prResult = timePhase(timingPhases, "linked-pull-request", nowMs, () => linkedPullRequest(cwd, branch, blockers, options.commandRunner));
   const linkedIssueNumber = issue.status === "linked" ? issue.number : undefined;
-  const planningWarnings = buildRuntimeTokenCostPlanningWarnings({ branch, linkedIssueNumber });
-  const combinedReliabilityWarnings = buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings });
-  const prompt = (snapshot.sequentialPlanningHints ?? []).some((hint) =>
+  const planningWarnings = timePhase(timingPhases, "planning-warnings", nowMs, () => buildRuntimeTokenCostPlanningWarnings({ branch, linkedIssueNumber }));
+  const combinedReliabilityWarnings = timePhase(timingPhases, "combined-reliability-warnings", nowMs, () => buildCombinedReliabilityWarnings({ contextTrust: snapshot.contextTrust, planningWarnings }));
+  const prompt = timePhase(timingPhases, "sequential-planning-prompt", nowMs, () => (snapshot.sequentialPlanningHints ?? []).some((hint) =>
     hint.trigger === "prompt-implies-sequential-execution" || hint.trigger === "run-label-implies-sequential-execution"
   )
     ? readSequentialPlanningPrompt(cwd)
-    : undefined;
-  const sequentialPlanningHints = buildSequentialPlanningHints({ branch, linkedIssueNumber, prompt, planningWarnings, combinedReliabilityWarnings });
-  const planBeforeExecuteGuards = buildPlanBeforeExecuteGuards({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints });
-  const longRunBudgetWarnings = buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards });
-  const resetCompactHandoffRecommendations = buildResetCompactHandoffRecommendations({ contextTrust: snapshot.contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings });
-  const staleOrHistoricalContextToAvoid = staleAvoidList(snapshot, preflight);
-  const nextRecommendedAction = nextAction(preflight, issue, prResult.artifact, changedPaths.length);
-  const authoritativeResumePacket = buildAuthoritativeResumePacket({
+    : undefined);
+  const sequentialPlanningHints = timePhase(timingPhases, "sequential-planning-hints", nowMs, () => buildSequentialPlanningHints({ branch, linkedIssueNumber, prompt, planningWarnings, combinedReliabilityWarnings }));
+  const planBeforeExecuteGuards = timePhase(timingPhases, "plan-before-execute-guards", nowMs, () => buildPlanBeforeExecuteGuards({ branch, linkedIssueNumber, planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints }));
+  const longRunBudgetWarnings = timePhase(timingPhases, "long-run-budget-warnings", nowMs, () => buildLongRunBudgetWarnings({ planningWarnings, combinedReliabilityWarnings, sequentialPlanningHints, planBeforeExecuteGuards }));
+  const resetCompactHandoffRecommendations = timePhase(timingPhases, "reset-compact-handoff-recommendations", nowMs, () => buildResetCompactHandoffRecommendations({ contextTrust: snapshot.contextTrust, combinedReliabilityWarnings, longRunBudgetWarnings }));
+  const staleOrHistoricalContextToAvoid = timePhase(timingPhases, "stale-avoid-list", nowMs, () => staleAvoidList(snapshot, preflight));
+  const nextRecommendedAction = timePhase(timingPhases, "next-action", nowMs, () => nextAction(preflight, issue, prResult.artifact, changedPaths.length));
+  const authoritativeResumePacket = timePhase(timingPhases, "authoritative-resume-packet", nowMs, () => buildAuthoritativeResumePacket({
     cwd,
     branch,
     head,
@@ -547,8 +614,8 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     planBeforeExecuteGuards,
     longRunBudgetWarnings,
     resetCompactHandoffRecommendations,
-  });
-  const workflows = snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
+  }));
+  const workflows = timePhase(timingPhases, "ci-workflows-projection", nowMs, () => snapshot.postMergeMainCiEvidence.workflowEvidence.map((workflow) => ({
     workflow: workflow.workflow,
     status: workflow.status,
     ...(workflow.conclusion ? { conclusion: workflow.conclusion } : {}),
@@ -556,7 +623,7 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     ...(workflow.url ? { url: workflow.url } : {}),
     ...(workflow.headSha ? { headSha: workflow.headSha } : {}),
     reason: workflow.reason,
-  }));
+  })));
 
   return {
     schemaVersion: SOURCE_OF_TRUTH_HANDOFF_SCHEMA_VERSION,
@@ -624,6 +691,9 @@ export function buildSourceOfTruthHandoffPacket(snapshot: OperatorCheckSnapshot,
     longRunBudgetWarnings,
     resetCompactHandoffRecommendations,
     authoritativeResumePacket,
+    diagnostics: {
+      handoffTiming: buildTimingReceipt(timingPhases, nowMs, timingStartedAtMs),
+    },
     blockers,
   };
 }
