@@ -953,6 +953,10 @@ test("operator check snapshot emits narrow timing diagnostics without changing a
   const phaseNames = receipt.phases.map((phase) => phase.name);
   assert.ok(phaseNames.includes("read-operator-activity-snapshot"));
   assert.ok(phaseNames.includes("build-active-work-receipts"));
+  assert.ok(phaseNames.includes("build-active-work-receipts:repo-identity"));
+  assert.ok(phaseNames.includes("build-active-work-receipts:base-identifiers"));
+  assert.ok(phaseNames.includes("build-active-work-receipts:sibling-worktree-triage"));
+  assert.ok(phaseNames.includes("build-active-work-receipts:legacy-local-residue-cleanup-review"));
   assert.ok(phaseNames.includes("read-sequential-planning-prompt"));
   assert.ok(phaseNames.includes("read-operator-check-runtime-provenance"));
   assert.ok(snapshot.activity.diagnostics.operatorActivityTiming.phases.some((phase) => phase.name === "read-remote-counts"));

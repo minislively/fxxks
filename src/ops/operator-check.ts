@@ -1082,6 +1082,7 @@ function siblingWorktreeReceipts(
   baseIdentifiers: Omit<OperatorCheckActiveWorkReceiptIdentifiers, "session" | "siblingWorktree">,
   baseBlockers: string[],
   options: OperatorActivityOptions,
+  timingPhases?: OperatorCheckTimingPhase[],
 ): {
   receipts: OperatorCheckActiveWorkReceipt[];
   salvageReviewQueue: OperatorCheckSalvageReviewQueue;
@@ -1090,13 +1091,23 @@ function siblingWorktreeReceipts(
   blockers: string[];
 } {
   try {
-    const triage = triageOrphanLocalWorktrees(cwd, {
-      runner: options.commandRunner
-        ? (command, args, runnerCwd) => options.commandRunner?.(command, args, runnerCwd, 3000) ?? ""
-        : undefined,
-      pathExists: options.pathExists,
-      now: options.now,
-    });
+    const triage = timingPhases
+      ? timeDiagnosticPhase(timingPhases, "build-active-work-receipts:sibling-worktree-triage", () =>
+        triageOrphanLocalWorktrees(cwd, {
+          runner: options.commandRunner
+            ? (command, args, runnerCwd) => options.commandRunner?.(command, args, runnerCwd, 3000) ?? ""
+            : undefined,
+          pathExists: options.pathExists,
+          now: options.now,
+        }),
+      )
+      : triageOrphanLocalWorktrees(cwd, {
+        runner: options.commandRunner
+          ? (command, args, runnerCwd) => options.commandRunner?.(command, args, runnerCwd, 3000) ?? ""
+          : undefined,
+        pathExists: options.pathExists,
+        now: options.now,
+      });
     const receipts = triage.entries
       .filter((entry) => !entry.current)
       .map((entry) => ({
@@ -1626,9 +1637,18 @@ function buildActiveWorkReceipts(
   cwd: string,
   activity: OperatorActivitySnapshot,
   options: OperatorActivityOptions,
+  timingPhases?: OperatorCheckTimingPhase[],
 ): OperatorCheckActiveWorkReceipts {
-  const repoIdentity = readRepoIdentifier(cwd, options);
-  const baseIdentifiers = baseReceiptIdentifiers(activity, repoIdentity.repo, repoIdentity.blockers);
+  const repoIdentity = timingPhases
+    ? timeDiagnosticPhase(timingPhases, "build-active-work-receipts:repo-identity", () =>
+      readRepoIdentifier(cwd, options),
+    )
+    : readRepoIdentifier(cwd, options);
+  const baseIdentifiers = timingPhases
+    ? timeDiagnosticPhase(timingPhases, "build-active-work-receipts:base-identifiers", () =>
+      baseReceiptIdentifiers(activity, repoIdentity.repo, repoIdentity.blockers),
+    )
+    : baseReceiptIdentifiers(activity, repoIdentity.repo, repoIdentity.blockers);
   const receipts: OperatorCheckActiveWorkReceipt[] = [];
 
   const baseBlockers = repoIdentity.blockers;
@@ -1713,8 +1733,12 @@ function buildActiveWorkReceipts(
     });
   }
 
-  const siblingReceipts = siblingWorktreeReceipts(cwd, baseIdentifiers, baseBlockers, options);
-  const legacyLocalResidueCleanupReview = buildLegacyLocalResidueCleanupReview(activity.legacyWorktreeEvidence);
+  const siblingReceipts = siblingWorktreeReceipts(cwd, baseIdentifiers, baseBlockers, options, timingPhases);
+  const legacyLocalResidueCleanupReview = timingPhases
+    ? timeDiagnosticPhase(timingPhases, "build-active-work-receipts:legacy-local-residue-cleanup-review", () =>
+      buildLegacyLocalResidueCleanupReview(activity.legacyWorktreeEvidence),
+    )
+    : buildLegacyLocalResidueCleanupReview(activity.legacyWorktreeEvidence);
   receipts.push(...siblingReceipts.receipts);
 
   const blockers = checkProjectionBlockers(uniqueSorted([
@@ -2019,7 +2043,9 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const timingPhases: OperatorCheckTimingPhase[] = [];
   const activity = timeDiagnosticPhase(timingPhases, "read-operator-activity-snapshot", () => readOperatorActivitySnapshot(cwd, { ...options, includeRemoteCounts: true }));
   const activeArtifacts = timeDiagnosticPhase(timingPhases, "active-artifacts", () => activeArtifactsFrom(activity));
-  const activeWorkReceipts = timeDiagnosticPhase(timingPhases, "build-active-work-receipts", () => buildActiveWorkReceipts(cwd, activity, options));
+  const activeWorkReceipts = timeDiagnosticPhase(timingPhases, "build-active-work-receipts", () =>
+    buildActiveWorkReceipts(cwd, activity, options, timingPhases),
+  );
   const branch = activity.worktree.branch;
   const blockers = timeDiagnosticPhase(timingPhases, "check-projection-blockers", () => checkProjectionBlockers([...activity.blockers]));
   const hasActiveArtifact = activeArtifacts.length > 0;
