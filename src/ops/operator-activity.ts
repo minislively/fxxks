@@ -45,6 +45,7 @@ export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY =
   "Read-only issue #910 operator artifact; a current OMX pane with only a staged prompt placeholder, no submitted/working/tool-output evidence, only .fooks-session-task.txt delta, and ahead=0 is not active development proof.";
 export const OPERATOR_ACTIVITY_TMUX_CAPTURE_COMMAND = "tmux capture-pane -pt <pane_id> -S -200";
 export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS = ["CI", "React Web Release Report"] as const;
+export const OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER = 960;
 const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_GH_RUN_LIST_ARGS = [
   "run",
   "list",
@@ -162,6 +163,7 @@ export type OperatorActivityRemoteCounts =
       enabled: true;
       source: typeof OPERATOR_ACTIVITY_REMOTE_SOURCE;
       openIssues?: number;
+      openIssueNumbers?: number[];
       openPullRequests?: number;
       blockers: string[];
     };
@@ -695,12 +697,13 @@ function buildCurrentRunReceipt(input: {
   openIssues?: number;
   openPullRequests?: number;
   mainEchoEvidence: boolean;
+  advisoryPlanningEpicOnly: boolean;
 }): OperatorActivityCurrentRunReceipt {
   const evidenceKinds: OperatorActivityCurrentRunReceipt["evidenceKinds"] = [];
   const activeParts: string[] = [];
   const idleParts: string[] = [];
 
-  if (typeof input.openIssues === "number" && input.openIssues > 0) {
+  if (typeof input.openIssues === "number" && input.openIssues > 0 && !input.advisoryPlanningEpicOnly) {
     evidenceKinds.push("issue");
     activeParts.push(plural(input.openIssues, "open issue"));
   }
@@ -727,6 +730,7 @@ function buildCurrentRunReceipt(input: {
   if (input.worktree.ahead === 0 && input.worktree.behind === 0) idleParts.push("zero divergence");
   if (input.fooksSessionCount === 0) idleParts.push("no mapped fooks sessions");
   if (input.openIssues === 0 && input.openPullRequests === 0) idleParts.push("zero open issues/PRs");
+  if (input.advisoryPlanningEpicOnly) idleParts.push("only planning epic #960 is open");
   if (input.worktree.clean === false && hasOnlyFooksSessionTaskDelta(input.worktree)) {
     idleParts.push(".fooks-session-task.txt-only delta is not active work proof");
   }
@@ -993,6 +997,33 @@ function parseGhJsonCount(output: string): number | undefined {
   }
 }
 
+function parseGhIssueNumbers(output: string): number[] | undefined {
+  try {
+    const parsed = JSON.parse(output) as unknown;
+    if (!Array.isArray(parsed)) return undefined;
+    const numbers: number[] = [];
+    for (const entry of parsed) {
+      if (typeof entry !== "object" || entry === null) return undefined;
+      const number = (entry as { number?: unknown }).number;
+      if (typeof number !== "number" || !Number.isInteger(number)) return undefined;
+      numbers.push(number);
+    }
+    return numbers;
+  } catch {
+    return undefined;
+  }
+}
+
+export function hasOnlyPlanningEpicOpenIssue(counts: OperatorActivityRemoteCounts): boolean {
+  return Boolean(
+    counts.enabled
+    && counts.openIssues === 1
+    && (counts.openPullRequests ?? 0) === 0
+    && counts.openIssueNumbers?.length === 1
+    && counts.openIssueNumbers[0] === OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER,
+  );
+}
+
 function readRemoteCounts(cwd: string, options: OperatorActivityOptions): OperatorActivityRemoteCounts {
   if (!options.includeRemoteCounts) {
     return { enabled: false, source: "disabled; pass --include-remote-counts to opt in" };
@@ -1001,11 +1032,16 @@ function readRemoteCounts(cwd: string, options: OperatorActivityOptions): Operat
   const runner = options.commandRunner ?? defaultOperatorActivityCommandRunner;
   const blockers: string[] = [];
   let openIssues: number | undefined;
+  const returnOpenIssueNumbers: number[] = [];
   let openPullRequests: number | undefined;
 
   try {
     const output = runner("gh", ["issue", "list", "--state", "open", "--json", "number", "--limit", "1000"], cwd, DEFAULT_OPERATOR_ACTIVITY_REMOTE_TIMEOUT_MS);
     openIssues = parseGhJsonCount(output);
+    const openIssueNumbers = parseGhIssueNumbers(output);
+    if (openIssueNumbers !== undefined && openIssueNumbers.length > 0) {
+      returnOpenIssueNumbers.push(...openIssueNumbers);
+    }
     if (openIssues === undefined) blockers.push("GitHub open issue count unavailable: unable to parse gh issue list JSON");
   } catch (error) {
     blockers.push(`GitHub open issue count unavailable: ${errorDetail(error)}`);
@@ -1023,6 +1059,7 @@ function readRemoteCounts(cwd: string, options: OperatorActivityOptions): Operat
     enabled: true,
     source: OPERATOR_ACTIVITY_REMOTE_SOURCE,
     openIssues,
+    ...(returnOpenIssueNumbers.length > 0 ? { openIssueNumbers: returnOpenIssueNumbers } : {}),
     openPullRequests,
     blockers: uniqueSorted(blockers),
   };
@@ -1460,6 +1497,8 @@ function buildCurrentRunEvidence(
   const noLocalDivergence = localDivergenceKnown && worktree.ahead === 0 && worktree.behind === 0;
   const noSessions = fooksSessionCount === 0;
   const zeroRemoteCounts = remoteCountsAvailable && openIssues === 0 && openPullRequests === 0;
+  const advisoryPlanningEpicOnly = hasOnlyPlanningEpicOpenIssue(optionalCounts);
+  const remoteCountsIdle = zeroRemoteCounts || advisoryPlanningEpicOnly;
 
   if (!optionalCounts.enabled) {
     blockers.push("remote issue/PR counts disabled; pass --include-remote-counts to prove zero open issue/PR reminder evidence");
@@ -1483,22 +1522,24 @@ function buildCurrentRunEvidence(
     reasons.push(`${ancestorMaintenanceSessionCount} ancestor maintenance tmux session(s) were not counted as active work evidence`);
   }
   if (zeroRemoteCounts) reasons.push("open issue and pull request counts are both zero");
+  if (advisoryPlanningEpicOnly) reasons.push("only open issue is planning epic #960; it is advisory and not active work evidence");
   if (legacyWorktreeEvidence.staleClosedArtifactWorktreeCount > 0) {
     reasons.push("legacy closed-artifact worktree evidence is separated from active current-run evidence");
   }
 
-  const mainEchoEvidence = blockers.length === 0 && onMain && clean && noLocalDivergence && noSessions && zeroRemoteCounts;
+  const mainEchoEvidence = blockers.length === 0 && onMain && clean && noLocalDivergence && noSessions && remoteCountsIdle;
   const activeWorkEvidence =
     (Boolean(worktree.branch) && worktree.branch !== "main" && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     (worktree.clean === false && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     fooksSessionCount > 0 ||
-    (optionalCounts.enabled && ((openIssues ?? 0) > 0 || (openPullRequests ?? 0) > 0));
+    (optionalCounts.enabled && (((openIssues ?? 0) > 0 && !advisoryPlanningEpicOnly) || (openPullRequests ?? 0) > 0));
   const receipt = buildCurrentRunReceipt({
     worktree,
     fooksSessionCount,
     openIssues,
     openPullRequests,
     mainEchoEvidence,
+    advisoryPlanningEpicOnly,
   });
 
   return {

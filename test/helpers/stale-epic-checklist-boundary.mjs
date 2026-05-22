@@ -105,6 +105,51 @@ export function classifyEpicOnlyOpenIssueState(input) {
   };
 }
 
+export function classifyCleanEpicOnlySessionWhip(input) {
+  const epicNumber = issueNumber(input?.epic) ?? 960;
+  const evidence = input?.evidence ?? {};
+  const issues = openIssueNumbers(evidence.issues ?? evidence.childIssues);
+  const openIssueCount = typeof input?.openIssueCount === "number" ? input.openIssueCount : issues.length;
+  const openPullRequestCount = typeof input?.openPullRequestCount === "number"
+    ? input.openPullRequestCount
+    : (evidence.pullRequests ?? []).filter((pr) => isOpenState(pr?.state)).length;
+  const activeKinds = epicOnlyActiveEvidenceKinds(evidence, epicNumber);
+  const cleanPostMergeEcho = Boolean(input?.clean === true && input?.branch === "main" && input?.ahead === 0 && input?.behind === 0);
+  const epicOnlyOpenIssueState = openIssueCount === 1 && issues.length === 1 && issues[0] === epicNumber && openPullRequestCount === 0;
+  const requiresConcreteChildArtifact = cleanPostMergeEcho && epicOnlyOpenIssueState && activeKinds.length === 0;
+
+  return {
+    issue: "#1040",
+    epic: `#${epicNumber}`,
+    classification: requiresConcreteChildArtifact
+      ? "clean-epic-only-session-whip-idle"
+      : "concrete-child-artifact-present",
+    cleanPostMergeEcho,
+    epicOnlyOpenIssueState,
+    activeDevelopmentAllowed: !requiresConcreteChildArtifact,
+    sessionWhipMayEndOnCleanEcho: false,
+    requiredConcreteChildArtifacts: [
+      "open-child-issue",
+      "active-session",
+      "active-branch",
+      "open-pull-request",
+      "active-worktree",
+      "active-process",
+    ],
+    activeEvidenceKinds: activeKinds,
+    mutationBoundary: {
+      mutatesGitHubIssues: false,
+      changesMergePolicy: false,
+      changesProviderRuntimeHooks: false,
+      changesTelemetry: false,
+      changesBillingTokenProof: false,
+      changesDetectorScope: false,
+      changesProductClaims: false,
+    },
+    rule: "A clean post-merge session-whip snapshot with only planning epic #960 open is idle and must name a concrete child issue, session, branch, PR, worktree, or process before claiming active work.",
+  };
+}
+
 export function classifyStaleEpicChecklistCandidate(input) {
   const activeKinds = activeEvidenceKinds(input?.evidence ?? {});
   const hasUncheckedEpicChecklistText = Boolean(input?.uncheckedEpicChecklistText);
