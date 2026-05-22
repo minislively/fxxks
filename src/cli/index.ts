@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { ExtractionResult } from "../core/schema";
+import type { DomainMemoryReceipt } from "../core/domain-memory-receipt";
 import type { InspectDomainReactNativeSourceAnchorBeta } from "../core/react-native-proof-surface";
 
 function print(value: unknown): void {
@@ -680,7 +681,7 @@ Everyday commands:
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect react-web-label-preview <file> [--json]
   ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
-  ${displayCliName} inspect-domain <file> [--json]
+  ${displayCliName} inspect-domain <file> [--json] [--domain-memory-receipt]
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
@@ -797,6 +798,34 @@ function parseCompareArgs(args: string[]): { filePath: string; json: boolean } {
   }
 
   return { filePath: requireFilePath(filePath), json };
+}
+
+function parseInspectDomainArgs(args: string[]): { filePath: string; json: boolean; domainMemoryReceipt: boolean } {
+  let filePath: string | undefined;
+  let json = false;
+  let domainMemoryReceipt = false;
+
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--domain-memory-receipt") {
+      domainMemoryReceipt = true;
+      continue;
+    }
+    if (!filePath) {
+      filePath = arg;
+      continue;
+    }
+    throw new Error(`Unexpected inspect-domain argument: ${arg}`);
+  }
+
+  if (domainMemoryReceipt && !json) {
+    throw new Error("inspect-domain --domain-memory-receipt requires --json");
+  }
+
+  return { filePath: requireFilePath(filePath), json, domainMemoryReceipt };
 }
 
 function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode: "text" | "json" | "summary-json" | "dry-run-json" } {
@@ -932,6 +961,7 @@ type InspectDomainCliResult = {
     omittedRuntimeSemantics: string[];
   };
   reactNativeSourceAnchorBeta?: InspectDomainReactNativeSourceAnchorBeta;
+  domainMemoryReceipt?: DomainMemoryReceipt;
 };
 
 function hasWebViewEvidence(evidence: Array<{ domain: string }>): boolean {
@@ -979,6 +1009,7 @@ function buildInspectDomainResult(options: {
   json: boolean;
   tuiSourceMetadata?: NonNullable<InspectDomainCliResult["tuiSourceMetadata"]>;
   reactNativeSourceAnchorBeta?: InspectDomainCliResult["reactNativeSourceAnchorBeta"];
+  domainMemoryReceipt?: InspectDomainCliResult["domainMemoryReceipt"];
 }): InspectDomainCliResult {
   const relative = path.relative(options.cwd, options.filePath) || path.basename(options.filePath);
   const webViewFallbackFirst = hasWebViewEvidence(options.detection.evidence);
@@ -999,6 +1030,9 @@ function buildInspectDomainResult(options: {
   }
   if (options.json && options.reactNativeSourceAnchorBeta) {
     result.reactNativeSourceAnchorBeta = options.reactNativeSourceAnchorBeta;
+  }
+  if (options.json && options.domainMemoryReceipt) {
+    result.domainMemoryReceipt = options.domainMemoryReceipt;
   }
   return result;
 }
@@ -1427,6 +1461,7 @@ async function run(): Promise<void> {
         { toModelFacingPayload },
         { assessFrontendPayloadPolicy },
         { inspectDomainReactNativeSourceAnchorBetaFor },
+        { buildDomainMemoryReceipt },
       ] = await Promise.all([
         import("../core/domain-detector.js"),
         import("../core/tui-source-metadata.js"),
@@ -1434,8 +1469,17 @@ async function run(): Promise<void> {
         import("../core/payload/model-facing.js"),
         import("../core/payload-policy/registry.js"),
         import("../core/react-native-proof-surface.js"),
+        import("../core/domain-memory-receipt.js"),
       ]);
-      const { filePath: file, json } = parseCompareArgs(rest);
+      let inspectDomainOptions: ReturnType<typeof parseInspectDomainArgs>;
+      try {
+        inspectDomainOptions = parseInspectDomainArgs(rest);
+      } catch (error) {
+        console.error(`fooks inspect-domain: ${error instanceof Error ? error.message : String(error)}`);
+        process.exitCode = 1;
+        return;
+      }
+      const { filePath: file, json, domainMemoryReceipt: includeDomainMemoryReceipt } = inspectDomainOptions;
       const sourceText = fs.readFileSync(file, "utf8");
       const detection = detectDomainFromSource(sourceText, file);
       const tuiSourceMetadata =
@@ -1463,6 +1507,14 @@ async function run(): Promise<void> {
               );
             })()
           : undefined;
+      const domainMemoryReceipt = includeDomainMemoryReceipt
+        ? buildDomainMemoryReceipt({
+            filePath: file,
+            cwd: process.cwd(),
+            sourceText,
+            domainDetection: detection,
+          })
+        : undefined;
       print(buildInspectDomainResult({
         filePath: file,
         cwd: process.cwd(),
@@ -1470,6 +1522,7 @@ async function run(): Promise<void> {
         json,
         tuiSourceMetadata,
         reactNativeSourceAnchorBeta,
+        domainMemoryReceipt,
       }));
       return;
     }

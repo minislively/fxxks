@@ -55,6 +55,12 @@ Source-derived evidence should carry enough freshness context for a later agent 
 
 If a freshness anchor is absent or stale, the safe next action is to read the current source or rerun the relevant fooks command. For a TUI work domain, safe next actions can also include a TTY smoke run, keyboard-flow verification, or a non-interactive fallback check when those are the relevant missing receipts.
 
+## Domain memory receipts
+
+`domain-memory.v1` is defined in [Domain memory contract](domain-memory-contract.md). It is a future-facing receipt contract for keeping source scope, domain evidence, concern evidence, payload-policy decisions, freshness anchors, and non-claims together. It does not change cache storage, detector logic, runtime adapters, or implementation behavior.
+
+Domain-memory receipts follow the same state rules in this document: freshness first, policy before reuse, fallback as explicit state, and receipts scoped to the command, file, or policy decision they name.
+
 ## Receipt shape
 
 A product receipt should be easy to quote without overclaiming:
