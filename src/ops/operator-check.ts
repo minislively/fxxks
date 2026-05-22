@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import {
+  hasPlanningEpicPlusSingleChildOpenIssue,
   hasOnlyPlanningEpicOpenIssue,
   readOperatorActivitySnapshot,
   type OperatorActivityOptions,
@@ -1713,7 +1714,9 @@ function buildActiveWorkReceipts(
 
   const baseBlockers = repoIdentity.blockers;
   const counts = activity.optionalCounts;
-  if (counts.enabled && typeof counts.openIssues === "number" && counts.openIssues > 0 && !hasOnlyPlanningEpicOpenIssue(counts)) {
+  const issueInventoryIsCleanMainAdvisoryOnly = activity.currentRunEvidence.mainEchoEvidence
+    && (hasOnlyPlanningEpicOpenIssue(counts) || hasPlanningEpicPlusSingleChildOpenIssue(counts));
+  if (counts.enabled && typeof counts.openIssues === "number" && counts.openIssues > 0 && !issueInventoryIsCleanMainAdvisoryOnly) {
     receipts.push({
       kind: "issue",
       classification: "active",
@@ -1973,7 +1976,9 @@ function buildSessionWhipRunReceipt(activeWorkReceipts: Pick<OperatorCheckActive
 function activeArtifactsFrom(activity: OperatorActivitySnapshot): OperatorCheckActiveArtifact[] {
   const artifacts: OperatorCheckActiveArtifact[] = [];
   const counts = activity.optionalCounts;
-  if (counts.enabled && typeof counts.openIssues === "number" && counts.openIssues > 0 && !hasOnlyPlanningEpicOpenIssue(counts)) {
+  const issueInventoryIsCleanMainAdvisoryOnly = activity.currentRunEvidence.mainEchoEvidence
+    && (hasOnlyPlanningEpicOpenIssue(counts) || hasPlanningEpicPlusSingleChildOpenIssue(counts));
+  if (counts.enabled && typeof counts.openIssues === "number" && counts.openIssues > 0 && !issueInventoryIsCleanMainAdvisoryOnly) {
     artifacts.push({ kind: "issue", count: counts.openIssues, source: counts.source });
   }
   if (counts.enabled && typeof counts.openPullRequests === "number" && counts.openPullRequests > 0) {

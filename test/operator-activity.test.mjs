@@ -1638,6 +1638,69 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.match(snapshot.sessionWhipRunReceipt.noOp.reason, /No created\/adopted issue, PR, non-main branch, mapped session, or adopted worktree evidence/);
 });
 
+test("operator check treats clean epic plus idle child issue inventory as status-only and requires spawned or adopted child work", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-22T12:00:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[{\"number\":960},{\"number\":1046}]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "git@github.com:minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD post-pr-1048-main-head", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "post-pr-1048-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.activity.optionalCounts.openIssues, 2);
+  assert.deepEqual(snapshot.activity.optionalCounts.openIssueNumbers, [960, 1046]);
+  assert.equal(snapshot.activity.optionalCounts.openPullRequests, 0);
+  assert.equal(snapshot.activity.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.activity.currentRunEvidence.activeWorkEvidence, false);
+  assert.match(snapshot.activity.currentRunEvidence.reasons.join("\n"), /planning epic #960 plus one idle child issue/);
+  assert.match(snapshot.activity.currentRunEvidence.receipt.oneLine, /planning epic #960 plus one idle child issue only/);
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.deepEqual(snapshot.activeArtifacts, []);
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
+  assert.equal(snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.kind === "issue"), false);
+  assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
+  assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, true);
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {
+    createdOrAdoptedIssues: 0,
+    adoptedPullRequests: 0,
+    adoptedBranches: 0,
+    mappedSessions: 0,
+    adoptedWorktrees: 0,
+    staleOrReviewOnly: 0,
+    mainEchoes: 1,
+    blockers: 0,
+  });
+  assert.deepEqual(snapshot.sessionWhipRunReceipt.evidence.issues, []);
+});
+
 
 test("operator check treats absent tmux server as zero mapped sessions and keeps CI uncertainty separate", () => {
   const tempDir = makeTempProject();
