@@ -74,7 +74,7 @@ test("bare status includes docs-backed WorkItem dashboard while preserving metri
   assert.equal(dashboard.anchors.issueUrl, "https://github.com/minislively/fooks/issues/922");
   assert.equal(dashboard.anchors.branch, "feature/issue-922-docs-backed-work-item-action-dashboard");
   assert.equal(dashboard.anchors.session, "omx-test-session");
-  assert.equal(dashboard.anchors.worktree, tempDir);
+  assert.equal(fs.realpathSync(dashboard.anchors.worktree), fs.realpathSync(tempDir));
   assert.equal(dashboard.workItems[0].requiredNextAction.kind, "open-pr");
   assert.deepEqual(dashboard.tuiCompatibility.sharedTypes, ["WorkItem", "Evidence", "NextAction"]);
   assert.equal(dashboard.tuiCompatibility.modelOnly, true);
@@ -83,6 +83,55 @@ test("bare status includes docs-backed WorkItem dashboard while preserving metri
   assert.ok(dashboard.architectureAudit.some((item) => item.scope === "tui" && /do not rewrite/.test(item.firstPassAction)));
   assert.ok(dashboard.workItems[0].evidence.some((item) => item.kind === "architectureDoc" && item.supports.includes("WorkItem/Evidence/NextAction")));
   assert.ok(dashboard.workItems[0].nonClaims.some((item) => item.includes("provider usage")));
+  assert.equal(dashboard.currentAuthoritySummary.status, "needs-recheck");
+  assert.equal(dashboard.currentAuthoritySummary.statusLabel, "Needs recheck");
+  assert.match(dashboard.currentAuthoritySummary.sourceOfTruth, /issue #922/);
+  assert.match(dashboard.currentAuthoritySummary.staleBoundary, /needs recheck/);
+  assert.match(dashboard.currentAuthoritySummary.nextAction, /Open or link the PR/);
+  assert.ok(dashboard.currentAuthoritySummary.reasons.some((item) => /next action kind is open-pr/.test(item)));
+  assert.ok(dashboard.currentAuthoritySummary.nonClaims.some((item) => /advisory projection/.test(item)));
+});
+
+test("WorkItem current authority summary marks ready when issue and PR anchors are present", () => {
+  const tempDir = makeRepo();
+  const status = runStatus(tempDir, { FOOOKS_UNUSED: "ignored", PR_NUMBER: "123", PR_URL: "https://github.com/minislively/fooks/pull/123" });
+  const summary = status.workItemDashboard.currentAuthoritySummary;
+
+  assert.equal(summary.status, "ready-to-continue");
+  assert.equal(summary.statusLabel, "Ready to continue");
+  assert.match(summary.sourceOfTruth, /issue #922/);
+  assert.match(summary.sourceOfTruth, /PR #123/);
+  assert.match(summary.staleBoundary, /No blocking stale or historical boundary/);
+  assert.match(summary.nextAction, /Verify and close active work/);
+  assert.ok(summary.reasons.some((item) => /verification\/continuation/.test(item)));
+  assert.ok(summary.nonClaims.some((item) => /does not prove release readiness/));
+});
+
+test("WorkItem current authority summary stops when no current authority is linked", () => {
+  const tempDir = makeRepo();
+  git(tempDir, ["checkout", "main"]);
+  const previousFooksSession = process.env.FOOKS_SESSION_ID;
+  const previousOmxSession = process.env.OMX_SESSION_ID;
+  const previousTmuxPane = process.env.TMUX_PANE;
+  delete process.env.FOOKS_SESSION_ID;
+  delete process.env.OMX_SESSION_ID;
+  delete process.env.TMUX_PANE;
+  try {
+    const status = runStatus(tempDir, { FOOKS_SESSION_ID: "", OMX_SESSION_ID: "", TMUX_PANE: "" });
+    const summary = status.workItemDashboard.currentAuthoritySummary;
+
+    assert.equal(summary.status, "stop-before-execution");
+    assert.equal(summary.statusLabel, "Stop before execution");
+    assert.match(summary.sourceOfTruth, /No issue, PR, or submitted-session authority/);
+    assert.match(summary.staleBoundary, /non-authorizing/);
+    assert.match(summary.nextAction, /Link an open issue/);
+    assert.ok(summary.reasons.some((item) => /no issue, PR, or submitted-session authority/.test(item)));
+    assert.ok(summary.nonClaims.some((item) => /does not enforce or block unrelated CLI commands/));
+  } finally {
+    if (previousFooksSession === undefined) delete process.env.FOOKS_SESSION_ID; else process.env.FOOKS_SESSION_ID = previousFooksSession;
+    if (previousOmxSession === undefined) delete process.env.OMX_SESSION_ID; else process.env.OMX_SESSION_ID = previousOmxSession;
+    if (previousTmuxPane === undefined) delete process.env.TMUX_PANE; else process.env.TMUX_PANE = previousTmuxPane;
+  }
 });
 
 test("shared WorkItem dashboard builder is importable for non-CLI consumers", () => {
@@ -247,6 +296,9 @@ test("ambient session alone does not make a clean unlinked checkout active work"
     assert.equal(dashboard.workItems[0].state, "evidence-ready");
     assert.equal(dashboard.nextActions[0].kind, "link");
     assert.ok(dashboard.workItems[0].evidence.some((item) => item.kind === "session"));
+    assert.equal(dashboard.currentAuthoritySummary.status, "stop-before-execution");
+    assert.match(dashboard.currentAuthoritySummary.sourceOfTruth, /No issue, PR, or submitted-session authority/);
+    assert.ok(dashboard.currentAuthoritySummary.reasons.some((item) => /ambient session ambient-session-only is advisory only/.test(item)));
   } finally {
     if (previousFooksSession === undefined) delete process.env.FOOKS_SESSION_ID;
     else process.env.FOOKS_SESSION_ID = previousFooksSession;
@@ -263,6 +315,11 @@ test("fooks explain status renders WorkItem evidence, rejected evidence, and nex
 
   assert.match(text, /^# fooks explain status/m);
   assert.match(text, /CLI-only WorkItem evidence explanation/);
+  assert.match(text, /## Current authority summary/);
+  assert.match(text, /- status: Needs recheck/);
+  assert.match(text, /- source of truth: Current authority derives from issue #922/);
+  assert.match(text, /- stale boundary: No stale stop boundary is represented here, but current authority or closeout evidence needs recheck\./);
+  assert.match(text, /- next action: Open or link the PR after focused verification passes/);
   assert.match(text, /## Why/);
   assert.match(text, /artifact 'status' resolves to WorkItem 'work-item-922' in state 'active-work'/);
   assert.match(text, /## Evidence/);
@@ -287,6 +344,9 @@ test("fooks explain work-item --json exposes machine-readable WorkItem explanati
   assert.equal(explanation.readOnly, true);
   assert.equal(explanation.workItem.id, "work-item-922");
   assert.equal(explanation.workItem.state, "active-work");
+  assert.equal(explanation.currentAuthoritySummary.status, "needs-recheck");
+  assert.equal(explanation.currentAuthoritySummary.statusLabel, "Needs recheck");
+  assert.match(explanation.currentAuthoritySummary.sourceOfTruth, /issue #922/);
   assert.ok(explanation.why.some((line) => line.includes("next action:")));
   assert.ok(explanation.evidence.some((item) => item.kind === "worktree"));
   assert.ok(explanation.rejectedEvidence.some((item) => item.reason.includes("provider usage")));
@@ -325,6 +385,8 @@ test("fooks explain current defaults to the current repository WorkItem artifact
   assert.equal(explicit.workItem.id, "work-item-922");
   assert.equal(implicit.workItem.id, "work-item-922");
   assert.equal(explicit.nextAction.kind, "open-pr");
+  assert.equal(explicit.currentAuthoritySummary.status, "needs-recheck");
+  assert.equal(implicit.currentAuthoritySummary.status, "needs-recheck");
 });
 
 test("fooks explain exposes command help without reading live WorkItem evidence", () => {
