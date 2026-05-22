@@ -315,6 +315,66 @@ test("orphan local worktree triage keeps detached PR review worktrees when match
   assert.match(decision?.decisionLabel ?? "", /KEEP/);
 });
 
+test("orphan local worktree triage keeps open PR branches with pending checks out of branch-deletion cleanup", () => {
+  const cwd = "/work/fooks.omx-worktrees/current";
+  const activePr = "/work/fooks.omx-worktrees/fooks-issue-1047-active-pr-cleanup";
+  const calls = [];
+  const result = triageOrphanLocalWorktrees(cwd, {
+    now: () => "2026-05-22T12:00:00.000Z",
+    pathExists: (target) => [cwd, activePr].includes(target),
+    runner: makeRunner({
+      "git worktree list --porcelain": [
+        `worktree ${cwd}`,
+        "HEAD main-head",
+        "branch refs/heads/main",
+        "",
+        `worktree ${activePr}`,
+        "HEAD active-pr-head",
+        "branch refs/heads/fooks-issue-1047-active-pr-cleanup",
+        "",
+      ].join("\n"),
+      "git rev-parse --verify origin/main": "origin-main-sha\n",
+      "git branch -r --format=%(refname:short)": "origin/main\n",
+      "tmux list-panes -a -F #{session_name}	#{pane_current_path}": "",
+      [`${cwd} :: git status --porcelain=v1 -z`]: "",
+      [`${activePr} :: git status --porcelain=v1 -z`]: "",
+      [`${cwd} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${activePr} :: git rev-list --left-right --count origin/main...HEAD`]: "0 0\n",
+      [`${cwd} :: git diff --shortstat origin/main...HEAD`]: "",
+      [`${activePr} :: git diff --shortstat origin/main...HEAD`]: "",
+      "gh pr list --state open --json number,url,headRefName --limit 200": JSON.stringify([
+        {
+          number: 1045,
+          url: "https://github.com/minislively/fooks/pull/1045",
+          headRefName: "fooks-issue-1047-active-pr-cleanup",
+          mergeStateStatus: "UNSTABLE",
+          statusCheckRollup: [{ name: "Node", status: "PENDING", conclusion: null }],
+        },
+      ]),
+      "gh pr list --state closed --json number,url,headRefName,state,closedAt --limit 200": "[]",
+    }, calls),
+  });
+
+  const entry = result.entries.find((item) => item.branch === "fooks-issue-1047-active-pr-cleanup");
+  assert.equal(entry?.category, "keep");
+  assert.equal(entry?.remoteBranchExists, false);
+  assert.equal(entry?.openPullRequest.state, "open");
+  assert.equal(entry?.openPullRequest.pullRequests[0]?.number, 1045);
+  assert.equal(entry?.openPullRequest.pullRequests[0]?.statusCheckRollup?.[0]?.status, "PENDING");
+  assert.deepEqual(entry?.manualCleanupCommands, []);
+  assert.match(entry?.manualReviewCommands.join("\n") ?? "", /inspect active worktree\/PR\/remote evidence before cleanup/i);
+  assert.match(entry?.reasons.join("\n") ?? "", /active PR cleanup guard/i);
+  assert.match(entry?.reasons.join("\n") ?? "", /required checks terminal/i);
+  assert.deepEqual(result.categories["safe-cleanup"].map((item) => item.branch), []);
+
+  const decision = result.decisionTable.find((item) => item.branch === "fooks-issue-1047-active-pr-cleanup");
+  assert.equal(decision?.decision, "keep-active-evidence");
+  assert.equal(decision?.deleteCommand, "none from this artifact");
+  assert.match(decision?.decisionLabel ?? "", /KEEP because active PR/);
+  assert.match(decision?.evidenceSummary ?? "", /open-pr:#1045/);
+  assert.equal(calls.some(([command, args]) => command === "git" && /fetch|worktree remove|branch -d|push/.test(args.join(" "))), false);
+});
+
 test("status orphan-worktrees emits parseable JSON", () => {
   const stdout = execFileSync(process.execPath, [cli, "status", "orphan-worktrees", "--json"], {
     cwd: repoRoot,

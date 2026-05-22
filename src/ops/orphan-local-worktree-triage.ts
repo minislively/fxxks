@@ -10,6 +10,7 @@ export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE = "#711";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_ISSUE_URL = "https://github.com/minislively/fooks/issues/711";
 export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE = "#843";
 export const ORPHAN_LOCAL_AHEAD_SALVAGE_QUEUE_ISSUE_URL = "https://github.com/minislively/fooks/issues/843";
+export const ORPHAN_LOCAL_WORKTREE_ACTIVE_PR_CLEANUP_GUARD_ISSUE = "#1047";
 export const ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY =
   "Read-only issue #711 local sibling worktree salvage/delete decision artifact; does not fetch, delete branches/worktrees, open PRs, auto-delete local-only commits, or change runtime/provider/merge-gate policy.";
 export const DEFAULT_ORPHAN_LOCAL_WORKTREE_TRIAGE_TIMEOUT_MS = 3000;
@@ -519,7 +520,10 @@ function classifyEntry(input: {
   if (input.activeTmuxPaneCount > 0) reasons.push("one or more tmux panes are mapped inside this worktree");
   if (input.remoteBranchExists === true) reasons.push("a local remote-tracking branch exists for this branch");
   if (input.remoteBranchExists === false) reasons.push("no local remote-tracking branch exists for this branch");
-  if (input.openPullRequest.state === "open") reasons.push("an open pull request exists for this branch");
+  if (input.openPullRequest.state === "open") {
+    reasons.push("an open pull request exists for this branch");
+    reasons.push(`active PR cleanup guard: branch/worktree/remote cleanup is unsafe while this PR remains open; wait for an intentional merged/closed PR state with required checks terminal (${ORPHAN_LOCAL_WORKTREE_ACTIVE_PR_CLEANUP_GUARD_ISSUE})`);
+  }
   if (input.openPullRequest.state === "none") reasons.push("no open pull request was found for this branch");
   if (input.openPullRequest.state === "unknown") reasons.push("open pull request evidence is unavailable");
   if (input.closedPullRequest.state === "closed") {
