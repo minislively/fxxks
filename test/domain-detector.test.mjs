@@ -405,6 +405,59 @@ test("CLI inspect-domain emits explicit report-only domain memory receipt only w
   assert.doesNotMatch(JSON.stringify(receipt), forbiddenSupportClaims);
 });
 
+test("CLI inspect-domain emits explicit report-only context decision only with its flag", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+
+  const plainCli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(plainCli.status, 0, plainCli.stderr);
+  const plainResult = JSON.parse(plainCli.stdout);
+  assert.equal("contextDecision" in plainResult, false);
+
+  const decisionCli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json", "--context-decision"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.equal(decisionCli.status, 0, decisionCli.stderr);
+  const result = JSON.parse(decisionCli.stdout);
+  const decision = result.contextDecision;
+  assert.ok(decision);
+  assert.equal(decision.schemaVersion, "context-decision.v1");
+  assert.equal(decision.evidence.domain, "react-web");
+  assert.equal(decision.decision.kind, "compact-context");
+  assert.equal(decision.decision.diagnosticOnly, true);
+  assert.equal(decision.policy.allowed, false);
+  assert.match(decision.policy.allowedMeaning, /report-only/);
+  assert.ok(decision.nonClaims.includes("does not authorize runtime reuse"));
+  assert.ok(decision.nonClaims.includes("does not authorize pre-read reuse"));
+  assert.ok(decision.nonClaims.includes("does not authorize cache reuse"));
+  assert.ok(decision.nonClaims.includes("does not authorize model-facing payload reuse"));
+  assert.doesNotMatch(JSON.stringify(decision), forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain requires --json before emitting a context decision", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const cli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--context-decision"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /--context-decision requires --json/);
+  assert.equal(cli.stdout, "");
+});
+
 test("CLI inspect-domain requires --json before emitting a domain memory receipt", () => {
   const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
   const cli = spawnSync(

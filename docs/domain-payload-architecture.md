@@ -270,3 +270,7 @@ When in doubt:
 - describe TUI/Ink as measured syntax/payload evidence, not terminal behavior support;
 - describe Mixed/Unknown as safety states;
 - keep provider-token, billing, runtime-token, cost, performance, bridge-safety, and terminal-correctness claims out of this architecture layer.
+
+## Context decision planning appendix
+
+`context-decision.v1` (`context-decision-contract.md`) keeps context-planning metadata separate from payload authorization. Diagnostic `compact-context` or `narrow-payload` decisions remain report-only in this slice; scanner evidence and concern metadata remain observations, while policy remains the permission owner.
