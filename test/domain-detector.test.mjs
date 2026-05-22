@@ -14,7 +14,7 @@ const { detectDomain, detectDomainFromSource } = require(path.join(repoRoot, "di
 
 const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
 const manifestPath = path.join(fixtureRoot, "manifest.json");
-const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled/i;
+const forbiddenSupportClaims = /React Native support is available|React Native is supported today|WebView support is available|WebView is supported today|TUI support is available|TUI is supported today|TUI\/Ink is supported today|default WebView compact extraction is enabled|runtime reuse enabled|pre-read reuse enabled|cache reuse enabled|provider token savings|billing cost savings/i;
 
 function assertSignals(result, expectedSignals) {
   for (const signal of expectedSignals) {
@@ -358,6 +358,67 @@ test("CLI inspect-domain accepts --json before and after the file path", () => {
     assert.deepEqual(result.fallbackFirst, { applies: true, reason: "unsupported-react-native-webview-boundary" });
     assert.doesNotMatch(JSON.stringify(result), forbiddenSupportClaims);
   }
+});
+
+test("CLI inspect-domain emits explicit report-only domain memory receipt only with its flag", () => {
+  const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
+
+  const plainCli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(plainCli.status, 0, plainCli.stderr);
+  const plainResult = JSON.parse(plainCli.stdout);
+  assert.equal("domainMemoryReceipt" in plainResult, false);
+
+  const receiptCli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json", "--domain-memory-receipt"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.equal(receiptCli.status, 0, receiptCli.stderr);
+  const result = JSON.parse(receiptCli.stdout);
+  const receipt = result.domainMemoryReceipt;
+  assert.ok(receipt);
+  assert.equal(receipt.schemaVersion, "domain-memory.v1");
+  assert.equal(receipt.scope.filePath, path.relative(repoRoot, fixture));
+  assert.match(receipt.scope.sourceFingerprint.fileHash, /^sha256:[a-f0-9]{64}$/);
+  assert.ok(receipt.scope.sourceFingerprint.lineCount > 0);
+  assert.equal(receipt.scope.promptSpecificity, "exact-file");
+  assert.equal(receipt.domain.lane, "webview");
+  assert.ok(receipt.domain.evidence.some((item) => item.includes("webview:component:WebView")));
+  assert.equal(receipt.policy.plannerDecision, "fallback-full-read");
+  assert.equal(receipt.policy.allowed, false);
+  assert.match(receipt.policy.allowedMeaning, /do not authorize runtime, pre-read, cache, or compact-payload reuse/);
+  assert.ok(receipt.policy.staleWhen.some((item) => item.includes("source file content changes")));
+  assert.equal(receipt.receipt.runtimeOrCacheReuse, false);
+  assert.ok(receipt.receipt.nonClaims.includes("does not enable runtime or pre-read reuse"));
+  assert.ok(receipt.receipt.nonClaims.includes("does not enable cache reuse"));
+  assert.ok(receipt.receipt.nonClaims.includes("does not expand React Native, WebView, or TUI support"));
+  assert.ok(receipt.receipt.nonClaims.includes("does not use concern or domain evidence as authorization"));
+  assert.match(receipt.receipt.safeNextAction, /Read the current source or rerun inspect-domain/);
+  assert.ok(receipt.concerns.some((item) => /not authorization/.test(item.nonAuthorizationBoundary)));
+  assert.doesNotMatch(JSON.stringify(receipt), forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain requires --json before emitting a domain memory receipt", () => {
+  const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
+  const cli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--domain-memory-receipt"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /--domain-memory-receipt requires --json/);
+  assert.equal(cli.stdout, "");
 });
 
 test("CLI inspect-domain prints detector evidence without support claims", () => {

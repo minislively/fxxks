@@ -213,6 +213,12 @@ Each step needs its own plan and verification. This document does not authorize 
 
 The older scanner/planner/builder sequence remains the internal responsibility model for payload work: scanner output is evidence, the planner owns permission, and the builder formats only what the planner authorizes. The new registry-first order describes how to make those seams parallel-worktree friendly before broadening any domain lane.
 
+## Domain memory receipt contract
+
+[`domain-memory.v1`](domain-memory-contract.md) is the future-facing receipt contract for recording source scope, domain evidence, concern evidence, payload-policy decisions, freshness anchors, and non-claims together. It is an audit target only and does not add runtime behavior, detector behavior, pre-read behavior, payload schema changes, or support wording.
+
+Domain-memory receipts must preserve the scanner/planner/builder split in this document: scanner evidence and concern metadata remain observations, policy remains the permission owner, and fallback/deferred receipts remain safe states rather than failed extraction.
+
 ## Cache and repeated-read policy
 
 Cache and repeated-read policy should sit after the planner/builder decision. Cache reuse is a delivery mechanism for a context packet that has already been judged safe enough for its domain policy. It is not proof that a domain is compact-safe.
