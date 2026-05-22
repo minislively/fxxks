@@ -493,6 +493,24 @@ test("file commands accept --json before or after the file path", () => {
   const inspectAfter = run(["inspect-domain", "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx", "--json"]);
   const inspectBefore = run(["inspect-domain", "--json", "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx"]);
   assert.deepEqual(inspectBefore, inspectAfter);
+  assert.equal("domainMemoryReceipt" in inspectAfter, false);
+
+  const inspectReceiptAfter = run([
+    "inspect-domain",
+    "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx",
+    "--json",
+    "--domain-memory-receipt",
+  ]);
+  const inspectReceiptBefore = run([
+    "inspect-domain",
+    "--domain-memory-receipt",
+    "--json",
+    "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx",
+  ]);
+  assert.equal(inspectReceiptAfter.domainMemoryReceipt.schemaVersion, "domain-memory.v1");
+  assert.equal(inspectReceiptBefore.domainMemoryReceipt.schemaVersion, "domain-memory.v1");
+  assert.equal(inspectReceiptAfter.domainMemoryReceipt.policy.allowed, false);
+  assert.equal(inspectReceiptBefore.domainMemoryReceipt.policy.allowed, false);
 
   const extractAfter = run(["extract", "fixtures/compressed/FormSection.tsx", "--model-payload", "--json"]);
   const extractBefore = run(["extract", "--json", "fixtures/compressed/FormSection.tsx", "--model-payload"]);
@@ -3926,7 +3944,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks inspect ranked-bundle <id> \[--json\]/);
   assert.match(help, /fooks inspect react-web-label-preview <file> \[--json\]/);
   assert.match(help, /fooks inspect react-web-issues <file> \[--json\|--summary-json\|--dry-run-json\]/);
-  assert.match(help, /fooks inspect-domain <file> \[--json\]/);
+  assert.match(help, /fooks inspect-domain <file> \[--json\] \[--domain-memory-receipt\]/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /fooks status react-web \[--json\] \[--handoff-resume-json <file>\]/);
   assert.match(help, /fooks status artifacts/);
