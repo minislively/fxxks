@@ -295,6 +295,8 @@ export {
   WORK_ITEM_DASHBOARD_CLAIM_BOUNDARY,
   buildWorkItemDashboard,
   type WorkItem,
+  type WorkItemCurrentAuthorityStatus,
+  type WorkItemCurrentAuthoritySummary,
   type WorkItemEvidence,
   type WorkItemNextAction,
   type WorkItemDashboard,

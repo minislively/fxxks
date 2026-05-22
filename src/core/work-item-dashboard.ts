@@ -14,6 +14,7 @@ export type WorkItemEvidenceClass = "Source evidence" | "Local command evidence"
 export type WorkItemState = "uninspected" | "evidence-ready" | "fallback-required" | "context-issued" | "receipt-recorded" | "active-work" | "blocked";
 export type WorkItemNextActionKind = "inspect" | "verify" | "link" | "open-pr" | "continue" | "fallback";
 export type WorkItemDomainJudgmentConfidence = "high" | "medium" | "low";
+export type WorkItemCurrentAuthorityStatus = "ready-to-continue" | "needs-recheck" | "stop-before-execution";
 
 export type WorkItemEvidence = {
   kind: WorkItemEvidenceKind;
@@ -65,6 +66,16 @@ export type WorkItemArchitectureAudit = {
   firstPassAction: string;
 };
 
+export type WorkItemCurrentAuthoritySummary = {
+  status: WorkItemCurrentAuthorityStatus;
+  statusLabel: "Ready to continue" | "Needs recheck" | "Stop before execution";
+  sourceOfTruth: string;
+  staleBoundary: string;
+  nextAction: string;
+  reasons: string[];
+  nonClaims: string[];
+};
+
 export type WorkItemDashboard = {
   schemaVersion: typeof WORK_ITEM_DASHBOARD_SCHEMA_VERSION;
   source: typeof WORK_ITEM_DASHBOARD_SOURCE;
@@ -86,6 +97,7 @@ export type WorkItemDashboard = {
     pullRequestUrl?: string;
   };
   architectureAudit: WorkItemArchitectureAudit[];
+  currentAuthoritySummary: WorkItemCurrentAuthoritySummary;
   workItems: WorkItem[];
   nextActions: WorkItemNextAction[];
   frontendDomainTaxonomy: WorkItemFrontendDomain[];
@@ -414,6 +426,81 @@ function nextActionFor(snapshot: GitSnapshot, anchors: WorkItemDashboard["anchor
   };
 }
 
+function statusLabel(status: WorkItemCurrentAuthorityStatus): WorkItemCurrentAuthoritySummary["statusLabel"] {
+  switch (status) {
+    case "ready-to-continue":
+      return "Ready to continue";
+    case "needs-recheck":
+      return "Needs recheck";
+    case "stop-before-execution":
+      return "Stop before execution";
+  }
+}
+
+function sourceOfTruthFor(item: WorkItem, anchors: WorkItemDashboard["anchors"]): string {
+  const submittedSession = item.state !== "evidence-ready" ? anchors.session : undefined;
+  const anchorsText = [
+    anchors.issue ? `issue ${anchors.issue}` : undefined,
+    anchors.pullRequest ? `PR ${anchors.pullRequest}` : undefined,
+    submittedSession ? `session ${submittedSession}` : undefined,
+  ].filter(Boolean).join(", ");
+  if (anchorsText) return `Current authority derives from ${anchorsText}.`;
+  if (item.state === "blocked") return "No current authority is available because local worktree evidence is blocked.";
+  return "No issue, PR, or submitted-session authority is linked for this checkout.";
+}
+
+function staleBoundaryFor(status: WorkItemCurrentAuthorityStatus): string {
+  if (status === "stop-before-execution") {
+    return "Treat stale, historical, and advisory context as non-authorizing until current authority is refreshed.";
+  }
+  if (status === "needs-recheck") {
+    return "No stale stop boundary is represented here, but current authority or closeout evidence needs recheck.";
+  }
+  return "No blocking stale or historical boundary is represented in this WorkItem projection.";
+}
+
+function authorityStatusFor(item: WorkItem, anchors: WorkItemDashboard["anchors"]): WorkItemCurrentAuthorityStatus {
+  const hasSubmittedSession = Boolean(anchors.session && item.state !== "evidence-ready");
+  const hasAuthority = Boolean(anchors.issue || anchors.pullRequest || hasSubmittedSession);
+  if (item.state === "blocked" || !hasAuthority) return "stop-before-execution";
+  if (item.requiredNextAction.kind === "continue" || item.requiredNextAction.kind === "verify") return "ready-to-continue";
+  return "needs-recheck";
+}
+
+function authorityReasonsFor(item: WorkItem, anchors: WorkItemDashboard["anchors"], status: WorkItemCurrentAuthorityStatus): string[] {
+  const hasSubmittedSession = Boolean(anchors.session && item.state !== "evidence-ready");
+  const reasons = [
+    `work item state is ${item.state}`,
+    `next action kind is ${item.requiredNextAction.kind}`,
+  ];
+  if (anchors.issue) reasons.push(`issue anchor ${anchors.issue} is present`);
+  if (anchors.pullRequest) reasons.push(`pull request anchor ${anchors.pullRequest} is present`);
+  if (hasSubmittedSession) reasons.push(`submitted-session anchor ${anchors.session} is present`);
+  if (anchors.session && !hasSubmittedSession) reasons.push(`ambient session ${anchors.session} is advisory only for this clean unlinked checkout`);
+  if (!anchors.issue && !anchors.pullRequest && !hasSubmittedSession) reasons.push("no issue, PR, or submitted-session authority anchor is present");
+  if (status === "ready-to-continue") reasons.push("existing evidence points to verification/continuation instead of inspection/linking/fallback");
+  if (status === "needs-recheck") reasons.push("existing evidence still asks for linking, PR creation, inspection, or fallback before a continue claim");
+  if (status === "stop-before-execution") reasons.push("current authority is absent or blocked, so execution should pause for source-of-truth refresh");
+  return reasons;
+}
+
+export function buildWorkItemCurrentAuthoritySummary(item: WorkItem, anchors: WorkItemDashboard["anchors"]): WorkItemCurrentAuthoritySummary {
+  const status = authorityStatusFor(item, anchors);
+  return {
+    status,
+    statusLabel: statusLabel(status),
+    sourceOfTruth: sourceOfTruthFor(item, anchors),
+    staleBoundary: staleBoundaryFor(status),
+    nextAction: item.requiredNextAction.label,
+    reasons: authorityReasonsFor(item, anchors, status),
+    nonClaims: [
+      "This summary is an advisory projection over existing WorkItem evidence, not a new authority source.",
+      "This summary does not prove release readiness, merge authority, autonomous CI success, provider billing, provider token usage, charged cost, benchmark performance, or runtime UI correctness.",
+      "A stop-before-execution status is operator guidance only; it does not enforce or block unrelated CLI commands.",
+    ],
+  };
+}
+
 export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMetricStatus): WorkItemDashboard {
   const snapshot = readGitSnapshot(cwd);
   const issue = issueFromBranch(snapshot.branch);
@@ -453,6 +540,28 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
       doesNotSupport: "submitted work or review completion by itself",
     });
   }
+  const workItem: WorkItem = {
+    id: issue ? `work-item-${issue.slice(1)}` : "work-item-unlinked",
+    title: issue ? `Active ${displayFrontendDomain(frontendDomain)} work ${issue}` : "Unlinked work item candidate",
+    state: workItemStateFor(snapshot, anchors),
+    frontendDomain,
+    domainJudgment,
+    observed: [...evidence.map((item) => item.observed), domainJudgment.rationale],
+    inferred: [
+      issue ? `${issue} is the local issue anchor inferred from branch naming.` : "No issue anchor was inferred from branch naming.",
+      snapshot.clean === false ? "The worktree has uncommitted local changes and still needs verification/closeout." : "Clean worktree evidence still needs a scoped receipt before active work is complete.",
+      `Domain judgment recommends state ${domainJudgment.recommendedState} and next action ${domainJudgment.nextAction.kind}.`,
+    ],
+    requiredNextAction: action,
+    evidence,
+    nonClaims: [
+      "This dashboard does not prove provider usage or billing-token savings.",
+      "This dashboard does not prove runtime UI correctness.",
+      "A TUI-domain work item means a user-developed terminal UI target, not fooks' own rendering surface.",
+      "This dashboard does not close active work without test/review/PR receipt evidence.",
+      ...domainJudgment.nonClaims,
+    ],
+  };
 
   return {
     schemaVersion: WORK_ITEM_DASHBOARD_SCHEMA_VERSION,
@@ -489,30 +598,8 @@ export function buildWorkItemDashboard(cwd: string, metricStatus: FooksProjectMe
         firstPassAction: "export shared model types, include the TUI frontend domain, and do not rewrite fooks' own TUI board",
       },
     ],
-    workItems: [
-      {
-        id: issue ? `work-item-${issue.slice(1)}` : "work-item-unlinked",
-        title: issue ? `Active ${displayFrontendDomain(frontendDomain)} work ${issue}` : "Unlinked work item candidate",
-        state: workItemStateFor(snapshot, anchors),
-        frontendDomain,
-        domainJudgment,
-        observed: [...evidence.map((item) => item.observed), domainJudgment.rationale],
-        inferred: [
-          issue ? `${issue} is the local issue anchor inferred from branch naming.` : "No issue anchor was inferred from branch naming.",
-          snapshot.clean === false ? "The worktree has uncommitted local changes and still needs verification/closeout." : "Clean worktree evidence still needs a scoped receipt before active work is complete.",
-          `Domain judgment recommends state ${domainJudgment.recommendedState} and next action ${domainJudgment.nextAction.kind}.`,
-        ],
-        requiredNextAction: action,
-        evidence,
-        nonClaims: [
-          "This dashboard does not prove provider usage or billing-token savings.",
-          "This dashboard does not prove runtime UI correctness.",
-          "A TUI-domain work item means a user-developed terminal UI target, not fooks' own rendering surface.",
-          "This dashboard does not close active work without test/review/PR receipt evidence.",
-          ...domainJudgment.nonClaims,
-        ],
-      },
-    ],
+    currentAuthoritySummary: buildWorkItemCurrentAuthoritySummary(workItem, anchors),
+    workItems: [workItem],
     nextActions: [action],
     tuiCompatibility: {
       modelOnly: true,
