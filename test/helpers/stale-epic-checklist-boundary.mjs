@@ -150,6 +150,65 @@ export function classifyCleanEpicOnlySessionWhip(input) {
   };
 }
 
+export function classifyCleanEpicAdvisoryInventorySessionWhip(input) {
+  const epicNumber = issueNumber(input?.epic) ?? 960;
+  const evidence = input?.evidence ?? {};
+  const issues = openIssueNumbers(evidence.issues ?? evidence.childIssues);
+  const openIssueCount = typeof input?.openIssueCount === "number" ? input.openIssueCount : issues.length;
+  const openPullRequestCount = typeof input?.openPullRequestCount === "number"
+    ? input.openPullRequestCount
+    : (evidence.pullRequests ?? []).filter((pr) => isOpenState(pr?.state)).length;
+  const childIssues = issues.filter((number) => number !== epicNumber);
+  const activeKinds = [
+    hasActiveBranch(evidence) ? "active-branch" : null,
+    hasActiveWorktree(evidence) ? "active-worktree" : null,
+    hasActiveSession(evidence) ? "active-session" : null,
+    hasOpenPullRequest(evidence) ? "open-pull-request" : null,
+    (evidence?.processes ?? []).some((process) =>
+      isOpenState(process?.state) || process?.active === true
+    ) ? "active-process" : null,
+  ].filter(Boolean);
+  const cleanPostMergeEcho = Boolean(input?.clean === true && input?.branch === "main" && input?.ahead === 0 && input?.behind === 0);
+  const epicPlusSingleIdleChildInventory =
+    openIssueCount === 2
+    && issues.length === 2
+    && issues.includes(epicNumber)
+    && childIssues.length === 1
+    && openPullRequestCount === 0;
+  const requiresSpawnOrAdoption = cleanPostMergeEcho && epicPlusSingleIdleChildInventory && activeKinds.length === 0;
+
+  return {
+    issue: "#1046",
+    epic: `#${epicNumber}`,
+    classification: requiresSpawnOrAdoption
+      ? "clean-epic-plus-idle-child-session-whip-idle"
+      : "active-child-work-adopted",
+    cleanPostMergeEcho,
+    epicPlusSingleIdleChildInventory,
+    activeDevelopmentAllowed: !requiresSpawnOrAdoption,
+    statusOnlyCheckMayEndOnCleanEcho: false,
+    requiredConcreteChildArtifacts: [
+      "active-session",
+      "active-branch",
+      "open-pull-request",
+      "active-worktree",
+      "active-process",
+    ],
+    activeEvidenceKinds: activeKinds,
+    mutationBoundary: {
+      mutatesGitHubIssues: false,
+      changesMergePolicy: false,
+      changesProviderRuntimeHooks: false,
+      changesTelemetry: false,
+      changesBillingTokenProof: false,
+      changesDetectorScope: false,
+      changesProductClaims: false,
+      reopensClosedArtifacts: false,
+    },
+    rule: "A clean post-merge session-whip/operator-check snapshot with only planning epic #960 plus one idle child issue and no active branch, session, PR, worktree, or process is status-only and must spawn or adopt concrete child work before claiming active development.",
+  };
+}
+
 export function classifyStaleEpicChecklistCandidate(input) {
   const activeKinds = activeEvidenceKinds(input?.evidence ?? {});
   const hasUncheckedEpicChecklistText = Boolean(input?.uncheckedEpicChecklistText);

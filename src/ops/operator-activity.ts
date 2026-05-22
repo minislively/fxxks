@@ -698,12 +698,14 @@ function buildCurrentRunReceipt(input: {
   openPullRequests?: number;
   mainEchoEvidence: boolean;
   advisoryPlanningEpicOnly: boolean;
+  advisoryPlanningEpicPlusSingleChild: boolean;
 }): OperatorActivityCurrentRunReceipt {
   const evidenceKinds: OperatorActivityCurrentRunReceipt["evidenceKinds"] = [];
   const activeParts: string[] = [];
   const idleParts: string[] = [];
 
-  if (typeof input.openIssues === "number" && input.openIssues > 0 && !input.advisoryPlanningEpicOnly) {
+  const advisoryIssueInventory = input.advisoryPlanningEpicOnly || input.advisoryPlanningEpicPlusSingleChild;
+  if (typeof input.openIssues === "number" && input.openIssues > 0 && !advisoryIssueInventory) {
     evidenceKinds.push("issue");
     activeParts.push(plural(input.openIssues, "open issue"));
   }
@@ -731,6 +733,7 @@ function buildCurrentRunReceipt(input: {
   if (input.fooksSessionCount === 0) idleParts.push("no mapped fooks sessions");
   if (input.openIssues === 0 && input.openPullRequests === 0) idleParts.push("zero open issues/PRs");
   if (input.advisoryPlanningEpicOnly) idleParts.push("only planning epic #960 is open");
+  if (input.advisoryPlanningEpicPlusSingleChild) idleParts.push("planning epic #960 plus one idle child issue only");
   if (input.worktree.clean === false && hasOnlyFooksSessionTaskDelta(input.worktree)) {
     idleParts.push(".fooks-session-task.txt-only delta is not active work proof");
   }
@@ -1022,6 +1025,20 @@ export function hasOnlyPlanningEpicOpenIssue(counts: OperatorActivityRemoteCount
     && counts.openIssueNumbers?.length === 1
     && counts.openIssueNumbers[0] === OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER,
   );
+}
+
+export function hasPlanningEpicPlusSingleChildOpenIssue(counts: OperatorActivityRemoteCounts): boolean {
+  if (
+    !counts.enabled
+    || counts.openIssues !== 2
+    || (counts.openPullRequests ?? 0) !== 0
+    || counts.openIssueNumbers?.length !== 2
+  ) {
+    return false;
+  }
+
+  return counts.openIssueNumbers.includes(OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER)
+    && counts.openIssueNumbers.some((number) => number !== OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER);
 }
 
 function readRemoteCounts(cwd: string, options: OperatorActivityOptions): OperatorActivityRemoteCounts {
@@ -1498,7 +1515,9 @@ function buildCurrentRunEvidence(
   const noSessions = fooksSessionCount === 0;
   const zeroRemoteCounts = remoteCountsAvailable && openIssues === 0 && openPullRequests === 0;
   const advisoryPlanningEpicOnly = hasOnlyPlanningEpicOpenIssue(optionalCounts);
-  const remoteCountsIdle = zeroRemoteCounts || advisoryPlanningEpicOnly;
+  const advisoryPlanningEpicPlusSingleChild = hasPlanningEpicPlusSingleChildOpenIssue(optionalCounts);
+  const advisoryIssueInventory = advisoryPlanningEpicOnly || advisoryPlanningEpicPlusSingleChild;
+  const remoteCountsIdle = zeroRemoteCounts || advisoryIssueInventory;
 
   if (!optionalCounts.enabled) {
     blockers.push("remote issue/PR counts disabled; pass --include-remote-counts to prove zero open issue/PR reminder evidence");
@@ -1523,6 +1542,9 @@ function buildCurrentRunEvidence(
   }
   if (zeroRemoteCounts) reasons.push("open issue and pull request counts are both zero");
   if (advisoryPlanningEpicOnly) reasons.push("only open issue is planning epic #960; it is advisory and not active work evidence");
+  if (advisoryPlanningEpicPlusSingleChild) {
+    reasons.push("open issue inventory is planning epic #960 plus one idle child issue; a status-only receipt must spawn or adopt a concrete branch, session, PR, worktree, or process before claiming active work");
+  }
   if (legacyWorktreeEvidence.staleClosedArtifactWorktreeCount > 0) {
     reasons.push("legacy closed-artifact worktree evidence is separated from active current-run evidence");
   }
@@ -1532,7 +1554,7 @@ function buildCurrentRunEvidence(
     (Boolean(worktree.branch) && worktree.branch !== "main" && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     (worktree.clean === false && !hasOnlyFooksSessionTaskDelta(worktree)) ||
     fooksSessionCount > 0 ||
-    (optionalCounts.enabled && (((openIssues ?? 0) > 0 && !advisoryPlanningEpicOnly) || (openPullRequests ?? 0) > 0));
+    (optionalCounts.enabled && (((openIssues ?? 0) > 0 && !advisoryIssueInventory) || (openPullRequests ?? 0) > 0));
   const receipt = buildCurrentRunReceipt({
     worktree,
     fooksSessionCount,
@@ -1540,6 +1562,7 @@ function buildCurrentRunEvidence(
     openPullRequests,
     mainEchoEvidence,
     advisoryPlanningEpicOnly,
+    advisoryPlanningEpicPlusSingleChild,
   });
 
   return {

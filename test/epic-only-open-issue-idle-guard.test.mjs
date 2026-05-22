@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  classifyCleanEpicAdvisoryInventorySessionWhip,
   classifyCleanEpicOnlySessionWhip,
   classifyEpicOnlyOpenIssueState,
 } from "./helpers/stale-epic-checklist-boundary.mjs";
@@ -15,6 +16,9 @@ const compactDoc = doc.replace(/\s+/gu, " ");
 const issue1040DocPath = path.join(repoRoot, "docs", "dogfood", "clean-epic-only-session-whip-1040.md");
 const issue1040Doc = fs.readFileSync(issue1040DocPath, "utf8");
 const compactIssue1040Doc = issue1040Doc.replace(/\s+/gu, " ");
+const issue1046DocPath = path.join(repoRoot, "docs", "dogfood", "clean-epic-advisory-inventory-spawn-child-1046.md");
+const issue1046Doc = fs.readFileSync(issue1046DocPath, "utf8");
+const compactIssue1046Doc = issue1046Doc.replace(/\s+/gu, " ");
 
 function extractJsonFence(markdown) {
   const match = markdown.match(/```json\n([\s\S]*?)\n```/u);
@@ -239,5 +243,127 @@ test("issue #1040 dogfood doc preserves the clean epic-only session-whip boundar
     "product claims",
   ]) {
     assert.ok(compactIssue1040Doc.includes(required), `missing #1040 doc text: ${required}`);
+  }
+});
+
+test("issue #1046 helper treats clean epic plus idle child inventory as status-only", () => {
+  assert.deepEqual(
+    classifyCleanEpicAdvisoryInventorySessionWhip({
+      epic: "#960",
+      branch: "main",
+      clean: true,
+      ahead: 0,
+      behind: 0,
+      openIssueCount: 2,
+      openPullRequestCount: 0,
+      evidence: {
+        issues: [{ number: 960, state: "open" }, { number: 1046, state: "open" }],
+        branches: [],
+        worktrees: [],
+        sessions: [],
+        pullRequests: [],
+        processes: [],
+      },
+    }),
+    {
+      issue: "#1046",
+      epic: "#960",
+      classification: "clean-epic-plus-idle-child-session-whip-idle",
+      cleanPostMergeEcho: true,
+      epicPlusSingleIdleChildInventory: true,
+      activeDevelopmentAllowed: false,
+      statusOnlyCheckMayEndOnCleanEcho: false,
+      requiredConcreteChildArtifacts: [
+        "active-session",
+        "active-branch",
+        "open-pull-request",
+        "active-worktree",
+        "active-process",
+      ],
+      activeEvidenceKinds: [],
+      mutationBoundary: {
+        mutatesGitHubIssues: false,
+        changesMergePolicy: false,
+        changesProviderRuntimeHooks: false,
+        changesTelemetry: false,
+        changesBillingTokenProof: false,
+        changesDetectorScope: false,
+        changesProductClaims: false,
+        reopensClosedArtifacts: false,
+      },
+      rule: "A clean post-merge session-whip/operator-check snapshot with only planning epic #960 plus one idle child issue and no active branch, session, PR, worktree, or process is status-only and must spawn or adopt concrete child work before claiming active development.",
+    },
+  );
+});
+
+test("issue #1046 helper keeps active child work artifacts active", () => {
+  for (const [name, evidence, expectedKind] of [
+    ["active session", { issues: [{ number: 960, state: "open" }, { number: 1046, state: "open" }], sessions: [{ session: "fooks-issue-1046", active: true }] }, "active-session"],
+    ["active branch", { issues: [{ number: 960, state: "open" }, { number: 1046, state: "open" }], branches: [{ name: "fooks-issue-1046-clean-epic-advisory-inventory", active: true }] }, "active-branch"],
+    ["open PR", { issues: [{ number: 960, state: "open" }, { number: 1046, state: "open" }], pullRequests: [{ number: 1049, state: "open" }] }, "open-pull-request"],
+    ["active worktree", { issues: [{ number: 960, state: "open" }, { number: 1046, state: "open" }], worktrees: [{ path: "/tmp/fooks-1046", active: true }] }, "active-worktree"],
+    ["active process", { issues: [{ number: 960, state: "open" }, { number: 1046, state: "open" }], processes: [{ pid: 1046, active: true }] }, "active-process"],
+  ]) {
+    const result = classifyCleanEpicAdvisoryInventorySessionWhip({
+      epic: "#960",
+      branch: "main",
+      clean: true,
+      ahead: 0,
+      behind: 0,
+      openIssueCount: 2,
+      openPullRequestCount: expectedKind === "open-pull-request" ? 1 : 0,
+      evidence,
+    });
+    assert.equal(result.classification, "active-child-work-adopted", name);
+    assert.equal(result.activeDevelopmentAllowed, true, name);
+    assert.deepEqual(result.activeEvidenceKinds, [expectedKind], name);
+  }
+});
+
+test("issue #1046 dogfood doc preserves the clean epic/advisory inventory spawn-or-adopt guard", () => {
+  const report = extractJsonFence(issue1046Doc);
+
+  assert.equal(report.issue, "#1046");
+  assert.equal(report.readOnly, true);
+  assert.equal(report.sourceEpic, "#960");
+  assert.equal(report.postMergeReceipt, "PR #1048");
+  assert.equal(report.operatorDecision.classification, "clean-epic-plus-idle-child-session-whip-idle");
+  assert.equal(report.operatorDecision.statusOnlyCheckMayEndOnCleanEcho, false);
+  assert.equal(report.operatorDecision.activeDevelopmentAllowed, false);
+  assert.deepEqual(report.operatorDecision.activeDevelopmentRequiresOneOf, [
+    "active-session",
+    "active-branch",
+    "open-pull-request",
+    "active-worktree",
+    "active-process",
+  ]);
+  assert.match(report.operatorDecision.rule, /only planning epic #960 plus one idle child issue/);
+
+  for (const required of [
+    "narrow read-only dogfood docs/test/operator-check/session-whip guard",
+    "after PR #1048",
+    "Epic `#960` plus one concrete but idle child issue",
+    "`open_pr=0`",
+    "no active branch",
+    "no mapped tmux session",
+    "no open PR",
+    "status-only check/whip receipt",
+    "`clean-epic-plus-idle-child-session-whip-idle`",
+    "must spawn or adopt concrete child work",
+    "active session",
+    "active branch",
+    "open PR",
+    "active worktree",
+    "active process",
+    "does not mutate GitHub issues automatically",
+    "change merge policy",
+    "provider/runtime hooks",
+    "telemetry",
+    "billing/token proof",
+    "detector scope",
+    "product claims",
+    "reopen closed PRs or issues",
+  ]) {
+    assert.ok(compactIssue1046Doc.includes(required), `missing #1046 doc text: ${required}`);
   }
 });
