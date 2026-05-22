@@ -358,12 +358,14 @@ function withEnv(overrides, fn) {
 
 test("init creates config and cache contract", () => {
   const tempDir = makeTempProject();
-  const result = run(["init"], tempDir);
-  assert.ok(result.config.endsWith(path.join(".fooks", "config.json")));
-  assert.ok(result.cacheDir.endsWith(path.join(".fooks", "cache")));
-  assert.ok(fs.existsSync(path.join(tempDir, ".fooks", "config.json")));
-  const config = JSON.parse(fs.readFileSync(path.join(tempDir, ".fooks", "config.json"), "utf8"));
-  assert.equal(config.targetAccount, "<your-github-org>");
+  withEnv({ FOOKS_TARGET_ACCOUNT: undefined }, () => {
+    const result = run(["init"], tempDir);
+    assert.ok(result.config.endsWith(path.join(".fooks", "config.json")));
+    assert.ok(result.cacheDir.endsWith(path.join(".fooks", "cache")));
+    assert.ok(fs.existsSync(path.join(tempDir, ".fooks", "config.json")));
+    const config = JSON.parse(fs.readFileSync(path.join(tempDir, ".fooks", "config.json"), "utf8"));
+    assert.equal(config.targetAccount, "<your-github-org>");
+  });
 });
 
 test("init prefers FOOKS_TARGET_ACCOUNT for canonical config writes", () => {
