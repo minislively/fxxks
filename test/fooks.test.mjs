@@ -3963,6 +3963,7 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks inspect react-web-label-preview <file> \[--json\]/);
   assert.match(help, /fooks inspect react-web-issues <file> \[--json\|--summary-json\|--dry-run-json\]/);
   assert.match(help, /fooks inspect-domain <file> \[--json\] \[--domain-memory-receipt\] \[--context-decision\]/);
+  assert.match(help, /fooks domain-memory verify --receipt <receipt\.json> --file <file> --json/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /fooks status react-web \[--json\] \[--handoff-resume-json <file>\]/);
   assert.match(help, /fooks status artifacts/);

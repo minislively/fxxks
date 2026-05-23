@@ -5,6 +5,7 @@ import { performance } from "node:perf_hooks";
 import type { ExtractionResult } from "../core/schema";
 import type { ContextDecision } from "../core/context-decision";
 import type { DomainMemoryReceipt } from "../core/domain-memory-receipt";
+import type { DomainMemoryVerifyResult } from "../core/domain-memory-verify";
 import type { InspectDomainReactNativeSourceAnchorBeta } from "../core/react-native-proof-surface";
 
 function print(value: unknown): void {
@@ -646,7 +647,7 @@ async function runSetup(displayCliName: string, cwd = process.cwd()): Promise<Re
 }
 
 function printHelp(displayCliName: string): void {
-  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|handoff|stale-context|run|scan|extract|compare|decide|explain|inspect|inspect-domain|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
+  console.log(`Usage: ${displayCliName} <init|setup|doctor|check|preflight|handoff|stale-context|run|scan|extract|compare|decide|explain|inspect|inspect-domain|domain-memory|attach|install|status|codex-pre-read|codex-runtime-hook|claude-runtime-hook>
 
 Everyday commands:
   ${displayCliName} setup
@@ -683,6 +684,7 @@ Everyday commands:
   ${displayCliName} inspect react-web-label-preview <file> [--json]
   ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
   ${displayCliName} inspect-domain <file> [--json] [--domain-memory-receipt] [--context-decision]
+  ${displayCliName} domain-memory verify --receipt <receipt.json> --file <file> --json
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
@@ -835,6 +837,48 @@ function parseInspectDomainArgs(args: string[]): { filePath: string; json: boole
   }
 
   return { filePath: requireFilePath(filePath), json, domainMemoryReceipt, contextDecision };
+}
+
+function parseDomainMemoryArgs(args: string[]): {
+  receiptPath: string;
+  filePath: string;
+} {
+  const [action, ...rest] = args;
+  if (action !== "verify") {
+    throw new Error("domain-memory expects 'verify'");
+  }
+
+  let receiptPath: string | undefined;
+  let filePath: string | undefined;
+  let json = false;
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index];
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--receipt") {
+      receiptPath = rest[index + 1];
+      index += 1;
+      continue;
+    }
+    if (arg === "--file") {
+      filePath = rest[index + 1];
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unexpected domain-memory verify argument: ${arg}`);
+  }
+
+  if (!json) {
+    throw new Error("domain-memory verify requires --json");
+  }
+
+  return {
+    receiptPath: requireFilePath(receiptPath),
+    filePath: requireFilePath(filePath),
+  };
 }
 
 function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode: "text" | "json" | "summary-json" | "dry-run-json" } {
@@ -1572,6 +1616,48 @@ async function run(): Promise<void> {
         reactNativeSourceAnchorBeta,
         domainMemoryReceipt,
         contextDecision,
+      }));
+      return;
+    }
+    case "domain-memory": {
+      let options: ReturnType<typeof parseDomainMemoryArgs>;
+      try {
+        options = parseDomainMemoryArgs(rest);
+      } catch (error) {
+        console.error(`fooks domain-memory: ${error instanceof Error ? error.message : String(error)}`);
+        process.exitCode = 1;
+        return;
+      }
+
+      const [
+        { detectDomainFromSource },
+        { verifyDomainMemoryReceipt, unsupportedDomainMemoryVerifyResult },
+      ] = await Promise.all([
+        import("../core/domain-detector.js"),
+        import("../core/domain-memory-verify.js"),
+      ]);
+      const sourceText = fs.readFileSync(options.filePath, "utf8");
+      let receipt: unknown;
+      try {
+        receipt = JSON.parse(fs.readFileSync(options.receiptPath, "utf8"));
+      } catch (error) {
+        const result: DomainMemoryVerifyResult = unsupportedDomainMemoryVerifyResult({
+          filePath: options.filePath,
+          receiptPath: options.receiptPath,
+          cwd: process.cwd(),
+          reason: `receipt JSON could not be parsed: ${error instanceof Error ? error.message : String(error)}`,
+        });
+        print(result);
+        return;
+      }
+
+      print(verifyDomainMemoryReceipt({
+        receipt,
+        receiptPath: options.receiptPath,
+        filePath: options.filePath,
+        cwd: process.cwd(),
+        sourceText,
+        domainDetection: detectDomainFromSource(sourceText, options.filePath),
       }));
       return;
     }
