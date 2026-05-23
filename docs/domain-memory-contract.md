@@ -180,3 +180,17 @@ This lane does not search cache directories, does not persist receipts, and does
 If the explicit receipt is `stale`, `incompatible`, `unsupported`, missing, or unreadable, the runtime hook fails closed to full-read guidance. The stale receipt is not silently ignored, because an explicit receipt hint means the prompt is asking the runtime to rely on that evidence.
 
 This lane still does not add pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims. Automatic cache lookup and pre-read consumers require separate plans.
+
+## Lookup diagnostic lane
+
+The next consumer-adjacent lane is an advisory-only lookup diagnostic:
+
+```bash
+fooks domain-memory lookup --file src/Foo.tsx --json
+```
+
+The lookup recursively scans only the project-local `.fooks/domain-memory/` directory for JSON receipts, rejects symlinked lookup directories, verifies every candidate with the same freshness verifier, and returns a machine-readable status: `not-found`, `fresh`, `stale`, `incompatible`, `unsupported`, or `ambiguous`.
+
+A `fresh` lookup means exactly one receipt is fresh for report/advisory evidence only. The machine result still carries `authorization: "none"` and `advisoryOnly: true`; any `advisoryReceiptPath` is evidence-only, not permission. Multiple fresh receipts are `ambiguous` and must not be auto-selected. Stale, incompatible, unsupported, mixed fresh/non-fresh, missing, unreadable, or ambiguous lookup results do not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims.
+
+This lane intentionally does not change runtime hook behavior, pre-read decisions, cache storage, or model-facing payloads. Runtime automatic advisory lookup, pre-read appendices, and any payload/cache reuse require separate plans and tests.
