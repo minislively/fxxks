@@ -1,5 +1,6 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
 import type { DomainDetectionResult } from "./domain-detector";
+import type { DomainMemoryVerifyResult } from "./domain-memory-verify";
 import type { ProjectKnowledgeMetadata } from "./project-knowledge";
 import type { DomainPayload } from "./payload/domain-payload";
 import type { FrontendConcernProfile } from "./concern-profiles/types";
@@ -749,6 +750,13 @@ export type CodexRuntimeHookDecision = {
       score: number;
       reasons: string[];
       skipReasons: string[];
+    };
+    domainMemoryAdvisory?: {
+      requested: boolean;
+      receiptPath?: string;
+      status?: DomainMemoryVerifyResult["status"];
+      safeNextAction?: DomainMemoryVerifyResult["safeNextAction"];
+      reasons: string[];
     };
   };
   fallback?: {

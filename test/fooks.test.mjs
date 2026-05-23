@@ -42,6 +42,7 @@ const { RAW_ORIGINAL_SIZE_THRESHOLD_BYTES } = require(path.join(repoRoot, "dist"
 const { toModelFacingPayload } = require(path.join(repoRoot, "dist", "core", "payload", "model-facing.js"));
 const { assessPayloadReadiness } = require(path.join(repoRoot, "dist", "core", "payload", "readiness.js"));
 const { detectDomain, detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+const { buildDomainMemoryReceipt } = require(path.join(repoRoot, "dist", "core", "domain-memory-receipt.js"));
 const codexPreReadModule = require(path.join(repoRoot, "dist", "adapters", "codex-pre-read.js"));
 const { decideCodexPreRead } = codexPreReadModule;
 const preReadModule = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
@@ -280,6 +281,22 @@ function writeProjectKnowledgeFixture(tempDir, overrides = {}) {
     fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
     fs.writeFileSync(path.join(tempDir, ".fooks", "project-knowledge.json"), JSON.stringify(overrides.ignoredRuleFile, null, 2));
   }
+}
+
+function writeDomainMemoryReceipt(tempDir, target, name = "domain-memory-receipt.json") {
+  const filePath = path.join(tempDir, target);
+  const sourceText = fs.readFileSync(filePath, "utf8");
+  const receipt = buildDomainMemoryReceipt({
+    filePath,
+    cwd: tempDir,
+    sourceText,
+    domainDetection: detectDomainFromSource(sourceText, filePath),
+  });
+  const receiptDir = path.join(tempDir, ".fooks", "domain-memory");
+  fs.mkdirSync(receiptDir, { recursive: true });
+  const receiptPath = path.join(receiptDir, name);
+  fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  return path.relative(tempDir, receiptPath);
 }
 
 function makeTempTsJsBetaProject(repositoryUrl = "https://github.com/minislively/temp-ts-js-project.git") {
@@ -2216,6 +2233,84 @@ test("codex runtime hook records first matching exact-file prompt without projec
   assert.equal(lastEvent.authority, "tracked");
   assert.equal(lastEvent.rulesPath, DEFAULT_PROJECT_KNOWLEDGE_RULES_PATH);
   assert.equal(lastEvent.mode, "advisory");
+});
+
+test("codex runtime hook appends fresh explicit domain-memory receipt as advisory-only context", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-domain-memory-fresh-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  const receiptPath = writeDomainMemoryReceipt(tempDir, target);
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please inspect ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, inspect ${target} with domain-memory receipt ${receiptPath}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "inject");
+  assert.ok(second.additionalContext.includes("FOOKS DOMAIN MEMORY ADVISORY"));
+  assert.ok(second.additionalContext.includes("- Status: fresh; safe next action: reuse-for-report-only."));
+  assert.ok(second.additionalContext.includes("advisory-only report evidence"));
+  assert.ok(second.additionalContext.includes("does not authorize runtime reuse"));
+  assert.ok(second.additionalContext.includes("does not authorize pre-read reuse"));
+  assert.ok(second.additionalContext.includes("does not authorize cache reuse"));
+  assert.equal(second.debug.domainMemoryAdvisory.requested, true);
+  assert.equal(second.debug.domainMemoryAdvisory.status, "fresh");
+  assert.equal(second.debug.domainMemoryAdvisory.safeNextAction, "reuse-for-report-only");
+  assert.equal(second.reasons.includes("domain-memory-receipt-not-fresh"), false);
+});
+
+test("codex runtime hook fails closed when explicit domain-memory receipt is stale", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-domain-memory-stale-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  const receiptPath = writeDomainMemoryReceipt(tempDir, target);
+  fs.appendFileSync(path.join(tempDir, target), "\nexport const changedAfterReceipt = true;\n");
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please inspect ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, inspect ${target} with domain-memory receipt ${receiptPath}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "fallback");
+  assert.equal(second.contextMode, "full");
+  assert.equal(second.contextModeReason, "domain-memory-receipt-not-fresh");
+  assert.equal(second.fallback.action, "full-read");
+  assert.equal(second.fallback.reason, "domain-memory-receipt-not-fresh");
+  assert.ok(second.reasons.includes("domain-memory-receipt-not-fresh"));
+  assert.ok(second.reasons.includes("domain-memory-receipt:stale"));
+  assert.equal(second.debug.domainMemoryAdvisory.requested, true);
+  assert.equal(second.debug.domainMemoryAdvisory.status, "stale");
+  assert.equal(second.debug.domainMemoryAdvisory.safeNextAction, "rerun-inspect-domain");
 });
 
 test("runtime hook falls back when repeated-file payload build throws", () => {

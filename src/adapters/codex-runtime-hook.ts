@@ -3,6 +3,8 @@ import path from "node:path";
 import { decidePreRead } from "./pre-read";
 import { hasFullReadEscapeHatch, resolvePromptFileContext } from "./prompt-context";
 import { discoverProjectFiles } from "../core/discover";
+import { detectDomainFromSource } from "../core/domain-detector";
+import { unsupportedDomainMemoryVerifyResult, verifyDomainMemoryReceipt } from "../core/domain-memory-verify";
 import { appendProjectKnowledgeBlock, resolveProjectKnowledgeContext } from "../core/project-knowledge";
 import { buildPreReadReuseStatus } from "./codex-runtime-status";
 import { clearCodexActiveFile, ensureFreshCodexContextForTarget, markCodexAttachPrepared, markCodexReady } from "./codex-runtime-trust";
@@ -30,6 +32,7 @@ const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|mo
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const EDIT_GUIDANCE_CONTEXT_MAX_BYTES = 8_192;
 const PREFLIGHT_ADVISORY_CONTEXT_MARKER = "FOOKS PREFLIGHT ADVISORY";
+const DOMAIN_MEMORY_ADVISORY_CONTEXT_MARKER = "FOOKS DOMAIN MEMORY ADVISORY";
 const PREFLIGHT_ISSUE_OR_PR_PATTERN = /(?:#\d+\b|\b(?:issue|issues|pr|pull\s+request)\s*#?\d+\b)/iu;
 const PREFLIGHT_TEST_COMMAND_PATTERN = /(?:\bnpm\s+(?:run\s+)?test\b|\bnode\s+--test\b|\bpytest\b|\bvitest\b|\bjest\b|테스트)/iu;
 const PREFLIGHT_STACK_OR_ERROR_PATTERN = /(?:\b(?:typeerror|referenceerror|syntaxerror|stack\s+trace|traceback|failed|failure|exception|error)\b|에러|오류|실패|스택|이상한데)/iu;
@@ -178,6 +181,102 @@ function compactRuntimeReactWebContext(
 type RuntimeReactWebContextPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebContextPacking"]>;
 type CodexRuntimeDebug = NonNullable<CodexRuntimeHookDecision["debug"]>;
 type PreflightAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["preflightAdvisoryIntent"]>;
+type DomainMemoryAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["domainMemoryAdvisory"]>;
+
+function unquotePromptPath(value: string): string {
+  return value.replace(/^["'`]+|["'`,.;:)]+$/gu, "");
+}
+
+function resolveDomainMemoryReceiptHint(prompt: string, cwd: string): { receiptPath?: string; reasons: string[] } {
+  const match =
+    /(?:--receipt|domain-memory\s+receipt|domain\s+memory\s+receipt)\s+(?<path>["'`]?[^\s"'`]+\.json["'`]?)/iu.exec(prompt);
+  const rawPath = match?.groups?.path;
+  if (!rawPath) return { reasons: [] };
+
+  const receiptPath = path.resolve(cwd, unquotePromptPath(rawPath));
+  const relative = path.relative(cwd, receiptPath) || path.basename(receiptPath);
+  if (!fs.existsSync(receiptPath) || !fs.statSync(receiptPath).isFile()) {
+    return {
+      receiptPath,
+      reasons: [`domain-memory receipt hint not readable: ${relative}`],
+    };
+  }
+  return { receiptPath, reasons: [] };
+}
+
+function verifyDomainMemoryAdvisory(
+  prompt: string,
+  target: string,
+  cwd: string,
+): { requested: boolean; result?: ReturnType<typeof verifyDomainMemoryReceipt>; debug: DomainMemoryAdvisoryDebugReceipt } {
+  const hint = resolveDomainMemoryReceiptHint(prompt, cwd);
+  if (!hint.receiptPath && hint.reasons.length === 0) {
+    return { requested: false, debug: { requested: false, reasons: [] } };
+  }
+
+  const filePath = path.join(cwd, target);
+  const receiptPath = hint.receiptPath ?? path.join(cwd, "__missing-domain-memory-receipt__.json");
+  const sourceText = fs.readFileSync(filePath, "utf8");
+  let receipt: unknown;
+  let result: ReturnType<typeof verifyDomainMemoryReceipt>;
+  try {
+    receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+    result = verifyDomainMemoryReceipt({
+      receipt,
+      receiptPath,
+      filePath,
+      cwd,
+      sourceText,
+      domainDetection: detectDomainFromSource(sourceText, filePath),
+    });
+  } catch (error) {
+    result = unsupportedDomainMemoryVerifyResult({
+      filePath,
+      receiptPath,
+      cwd,
+      reason: hint.reasons[0] ?? `domain-memory receipt could not be verified: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+
+  return {
+    requested: true,
+    result,
+    debug: {
+      requested: true,
+      receiptPath: result.receiptPath,
+      status: result.status,
+      safeNextAction: result.safeNextAction,
+      reasons: result.reasons,
+    },
+  };
+}
+
+function renderDomainMemoryAdvisoryContext(result: ReturnType<typeof verifyDomainMemoryReceipt>): string {
+  return [
+    DOMAIN_MEMORY_ADVISORY_CONTEXT_MARKER,
+    `- Source: explicit prompt-provided receipt ${result.receiptPath}; verified against ${result.filePath}.`,
+    `- Status: ${result.status}; safe next action: ${result.safeNextAction}.`,
+    `- Reasons: ${result.reasons.join(", ")}.`,
+    `- Non-claims: ${result.nonClaims.join("; ")}.`,
+    "- Boundary: advisory-only report evidence; does not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/billing/runtime savings claims.",
+  ].join("\n");
+}
+
+function attachDomainMemoryAdvisoryDebug(
+  runtimeDecision: CodexRuntimeHookDecision,
+  receipt: DomainMemoryAdvisoryDebugReceipt,
+): CodexRuntimeHookDecision {
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
+  };
+  runtimeDecision.debug = {
+    ...debug,
+    domainMemoryAdvisory: receipt,
+  };
+  return runtimeDecision;
+}
 
 function preflightAdvisoryDebugReceipt(decision: PreflightAdvisoryDecision): PreflightAdvisoryDebugReceipt {
   return {
@@ -697,6 +796,35 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
   }
 
   const originalEstimatedBytes = targetEstimatedBytes(cwd, target);
+  const domainMemoryAdvisory = verifyDomainMemoryAdvisory(prompt, target, cwd);
+  if (domainMemoryAdvisory.requested && domainMemoryAdvisory.result?.status !== "fresh") {
+    markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
+    const runtimeDecision = fallbackDecision(
+      hookEventName,
+      target,
+      statePath,
+      [
+        "repeated-file",
+        "domain-memory-receipt-not-fresh",
+        ...(domainMemoryAdvisory.result ? [`domain-memory-receipt:${domainMemoryAdvisory.result.status}`] : []),
+      ],
+      true,
+      true,
+      false,
+      "domain-memory-receipt-not-fresh",
+      policy,
+      decision,
+    );
+    attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
+    attachDomainMemoryAdvisoryDebug(runtimeDecision, domainMemoryAdvisory.debug);
+    recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
+      originalEstimatedBytes,
+      actualEstimatedBytes: originalEstimatedBytes,
+      comparableForSavings: originalEstimatedBytes !== undefined,
+    });
+    return attachReactWebEvidenceArtifact(cwd, runtimeDecision);
+  }
+
   const editGuidanceAllowed =
     decision.decision === "payload" &&
     Boolean(decision.payload?.sourceFingerprint) &&
@@ -724,7 +852,13 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     const contextMode = payloadContextMode(decision.payload);
     const runtimeContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes);
     const projectKnowledge = resolveProjectKnowledgeContext(prompt, [target], cwd);
-    const additionalContext = appendProjectKnowledgeBlock(runtimeContext.additionalContext, projectKnowledge?.block);
+    const advisoryContext = domainMemoryAdvisory.result?.status === "fresh"
+      ? renderDomainMemoryAdvisoryContext(domainMemoryAdvisory.result)
+      : undefined;
+    const additionalContext = appendProjectKnowledgeBlock(
+      [runtimeContext.additionalContext, advisoryContext].filter(Boolean).join("\n\n"),
+      projectKnowledge?.block,
+    );
     const { reactWebContextPacking } = runtimeContext;
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
@@ -756,6 +890,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       },
     };
     attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
+    if (domainMemoryAdvisory.requested) {
+      attachDomainMemoryAdvisoryDebug(runtimeDecision, domainMemoryAdvisory.debug);
+    }
 
     if (decision.payload.domainPayload?.domain === "react-web" && !decision.payload.useOriginal) {
       const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
@@ -812,6 +949,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     decision,
   );
   attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
+  if (domainMemoryAdvisory.requested) {
+    attachDomainMemoryAdvisoryDebug(runtimeDecision, domainMemoryAdvisory.debug);
+  }
   recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
     originalEstimatedBytes,
     actualEstimatedBytes: originalEstimatedBytes,
