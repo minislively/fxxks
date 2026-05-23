@@ -6,6 +6,7 @@ import type { ExtractionResult } from "../core/schema";
 import type { ContextDecision } from "../core/context-decision";
 import type { DomainMemoryReceipt } from "../core/domain-memory-receipt";
 import type { DomainMemoryVerifyResult } from "../core/domain-memory-verify";
+import type { DomainMemoryLookupResult } from "../core/domain-memory-lookup";
 import type { InspectDomainReactNativeSourceAnchorBeta } from "../core/react-native-proof-surface";
 
 function print(value: unknown): void {
@@ -685,6 +686,7 @@ Everyday commands:
   ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
   ${displayCliName} inspect-domain <file> [--json] [--domain-memory-receipt] [--context-decision]
   ${displayCliName} domain-memory verify --receipt <receipt.json> --file <file> --json
+  ${displayCliName} domain-memory lookup --file <file> --json
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
@@ -839,13 +841,12 @@ function parseInspectDomainArgs(args: string[]): { filePath: string; json: boole
   return { filePath: requireFilePath(filePath), json, domainMemoryReceipt, contextDecision };
 }
 
-function parseDomainMemoryArgs(args: string[]): {
-  receiptPath: string;
-  filePath: string;
-} {
+function parseDomainMemoryArgs(args: string[]):
+  | { action: "verify"; receiptPath: string; filePath: string }
+  | { action: "lookup"; filePath: string } {
   const [action, ...rest] = args;
-  if (action !== "verify") {
-    throw new Error("domain-memory expects 'verify'");
+  if (action !== "verify" && action !== "lookup") {
+    throw new Error("domain-memory expects 'verify' or 'lookup'");
   }
 
   let receiptPath: string | undefined;
@@ -858,7 +859,7 @@ function parseDomainMemoryArgs(args: string[]): {
       json = true;
       continue;
     }
-    if (arg === "--receipt") {
+    if (action === "verify" && arg === "--receipt") {
       receiptPath = rest[index + 1];
       index += 1;
       continue;
@@ -868,14 +869,19 @@ function parseDomainMemoryArgs(args: string[]): {
       index += 1;
       continue;
     }
-    throw new Error(`Unexpected domain-memory verify argument: ${arg}`);
+    throw new Error(`Unexpected domain-memory ${action} argument: ${arg}`);
   }
 
   if (!json) {
-    throw new Error("domain-memory verify requires --json");
+    throw new Error(`domain-memory ${action} requires --json`);
+  }
+
+  if (action === "lookup") {
+    return { action, filePath: requireFilePath(filePath) };
   }
 
   return {
+    action,
     receiptPath: requireFilePath(receiptPath),
     filePath: requireFilePath(filePath),
   };
@@ -1626,6 +1632,13 @@ async function run(): Promise<void> {
       } catch (error) {
         console.error(`fooks domain-memory: ${error instanceof Error ? error.message : String(error)}`);
         process.exitCode = 1;
+        return;
+      }
+
+      if (options.action === "lookup") {
+        const { lookupDomainMemoryReceipts } = await import("../core/domain-memory-lookup.js");
+        const result: DomainMemoryLookupResult = lookupDomainMemoryReceipts(options.filePath, process.cwd());
+        print(result);
         return;
       }
 

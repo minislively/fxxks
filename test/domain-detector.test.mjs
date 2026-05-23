@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { detectDomain, detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
+const { lookupDomainMemoryReceipts } = require(path.join(repoRoot, "dist", "core", "domain-memory-lookup.js"));
 
 const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
 const manifestPath = path.join(fixtureRoot, "manifest.json");
@@ -563,6 +564,231 @@ test("CLI domain-memory verify requires JSON and rejects unknown arguments", () 
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+
+test("CLI domain-memory lookup reports advisory-only receipt diagnostics", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-lookup-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    fs.copyFileSync(fixture, path.join(tempDir, "src", "custom-form-shell.tsx"));
+    const target = path.join("src", "custom-form-shell.tsx");
+    const cliPath = path.join(repoRoot, "dist", "cli", "index.js");
+
+    const notFoundCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(notFoundCli.status, 0, notFoundCli.stderr);
+    const notFound = JSON.parse(notFoundCli.stdout);
+    assert.equal(notFound.schemaVersion, "domain-memory-lookup.v1");
+    assert.equal(notFound.status, "not-found");
+    assert.equal(notFound.candidateCount, 0);
+    assert.equal(notFound.safeNextAction, "rerun-inspect-domain");
+    assert.ok(notFound.nonClaims.includes("does not authorize runtime reuse"));
+    assert.ok(notFound.nonClaims.includes("does not authorize pre-read reuse"));
+    assert.ok(notFound.nonClaims.includes("does not authorize cache reuse"));
+    assert.ok(notFound.nonClaims.includes("does not authorize model-facing payload reuse"));
+
+    const receiptCli = spawnSync(
+      process.execPath,
+      [cliPath, "inspect-domain", target, "--json", "--domain-memory-receipt"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(receiptCli.status, 0, receiptCli.stderr);
+    const receipt = JSON.parse(receiptCli.stdout).domainMemoryReceipt;
+    fs.writeFileSync(path.join(tempDir, "outside-receipt.json"), JSON.stringify(receipt, null, 2));
+    const outsideIgnoredCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(outsideIgnoredCli.status, 0, outsideIgnoredCli.stderr);
+    assert.equal(JSON.parse(outsideIgnoredCli.stdout).status, "not-found");
+
+    const receiptDir = path.join(tempDir, ".fooks", "domain-memory");
+    fs.mkdirSync(receiptDir, { recursive: true });
+    const receiptPath = path.join(receiptDir, "receipt.json");
+    fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+
+    const freshCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(freshCli.status, 0, freshCli.stderr);
+    const fresh = JSON.parse(freshCli.stdout);
+    assert.equal(fresh.status, "fresh");
+    assert.equal(fresh.authorization, "none");
+    assert.equal(fresh.advisoryOnly, true);
+    assert.equal(fresh.advisoryReceiptPath, path.join(".fooks", "domain-memory", "receipt.json"));
+    assert.equal(fresh.candidateCount, 1);
+    assert.equal(fresh.freshCandidateCount, 1);
+    assert.equal(fresh.safeNextAction, "reuse-for-report-only");
+    assert.equal(fresh.candidates[0].verifyResult.status, "fresh");
+    assert.doesNotMatch(JSON.stringify(fresh), forbiddenSupportClaims);
+
+    fs.copyFileSync(receiptPath, path.join(receiptDir, "receipt-copy.json"));
+    const ambiguousCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(ambiguousCli.status, 0, ambiguousCli.stderr);
+    const ambiguous = JSON.parse(ambiguousCli.stdout);
+    assert.equal(ambiguous.status, "ambiguous");
+    assert.equal(ambiguous.advisoryReceiptPath, undefined);
+    assert.equal(ambiguous.freshCandidateCount, 2);
+    assert.equal(ambiguous.safeNextAction, "full-read");
+
+    fs.rmSync(path.join(receiptDir, "receipt-copy.json"));
+    const incompatibleReceipt = JSON.parse(JSON.stringify(receipt));
+    incompatibleReceipt.domain.lane = "react-native";
+    fs.writeFileSync(path.join(receiptDir, "incompatible.json"), JSON.stringify(incompatibleReceipt, null, 2));
+    const mixedIncompatibleCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(mixedIncompatibleCli.status, 0, mixedIncompatibleCli.stderr);
+    const mixedIncompatible = JSON.parse(mixedIncompatibleCli.stdout);
+    assert.equal(mixedIncompatible.status, "incompatible");
+    assert.equal(mixedIncompatible.advisoryReceiptPath, undefined);
+
+    fs.rmSync(path.join(receiptDir, "receipt.json"));
+    fs.renameSync(path.join(receiptDir, "incompatible.json"), receiptPath);
+    const incompatibleCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(incompatibleCli.status, 0, incompatibleCli.stderr);
+    const incompatible = JSON.parse(incompatibleCli.stdout);
+    assert.equal(incompatible.status, "incompatible");
+    assert.equal(incompatible.safeNextAction, "full-read");
+
+    fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+    fs.writeFileSync(path.join(receiptDir, "malformed.json"), "{not-json");
+    const mixedMalformedCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(mixedMalformedCli.status, 0, mixedMalformedCli.stderr);
+    const mixedMalformed = JSON.parse(mixedMalformedCli.stdout);
+    assert.equal(mixedMalformed.status, "unsupported");
+    assert.equal(mixedMalformed.advisoryReceiptPath, undefined);
+    fs.rmSync(path.join(receiptDir, "malformed.json"));
+
+    fs.appendFileSync(path.join(tempDir, target), "\nexport const changedForDomainMemoryLookup = true;\n");
+    const staleCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(staleCli.status, 0, staleCli.stderr);
+    const stale = JSON.parse(staleCli.stdout);
+    assert.equal(stale.status, "stale");
+    assert.equal(stale.safeNextAction, "rerun-inspect-domain");
+
+    fs.writeFileSync(path.join(receiptDir, "malformed.json"), "{not-json");
+    const unsupportedCli = spawnSync(
+      process.execPath,
+      [cliPath, "domain-memory", "lookup", "--file", target, "--json"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(unsupportedCli.status, 0, unsupportedCli.stderr);
+    const unsupported = JSON.parse(unsupportedCli.stdout);
+    assert.equal(unsupported.status, "unsupported");
+    assert.equal(unsupported.safeNextAction, "full-read");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+test("domain-memory lookup returns unsupported JSON when lookup directory cannot be read", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-lookup-error-"));
+  const originalReaddirSync = fs.readdirSync;
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    fs.copyFileSync(fixture, path.join(tempDir, "src", "custom-form-shell.tsx"));
+    fs.mkdirSync(path.join(tempDir, ".fooks", "domain-memory"), { recursive: true });
+    fs.readdirSync = ((target, options) => {
+      if (String(target).endsWith(path.join(".fooks", "domain-memory"))) {
+        throw new Error("simulated unreadable lookup directory");
+      }
+      return originalReaddirSync(target, options);
+    });
+    const lookup = lookupDomainMemoryReceipts(path.join("src", "custom-form-shell.tsx"), tempDir);
+    assert.equal(lookup.status, "unsupported");
+    assert.equal(lookup.safeNextAction, "full-read");
+    assert.equal(lookup.authorization, "none");
+    assert.equal(lookup.advisoryOnly, true);
+    assert.match(lookup.reasons.join("\n"), /lookup directory could not be read/);
+  } finally {
+    fs.readdirSync = originalReaddirSync;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("domain-memory lookup rejects symlinked lookup directories", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-lookup-symlink-"));
+  const outsideDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-outside-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    fs.copyFileSync(fixture, path.join(tempDir, "src", "custom-form-shell.tsx"));
+
+    const target = path.join("src", "custom-form-shell.tsx");
+    const receiptCli = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", target, "--json", "--domain-memory-receipt"],
+      { cwd: tempDir, encoding: "utf8" },
+    );
+    assert.equal(receiptCli.status, 0, receiptCli.stderr);
+    fs.writeFileSync(
+      path.join(outsideDir, "outside-receipt.json"),
+      JSON.stringify(JSON.parse(receiptCli.stdout).domainMemoryReceipt, null, 2),
+    );
+
+    fs.mkdirSync(path.join(tempDir, ".fooks"), { recursive: true });
+    fs.symlinkSync(outsideDir, path.join(tempDir, ".fooks", "domain-memory"), "dir");
+
+    const lookup = lookupDomainMemoryReceipts(target, tempDir);
+    assert.equal(lookup.status, "unsupported");
+    assert.equal(lookup.candidateCount, 0);
+    assert.equal(lookup.safeNextAction, "full-read");
+    assert.equal(lookup.authorization, "none");
+    assert.equal(lookup.advisoryOnly, true);
+    assert.match(lookup.reasons.join("\n"), /lookup directory must not be a symlink/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI domain-memory lookup requires JSON and rejects unknown arguments", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const noJson = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "lookup", "--file", fixture],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.notEqual(noJson.status, 0);
+  assert.match(noJson.stderr, /domain-memory lookup requires --json/);
+  assert.equal(noJson.stdout, "");
+
+  const unknown = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "lookup", "--file", fixture, "--json", "--surprise"],
+    { cwd: repoRoot, encoding: "utf8" },
+  );
+  assert.notEqual(unknown.status, 0);
+  assert.match(unknown.stderr, /Unexpected domain-memory lookup argument/);
 });
 
 test("CLI inspect-domain emits explicit report-only context decision only with its flag", () => {

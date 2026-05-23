@@ -85,6 +85,23 @@ test("domain-memory contract scopes runtime advisory consumer to explicit fresh 
   ]);
 });
 
+test("domain-memory contract scopes lookup diagnostics to advisory-only evidence", () => {
+  assertContains("domain memory", domainMemory, [
+    "Lookup diagnostic lane",
+    "fooks domain-memory lookup --file src/Foo.tsx --json",
+    "recursively scans only the project-local `.fooks/domain-memory/` directory",
+    "rejects symlinked lookup directories",
+    "not-found`, `fresh`, `stale`, `incompatible`, `unsupported`, or `ambiguous`",
+    "fresh for report/advisory evidence only",
+    "authorization: \"none\"",
+    "advisoryReceiptPath` is evidence-only",
+    "Multiple fresh receipts are `ambiguous`",
+    "mixed fresh/non-fresh",
+    "do not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse",
+    "does not change runtime hook behavior, pre-read decisions, cache storage, or model-facing payloads",
+  ]);
+});
+
 test("state and domain-payload architecture docs link the domain-memory contract without widening behavior", () => {
   assertContains("state contract", stateContract, [
     "domain-memory.v1",
