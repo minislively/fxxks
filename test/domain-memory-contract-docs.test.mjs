@@ -72,6 +72,19 @@ test("domain-memory contract forbids support and runtime expansion", () => {
   ]);
 });
 
+test("domain-memory contract scopes runtime advisory consumer to explicit fresh receipts", () => {
+  assertContains("domain memory", domainMemory, [
+    "Runtime advisory consumer lane",
+    "explicit prompt-provided receipt path",
+    "advisory-only",
+    "FOOKS DOMAIN MEMORY ADVISORY",
+    "normal pre-read/runtime payload gate must already allow injection",
+    "fails closed to full-read guidance",
+    "does not add pre-read reuse, cache reuse, model-facing payload reuse",
+    "Automatic cache lookup and pre-read consumers require separate plans",
+  ]);
+});
+
 test("state and domain-payload architecture docs link the domain-memory contract without widening behavior", () => {
   assertContains("state contract", stateContract, [
     "domain-memory.v1",

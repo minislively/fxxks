@@ -166,3 +166,17 @@ Verifier statuses are fail-closed:
 - `unsupported` means the receipt is malformed, from an unsupported schema, or attempts to claim runtime/cache reuse.
 
 For this lane, any receipt with `policy.allowed: true` or `receipt.runtimeOrCacheReuse: true` is unsupported. Runtime/cache/pre-read consumers remain deferred until a later plan names the exact consumer, freshness gates, policy boundaries, and verification evidence.
+
+## Runtime advisory consumer lane
+
+The first consumer is deliberately narrow: the Codex runtime hook may consume an explicit prompt-provided receipt path as **advisory-only** context on a repeated-file turn:
+
+```text
+Again inspect src/Foo.tsx with domain-memory receipt .fooks/domain-memory/foo.json
+```
+
+This lane does not search cache directories, does not persist receipts, and does not let a receipt authorize compact injection. The normal pre-read/runtime payload gate must already allow injection. When the receipt verifies as `fresh`, the hook may append a bounded `FOOKS DOMAIN MEMORY ADVISORY` block that repeats the receipt status, reasons, safe next action, and non-claims.
+
+If the explicit receipt is `stale`, `incompatible`, `unsupported`, missing, or unreadable, the runtime hook fails closed to full-read guidance. The stale receipt is not silently ignored, because an explicit receipt hint means the prompt is asking the runtime to rely on that evidence.
+
+This lane still does not add pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims. Automatic cache lookup and pre-read consumers require separate plans.
