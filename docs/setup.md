@@ -247,3 +247,7 @@ fooks scan
 fooks extract <file> --model-payload
 fooks compare src/components/Button.tsx --json
 ```
+
+## Context decision report
+
+`fooks inspect-domain <file> --json --context-decision` emits an explicit report-only `context-decision.v1` appendix. It is local CLI metadata for domain/concern/freshness/risk planning and does not authorize runtime, pre-read, cache, setup-readiness, or model-facing payload reuse. Plain `inspect-domain --json` output remains unchanged, and `--context-decision` requires `--json`.

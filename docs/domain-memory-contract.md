@@ -147,3 +147,22 @@ That flag may add a top-level `domainMemoryReceipt` to the existing `inspect-dom
 3. `policy.allowed` in this lane is `false`, and `allowedMeaning` says the receipt does not authorize runtime, pre-read, cache, or compact-payload reuse.
 4. `receipt.runtimeOrCacheReuse` is `false`, and `nonClaims` preserves the no-support-expansion and no-token/cost/performance-claim boundaries.
 5. Runtime or payload-shape changes remain deferred until a separate plan names exact files, fixtures, policy gates, and verification commands.
+
+## Receipt freshness verifier lane
+
+The next implementation lane is an explicit CLI-only verifier:
+
+```bash
+fooks domain-memory verify --receipt receipt.json --file src/Foo.tsx --json
+```
+
+The verifier checks whether a saved `domain-memory.v1` receipt still matches the current source fingerprint, file scope, domain lane, claim boundary, and report-only policy boundary. Its `fresh` status means **fresh for report-only evidence only**. It does not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims.
+
+Verifier statuses are fail-closed:
+
+- `fresh` means the receipt matches the current file and may be quoted as report-only evidence.
+- `stale` means source freshness changed or is missing; rerun `inspect-domain`.
+- `incompatible` means file scope, domain lane, or claim boundary no longer matches; full-read the current source.
+- `unsupported` means the receipt is malformed, from an unsupported schema, or attempts to claim runtime/cache reuse.
+
+For this lane, any receipt with `policy.allowed: true` or `receipt.runtimeOrCacheReuse: true` is unsupported. Runtime/cache/pre-read consumers remain deferred until a later plan names the exact consumer, freshness gates, policy boundaries, and verification evidence.

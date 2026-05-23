@@ -494,6 +494,7 @@ test("file commands accept --json before or after the file path", () => {
   const inspectBefore = run(["inspect-domain", "--json", "test/fixtures/frontend-domain-expectations/webview-boundary-basic.tsx"]);
   assert.deepEqual(inspectBefore, inspectAfter);
   assert.equal("domainMemoryReceipt" in inspectAfter, false);
+  assert.equal("contextDecision" in inspectAfter, false);
 
   const inspectReceiptAfter = run([
     "inspect-domain",
@@ -511,6 +512,23 @@ test("file commands accept --json before or after the file path", () => {
   assert.equal(inspectReceiptBefore.domainMemoryReceipt.schemaVersion, "domain-memory.v1");
   assert.equal(inspectReceiptAfter.domainMemoryReceipt.policy.allowed, false);
   assert.equal(inspectReceiptBefore.domainMemoryReceipt.policy.allowed, false);
+
+  const inspectDecisionAfter = run([
+    "inspect-domain",
+    "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+    "--json",
+    "--context-decision",
+  ]);
+  const inspectDecisionBefore = run([
+    "inspect-domain",
+    "--context-decision",
+    "--json",
+    "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx",
+  ]);
+  assert.equal(inspectDecisionAfter.contextDecision.schemaVersion, "context-decision.v1");
+  assert.equal(inspectDecisionBefore.contextDecision.schemaVersion, "context-decision.v1");
+  assert.equal(inspectDecisionAfter.contextDecision.policy.allowed, false);
+  assert.equal(inspectDecisionBefore.contextDecision.policy.allowed, false);
 
   const extractAfter = run(["extract", "fixtures/compressed/FormSection.tsx", "--model-payload", "--json"]);
   const extractBefore = run(["extract", "--json", "fixtures/compressed/FormSection.tsx", "--model-payload"]);
@@ -3944,7 +3962,8 @@ test("cli help advertises setup and package install has no auto hook side effect
   assert.match(help, /fooks inspect ranked-bundle <id> \[--json\]/);
   assert.match(help, /fooks inspect react-web-label-preview <file> \[--json\]/);
   assert.match(help, /fooks inspect react-web-issues <file> \[--json\|--summary-json\|--dry-run-json\]/);
-  assert.match(help, /fooks inspect-domain <file> \[--json\] \[--domain-memory-receipt\]/);
+  assert.match(help, /fooks inspect-domain <file> \[--json\] \[--domain-memory-receipt\] \[--context-decision\]/);
+  assert.match(help, /fooks domain-memory verify --receipt <receipt\.json> --file <file> --json/);
   assert.match(help, /fooks status claude/);
   assert.match(help, /fooks status react-web \[--json\] \[--handoff-resume-json <file>\]/);
   assert.match(help, /fooks status artifacts/);

@@ -405,6 +405,219 @@ test("CLI inspect-domain emits explicit report-only domain memory receipt only w
   assert.doesNotMatch(JSON.stringify(receipt), forbiddenSupportClaims);
 });
 
+test("CLI domain-memory verify reports fresh, stale, incompatible, and unsupported receipt states", () => {
+  const receiptFixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const incompatibleFixture = path.join(fixtureRoot, "rn-primitive-basic.tsx");
+  const receiptCli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", receiptFixture, "--json", "--domain-memory-receipt"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+  assert.equal(receiptCli.status, 0, receiptCli.stderr);
+
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-verify-"));
+  try {
+    const receiptPath = path.join(tempDir, "receipt.json");
+    fs.writeFileSync(receiptPath, JSON.stringify(JSON.parse(receiptCli.stdout).domainMemoryReceipt, null, 2));
+
+    const freshCli = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", receiptPath, "--file", receiptFixture, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(freshCli.status, 0, freshCli.stderr);
+    const fresh = JSON.parse(freshCli.stdout);
+    assert.equal(fresh.schemaVersion, "domain-memory-verify.v1");
+    assert.equal(fresh.status, "fresh");
+    assert.equal(fresh.checks.sourceFingerprint, "match");
+    assert.equal(fresh.checks.domainLane, "match");
+    assert.equal(fresh.checks.claimBoundary, "match");
+    assert.equal(fresh.checks.policyBoundary, "report-only");
+    assert.equal(fresh.checks.runtimeOrCacheReuse, false);
+    assert.equal(fresh.safeNextAction, "reuse-for-report-only");
+    assert.ok(fresh.nonClaims.includes("does not authorize runtime reuse"));
+    assert.ok(fresh.nonClaims.includes("does not authorize pre-read reuse"));
+    assert.ok(fresh.nonClaims.includes("does not authorize cache reuse"));
+    assert.ok(fresh.nonClaims.includes("does not authorize model-facing payload reuse"));
+    assert.doesNotMatch(JSON.stringify(fresh), forbiddenSupportClaims);
+
+    const staleFile = path.join(tempDir, "custom-form-shell.tsx");
+    fs.copyFileSync(receiptFixture, staleFile);
+    fs.appendFileSync(staleFile, "\nexport const changedForDomainMemoryVerify = true;\n");
+    const staleReceipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+    staleReceipt.scope.filePath = path.relative(repoRoot, staleFile);
+    const staleReceiptPath = path.join(tempDir, "stale-receipt.json");
+    fs.writeFileSync(staleReceiptPath, JSON.stringify(staleReceipt, null, 2));
+    const staleCli = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", staleReceiptPath, "--file", staleFile, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(staleCli.status, 0, staleCli.stderr);
+    const stale = JSON.parse(staleCli.stdout);
+    assert.equal(stale.status, "stale");
+    assert.equal(stale.checks.sourceFingerprint, "mismatch");
+    assert.equal(stale.safeNextAction, "rerun-inspect-domain");
+
+    const incompatibleCli = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", receiptPath, "--file", incompatibleFixture, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(incompatibleCli.status, 0, incompatibleCli.stderr);
+    const incompatible = JSON.parse(incompatibleCli.stdout);
+    assert.equal(incompatible.status, "incompatible");
+    assert.equal(incompatible.checks.fileScope, "mismatch");
+    assert.equal(incompatible.checks.domainLane, "mismatch");
+    assert.equal(incompatible.safeNextAction, "full-read");
+
+    const unsupportedReceipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+    unsupportedReceipt.policy.allowed = true;
+    unsupportedReceipt.policy.allowedMeaning = "domain-memory receipts are report-only and do not authorize runtime or cache reuse";
+    unsupportedReceipt.receipt.runtimeOrCacheReuse = true;
+    const unsupportedReceiptPath = path.join(tempDir, "unsupported-receipt.json");
+    fs.writeFileSync(unsupportedReceiptPath, JSON.stringify(unsupportedReceipt, null, 2));
+    const unsupportedCli = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", unsupportedReceiptPath, "--file", receiptFixture, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(unsupportedCli.status, 0, unsupportedCli.stderr);
+    const unsupported = JSON.parse(unsupportedCli.stdout);
+    assert.equal(unsupported.status, "unsupported");
+    assert.equal(unsupported.checks.policyBoundary, "mismatch");
+
+    const malformedPath = path.join(tempDir, "malformed.json");
+    fs.writeFileSync(malformedPath, "{not-json");
+    const malformedCli = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", malformedPath, "--file", receiptFixture, "--json"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(malformedCli.status, 0, malformedCli.stderr);
+    const malformed = JSON.parse(malformedCli.stdout);
+    assert.equal(malformed.status, "unsupported");
+    assert.match(malformed.reasons.join("\n"), /could not be parsed/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI domain-memory verify requires JSON and rejects unknown arguments", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const receiptCli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json", "--domain-memory-receipt"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+  assert.equal(receiptCli.status, 0, receiptCli.stderr);
+
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-verify-"));
+  try {
+    const receiptPath = path.join(tempDir, "receipt.json");
+    fs.writeFileSync(receiptPath, JSON.stringify(JSON.parse(receiptCli.stdout).domainMemoryReceipt, null, 2));
+
+    const noJson = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", receiptPath, "--file", fixture],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.notEqual(noJson.status, 0);
+    assert.match(noJson.stderr, /domain-memory verify requires --json/);
+    assert.equal(noJson.stdout, "");
+
+    const unknown = spawnSync(
+      process.execPath,
+      [path.join(repoRoot, "dist", "cli", "index.js"), "domain-memory", "verify", "--receipt", receiptPath, "--file", fixture, "--json", "--surprise"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+    assert.notEqual(unknown.status, 0);
+    assert.match(unknown.stderr, /Unexpected domain-memory verify argument/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI inspect-domain emits explicit report-only context decision only with its flag", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+
+  const plainCli = spawnSync(process.execPath, [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(plainCli.status, 0, plainCli.stderr);
+  const plainResult = JSON.parse(plainCli.stdout);
+  assert.equal("contextDecision" in plainResult, false);
+
+  const decisionCli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--json", "--context-decision"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.equal(decisionCli.status, 0, decisionCli.stderr);
+  const result = JSON.parse(decisionCli.stdout);
+  const decision = result.contextDecision;
+  assert.ok(decision);
+  assert.equal(decision.schemaVersion, "context-decision.v1");
+  assert.equal(decision.evidence.domain, "react-web");
+  assert.equal(decision.decision.kind, "compact-context");
+  assert.equal(decision.decision.diagnosticOnly, true);
+  assert.equal(decision.policy.allowed, false);
+  assert.match(decision.policy.allowedMeaning, /report-only/);
+  assert.ok(decision.nonClaims.includes("does not authorize runtime reuse"));
+  assert.ok(decision.nonClaims.includes("does not authorize pre-read reuse"));
+  assert.ok(decision.nonClaims.includes("does not authorize cache reuse"));
+  assert.ok(decision.nonClaims.includes("does not authorize model-facing payload reuse"));
+  assert.doesNotMatch(JSON.stringify(decision), forbiddenSupportClaims);
+});
+
+test("CLI inspect-domain requires --json before emitting a context decision", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const cli = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "dist", "cli", "index.js"), "inspect-domain", fixture, "--context-decision"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /--context-decision requires --json/);
+  assert.equal(cli.stdout, "");
+});
+
 test("CLI inspect-domain requires --json before emitting a domain memory receipt", () => {
   const fixture = path.join(fixtureRoot, "webview-boundary-basic.tsx");
   const cli = spawnSync(

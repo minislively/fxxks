@@ -96,3 +96,7 @@ Evidence cannot choose a next action without state, and state cannot be assigned
 ## State to next-action mapping
 
 `architecture_blocked`, `idle_clean`, `active_session`, `active_branch`, `pr_ready`, `receipt_only`, and `blocked` are report-facing state terms. State to next-action mapping keeps active work, receipts, and architecture blockers separate.
+
+## Context decision report boundary
+
+`context-decision.v1` is documented in `context-decision-contract.md`. It records report-only domain, concern, freshness, environment, risk, and diagnostic decision metadata. It does not change cache storage, detector logic, runtime adapters, pre-read behavior, setup-readiness behavior, or implementation behavior.
