@@ -175,11 +175,13 @@ The first consumer is deliberately narrow: the Codex runtime hook may consume an
 Again inspect src/Foo.tsx with domain-memory receipt .fooks/domain-memory/foo.json
 ```
 
-This lane does not search cache directories, does not persist receipts, and does not let a receipt authorize compact injection. The normal pre-read/runtime payload gate must already allow injection. When the receipt verifies as `fresh`, the hook may append a bounded `FOOKS DOMAIN MEMORY ADVISORY` block that repeats the receipt status, reasons, safe next action, and non-claims.
+This lane does not persist receipts and does not let a receipt authorize compact injection. The normal pre-read/runtime payload gate must already allow injection. When the receipt verifies as `fresh`, the hook may append a bounded `FOOKS DOMAIN MEMORY ADVISORY` block that repeats the receipt status, reasons, safe next action, and non-claims.
 
 If the explicit receipt is `stale`, `incompatible`, `unsupported`, missing, or unreadable, the runtime hook fails closed to full-read guidance. The stale receipt is not silently ignored, because an explicit receipt hint means the prompt is asking the runtime to rely on that evidence.
 
-This lane still does not add pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims. Automatic cache lookup and pre-read consumers require separate plans.
+When no explicit receipt hint is present and the normal repeated-file payload gate already allows injection, the Codex runtime hook may also run an **automatic project-local lookup** in `.fooks/domain-memory/`. A `fresh` automatic lookup may append the same bounded `FOOKS DOMAIN MEMORY ADVISORY` block with `authorization: none` and `advisoryOnly: true`. Automatic `not-found`, `stale`, `incompatible`, `unsupported`, or `ambiguous` results are debug-only no-ops: they do not force full-read fallback, do not append advisory context, and do not change the normal runtime/pre-read decision. Runtime lookup errors are represented as `unsupported` debug metadata.
+
+This lane still does not add pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims. Pre-read consumers, automatic receipt persistence, and authorized runtime/cache reuse require separate plans.
 
 ## Lookup diagnostic lane
 
@@ -193,4 +195,4 @@ The lookup recursively scans only the project-local `.fooks/domain-memory/` dire
 
 A `fresh` lookup means exactly one receipt is fresh for report/advisory evidence only. The machine result still carries `authorization: "none"` and `advisoryOnly: true`; any `advisoryReceiptPath` is evidence-only, not permission. Multiple fresh receipts are `ambiguous` and must not be auto-selected. Stale, incompatible, unsupported, mixed fresh/non-fresh, missing, unreadable, or ambiguous lookup results do not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims.
 
-This lane intentionally does not change runtime hook behavior, pre-read decisions, cache storage, or model-facing payloads. Runtime automatic advisory lookup, pre-read appendices, and any payload/cache reuse require separate plans and tests.
+This lane intentionally does not authorize pre-read decisions, cache storage, or model-facing payload reuse. The runtime hook consumes a `fresh` lookup only as advisory context after normal payload eligibility, while pre-read appendices, automatic receipt persistence, and any payload/cache reuse require separate plans and tests.

@@ -1,5 +1,6 @@
 import type { DesignReviewMetadataV0 } from "./design-review-metadata";
 import type { DomainDetectionResult } from "./domain-detector";
+import type { DomainMemoryLookupResult } from "./domain-memory-lookup";
 import type { DomainMemoryVerifyResult } from "./domain-memory-verify";
 import type { ProjectKnowledgeMetadata } from "./project-knowledge";
 import type { DomainPayload } from "./payload/domain-payload";
@@ -756,6 +757,17 @@ export type CodexRuntimeHookDecision = {
       receiptPath?: string;
       status?: DomainMemoryVerifyResult["status"];
       safeNextAction?: DomainMemoryVerifyResult["safeNextAction"];
+      reasons: string[];
+    };
+    domainMemoryLookup?: {
+      source: "automatic project-local lookup";
+      status: DomainMemoryLookupResult["status"];
+      authorization: "none";
+      advisoryOnly: true;
+      candidateCount: number;
+      freshCandidateCount: number;
+      advisoryReceiptPath?: string;
+      safeNextAction: DomainMemoryLookupResult["safeNextAction"];
       reasons: string[];
     };
   };

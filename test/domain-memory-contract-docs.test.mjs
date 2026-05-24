@@ -72,7 +72,7 @@ test("domain-memory contract forbids support and runtime expansion", () => {
   ]);
 });
 
-test("domain-memory contract scopes runtime advisory consumer to explicit fresh receipts", () => {
+test("domain-memory contract scopes runtime advisory consumer to explicit and automatic fresh advisory receipts", () => {
   assertContains("domain memory", domainMemory, [
     "Runtime advisory consumer lane",
     "explicit prompt-provided receipt path",
@@ -80,8 +80,14 @@ test("domain-memory contract scopes runtime advisory consumer to explicit fresh 
     "FOOKS DOMAIN MEMORY ADVISORY",
     "normal pre-read/runtime payload gate must already allow injection",
     "fails closed to full-read guidance",
+    "automatic project-local lookup",
+    "authorization: none",
+    "advisoryOnly: true",
+    "debug-only no-ops",
+    "do not force full-read fallback",
+    "Runtime lookup errors are represented as `unsupported` debug metadata",
     "does not add pre-read reuse, cache reuse, model-facing payload reuse",
-    "Automatic cache lookup and pre-read consumers require separate plans",
+    "Pre-read consumers, automatic receipt persistence, and authorized runtime/cache reuse require separate plans",
   ]);
 });
 
@@ -98,7 +104,8 @@ test("domain-memory contract scopes lookup diagnostics to advisory-only evidence
     "Multiple fresh receipts are `ambiguous`",
     "mixed fresh/non-fresh",
     "do not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse",
-    "does not change runtime hook behavior, pre-read decisions, cache storage, or model-facing payloads",
+    "does not authorize pre-read decisions, cache storage, or model-facing payload reuse",
+    "runtime hook consumes a `fresh` lookup only as advisory context after normal payload eligibility",
   ]);
 });
 
