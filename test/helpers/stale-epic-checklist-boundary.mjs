@@ -209,6 +209,56 @@ export function classifyCleanEpicAdvisoryInventorySessionWhip(input) {
   };
 }
 
+export function classifyAdvisoryOnlyQueueAfterCompletedChild(input) {
+  const epicNumber = issueNumber(input?.epic) ?? 960;
+  const evidence = input?.evidence ?? {};
+  const issues = openIssueNumbers(evidence.issues ?? evidence.childIssues);
+  const openIssueCount = typeof input?.openIssueCount === "number" ? input.openIssueCount : issues.length;
+  const openPullRequestCount = typeof input?.openPullRequestCount === "number"
+    ? input.openPullRequestCount
+    : (evidence.pullRequests ?? []).filter((pr) => isOpenState(pr?.state)).length;
+  const activeKinds = epicOnlyActiveEvidenceKinds(evidence, epicNumber);
+  const cleanPostChildCompletionEcho = Boolean(input?.clean === true && input?.branch === "main" && input?.ahead === 0 && input?.behind === 0);
+  const completedChildReceipt = Boolean(input?.completedChildReceipt?.issue || input?.completedChildReceipt?.pullRequest);
+  const advisoryOnlyQueue = openIssueCount === 1 && issues.length === 1 && issues[0] === epicNumber && openPullRequestCount === 0;
+  const actionRequired = cleanPostChildCompletionEcho && completedChildReceipt && advisoryOnlyQueue && activeKinds.length === 0;
+
+  return {
+    issue: "#1050",
+    epic: `#${epicNumber}`,
+    classification: actionRequired
+      ? "advisory-only-queue-after-completed-child-action-required"
+      : "concrete-child-session-present",
+    cleanPostChildCompletionEcho,
+    completedChildReceipt,
+    advisoryOnlyQueue,
+    terminalIdleAllowed: false,
+    actionRequiredForConcreteChildOrSession: actionRequired,
+    activeDevelopmentAllowed: !actionRequired,
+    requiredConcreteChildArtifacts: [
+      "open-child-issue",
+      "active-session",
+      "active-branch",
+      "open-pull-request",
+      "active-worktree",
+      "active-process",
+    ],
+    activeEvidenceKinds: activeKinds,
+    mutationBoundary: {
+      mutatesGitHubIssues: false,
+      changesMergePolicy: false,
+      changesRuntimeHooks: false,
+      changesTelemetry: false,
+      changesBillingTokenProof: false,
+      changesDetectorScope: false,
+      changesProductClaims: false,
+      reopensClosedArtifacts: false,
+      mergesPullRequests: false,
+    },
+    rule: "After completed child work closes and only planning epic #960 remains open, the advisory-only queue is action-required for a concrete child/session; it is not a terminal idle dogfood answer.",
+  };
+}
+
 export function classifyStaleEpicChecklistCandidate(input) {
   const activeKinds = activeEvidenceKinds(input?.evidence ?? {});
   const hasUncheckedEpicChecklistText = Boolean(input?.uncheckedEpicChecklistText);
