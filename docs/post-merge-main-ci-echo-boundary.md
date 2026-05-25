@@ -151,6 +151,12 @@ active development.
   branch, mapped session, active worktree/process evidence, or concrete blocker
   before session whip can report active development from an epic-only #960
   queue.
+- `activeWorkReceipts.epicStaleChecklistReconciliation` is the issue #1070
+  stale epic checklist reconciliation summary. It keeps unchecked #960 checklist
+  text advisory when clean `main` has only the epic open, requires landed child
+  evidence before the epic can be considered drainable, and requires current
+  child issue, PR, branch, mapped session, worktree/process evidence, or blocker
+  before active-development reporting.
 - `docs/dogfood/current-development-nudge-target-871.md` is the issue #871
   current-development nudge target artifact. It keeps PR #870 merged CI/release
   receipts receipt-only and documents that the answer to "what is being
