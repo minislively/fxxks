@@ -2018,6 +2018,7 @@ async function run(): Promise<void> {
           print({
             ...checkSnapshot.activity,
             operatorStatusCues: {
+              ...checkSnapshot.activity.operatorStatusCues,
               nextChildEvidence: buildOperatorCheckNextChildEvidenceStatusCue(checkSnapshot.activeWorkReceipts.nextChildEvidenceBoundary),
             },
           });

@@ -4128,6 +4128,37 @@ test("status activity include-remote-counts surfaces next-child evidence cue fro
   assert.match(cue.claimBoundary, /adds no authority, telemetry, merge gate, approval, product, or frontend behavior/);
 });
 
+test("default status activity surfaces remote-counts-required next action for clean local idle main", () => {
+  const { tempDir, env } = makeEpicOnlyNextChildCueCliFixture();
+  const activity = run(["status", "activity", "--json"], tempDir, env);
+
+  assert.equal(activity.command, OPERATOR_ACTIVITY_COMMAND);
+  assert.equal(activity.optionalCounts.enabled, false);
+  assert.equal(activity.currentRunEvidence.available, false);
+  assert.equal(activity.currentRunEvidence.activeWorkEvidence, false);
+  assert.match(activity.currentRunEvidence.blockers.join("\n"), /remote issue\/PR counts disabled/);
+
+  const cue = activity.operatorStatusCues.remoteCountsRequiredNextAction;
+  assert.equal(cue.issue, "#1073");
+  assert.equal(cue.readOnly, true);
+  assert.equal(cue.advisoryOnly, true);
+  assert.equal(cue.visible, true);
+  assert.equal(cue.classification, "remote-counts-required");
+  assert.equal(cue.remoteCountsRequired, true);
+  assert.equal(cue.activeDevelopmentEvidence, false);
+  assert.match(cue.currentEvidenceCue, /clean main with zero divergence and no mapped fooks session/);
+  assert.match(cue.currentEvidenceCue, /remote issue\/PR counts are disabled/);
+  assert.match(cue.nextAction, /fooks status activity --include-remote-counts --json/);
+  assert.match(cue.nextAction, /fooks check --json/);
+  assert.match(cue.nextAction, /if only planning epic #960 remains open/);
+  assert.match(cue.nextAction, /child issue/);
+  assert.match(cue.nextAction, /open PR/);
+  assert.match(cue.nextAction, /mapped fooks session/);
+  assert.match(cue.nextAction, /concrete blocker/);
+  assert.match(cue.claimBoundary, /adds no active-development evidence/);
+  assert.match(cue.claimBoundary, /adds no active-development evidence, authority, telemetry, merge gate, approval, product, or frontend behavior/);
+});
+
 test("source checkout npm operator aliases route to built CLI behavior", () => {
   const check = runNpmScript("check", ["--json"]);
   assert.equal(check.command, OPERATOR_CHECK_COMMAND);
