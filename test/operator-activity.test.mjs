@@ -1622,6 +1622,15 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
   assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
   assert.equal(snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.kind === "issue"), false);
+  assert.equal(
+    snapshot.activeWorkReceipts.completedChildReceiptBoundary.classification,
+    "completed-child-receipt-missing",
+  );
+  assert.equal(snapshot.activeWorkReceipts.completedChildReceiptBoundary.issue, "#1062");
+  assert.equal(snapshot.activeWorkReceipts.completedChildReceiptBoundary.completedChildReceipt.required, true);
+  assert.equal(snapshot.activeWorkReceipts.completedChildReceiptBoundary.completedChildReceipt.present, false);
+  assert.deepEqual(snapshot.activeWorkReceipts.completedChildReceiptBoundary.currentEvidence.openIssueNumbers, [960]);
+  assert.match(snapshot.activeWorkReceipts.completedChildReceiptBoundary.nudgeRule, /missing the completed-child receipt/);
   assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
   assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, true);
   assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {
