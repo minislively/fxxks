@@ -29,6 +29,10 @@ test("operator docs document status activity receipt projection boundary", () =>
 
 test("operator docs document next-child evidence cue as check-derived status activity output", () => {
   for (const required of [
+    "operatorStatusCues.remoteCountsRequiredNextAction",
+    "advisory/non-authorizing",
+    "fooks status activity --include-remote-counts --json",
+    "if only #960 remains",
     "operatorStatusCues.nextChildEvidence",
     "activeWorkReceipts.nextChildEvidenceBoundary",
     "operator-check JSON boundary remains the source of truth",

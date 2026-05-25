@@ -43,6 +43,11 @@ export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE = "#910";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE = "operator/activity issue #910 staged OMX prompt pane evidence";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY =
   "Read-only issue #910 operator artifact; a current OMX pane with only a staged prompt placeholder, no submitted/working/tool-output evidence, only .fooks-session-task.txt delta, and ahead=0 is not active development proof.";
+export const OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_ISSUE = "#1073";
+export const OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_ISSUE_URL = "https://github.com/minislively/fooks/issues/1073";
+export const OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_SOURCE = "operator/activity issue #1073 remote-counts-required next-action cue";
+export const OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_CLAIM_BOUNDARY =
+  "Operator-visible status/activity next-action cue only; remote counts remain explicit opt-in, the operator-check JSON boundary remains the source of truth after include-remote-counts, and this cue adds no active-development evidence, authority, telemetry, merge gate, approval, product, or frontend behavior.";
 export const OPERATOR_ACTIVITY_TMUX_CAPTURE_COMMAND = "tmux capture-pane -pt <pane_id> -S -200";
 export const OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_WORKFLOWS = ["CI", "React Web Release Report"] as const;
 export const OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER = 960;
@@ -222,6 +227,23 @@ export type OperatorActivityCurrentRunEvidence = {
   blockers: string[];
 };
 
+export type OperatorActivityRemoteCountsRequiredNextActionCue = {
+  schemaVersion: typeof OPERATOR_ACTIVITY_SCHEMA_VERSION;
+  issue: typeof OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_ISSUE;
+  issueUrl: typeof OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_ISSUE_URL;
+  source: typeof OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_SOURCE;
+  claimBoundary: typeof OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_CLAIM_BOUNDARY;
+  readOnly: true;
+  advisoryOnly: true;
+  visible: boolean;
+  classification: "remote-counts-required" | "not-required";
+  remoteCountsRequired: boolean;
+  activeDevelopmentEvidence: false;
+  currentEvidenceCue: string;
+  nextAction: string;
+  oneLine: string;
+};
+
 export type OperatorActivityPostMergeMainWorkflowEvidenceStatus = "success" | "failure" | "pending" | "unknown";
 export type OperatorActivityPostMergeMainWorkflowDiagnosticReason =
   | "success"
@@ -363,6 +385,9 @@ export type OperatorActivitySnapshot = {
   stagedOmxPromptEvidence: OperatorActivityStagedOmxPromptEvidence;
   currentRunEvidence: OperatorActivityCurrentRunEvidence;
   postMergeMainCiEvidence: OperatorActivityPostMergeMainCiEvidence;
+  operatorStatusCues: {
+    remoteCountsRequiredNextAction: OperatorActivityRemoteCountsRequiredNextActionCue;
+  };
   blockers: string[];
   diagnostics: {
     operatorActivityTiming: OperatorActivityTimingReceipt;
@@ -1590,6 +1615,46 @@ function buildCurrentRunEvidence(
   };
 }
 
+function buildRemoteCountsRequiredNextActionCue(
+  currentRunEvidence: OperatorActivityCurrentRunEvidence,
+  optionalCounts: OperatorActivityRemoteCounts,
+): OperatorActivityRemoteCountsRequiredNextActionCue {
+  const locallyIdleMain =
+    currentRunEvidence.evidence.branch === "main"
+    && currentRunEvidence.evidence.clean === true
+    && currentRunEvidence.evidence.ahead === 0
+    && currentRunEvidence.evidence.behind === 0
+    && currentRunEvidence.evidence.fooksSessionCount === 0;
+  const remoteCountsRequired = !optionalCounts.enabled && locallyIdleMain;
+  const currentEvidenceCue = remoteCountsRequired
+    ? "local snapshot is clean main with zero divergence and no mapped fooks session; remote issue/PR counts are disabled, so epic-only idle state is unproven"
+    : optionalCounts.enabled
+      ? "remote issue/PR counts were explicitly requested; use operator-check-derived status cues for next-child evidence"
+      : "local active or unknown evidence means remote-counts-required idle guidance is not the current cue";
+  const nextAction = remoteCountsRequired
+    ? "Run fooks status activity --include-remote-counts --json or fooks check --json; if only planning epic #960 remains open, create or link a child issue, open PR, non-main branch, mapped fooks session, active worktree/process evidence, or concrete blocker before treating the run as active development."
+    : "No default remote-counts-required next action is visible for this snapshot.";
+
+  return {
+    schemaVersion: OPERATOR_ACTIVITY_SCHEMA_VERSION,
+    issue: OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_ISSUE,
+    issueUrl: OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_ISSUE_URL,
+    source: OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_SOURCE,
+    claimBoundary: OPERATOR_ACTIVITY_REMOTE_COUNTS_NEXT_ACTION_CLAIM_BOUNDARY,
+    readOnly: true,
+    advisoryOnly: true,
+    visible: remoteCountsRequired,
+    classification: remoteCountsRequired ? "remote-counts-required" : "not-required",
+    remoteCountsRequired,
+    activeDevelopmentEvidence: false,
+    currentEvidenceCue,
+    nextAction,
+    oneLine: remoteCountsRequired
+      ? `Remote counts required: ${currentEvidenceCue}; ${nextAction}`
+      : currentEvidenceCue,
+  };
+}
+
 export function readOperatorActivitySnapshot(cwd = process.cwd(), options: OperatorActivityOptions = {}): OperatorActivitySnapshot {
   const timingStartedAt = performance.now();
   const timingPhases: OperatorDiagnosticTimingPhase[] = [];
@@ -1604,6 +1669,9 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
   const stagedOmxPromptEvidence = timeDiagnosticPhase(timingPhases, "build-staged-omx-prompt-evidence", () => buildStagedOmxPromptEvidence(worktree, tmux));
   const currentRunEvidence = timeDiagnosticPhase(timingPhases, "build-current-run-evidence", () => buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence));
   const postMergeMainCiEvidence = timeDiagnosticPhase(timingPhases, "read-post-merge-main-ci-evidence", () => readPostMergeMainCiEvidence(cwd, options));
+  const operatorStatusCues = timeDiagnosticPhase(timingPhases, "build-operator-status-cues", () => ({
+    remoteCountsRequiredNextAction: buildRemoteCountsRequiredNextActionCue(currentRunEvidence, optionalCounts),
+  }));
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
   const runtimeProvenance = timeDiagnosticPhase(timingPhases, "read-operator-activity-runtime-provenance", () => readOperatorActivityRuntimeProvenance(cwd));
 
@@ -1622,6 +1690,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     stagedOmxPromptEvidence,
     currentRunEvidence,
     postMergeMainCiEvidence,
+    operatorStatusCues,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
     diagnostics: {
       operatorActivityTiming: buildOperatorActivityTimingReceipt(timingPhases, performance.now() - timingStartedAt),
