@@ -2274,6 +2274,161 @@ test("codex runtime hook appends fresh explicit domain-memory receipt as advisor
   assert.equal(second.reasons.includes("domain-memory-receipt-not-fresh"), false);
 });
 
+test("codex runtime hook appends fresh automatic domain-memory lookup as advisory-only context", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-domain-memory-auto-fresh-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  writeDomainMemoryReceipt(tempDir, target);
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please inspect ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, inspect ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "inject");
+  assert.ok(second.additionalContext.includes("FOOKS DOMAIN MEMORY ADVISORY"));
+  assert.ok(second.additionalContext.includes("Source: automatic project-local lookup"));
+  assert.match(second.additionalContext, /automatic project-local lookup ".+domain-memory-receipt\.json"; verified against "src\/components\/FormSection\.tsx"/);
+  assert.ok(second.additionalContext.includes("Authorization: none; advisoryOnly: true."));
+  assert.ok(second.additionalContext.includes("does not authorize runtime reuse"));
+  assert.equal(second.debug.domainMemoryAdvisory, undefined);
+  assert.equal(second.debug.domainMemoryLookup.source, "automatic project-local lookup");
+  assert.equal(second.debug.domainMemoryLookup.status, "fresh");
+  assert.equal(second.debug.domainMemoryLookup.authorization, "none");
+  assert.equal(second.debug.domainMemoryLookup.advisoryOnly, true);
+  assert.equal(second.debug.domainMemoryLookup.candidateCount, 1);
+  assert.equal(second.debug.domainMemoryLookup.freshCandidateCount, 1);
+  assert.equal(second.reasons.includes("domain-memory-automatic-advisory:fresh"), true);
+  assert.equal(second.reasons.includes("domain-memory-receipt-not-fresh"), false);
+});
+
+test("codex runtime hook treats stale automatic domain-memory lookup as debug-only no-op", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-domain-memory-auto-stale-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  writeDomainMemoryReceipt(tempDir, target);
+  fs.appendFileSync(path.join(tempDir, target), "\nexport const changedAfterAutomaticReceipt = true;\n");
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please inspect ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, inspect ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "inject");
+  assert.equal(second.additionalContext.includes("FOOKS DOMAIN MEMORY ADVISORY"), false);
+  assert.equal(second.debug.domainMemoryAdvisory, undefined);
+  assert.equal(second.debug.domainMemoryLookup.status, "stale");
+  assert.equal(second.debug.domainMemoryLookup.authorization, "none");
+  assert.equal(second.debug.domainMemoryLookup.advisoryOnly, true);
+  assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+  assert.equal(second.reasons.includes("domain-memory-automatic-advisory:fresh"), false);
+  assert.equal(second.reasons.includes("domain-memory-receipt-not-fresh"), false);
+  assert.equal(second.fallback, undefined);
+});
+
+test("codex runtime hook treats ambiguous automatic domain-memory lookup as debug-only no-op", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-domain-memory-auto-ambiguous-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  writeDomainMemoryReceipt(tempDir, target, "one.json");
+  writeDomainMemoryReceipt(tempDir, target, "two.json");
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please inspect ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, inspect ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "inject");
+  assert.equal(second.additionalContext.includes("FOOKS DOMAIN MEMORY ADVISORY"), false);
+  assert.equal(second.debug.domainMemoryLookup.status, "ambiguous");
+  assert.equal(second.debug.domainMemoryLookup.candidateCount, 2);
+  assert.equal(second.debug.domainMemoryLookup.freshCandidateCount, 2);
+  assert.equal(second.reasons.includes("domain-memory-receipt-not-fresh"), false);
+  assert.equal(second.fallback, undefined);
+});
+
+test("codex runtime hook treats unsupported automatic domain-memory lookup as debug-only no-op", () => {
+  const tempDir = makeTempProject();
+  const sessionId = `hook-domain-memory-auto-unsupported-${Date.now()}`;
+  const target = path.join("src", "components", "FormSection.tsx");
+  const receiptDir = path.join(tempDir, ".fooks", "domain-memory");
+  fs.mkdirSync(path.dirname(receiptDir), { recursive: true });
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-domain-memory-outside-"));
+  fs.symlinkSync(outsideDir, receiptDir);
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+  const first = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please inspect ${target}`,
+    },
+    tempDir,
+  );
+  assert.equal(first.action, "record");
+
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, inspect ${target}`,
+    },
+    tempDir,
+  );
+
+  assert.equal(second.action, "inject");
+  assert.equal(second.additionalContext.includes("FOOKS DOMAIN MEMORY ADVISORY"), false);
+  assert.equal(second.debug.domainMemoryLookup.status, "unsupported");
+  assert.ok(second.debug.domainMemoryLookup.reasons.some((reason) => reason.includes("lookup directory must not be a symlink")));
+  assert.equal(second.reasons.includes("domain-memory-receipt-not-fresh"), false);
+  assert.equal(second.fallback, undefined);
+});
+
 test("codex runtime hook fails closed when explicit domain-memory receipt is stale", () => {
   const tempDir = makeTempProject();
   const sessionId = `hook-domain-memory-stale-${Date.now()}`;
