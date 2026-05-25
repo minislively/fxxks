@@ -289,6 +289,91 @@ process.exit(2);
   return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
 }
 
+function makeEpicOnlyNextChildCueCliFixture() {
+  const tempDir = fs.realpathSync(makeTempProject());
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-next-child-cue-bin-"));
+  const mainHead = "next-child-cue-main-head";
+  writeExecutable(path.join(binDir, "tmux"), `#!/usr/bin/env node
+process.exit(0);
+`);
+  writeExecutable(path.join(binDir, "gh"), `#!/usr/bin/env node
+const args = process.argv.slice(2).join(" ");
+if (args.startsWith("issue list")) {
+  process.stdout.write("[{\\"number\\":960}]");
+  process.exit(0);
+}
+if (args.startsWith("pr list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+if (args.startsWith("run list")) {
+  process.stdout.write("[]");
+  process.exit(0);
+}
+process.stderr.write("unexpected gh " + args + "\\n");
+process.exit(2);
+`);
+  writeExecutable(path.join(binDir, "git"), `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const joined = args.join(" ");
+const cwd = process.cwd();
+const mainHead = ${JSON.stringify(mainHead)};
+if (joined === "status --porcelain=v1 -z") process.exit(0);
+if (joined === "symbolic-ref --quiet --short HEAD") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+  process.stdout.write("origin/main\\n");
+  process.exit(0);
+}
+if (joined === "rev-list --left-right --count HEAD...@{u}") {
+  process.stdout.write("0\\t0\\n");
+  process.exit(0);
+}
+if (joined === "config --get remote.origin.url") {
+  process.stdout.write("git@github.com:minislively/fooks.git\\n");
+  process.exit(0);
+}
+if (joined === "worktree list --porcelain") {
+  process.stdout.write(["worktree " + cwd, "HEAD " + mainHead, "branch refs/heads/main", ""].join("\\n"));
+  process.exit(0);
+}
+if (joined === "rev-parse --verify origin/main") {
+  process.stdout.write(mainHead + "\\n");
+  process.exit(0);
+}
+if (joined === "rev-parse HEAD") {
+  process.stdout.write(mainHead + "\\n");
+  process.exit(0);
+}
+if (joined === "branch --show-current") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "branch --format=%(refname:short)") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "branch -r --format=%(refname:short)") {
+  process.stdout.write("origin/main\\n");
+  process.exit(0);
+}
+if (joined === "branch --merged origin/main") {
+  process.stdout.write("main\\n");
+  process.exit(0);
+}
+if (joined === "diff --shortstat origin/main...HEAD") process.exit(0);
+if (joined === "rev-list --left-right --count origin/main...HEAD") {
+  process.stdout.write("0 0\\n");
+  process.exit(0);
+}
+process.stderr.write("unexpected git " + joined + "\\n");
+process.exit(2);
+`);
+  return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
+}
+
 function assertPostMergeMainCiDiagnostic(item, { workflow, reason, headSha }) {
   assert.equal(item.workflow, workflow);
   assert.equal(item.diagnostic.source, OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE);
@@ -3982,6 +4067,35 @@ test("status activity CLI route preserves existing status contracts", () => {
   }
   assert.match(output, /Unexpected status activity argument/);
   assert.match(OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG, /--include-remote-counts/);
+});
+
+test("status activity include-remote-counts surfaces next-child evidence cue from operator-check boundary", () => {
+  const { tempDir, env } = makeEpicOnlyNextChildCueCliFixture();
+  const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
+
+  assert.equal(activity.command, OPERATOR_ACTIVITY_COMMAND);
+  assert.equal(activity.optionalCounts.enabled, true);
+  assert.deepEqual(activity.optionalCounts.openIssueNumbers, [960]);
+  assert.equal(activity.currentRunEvidence.activeWorkEvidence, false);
+
+  const cue = activity.operatorStatusCues.nextChildEvidence;
+  assert.equal(cue.issue, "#1067");
+  assert.equal(cue.readOnly, true);
+  assert.equal(cue.visible, true);
+  assert.equal(cue.classification, "next-child-evidence-required");
+  assert.equal(cue.requiresConcreteNextChildEvidence, true);
+  assert.equal(cue.derivedFrom.operatorCheckJsonPath, "activeWorkReceipts.nextChildEvidenceBoundary");
+  assert.match(cue.derivedFrom.source, /next-child evidence boundary/);
+  assert.match(cue.currentEvidenceCue, /only planning epic #960 is open/);
+  assert.match(cue.currentEvidenceCue, /no child issue, PR, non-main branch, mapped fooks session, active worktree\/process, or blocker evidence is present/);
+  assert.match(cue.requiredEvidenceCue, /next child issue/);
+  assert.match(cue.requiredEvidenceCue, /open pull request/);
+  assert.match(cue.requiredEvidenceCue, /mapped fooks tmux session/);
+  assert.match(cue.requiredEvidenceCue, /active worktree or process evidence/);
+  assert.match(cue.requiredEvidenceCue, /concrete blocker/);
+  assert.match(cue.oneLine, /Next-child evidence required/);
+  assert.match(cue.claimBoundary, /operator-check next-child evidence boundary remains the JSON source of truth/);
+  assert.match(cue.claimBoundary, /adds no authority, telemetry, merge gate, approval, product, or frontend behavior/);
 });
 
 test("source checkout npm operator aliases route to built CLI behavior", () => {
