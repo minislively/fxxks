@@ -4072,6 +4072,8 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.match(help, /fooks check \[--json\]/);
   assert.match(help, /fooks preflight \[--json\]/);
   assert.match(help, /fooks status activity \[--include-remote-counts\]/);
+  assert.match(help, /--include-remote-counts belongs only to status activity/);
+  assert.match(help, /fooks check --json for the operator\/check source-of-truth projection/);
 
   let output = "";
   try {
@@ -4080,6 +4082,17 @@ test("status activity CLI route preserves existing status contracts", () => {
     output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
   }
   assert.match(output, /Unexpected check argument/);
+
+  output = "";
+  try {
+    runText(["check", "--include-remote-counts"], tempDir);
+  } catch (error) {
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  assert.match(output, /Unexpected check argument: --include-remote-counts/);
+  assert.match(output, /--include-remote-counts belongs to status activity/);
+  assert.match(output, /fooks status activity --include-remote-counts --json/);
+  assert.match(output, /fooks check --json/);
 
   output = "";
   try {
@@ -4150,6 +4163,11 @@ test("default status activity surfaces remote-counts-required next action for cl
   assert.match(cue.currentEvidenceCue, /remote issue\/PR counts are disabled/);
   assert.match(cue.nextAction, /fooks status activity --include-remote-counts --json/);
   assert.match(cue.nextAction, /fooks check --json/);
+
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  assert.match(readme, /`--include-remote-counts` belongs to `fooks status activity`/);
+  assert.match(readme, /do not add it to `fooks check`/);
+  assert.match(readme, /Use `fooks check --json` for the operator\/check source-of-truth projection/);
   assert.match(cue.nextAction, /if only planning epic #960 remains open/);
   assert.match(cue.nextAction, /child issue/);
   assert.match(cue.nextAction, /open PR/);

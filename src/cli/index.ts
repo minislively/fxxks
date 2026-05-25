@@ -701,6 +701,9 @@ Everyday commands:
   ${displayCliName} status stale-worktrees [--json]
   ${displayCliName} status orphan-worktrees [--json]
   ${displayCliName} status activity [--include-remote-counts] [--receipt-json]
+
+Remote-counts boundary: --include-remote-counts belongs only to status activity.
+Use ${displayCliName} status activity --include-remote-counts --json for remote counts, or ${displayCliName} check --json for the operator/check source-of-truth projection.
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
@@ -1817,7 +1820,10 @@ async function run(): Promise<void> {
       let receiptJson = false;
       for (const arg of rest) {
         if (!allowed.has(arg)) {
-          throw new Error(`Unexpected check argument: ${arg}`);
+          const remoteCountsHint = arg === "--include-remote-counts"
+            ? `; --include-remote-counts belongs to status activity. Use ${displayCliName} status activity --include-remote-counts --json for remote counts, or ${displayCliName} check --json for the operator/check source-of-truth projection.`
+            : "";
+          throw new Error(`Unexpected check argument: ${arg}${remoteCountsHint}`);
         }
         if (arg === "--receipt-json") receiptJson = true;
       }
