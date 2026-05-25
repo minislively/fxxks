@@ -109,7 +109,7 @@ test("issue #1050 helper treats open PR as concrete-child-session-present", () =
   assert.equal(result.actionRequiredForConcreteChildOrSession, false);
 });
 
-test("issue #1050 helper requires completed child receipt before action-required", () => {
+test("issue #1050 helper keeps missing receipt from claiming active development", () => {
   const result = classifyAdvisoryOnlyQueueAfterCompletedChild({
     clean: true,
     branch: "main",
@@ -128,8 +128,11 @@ test("issue #1050 helper requires completed child receipt before action-required
   assert.equal(result.completedChildReceipt, false);
   assert.equal(
     result.classification,
-    "concrete-child-session-present",
+    "completed-child-receipt-missing",
   );
+  assert.equal(result.activeDevelopmentAllowed, false);
+  assert.equal(result.actionRequiredForConcreteChildOrSession, false);
+  assert.deepEqual(result.activeEvidenceKinds, []);
 });
 
 test("issue #1050 doc preserves the advisory-only queue guard contract", () => {

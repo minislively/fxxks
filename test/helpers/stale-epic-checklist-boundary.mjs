@@ -222,19 +222,23 @@ export function classifyAdvisoryOnlyQueueAfterCompletedChild(input) {
   const completedChildReceipt = Boolean(input?.completedChildReceipt?.issue || input?.completedChildReceipt?.pullRequest);
   const advisoryOnlyQueue = openIssueCount === 1 && issues.length === 1 && issues[0] === epicNumber && openPullRequestCount === 0;
   const actionRequired = cleanPostChildCompletionEcho && completedChildReceipt && advisoryOnlyQueue && activeKinds.length === 0;
+  const missingCompletedChildReceipt = cleanPostChildCompletionEcho && !completedChildReceipt && advisoryOnlyQueue && activeKinds.length === 0;
+  const concreteChildPresent = !actionRequired && !missingCompletedChildReceipt;
 
   return {
     issue: "#1050",
     epic: `#${epicNumber}`,
     classification: actionRequired
       ? "advisory-only-queue-after-completed-child-action-required"
-      : "concrete-child-session-present",
+      : missingCompletedChildReceipt
+        ? "completed-child-receipt-missing"
+        : "concrete-child-session-present",
     cleanPostChildCompletionEcho,
     completedChildReceipt,
     advisoryOnlyQueue,
     terminalIdleAllowed: false,
     actionRequiredForConcreteChildOrSession: actionRequired,
-    activeDevelopmentAllowed: !actionRequired,
+    activeDevelopmentAllowed: concreteChildPresent,
     requiredConcreteChildArtifacts: [
       "open-child-issue",
       "active-session",

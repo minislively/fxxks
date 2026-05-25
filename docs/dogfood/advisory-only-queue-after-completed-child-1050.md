@@ -67,5 +67,5 @@ claims, or merge anything.
 ## Focused verification
 
 ```sh
-node --test test/epic-only-open-issue-idle-guard.test.mjs test/operator-activity.test.mjs
+node --test test/advisory-only-queue-after-completed-child-1050.test.mjs test/epic-only-open-issue-idle-guard.test.mjs test/operator-activity.test.mjs
 ```
