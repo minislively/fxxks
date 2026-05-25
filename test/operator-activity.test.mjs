@@ -1770,6 +1770,35 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.match(staleChecklist.claimBoundary, /issue #1070/);
   assert.match(staleChecklist.nudgeRule, /stale unchecked checklist text cannot be reported as active development/);
   assert.match(staleChecklist.nudgeRule, /landed child evidence plus a current child issue, branch, session, PR, worktree\/process, or blocker/);
+
+  const drainReadyCutoff = snapshot.activeWorkReceipts.drainReadyCutoff;
+  assert.equal(drainReadyCutoff.issue, "#1077");
+  assert.equal(drainReadyCutoff.readOnly, true);
+  assert.equal(drainReadyCutoff.classification, "no-new-child-drain-ready-after-landed-child-evidence");
+  assert.equal(drainReadyCutoff.noNewChildBoundary.availableWhenLandedChildEvidenceIsCited, true);
+  assert.equal(drainReadyCutoff.noNewChildBoundary.createChildFromStaleChecklistText, false);
+  assert.equal(drainReadyCutoff.noNewChildBoundary.reportActiveDevelopmentFromEpicOnlyQueue, false);
+  assert.equal(drainReadyCutoff.noNewChildBoundary.drainReadyLabelAllowed, true);
+  assert.equal(
+    drainReadyCutoff.safeNextAction,
+    "cite-landed-child-evidence-then-drain-epic-without-creating-new-child",
+  );
+  assert.deepEqual(drainReadyCutoff.currentEvidence.openIssueNumbers, [960]);
+  assert.deepEqual(drainReadyCutoff.landedChildEvidenceRequiredForDrain, [
+    "closed child issue receipt",
+    "merged child pull request receipt",
+    "operator closeout receipt naming the completed child",
+  ]);
+  assert.equal(
+    drainReadyCutoff.preservesNextChildEvidenceBehavior.operatorCheckJsonPath,
+    "activeWorkReceipts.nextChildEvidenceBoundary",
+  );
+  assert.match(drainReadyCutoff.claimBoundary, /issue #1077/);
+  assert.match(drainReadyCutoff.claimBoundary, /no-new-child\/drain-ready/);
+  assert.match(drainReadyCutoff.claimBoundary, /concrete child issue, PR, session, branch, worktree\/process, or blocker evidence continues to use the next-child evidence path/);
+  assert.match(drainReadyCutoff.nudgeRule, /no-new-child\/drain-ready/);
+  assert.match(drainReadyCutoff.nudgeRule, /do not create another child from stale unchecked epic checklist text/);
+  assert.match(drainReadyCutoff.nudgeRule, /do not call the epic-only queue active development/);
   assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
   assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, true);
   assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {
@@ -2013,8 +2042,9 @@ test("CLI status activity receipt projection matches full active current-run rec
   const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
   const receipt = run(["status", "activity", "--include-remote-counts", "--receipt-json"], tempDir, env);
   const checkReceipt = run(["check", "--receipt-json"], tempDir, env);
+  const check = run(["check", "--json"], tempDir, env);
 
-  assert.deepEqual(checkReceipt, run(["check", "--json"], tempDir, env).sessionWhipRunReceipt);
+  assert.deepEqual(checkReceipt, check.sessionWhipRunReceipt);
   assert.equal(checkReceipt.status, "active");
   assert.equal(checkReceipt.counts.createdOrAdoptedIssues, 1);
   assert.equal(checkReceipt.counts.adoptedBranches, 1);
@@ -2032,6 +2062,21 @@ test("CLI status activity receipt projection matches full active current-run rec
   });
   assert.equal(activity.currentRunEvidence.activeWorkEvidence, true);
   assert.equal(activity.currentRunEvidence.receipt.readOnly, true);
+  assert.equal(
+    check.activeWorkReceipts.nextChildEvidenceBoundary.classification,
+    "concrete-next-child-evidence-present",
+  );
+  assert.equal(
+    check.activeWorkReceipts.drainReadyCutoff.classification,
+    "concrete-child-evidence-present-use-next-child-path",
+  );
+  assert.equal(check.activeWorkReceipts.drainReadyCutoff.noNewChildBoundary.drainReadyLabelAllowed, false);
+  assert.equal(check.activeWorkReceipts.drainReadyCutoff.safeNextAction, "use-next-child-evidence-boundary");
+  assert.equal(
+    check.activeWorkReceipts.drainReadyCutoff.preservesNextChildEvidenceBehavior.operatorCheckJsonPath,
+    "activeWorkReceipts.nextChildEvidenceBoundary",
+  );
+  assert.match(check.activeWorkReceipts.drainReadyCutoff.nudgeRule, /preserve the existing next-child evidence behavior/);
 });
 
 

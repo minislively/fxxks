@@ -95,6 +95,14 @@ means session whip must name a concrete next child issue, PR, branch, mapped
 session, active worktree/process evidence, or concrete blocker before reporting
 active development.
 
+For issue #1077, clean post-merge epic-only reports also get
+`activeWorkReceipts.drainReadyCutoff`. After landed child evidence is cited,
+clean `main` with only planning epic #960 open may be labeled
+no-new-child/drain-ready; stale checklist text cannot auto-create another child
+or be reported as active development. If concrete child issue, PR, branch,
+mapped session, worktree/process evidence, or blocker evidence exists, preserve
+the existing `activeWorkReceipts.nextChildEvidenceBoundary` behavior instead.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
@@ -157,6 +165,12 @@ active development.
   evidence before the epic can be considered drainable, and requires current
   child issue, PR, branch, mapped session, worktree/process evidence, or blocker
   before active-development reporting.
+- `activeWorkReceipts.drainReadyCutoff` is the issue #1077 drain-ready cutoff
+  summary. It keeps clean `main` plus only epic #960 open as non-active, allows a
+  no-new-child/drain-ready operator label only after landed child evidence is
+  cited, prevents stale checklist text from auto-slicing another child, and
+  defers to `activeWorkReceipts.nextChildEvidenceBoundary` whenever concrete
+  child issue/session/PR/branch/worktree-process/blocker evidence exists.
 - `docs/dogfood/current-development-nudge-target-871.md` is the issue #871
   current-development nudge target artifact. It keeps PR #870 merged CI/release
   receipts receipt-only and documents that the answer to "what is being
