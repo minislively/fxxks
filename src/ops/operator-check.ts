@@ -48,6 +48,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SCHEMA_VERSI
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE = "operator/check compact session-whip run receipt projection";
@@ -75,6 +76,7 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE = "#869";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE = "#885";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE = "#895";
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE = "#992";
+export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE = "#1062";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -83,6 +85,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_ISSUE_URL = 
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_ISSUE_URL = "https://github.com/minislively/fooks/issues/867";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/869";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL = "https://github.com/minislively/fooks/issues/885";
+export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1062";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL = "https://github.com/minislively/fooks/issues/895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
@@ -93,6 +96,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_WORKTREE_RESIDUE_BOUNDARY_SOURCE = "op
 export const OPERATOR_CHECK_POST_RECEIPT_NUDGE_ANCHOR_SOURCE = "operator/check post-receipt dogfood nudge anchor projection";
 export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE = "operator/check receipt-only dogfood nudge loop boundary projection";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SOURCE = "operator/check issue #885 handoff artifact evidence projection";
+export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SOURCE = "operator/check issue #1062 completed-child receipt boundary projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
@@ -112,6 +116,8 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #869 dogfood receipt-only nudge loop artifact; after PR #868 receipt-only closeout, the next nudge report must name newly created or adopted issue evidence plus mapped OMX session evidence, not the last merged commit, main CI run, or release receipt.";
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_CLAIM_BOUNDARY =
   "Read-only issue #885 fooks-check handoff artifact; adopt live issue, PR, mapped session, or live non-main worktree evidence when present, otherwise require exactly one run-created issue, branch, or session evidence report without mutating runtime/provider behavior.";
+export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_CLAIM_BOUNDARY =
+  "Read-only issue #1062 dogfood clean epic-only nudge artifact; a queue containing only planning epic #960 after child work completed must surface a completed-child receipt requirement and cannot claim active development from the epic alone.";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
   "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
@@ -485,6 +491,36 @@ export type OperatorCheckHandoffArtifactEvidence = {
   nextReportRule: string;
 };
 
+export type OperatorCheckCompletedChildReceiptBoundary = {
+  schemaVersion: typeof OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_CLAIM_BOUNDARY;
+  readOnly: true;
+  classification: "completed-child-receipt-missing" | "not-clean-epic-only-nudge";
+  currentEvidence: {
+    clean: boolean | null;
+    branch?: string;
+    ahead?: number;
+    behind?: number;
+    openIssueNumbers?: number[];
+    openPullRequestCount?: number;
+    mappedFooksTmuxSessionCount: number;
+  };
+  completedChildReceipt: {
+    required: boolean;
+    present: false;
+    acceptedEvidence: [
+      "completed child issue receipt",
+      "merged child pull request receipt",
+      "operator closeout receipt naming the completed child",
+    ];
+  };
+  activeDevelopmentAllowedFromEpicOnlyQueue: false;
+  nudgeRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -515,6 +551,7 @@ export type OperatorCheckActiveWorkReceipts = {
   postReceiptNudgeAnchorBoundary: OperatorCheckPostReceiptNudgeAnchorBoundary;
   receiptOnlyNudgeLoopBoundary: OperatorCheckReceiptOnlyNudgeLoopBoundary;
   handoffArtifactEvidence: OperatorCheckHandoffArtifactEvidence;
+  completedChildReceiptBoundary: OperatorCheckCompletedChildReceiptBoundary;
   currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
   sessionWhipRunReceipt: OperatorCheckSessionWhipRunReceipt;
   blockers: string[];
@@ -1566,6 +1603,48 @@ function buildReceiptOnlyNudgeLoopBoundary(
   };
 }
 
+function buildCompletedChildReceiptBoundary(
+  activity: OperatorActivitySnapshot,
+): OperatorCheckCompletedChildReceiptBoundary {
+  const cleanEpicOnlyNudge =
+    activity.currentRunEvidence.mainEchoEvidence && hasOnlyPlanningEpicOpenIssue(activity.optionalCounts);
+  const classification = cleanEpicOnlyNudge ? "completed-child-receipt-missing" : "not-clean-epic-only-nudge";
+
+  return {
+    schemaVersion: OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE,
+    issueUrl: OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE_URL,
+    source: OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SOURCE,
+    claimBoundary: OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_CLAIM_BOUNDARY,
+    readOnly: true,
+    classification,
+    currentEvidence: {
+      clean: activity.worktree.clean,
+      branch: activity.worktree.branch,
+      ahead: activity.worktree.ahead,
+      behind: activity.worktree.behind,
+      openIssueNumbers: activity.optionalCounts.enabled
+        ? activity.optionalCounts.openIssueNumbers
+        : undefined,
+      openPullRequestCount: activity.currentRunEvidence.evidence.openPullRequests,
+      mappedFooksTmuxSessionCount: activity.currentRunEvidence.evidence.fooksSessionCount,
+    },
+    completedChildReceipt: {
+      required: cleanEpicOnlyNudge,
+      present: false,
+      acceptedEvidence: [
+        "completed child issue receipt",
+        "merged child pull request receipt",
+        "operator closeout receipt naming the completed child",
+      ],
+    },
+    activeDevelopmentAllowedFromEpicOnlyQueue: false,
+    nudgeRule: cleanEpicOnlyNudge
+      ? "A clean nudge with only planning epic #960 open is missing the completed-child receipt required after child work completes; name that receipt plus a concrete child/session artifact before reporting active development."
+      : "The completed-child receipt requirement is only evaluated for clean epic-only nudges; active development still requires a concrete issue, PR, branch, session, worktree, process, or blocker outside the epic-only queue.",
+  };
+}
+
 function buildHandoffArtifactEvidence(
   activity: OperatorActivitySnapshot,
   receipts: OperatorCheckActiveWorkReceipt[],
@@ -1854,6 +1933,7 @@ function buildActiveWorkReceipts(
     postReceiptNudgeAnchorBoundary: buildPostReceiptNudgeAnchorBoundary(activity),
     receiptOnlyNudgeLoopBoundary: buildReceiptOnlyNudgeLoopBoundary(activity),
     handoffArtifactEvidence: buildHandoffArtifactEvidence(activity, receipts),
+    completedChildReceiptBoundary: buildCompletedChildReceiptBoundary(activity),
     currentRunReceipt: activity.currentRunEvidence.receipt,
     sessionWhipRunReceipt: buildSessionWhipRunReceipt({
       classification,
