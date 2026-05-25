@@ -1740,6 +1740,36 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.match(nextChildBoundary.claimBoundary, /issue #1065/);
   assert.match(nextChildBoundary.nudgeRule, /epic-only #960 queue is still idle/);
   assert.match(nextChildBoundary.nudgeRule, /concrete next-child issue, PR, branch, session, worktree\/process, or blocker evidence/);
+
+  const staleChecklist = snapshot.activeWorkReceipts.epicStaleChecklistReconciliation;
+  assert.equal(staleChecklist.issue, "#1070");
+  assert.equal(staleChecklist.readOnly, true);
+  assert.equal(staleChecklist.classification, "stale-epic-checklist-action-required");
+  assert.equal(staleChecklist.staleChecklistTextAuthority, "advisory");
+  assert.equal(staleChecklist.canDrainEpic, false);
+  assert.equal(staleChecklist.canReportActiveDevelopment, false);
+  assert.equal(
+    staleChecklist.safeNextAction,
+    "name-landed-child-evidence-and-open-or-adopt-current-active-artifact",
+  );
+  assert.equal(staleChecklist.duplicateWorkRisk, "elevated-until-current-child-evidence");
+  assert.deepEqual(staleChecklist.currentEvidence.openIssueNumbers, [960]);
+  assert.deepEqual(staleChecklist.landedChildEvidenceRequired, [
+    "closed child issue receipt",
+    "merged child pull request receipt",
+    "operator closeout receipt naming the completed child",
+  ]);
+  assert.deepEqual(staleChecklist.currentActiveArtifactRequired, [
+    "next child issue",
+    "open pull request",
+    "non-main branch",
+    "mapped fooks tmux session",
+    "active worktree or process evidence",
+    "concrete blocker",
+  ]);
+  assert.match(staleChecklist.claimBoundary, /issue #1070/);
+  assert.match(staleChecklist.nudgeRule, /stale unchecked checklist text cannot be reported as active development/);
+  assert.match(staleChecklist.nudgeRule, /landed child evidence plus a current child issue, branch, session, PR, worktree\/process, or blocker/);
   assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
   assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, true);
   assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {

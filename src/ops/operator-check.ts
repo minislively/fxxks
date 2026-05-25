@@ -51,6 +51,7 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE = "operator/check compact session-whip run receipt projection";
@@ -80,6 +81,7 @@ export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE = "
 export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE = "#992";
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE = "#1062";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE = "#1065";
+export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE = "#1070";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -90,6 +92,7 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_ISSUE_URL = "https:
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL = "https://github.com/minislively/fooks/issues/885";
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1062";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1065";
+export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE_URL = "https://github.com/minislively/fooks/issues/1070";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL = "https://github.com/minislively/fooks/issues/895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
@@ -104,6 +107,8 @@ export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SOURCE = "operator/
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SOURCE = "operator/check issue #1065 next-child evidence boundary projection";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_STATUS_CUE_SOURCE =
   "operator/status activity issue #1067 next-child evidence cue projection";
+export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SOURCE =
+  "operator/check issue #1070 stale epic checklist reconciliation projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
@@ -127,6 +132,8 @@ export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #1062 dogfood clean epic-only nudge artifact; a queue containing only planning epic #960 after child work completed must surface a completed-child receipt requirement and cannot claim active development from the epic alone.";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #1065 dogfood next-child evidence artifact; after clean post-merge main CI/release and completed-child receipts, an epic-only #960 queue remains idle until a concrete next child issue, PR, branch, session, worktree, process, or blocker is named.";
+export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_CLAIM_BOUNDARY =
+  "Read-only issue #1070 dogfood stale epic checklist reconciliation artifact; stale unchecked #960 checklist text is advisory only until landed child evidence and current active artifacts prove the epic can be drained or the next child can be named.";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
   "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
@@ -590,6 +597,51 @@ export type OperatorCheckNextChildEvidenceStatusCue = {
   oneLine: string;
 };
 
+export type OperatorCheckEpicStaleChecklistReconciliation = {
+  schemaVersion: typeof OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_CLAIM_BOUNDARY;
+  readOnly: true;
+  classification:
+    | "stale-epic-checklist-action-required"
+    | "epic-checklist-backed-by-current-active-artifact"
+    | "not-clean-epic-only-main-echo";
+  currentEvidence: {
+    clean: boolean | null;
+    branch?: string;
+    ahead?: number;
+    behind?: number;
+    openIssueNumbers?: number[];
+    openPullRequestCount?: number;
+    mappedFooksTmuxSessionCount: number;
+    activeWorkEvidence: boolean;
+  };
+  landedChildEvidenceRequired: [
+    "closed child issue receipt",
+    "merged child pull request receipt",
+    "operator closeout receipt naming the completed child",
+  ];
+  currentActiveArtifactRequired: [
+    "next child issue",
+    "open pull request",
+    "non-main branch",
+    "mapped fooks tmux session",
+    "active worktree or process evidence",
+    "concrete blocker",
+  ];
+  staleChecklistTextAuthority: "advisory" | "backed";
+  canDrainEpic: boolean;
+  canReportActiveDevelopment: boolean;
+  safeNextAction:
+    | "name-landed-child-evidence-and-open-or-adopt-current-active-artifact"
+    | "use-current-active-artifact"
+    | "ordinary-active-work-evidence-check";
+  duplicateWorkRisk: "elevated-until-current-child-evidence" | "bounded";
+  nudgeRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -622,6 +674,7 @@ export type OperatorCheckActiveWorkReceipts = {
   handoffArtifactEvidence: OperatorCheckHandoffArtifactEvidence;
   completedChildReceiptBoundary: OperatorCheckCompletedChildReceiptBoundary;
   nextChildEvidenceBoundary: OperatorCheckNextChildEvidenceBoundary;
+  epicStaleChecklistReconciliation: OperatorCheckEpicStaleChecklistReconciliation;
   currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
   sessionWhipRunReceipt: OperatorCheckSessionWhipRunReceipt;
   blockers: string[];
@@ -1828,6 +1881,71 @@ export function buildOperatorCheckNextChildEvidenceStatusCue(
   };
 }
 
+function buildEpicStaleChecklistReconciliation(
+  activity: OperatorActivitySnapshot,
+): OperatorCheckEpicStaleChecklistReconciliation {
+  const cleanEpicOnlyMainEcho =
+    activity.currentRunEvidence.mainEchoEvidence && hasOnlyPlanningEpicOpenIssue(activity.optionalCounts);
+  const currentActiveArtifactPresent = activity.currentRunEvidence.activeWorkEvidence;
+  const classification: OperatorCheckEpicStaleChecklistReconciliation["classification"] = cleanEpicOnlyMainEcho
+    ? "stale-epic-checklist-action-required"
+    : currentActiveArtifactPresent
+      ? "epic-checklist-backed-by-current-active-artifact"
+      : "not-clean-epic-only-main-echo";
+  const staleChecklistTextAuthority = classification === "epic-checklist-backed-by-current-active-artifact"
+    ? "backed"
+    : "advisory";
+
+  return {
+    schemaVersion: OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE,
+    issueUrl: OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE_URL,
+    source: OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SOURCE,
+    claimBoundary: OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_CLAIM_BOUNDARY,
+    readOnly: true,
+    classification,
+    currentEvidence: {
+      clean: activity.worktree.clean,
+      branch: activity.worktree.branch,
+      ahead: activity.worktree.ahead,
+      behind: activity.worktree.behind,
+      openIssueNumbers: activity.optionalCounts.enabled ? activity.optionalCounts.openIssueNumbers : undefined,
+      openPullRequestCount: activity.currentRunEvidence.evidence.openPullRequests,
+      mappedFooksTmuxSessionCount: activity.currentRunEvidence.evidence.fooksSessionCount,
+      activeWorkEvidence: activity.currentRunEvidence.activeWorkEvidence,
+    },
+    landedChildEvidenceRequired: [
+      "closed child issue receipt",
+      "merged child pull request receipt",
+      "operator closeout receipt naming the completed child",
+    ],
+    currentActiveArtifactRequired: [
+      "next child issue",
+      "open pull request",
+      "non-main branch",
+      "mapped fooks tmux session",
+      "active worktree or process evidence",
+      "concrete blocker",
+    ],
+    staleChecklistTextAuthority,
+    canDrainEpic: false,
+    canReportActiveDevelopment: currentActiveArtifactPresent,
+    safeNextAction: classification === "stale-epic-checklist-action-required"
+      ? "name-landed-child-evidence-and-open-or-adopt-current-active-artifact"
+      : classification === "epic-checklist-backed-by-current-active-artifact"
+        ? "use-current-active-artifact"
+        : "ordinary-active-work-evidence-check",
+    duplicateWorkRisk: classification === "stale-epic-checklist-action-required"
+      ? "elevated-until-current-child-evidence"
+      : "bounded",
+    nudgeRule: classification === "stale-epic-checklist-action-required"
+      ? "A clean main snapshot with only epic #960 open and stale unchecked checklist text cannot be reported as active development or drained from the epic body alone; name landed child evidence plus a current child issue, branch, session, PR, worktree/process, or blocker before continuing."
+      : classification === "epic-checklist-backed-by-current-active-artifact"
+        ? "Use the current active artifact evidence already present; stale epic checklist text remains explanatory only and should not spawn duplicate work."
+        : "This reconciliation only forces action for clean epic-only main echoes; other states still need ordinary current active-work evidence before active development claims.",
+  };
+}
+
 function buildHandoffArtifactEvidence(
   activity: OperatorActivitySnapshot,
   receipts: OperatorCheckActiveWorkReceipt[],
@@ -2118,6 +2236,7 @@ function buildActiveWorkReceipts(
     handoffArtifactEvidence: buildHandoffArtifactEvidence(activity, receipts),
     completedChildReceiptBoundary: buildCompletedChildReceiptBoundary(activity),
     nextChildEvidenceBoundary: buildNextChildEvidenceBoundary(activity),
+    epicStaleChecklistReconciliation: buildEpicStaleChecklistReconciliation(activity),
     currentRunReceipt: activity.currentRunEvidence.receipt,
     sessionWhipRunReceipt: buildSessionWhipRunReceipt({
       classification,
