@@ -87,6 +87,14 @@ nudge report must name newly created/adopted issue evidence plus mapped OMX
 session evidence; `requiresIssueAndOmxSessionEvidence: true` means another
 receipt-only report is not an active development anchor.
 
+For issue #1065, clean post-merge epic-only reports get
+`activeWorkReceipts.nextChildEvidenceBoundary`. It treats main CI/release
+success and completed-child receipt handling as status-only receipts. When only
+planning epic #960 remains open, `requiresConcreteNextChildEvidence: true`
+means session whip must name a concrete next child issue, PR, branch, mapped
+session, active worktree/process evidence, or concrete blocker before reporting
+active development.
+
 ## Evidence surfaces
 
 - `fooks check --json` exposes the operator/check projection. The idle case is
@@ -136,6 +144,13 @@ receipt-only report is not an active development anchor.
   CI success as receipts only, sets repeated receipt-only reports to false, and
   requires newly created/adopted issue evidence plus mapped OMX session evidence
   before the next nudge report can describe active development.
+- `activeWorkReceipts.nextChildEvidenceBoundary` is the issue #1065 next-child
+  evidence summary. It keeps post-merge main CI/release success and
+  completed-child receipt handling status-only, sets status-only receipts as
+  non-active-work evidence, and requires a concrete next child issue, PR,
+  branch, mapped session, active worktree/process evidence, or concrete blocker
+  before session whip can report active development from an epic-only #960
+  queue.
 - `docs/dogfood/current-development-nudge-target-871.md` is the issue #871
   current-development nudge target artifact. It keeps PR #870 merged CI/release
   receipts receipt-only and documents that the answer to "what is being
