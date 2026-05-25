@@ -1892,6 +1892,63 @@ test("CLI check and status activity treat absent tmux server as zero mapped sess
   });
 });
 
+test("status activity surfaces operator-visible next-child evidence cue for clean epic-only post-merge output", () => {
+  const tempDir = makeTempProject();
+  const snapshot = readOperatorActivitySnapshot(tempDir, {
+    includeRemoteCounts: true,
+    now: () => "2026-05-24T08:30:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return "origin/main\n";
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: /** @param {string} command @param {string[]} args */ (command, args) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[{\"number\":960}]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && args[0] === "run") return "[]";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [`worktree ${tempDir}`, "HEAD post-merge-main-head", "branch refs/heads/main", ""].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return "post-merge-main-head\n";
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined}`);
+    },
+    pathExists: /** @param {string} targetPath */ (targetPath) => targetPath === tempDir,
+  });
+
+  assert.equal(snapshot.command, OPERATOR_ACTIVITY_COMMAND);
+  assert.equal(snapshot.currentRunEvidence.mainEchoEvidence, true);
+  assert.equal(snapshot.currentRunEvidence.activeWorkEvidence, false);
+  assert.equal(snapshot.nextChildEvidenceCue.issue, "#1067");
+  assert.equal(snapshot.nextChildEvidenceCue.readOnly, true);
+  assert.equal(snapshot.nextChildEvidenceCue.advisoryOnly, true);
+  assert.equal(snapshot.nextChildEvidenceCue.operatorVisible, true);
+  assert.equal(snapshot.nextChildEvidenceCue.classification, "next-child-evidence-required");
+  assert.equal(snapshot.nextChildEvidenceCue.derivedFrom.sourceOfTruth, "operator-check activeWorkReceipts.nextChildEvidenceBoundary");
+  assert.deepEqual(snapshot.nextChildEvidenceCue.currentEvidence.openIssueNumbers, [960]);
+  assert.equal(snapshot.nextChildEvidenceCue.currentEvidence.openPullRequestCount, 0);
+  assert.equal(snapshot.nextChildEvidenceCue.currentEvidence.mappedFooksTmuxSessionCount, 0);
+  assert.deepEqual(snapshot.nextChildEvidenceCue.acceptableConcreteEvidence, [
+    "child issue",
+    "branch",
+    "session",
+    "pull request",
+    "worktree or process evidence",
+    "concrete blocker",
+  ]);
+  assert.match(snapshot.nextChildEvidenceCue.cue, /epic-only #960 is idle/);
+  assert.match(snapshot.nextChildEvidenceCue.cue, /child issue, branch, session, PR, worktree\/process evidence, or blocker/);
+});
+
 test("CLI status activity receipt projection matches full active current-run receipt", () => {
   const { tempDir, env } = makeActiveReceiptCliFixture();
 

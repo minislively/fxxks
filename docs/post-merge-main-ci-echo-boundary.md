@@ -109,6 +109,13 @@ active development.
   `currentRunEvidence`. The non-active echo case is only
   `classification: "mainEchoNonActive"` with `mainEchoEvidence: true` and
   `activeWorkEvidence: false`.
+- `fooks status activity --include-remote-counts --json` also exposes
+  `nextChildEvidenceCue` for issue #1067. In the clean epic-only #960 case,
+  `operatorVisible: true` and the cue tells the operator to name a concrete
+  child issue, branch, session, PR, worktree/process evidence, or blocker before
+  reporting active development. The source of truth remains
+  `activeWorkReceipts.nextChildEvidenceBoundary` in `fooks check --json`; the
+  status cue is advisory/read-only and creates no active-work authority.
 - `fooks check --json` and `fooks status activity --include-remote-counts
   --json` expose `postMergeMainCiEvidence`, a read-only exact-head summary for
   local `origin/main`. It reports the local `origin/main` head SHA and the
@@ -151,6 +158,11 @@ active development.
   branch, mapped session, active worktree/process evidence, or concrete blocker
   before session whip can report active development from an epic-only #960
   queue.
+- `nextChildEvidenceCue` is the issue #1067 operator-facing mirror in
+  `status activity`. It intentionally points back to
+  `activeWorkReceipts.nextChildEvidenceBoundary` as the source of truth and only
+  makes the required concrete-next-action wording visible in the compact status
+  surface.
 - `docs/dogfood/current-development-nudge-target-871.md` is the issue #871
   current-development nudge target artifact. It keeps PR #870 merged CI/release
   receipts receipt-only and documents that the answer to "what is being

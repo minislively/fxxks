@@ -40,6 +40,11 @@ export const OPERATOR_ACTIVITY_TIMING_SOURCE = "fooks status activity diagnostic
 export const OPERATOR_ACTIVITY_TIMING_CLAIM_BOUNDARY =
   "Diagnostic/read-only operator activity subphase timing only; not current-work authority, not cleanup authority, not provider billing/runtime proof, and not a source-of-truth semantic input.";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_ISSUE = "#910";
+export const OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_ISSUE = "#1067";
+export const OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_SOURCE =
+  "operator/activity issue #1067 next-child evidence cue";
+export const OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_CLAIM_BOUNDARY =
+  "Read-only issue #1067 operator-visible cue for clean epic-only post-merge status output; derived from status activity evidence and mirroring the operator/check next-child boundary without creating issues, branches, sessions, PRs, worktrees, blockers, or active-work authority.";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_SOURCE = "operator/activity issue #910 staged OMX prompt pane evidence";
 export const OPERATOR_ACTIVITY_STAGED_OMX_PROMPT_CLAIM_BOUNDARY =
   "Read-only issue #910 operator artifact; a current OMX pane with only a staged prompt placeholder, no submitted/working/tool-output evidence, only .fooks-session-task.txt delta, and ahead=0 is not active development proof.";
@@ -195,6 +200,50 @@ export type OperatorActivityStagedOmxPromptEvidence = {
     requiresCurrentOmxPane: true;
   };
   sessionNames: string[];
+  reasons: string[];
+};
+
+export type OperatorActivityNextChildEvidenceCue = {
+  issue: typeof OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_ISSUE;
+  source: typeof OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_SOURCE;
+  claimBoundary: typeof OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_CLAIM_BOUNDARY;
+  readOnly: true;
+  advisoryOnly: true;
+  classification: "next-child-evidence-required" | "not-required";
+  operatorVisible: boolean;
+  cue: string;
+  acceptableConcreteEvidence: [
+    "child issue",
+    "branch",
+    "session",
+    "pull request",
+    "worktree or process evidence",
+    "concrete blocker",
+  ];
+  derivedFrom: {
+    sourceOfTruth: "operator-check activeWorkReceipts.nextChildEvidenceBoundary";
+    statusActivityFields: [
+      "currentRunEvidence.mainEchoEvidence",
+      "currentRunEvidence.activeWorkEvidence",
+      "optionalCounts.openIssueNumbers",
+      "optionalCounts.openPullRequests",
+      "worktree.branch",
+      "worktree.clean",
+      "worktree.ahead",
+      "worktree.behind",
+      "tmux.sessions",
+    ];
+  };
+  currentEvidence: {
+    clean: boolean | null;
+    branch?: string;
+    ahead?: number;
+    behind?: number;
+    openIssueNumbers?: number[];
+    openPullRequestCount?: number;
+    mappedFooksTmuxSessionCount: number;
+    activeWorkEvidence: boolean;
+  };
   reasons: string[];
 };
 
@@ -361,6 +410,7 @@ export type OperatorActivitySnapshot = {
   optionalCounts: OperatorActivityRemoteCounts;
   legacyWorktreeEvidence: OperatorActivityLegacyWorktreeEvidence;
   stagedOmxPromptEvidence: OperatorActivityStagedOmxPromptEvidence;
+  nextChildEvidenceCue: OperatorActivityNextChildEvidenceCue;
   currentRunEvidence: OperatorActivityCurrentRunEvidence;
   postMergeMainCiEvidence: OperatorActivityPostMergeMainCiEvidence;
   blockers: string[];
@@ -937,6 +987,73 @@ function buildStagedOmxPromptEvidence(
       requiresCurrentOmxPane: true,
     },
     sessionNames: stagedSessions.map((session) => session.session),
+    reasons,
+  };
+}
+
+function buildNextChildEvidenceCue(
+  worktree: OperatorActivityWorktree,
+  optionalCounts: OperatorActivityRemoteCounts,
+  currentRunEvidence: OperatorActivityCurrentRunEvidence,
+): OperatorActivityNextChildEvidenceCue {
+  const mappedFooksTmuxSessionCount = currentRunEvidence.evidence.fooksSessionCount;
+  const requiresConcreteNextChildEvidence =
+    currentRunEvidence.mainEchoEvidence
+    && hasOnlyPlanningEpicOpenIssue(optionalCounts)
+    && !currentRunEvidence.activeWorkEvidence;
+  const reasons = requiresConcreteNextChildEvidence
+    ? [
+        "clean post-merge main echo has only planning epic #960 open",
+        "planning epic #960 is advisory inventory and not active development evidence",
+        "operator status output must name a concrete next child artifact or blocker before reporting active work",
+      ]
+    : [
+        "next-child evidence cue is only required for clean epic-only post-merge main echoes",
+      ];
+
+  return {
+    issue: OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_ISSUE,
+    source: OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_SOURCE,
+    claimBoundary: OPERATOR_ACTIVITY_NEXT_CHILD_EVIDENCE_CUE_CLAIM_BOUNDARY,
+    readOnly: true,
+    advisoryOnly: true,
+    classification: requiresConcreteNextChildEvidence ? "next-child-evidence-required" : "not-required",
+    operatorVisible: requiresConcreteNextChildEvidence,
+    cue: requiresConcreteNextChildEvidence
+      ? "Operator cue: epic-only #960 is idle; name a concrete next child issue, branch, session, PR, worktree/process evidence, or blocker before reporting active development."
+      : "Operator cue: no clean epic-only next-child evidence requirement is active for this status snapshot.",
+    acceptableConcreteEvidence: [
+      "child issue",
+      "branch",
+      "session",
+      "pull request",
+      "worktree or process evidence",
+      "concrete blocker",
+    ],
+    derivedFrom: {
+      sourceOfTruth: "operator-check activeWorkReceipts.nextChildEvidenceBoundary",
+      statusActivityFields: [
+        "currentRunEvidence.mainEchoEvidence",
+        "currentRunEvidence.activeWorkEvidence",
+        "optionalCounts.openIssueNumbers",
+        "optionalCounts.openPullRequests",
+        "worktree.branch",
+        "worktree.clean",
+        "worktree.ahead",
+        "worktree.behind",
+        "tmux.sessions",
+      ],
+    },
+    currentEvidence: {
+      clean: worktree.clean,
+      branch: worktree.branch,
+      ahead: worktree.ahead,
+      behind: worktree.behind,
+      openIssueNumbers: optionalCounts.enabled ? optionalCounts.openIssueNumbers : undefined,
+      openPullRequestCount: currentRunEvidence.evidence.openPullRequests,
+      mappedFooksTmuxSessionCount,
+      activeWorkEvidence: currentRunEvidence.activeWorkEvidence,
+    },
     reasons,
   };
 }
@@ -1603,6 +1720,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
   const legacyWorktreeEvidence = timeDiagnosticPhase(timingPhases, "read-legacy-worktree-evidence", () => readLegacyWorktreeEvidence(cwd, options, generatedAt));
   const stagedOmxPromptEvidence = timeDiagnosticPhase(timingPhases, "build-staged-omx-prompt-evidence", () => buildStagedOmxPromptEvidence(worktree, tmux));
   const currentRunEvidence = timeDiagnosticPhase(timingPhases, "build-current-run-evidence", () => buildCurrentRunEvidence(worktree, tmux, optionalCounts, legacyWorktreeEvidence));
+  const nextChildEvidenceCue = timeDiagnosticPhase(timingPhases, "build-next-child-evidence-cue", () => buildNextChildEvidenceCue(worktree, optionalCounts, currentRunEvidence));
   const postMergeMainCiEvidence = timeDiagnosticPhase(timingPhases, "read-post-merge-main-ci-evidence", () => readPostMergeMainCiEvidence(cwd, options));
   const optionalCountBlockers = optionalCounts.enabled ? optionalCounts.blockers : [];
   const runtimeProvenance = timeDiagnosticPhase(timingPhases, "read-operator-activity-runtime-provenance", () => readOperatorActivityRuntimeProvenance(cwd));
@@ -1620,6 +1738,7 @@ export function readOperatorActivitySnapshot(cwd = process.cwd(), options: Opera
     optionalCounts,
     legacyWorktreeEvidence,
     stagedOmxPromptEvidence,
+    nextChildEvidenceCue,
     currentRunEvidence,
     postMergeMainCiEvidence,
     blockers: uniqueSorted([...worktree.blockers, ...tmux.blockers, ...optionalCountBlockers]),
