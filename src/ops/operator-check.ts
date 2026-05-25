@@ -52,6 +52,7 @@ export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE = "operator/check compact session-whip run receipt projection";
@@ -82,6 +83,7 @@ export const OPERATOR_CHECK_RESUME_HANDOFF_PROJECTION_ISSUE = "#992";
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE = "#1062";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE = "#1065";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE = "#1070";
+export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE = "#1077";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -93,6 +95,7 @@ export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_ISSUE_URL = "https://githu
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1062";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1065";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE_URL = "https://github.com/minislively/fooks/issues/1070";
+export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE_URL = "https://github.com/minislively/fooks/issues/1077";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL = "https://github.com/minislively/fooks/issues/895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
@@ -109,6 +112,8 @@ export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_STATUS_CUE_SOURCE =
   "operator/status activity issue #1067 next-child evidence cue projection";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SOURCE =
   "operator/check issue #1070 stale epic checklist reconciliation projection";
+export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE =
+  "operator/check issue #1077 drain-ready no-new-child cutoff projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
@@ -134,6 +139,8 @@ export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #1065 dogfood next-child evidence artifact; after clean post-merge main CI/release and completed-child receipts, an epic-only #960 queue remains idle until a concrete next child issue, PR, branch, session, worktree, process, or blocker is named.";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_CLAIM_BOUNDARY =
   "Read-only issue #1070 dogfood stale epic checklist reconciliation artifact; stale unchecked #960 checklist text is advisory only until landed child evidence and current active artifacts prove the epic can be drained or the next child can be named.";
+export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_CLAIM_BOUNDARY =
+  "Read-only issue #1077 dogfood drain-ready cutoff artifact; after landed child evidence, clean main with only epic #960 open may be reported as no-new-child/drain-ready instead of active development or an auto-sliced child, while concrete child issue, PR, session, branch, worktree/process, or blocker evidence continues to use the next-child evidence path.";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
   "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
@@ -642,6 +649,49 @@ export type OperatorCheckEpicStaleChecklistReconciliation = {
   nudgeRule: string;
 };
 
+export type OperatorCheckDrainReadyCutoff = {
+  schemaVersion: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_CLAIM_BOUNDARY;
+  readOnly: true;
+  classification:
+    | "no-new-child-drain-ready-after-landed-child-evidence"
+    | "concrete-child-evidence-present-use-next-child-path"
+    | "ordinary-active-work-evidence-check";
+  currentEvidence: {
+    clean: boolean | null;
+    branch?: string;
+    ahead?: number;
+    behind?: number;
+    openIssueNumbers?: number[];
+    openPullRequestCount?: number;
+    mappedFooksTmuxSessionCount: number;
+    activeWorkEvidence: boolean;
+  };
+  landedChildEvidenceRequiredForDrain: [
+    "closed child issue receipt",
+    "merged child pull request receipt",
+    "operator closeout receipt naming the completed child",
+  ];
+  noNewChildBoundary: {
+    availableWhenLandedChildEvidenceIsCited: boolean;
+    createChildFromStaleChecklistText: false;
+    reportActiveDevelopmentFromEpicOnlyQueue: false;
+    drainReadyLabelAllowed: boolean;
+  };
+  preservesNextChildEvidenceBehavior: {
+    concreteChildIssueOrSessionOrPrOrBlockerUsesNextChildEvidencePath: true;
+    operatorCheckJsonPath: "activeWorkReceipts.nextChildEvidenceBoundary";
+  };
+  safeNextAction:
+    | "cite-landed-child-evidence-then-drain-epic-without-creating-new-child"
+    | "use-next-child-evidence-boundary"
+    | "ordinary-active-work-evidence-check";
+  nudgeRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -675,6 +725,7 @@ export type OperatorCheckActiveWorkReceipts = {
   completedChildReceiptBoundary: OperatorCheckCompletedChildReceiptBoundary;
   nextChildEvidenceBoundary: OperatorCheckNextChildEvidenceBoundary;
   epicStaleChecklistReconciliation: OperatorCheckEpicStaleChecklistReconciliation;
+  drainReadyCutoff: OperatorCheckDrainReadyCutoff;
   currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
   sessionWhipRunReceipt: OperatorCheckSessionWhipRunReceipt;
   blockers: string[];
@@ -1946,6 +1997,65 @@ function buildEpicStaleChecklistReconciliation(
   };
 }
 
+function buildDrainReadyCutoff(
+  activity: OperatorActivitySnapshot,
+): OperatorCheckDrainReadyCutoff {
+  const cleanEpicOnlyMainEcho =
+    activity.currentRunEvidence.mainEchoEvidence && hasOnlyPlanningEpicOpenIssue(activity.optionalCounts);
+  const currentActiveArtifactPresent = activity.currentRunEvidence.activeWorkEvidence;
+  const classification: OperatorCheckDrainReadyCutoff["classification"] = cleanEpicOnlyMainEcho
+    ? "no-new-child-drain-ready-after-landed-child-evidence"
+    : currentActiveArtifactPresent
+      ? "concrete-child-evidence-present-use-next-child-path"
+      : "ordinary-active-work-evidence-check";
+  const drainReadyLabelAllowed = classification === "no-new-child-drain-ready-after-landed-child-evidence";
+
+  return {
+    schemaVersion: OPERATOR_CHECK_DRAIN_READY_CUTOFF_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE,
+    issueUrl: OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE_URL,
+    source: OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE,
+    claimBoundary: OPERATOR_CHECK_DRAIN_READY_CUTOFF_CLAIM_BOUNDARY,
+    readOnly: true,
+    classification,
+    currentEvidence: {
+      clean: activity.worktree.clean,
+      branch: activity.worktree.branch,
+      ahead: activity.worktree.ahead,
+      behind: activity.worktree.behind,
+      openIssueNumbers: activity.optionalCounts.enabled ? activity.optionalCounts.openIssueNumbers : undefined,
+      openPullRequestCount: activity.currentRunEvidence.evidence.openPullRequests,
+      mappedFooksTmuxSessionCount: activity.currentRunEvidence.evidence.fooksSessionCount,
+      activeWorkEvidence: activity.currentRunEvidence.activeWorkEvidence,
+    },
+    landedChildEvidenceRequiredForDrain: [
+      "closed child issue receipt",
+      "merged child pull request receipt",
+      "operator closeout receipt naming the completed child",
+    ],
+    noNewChildBoundary: {
+      availableWhenLandedChildEvidenceIsCited: drainReadyLabelAllowed,
+      createChildFromStaleChecklistText: false,
+      reportActiveDevelopmentFromEpicOnlyQueue: false,
+      drainReadyLabelAllowed,
+    },
+    preservesNextChildEvidenceBehavior: {
+      concreteChildIssueOrSessionOrPrOrBlockerUsesNextChildEvidencePath: true,
+      operatorCheckJsonPath: "activeWorkReceipts.nextChildEvidenceBoundary",
+    },
+    safeNextAction: classification === "no-new-child-drain-ready-after-landed-child-evidence"
+      ? "cite-landed-child-evidence-then-drain-epic-without-creating-new-child"
+      : classification === "concrete-child-evidence-present-use-next-child-path"
+        ? "use-next-child-evidence-boundary"
+        : "ordinary-active-work-evidence-check",
+    nudgeRule: classification === "no-new-child-drain-ready-after-landed-child-evidence"
+      ? "When clean main has only epic #960 open after landed child evidence is cited, report the queue as no-new-child/drain-ready; do not create another child from stale unchecked epic checklist text and do not call the epic-only queue active development."
+      : classification === "concrete-child-evidence-present-use-next-child-path"
+        ? "Concrete child issue, PR, branch, mapped session, worktree/process, or blocker evidence is present; preserve the existing next-child evidence behavior instead of applying the drain-ready cutoff."
+        : "This cutoff only applies to clean main with only epic #960 open after landed child evidence is cited; other states still need ordinary active-work evidence checks.",
+  };
+}
+
 function buildHandoffArtifactEvidence(
   activity: OperatorActivitySnapshot,
   receipts: OperatorCheckActiveWorkReceipt[],
@@ -2237,6 +2347,7 @@ function buildActiveWorkReceipts(
     completedChildReceiptBoundary: buildCompletedChildReceiptBoundary(activity),
     nextChildEvidenceBoundary: buildNextChildEvidenceBoundary(activity),
     epicStaleChecklistReconciliation: buildEpicStaleChecklistReconciliation(activity),
+    drainReadyCutoff: buildDrainReadyCutoff(activity),
     currentRunReceipt: activity.currentRunEvidence.receipt,
     sessionWhipRunReceipt: buildSessionWhipRunReceipt({
       classification,
