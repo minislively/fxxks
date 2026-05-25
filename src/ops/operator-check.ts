@@ -9,6 +9,7 @@ import {
   type OperatorActivityOptions,
   type OperatorActivitySnapshot,
   OPERATOR_ACTIVITY_REMOTE_COUNTS_FLAG,
+  OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER,
 } from "./operator-activity";
 import {
   ORPHAN_LOCAL_WORKTREE_TRIAGE_CLAIM_BOUNDARY,
@@ -101,6 +102,8 @@ export const OPERATOR_CHECK_RECEIPT_ONLY_NUDGE_LOOP_BOUNDARY_SOURCE = "operator/
 export const OPERATOR_CHECK_HANDOFF_ARTIFACT_EVIDENCE_SOURCE = "operator/check issue #885 handoff artifact evidence projection";
 export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SOURCE = "operator/check issue #1062 completed-child receipt boundary projection";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SOURCE = "operator/check issue #1065 next-child evidence boundary projection";
+export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_STATUS_CUE_SOURCE =
+  "operator/status activity issue #1067 next-child evidence cue projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
@@ -565,6 +568,26 @@ export type OperatorCheckNextChildEvidenceBoundary = {
     "concrete blocker",
   ];
   nudgeRule: string;
+};
+
+export type OperatorCheckNextChildEvidenceStatusCue = {
+  schemaVersion: typeof OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SCHEMA_VERSION;
+  issue: "#1067";
+  issueUrl: "https://github.com/minislively/fooks/issues/1067";
+  source: typeof OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_STATUS_CUE_SOURCE;
+  derivedFrom: {
+    operatorCheckJsonPath: "activeWorkReceipts.nextChildEvidenceBoundary";
+    source: typeof OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SOURCE;
+    issue: typeof OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE;
+  };
+  claimBoundary: "Operator-visible status/activity cue only; the operator-check next-child evidence boundary remains the JSON source of truth and this cue adds no authority, telemetry, merge gate, approval, product, or frontend behavior.";
+  readOnly: true;
+  classification: OperatorCheckNextChildEvidenceBoundary["classification"];
+  visible: boolean;
+  requiresConcreteNextChildEvidence: boolean;
+  currentEvidenceCue: string;
+  requiredEvidenceCue: string;
+  oneLine: string;
 };
 
 export type OperatorCheckActiveWorkReceipt = {
@@ -1749,6 +1772,59 @@ function buildNextChildEvidenceBoundary(
       : concreteNextChildEvidencePresent
         ? "Use the concrete next-child evidence already present in this snapshot; status-only receipts remain historical context, not active development by themselves."
         : "This boundary only forces next-child evidence for clean post-merge main echoes with only planning epic #960 open; other states still require ordinary concrete active-work evidence before active development claims.",
+  };
+}
+
+export function buildOperatorCheckNextChildEvidenceStatusCue(
+  boundary: OperatorCheckNextChildEvidenceBoundary,
+): OperatorCheckNextChildEvidenceStatusCue {
+  const childIssueNumbers = boundary.currentEvidence.openIssueNumbers?.filter((issueNumber) =>
+    issueNumber !== OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER
+  ) ?? [];
+  const concreteEvidence: string[] = [];
+  if (childIssueNumbers.length > 0) concreteEvidence.push(`child issue ${childIssueNumbers.map((issueNumber) => `#${issueNumber}`).join(", ")}`);
+  if (boundary.currentEvidence.openPullRequestCount && boundary.currentEvidence.openPullRequestCount > 0) {
+    concreteEvidence.push(`${boundary.currentEvidence.openPullRequestCount} open PR(s)`);
+  }
+  if (boundary.currentEvidence.branch && boundary.currentEvidence.branch !== "main") {
+    concreteEvidence.push(`branch ${boundary.currentEvidence.branch}`);
+  }
+  if (boundary.currentEvidence.mappedFooksTmuxSessionCount > 0) {
+    concreteEvidence.push(`${boundary.currentEvidence.mappedFooksTmuxSessionCount} mapped fooks session(s)`);
+  }
+  if (boundary.currentEvidence.activeWorkEvidence && concreteEvidence.length === 0) {
+    concreteEvidence.push("active worktree/process evidence present");
+  }
+
+  const currentEvidenceCue = concreteEvidence.length > 0
+    ? concreteEvidence.join("; ")
+    : boundary.currentEvidence.openIssueNumbers?.includes(OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER)
+      ? "only planning epic #960 is open; no child issue, PR, non-main branch, mapped fooks session, active worktree/process, or blocker evidence is present"
+      : "no concrete next-child issue, PR, branch, session, worktree/process, or blocker evidence is present";
+  const requiredEvidenceCue = boundary.requiredConcreteNextChildEvidence.join(", ");
+  const oneLine = boundary.requiresConcreteNextChildEvidence
+    ? `Next-child evidence required: ${currentEvidenceCue}; name ${requiredEvidenceCue}.`
+    : `Next-child evidence cue: ${currentEvidenceCue}; status-only receipts remain non-authorizing.`;
+
+  return {
+    schemaVersion: boundary.schemaVersion,
+    issue: "#1067",
+    issueUrl: "https://github.com/minislively/fooks/issues/1067",
+    source: OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_STATUS_CUE_SOURCE,
+    derivedFrom: {
+      operatorCheckJsonPath: "activeWorkReceipts.nextChildEvidenceBoundary",
+      source: boundary.source,
+      issue: boundary.issue,
+    },
+    claimBoundary:
+      "Operator-visible status/activity cue only; the operator-check next-child evidence boundary remains the JSON source of truth and this cue adds no authority, telemetry, merge gate, approval, product, or frontend behavior.",
+    readOnly: true,
+    classification: boundary.classification,
+    visible: boundary.classification === "next-child-evidence-required" || concreteEvidence.length > 0,
+    requiresConcreteNextChildEvidence: boundary.requiresConcreteNextChildEvidence,
+    currentEvidenceCue,
+    requiredEvidenceCue,
+    oneLine,
   };
 }
 

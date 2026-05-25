@@ -27,6 +27,17 @@ test("operator docs document status activity receipt projection boundary", () =>
   }
 });
 
+test("operator docs document next-child evidence cue as check-derived status activity output", () => {
+  for (const required of [
+    "operatorStatusCues.nextChildEvidence",
+    "activeWorkReceipts.nextChildEvidenceBoundary",
+    "operator-check JSON boundary remains the source of truth",
+    "concrete child issue, PR, non-main branch, mapped fooks session, active worktree/process evidence, or blocker",
+  ]) {
+    assertDocsInclude(required);
+  }
+});
+
 test("source checkout docs keep receipt-json compatible with npm alias guidance", () => {
   for (const required of [
     "`npm run -s status:activity -- --receipt-json`",

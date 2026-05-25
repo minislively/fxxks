@@ -2012,6 +2012,17 @@ async function run(): Promise<void> {
       }
       if (arg1 === "activity") {
         const options = parseStatusActivityArgs(rest.slice(1));
+        if (options.includeRemoteCounts && !options.receiptJson) {
+          const { buildOperatorCheckNextChildEvidenceStatusCue, readOperatorCheckSnapshot } = await import("../ops/operator-check.js");
+          const checkSnapshot = readOperatorCheckSnapshot(process.cwd());
+          print({
+            ...checkSnapshot.activity,
+            operatorStatusCues: {
+              nextChildEvidence: buildOperatorCheckNextChildEvidenceStatusCue(checkSnapshot.activeWorkReceipts.nextChildEvidenceBoundary),
+            },
+          });
+          return;
+        }
         const { readOperatorActivitySnapshot } = await import("../ops/operator-activity.js");
         const snapshot = readOperatorActivitySnapshot(process.cwd(), { includeRemoteCounts: options.includeRemoteCounts });
         print(options.receiptJson ? snapshot.currentRunEvidence.receipt : snapshot);
