@@ -196,3 +196,15 @@ The lookup recursively scans only the project-local `.fooks/domain-memory/` dire
 A `fresh` lookup means exactly one receipt is fresh for report/advisory evidence only. The machine result still carries `authorization: "none"` and `advisoryOnly: true`; any `advisoryReceiptPath` is evidence-only, not permission. Multiple fresh receipts are `ambiguous` and must not be auto-selected. Stale, incompatible, unsupported, mixed fresh/non-fresh, missing, unreadable, or ambiguous lookup results do not authorize runtime reuse, pre-read reuse, cache reuse, model-facing payload reuse, setup readiness, support expansion, or provider token/cost/performance claims.
 
 This lane intentionally does not authorize pre-read decisions, cache storage, or model-facing payload reuse. The runtime hook consumes a `fresh` lookup only as advisory context after normal payload eligibility, while pre-read appendices, automatic receipt persistence, and any payload/cache reuse require separate plans and tests.
+
+## Codex pre-read advisory consumer lane
+
+The Codex pre-read consumer remains opt-in and debug-only:
+
+```bash
+fooks codex-pre-read src/Foo.tsx --json --include-domain-memory-lookup
+```
+
+Without `--include-domain-memory-lookup`, both `decideCodexPreRead()` and `fooks codex-pre-read <file>` return the same decision as before. With the flag, the command may add only `debug.domainMemoryLookup` after the normal pre-read decision has already been made for an existing eligible project file. The metadata uses source `codex-pre-read opt-in domain-memory lookup`, includes `authorization: "none"` and `advisoryOnly: true`, and is evidence only.
+
+The opt-in lookup must never change `decision`, `reasons`, `fallback`, `payload`, `readiness`, policy authorization, cache behavior, runtime behavior, model-facing payload reuse, setup readiness, support wording, or provider-token/cost/performance claims. Ineligible extensions, missing files, outside-project paths, source read failures, lookup read failures, stale/incompatible/unsupported/ambiguous/not-found receipts, and mixed fresh/non-fresh results do not authorize pre-read decisions or compact reuse.

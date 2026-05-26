@@ -667,6 +667,17 @@ export type PreReadDecision = {
       maxPayloadBytes: number;
       reason?: "within-budget" | "budget-exceeded" | "not-requested" | "not-emitted";
     };
+    domainMemoryLookup?: {
+      source: "codex-pre-read opt-in domain-memory lookup";
+      status: DomainMemoryLookupResult["status"];
+      authorization: "none";
+      advisoryOnly: true;
+      candidateCount: number;
+      freshCandidateCount: number;
+      advisoryReceiptPath?: string;
+      safeNextAction: DomainMemoryLookupResult["safeNextAction"];
+      reasons: string[];
+    };
   };
   fallback?: {
     action: "full-read";

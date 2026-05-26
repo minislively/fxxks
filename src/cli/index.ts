@@ -690,7 +690,7 @@ Everyday commands:
   ${displayCliName} install codex-hooks
   ${displayCliName} install claude-hooks
   ${displayCliName} install opencode-tool
-  ${displayCliName} codex-pre-read <file> [--json]
+  ${displayCliName} codex-pre-read <file> [--json] [--include-domain-memory-lookup]
   ${displayCliName} status [--json]
   ${displayCliName} status codex
   ${displayCliName} status claude
@@ -888,6 +888,19 @@ function parseDomainMemoryArgs(args: string[]):
     receiptPath: requireFilePath(receiptPath),
     filePath: requireFilePath(filePath),
   };
+}
+
+function parseCodexPreReadArgs(args: string[]): { includeDomainMemoryLookup: boolean } {
+  let includeDomainMemoryLookup = false;
+  for (const arg of args) {
+    if (arg === "--json") continue;
+    if (arg === "--include-domain-memory-lookup") {
+      includeDomainMemoryLookup = true;
+      continue;
+    }
+    throw new Error(`Unexpected codex-pre-read argument: ${arg}`);
+  }
+  return { includeDomainMemoryLookup };
 }
 
 function parseReactWebIssuesArgs(args: string[]): { filePath: string; outputMode: "text" | "json" | "summary-json" | "dry-run-json" } {
@@ -2049,7 +2062,8 @@ async function run(): Promise<void> {
     case "codex-pre-read": {
       const { decideCodexPreRead } = await import("../adapters/codex-pre-read.js");
       const file = requireFilePath(arg1);
-      print(decideCodexPreRead(file, process.cwd()));
+      const options = parseCodexPreReadArgs(rest.slice(1));
+      print(decideCodexPreRead(file, process.cwd(), options));
       return;
     }
     case "codex-runtime-hook": {

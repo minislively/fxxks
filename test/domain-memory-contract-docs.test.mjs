@@ -109,6 +109,20 @@ test("domain-memory contract scopes lookup diagnostics to advisory-only evidence
   ]);
 });
 
+test("domain-memory contract scopes codex pre-read lookup to explicit debug-only opt-in", () => {
+  assertContains("domain memory", domainMemory, [
+    "Codex pre-read advisory consumer lane",
+    "fooks codex-pre-read src/Foo.tsx --json --include-domain-memory-lookup",
+    "Without `--include-domain-memory-lookup`",
+    "debug.domainMemoryLookup",
+    "codex-pre-read opt-in domain-memory lookup",
+    "authorization: \"none\"",
+    "advisoryOnly: true",
+    "must never change `decision`, `reasons`, `fallback`, `payload`, `readiness`",
+    "do not authorize pre-read decisions or compact reuse",
+  ]);
+});
+
 test("state and domain-payload architecture docs link the domain-memory contract without widening behavior", () => {
   assertContains("state contract", stateContract, [
     "domain-memory.v1",
