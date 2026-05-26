@@ -18,6 +18,10 @@ create child issues, does not create PRs, does not mutate branches, does not
 change CI or merge authority, does not alter runtime or provider behavior, does
 not add telemetry, and does not make product/billing claims.
 
+Archived #1070 summary: stale unchecked #960 checklist text remains advisory
+until landed child evidence and current child/branch/session/PR/worktree-process/blocker
+evidence are named.
+
 ## Required evidence before #960 can be treated as drainable
 
 - closed child issue receipt;
