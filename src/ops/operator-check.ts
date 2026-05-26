@@ -54,6 +54,7 @@ export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE = "operator/check compact session-whip run receipt projection";
@@ -86,6 +87,7 @@ export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE = "#1065";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE = "#1070";
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE = "#1077";
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE = "#1079";
+export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_ISSUE = "#1085";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -99,6 +101,7 @@ export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE_URL = "https://gi
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE_URL = "https://github.com/minislively/fooks/issues/1070";
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE_URL = "https://github.com/minislively/fooks/issues/1077";
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1079";
+export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1085";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL = "https://github.com/minislively/fooks/issues/895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
@@ -120,6 +123,8 @@ export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE =
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE =
   "operator/status activity issue #1079 bounded #960 closeout receipt cue projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
+export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SOURCE =
+  "operator/check issue #1085 clean-idle nudge handoff boundary projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_CLAIM_BOUNDARY =
@@ -148,6 +153,8 @@ export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_CLAIM_BOUNDARY =
   "Read-only issue #1077 dogfood drain-ready cutoff artifact; after landed child evidence, clean main with only epic #960 open may be reported as no-new-child/drain-ready instead of active development or an auto-sliced child, while concrete child issue, PR, session, branch, worktree/process, or blocker evidence continues to use the next-child evidence path.";
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #1079 dogfood #960 closeout receipt boundary; clean main with only epic #960 open is no active development and the bounded next action is an operator closeout receipt for #960, without auto-closing #960, mutating GitHub, creating children from stale checklist text, or weakening approval, CI, merge, provider, runtime, frontend, or product boundaries.";
+export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_CLAIM_BOUNDARY =
+  "Read-only issue #1085 dogfood clean-idle nudge handoff boundary; a clean post-merge main snapshot with no open issue, PR, live branch/worktree, or mapped session remains idleRequiresActiveArtifact, treats CI echoes and stale residue as non-active receipts, and requires the next nudge to seed or resume an explicit issue, branch, session, or PR before claiming current development without creating issues from the CLI.";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
   "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
@@ -741,6 +748,46 @@ export type OperatorCheck960CloseoutReceiptStatusCue = {
   oneLine: string;
 };
 
+export type OperatorCheckCleanIdleNudgeHandoffBoundary = {
+  schemaVersion: typeof OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SOURCE;
+  claimBoundary: typeof OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_CLAIM_BOUNDARY;
+  readOnly: true;
+  classification:
+    | "clean-idle-handoff-artifact-required"
+    | "explicit-handoff-artifact-present"
+    | "blocked-or-not-clean-idle";
+  preservesOperatorCheckVerdict: "idleRequiresActiveArtifact";
+  currentEvidence: {
+    clean: boolean | null;
+    branch?: string;
+    openIssueCount?: number;
+    openPullRequestCount?: number;
+    mappedFooksTmuxSessionCount: number;
+    liveNonMainWorktreePresent: boolean;
+    postMergeMainCiEchoPresent: boolean;
+    staleResidueCount: number;
+    staleResidueIsActiveDevelopmentEvidence: false;
+    ciEchoIsActiveDevelopmentEvidence: false;
+  };
+  requiresExplicitHandoffArtifactBeforeDevelopmentClaim: boolean;
+  acceptableHandoffArtifacts: [
+    "open GitHub issue",
+    "non-main branch or live worktree",
+    "mapped fooks tmux session",
+    "open GitHub pull request",
+  ];
+  mutationBoundary: {
+    createsIssuesFromCli: false;
+    mutatesGitHub: false;
+    mutatesWorktrees: false;
+    changesRuntimeProviderFrontendOrMergeGatePolicy: false;
+  };
+  nudgeRule: string;
+};
+
 export type OperatorCheckActiveWorkReceipt = {
   kind: OperatorCheckActiveWorkReceiptKind;
   classification: OperatorCheckActiveWorkReceiptClassification;
@@ -775,6 +822,7 @@ export type OperatorCheckActiveWorkReceipts = {
   nextChildEvidenceBoundary: OperatorCheckNextChildEvidenceBoundary;
   epicStaleChecklistReconciliation: OperatorCheckEpicStaleChecklistReconciliation;
   drainReadyCutoff: OperatorCheckDrainReadyCutoff;
+  cleanIdleNudgeHandoffBoundary: OperatorCheckCleanIdleNudgeHandoffBoundary;
   currentRunReceipt: OperatorActivitySnapshot["currentRunEvidence"]["receipt"];
   sessionWhipRunReceipt: OperatorCheckSessionWhipRunReceipt;
   blockers: string[];
@@ -2165,6 +2213,72 @@ function buildDrainReadyCutoff(
   };
 }
 
+function buildCleanIdleNudgeHandoffBoundary(
+  activity: OperatorActivitySnapshot,
+  staleResidueCount: number,
+  receipts: OperatorCheckActiveWorkReceipt[],
+): OperatorCheckCleanIdleNudgeHandoffBoundary {
+  const openIssueCount = activity.currentRunEvidence.evidence.openIssues;
+  const openPullRequestCount = activity.currentRunEvidence.evidence.openPullRequests;
+  const mappedFooksTmuxSessionCount = activity.currentRunEvidence.evidence.fooksSessionCount;
+  const liveNonMainWorktreePresent = Boolean(activity.worktree.branch && activity.worktree.branch !== "main")
+    || receipts.some((receipt) => receipt.kind === "worktree" && receipt.classification === "active");
+  const explicitHandoffArtifactPresent = Boolean(
+    (typeof openIssueCount === "number" && openIssueCount > 0)
+    || (typeof openPullRequestCount === "number" && openPullRequestCount > 0)
+    || mappedFooksTmuxSessionCount > 0
+    || liveNonMainWorktreePresent,
+  );
+  const cleanIdleMainEcho = activity.currentRunEvidence.mainEchoEvidence && !explicitHandoffArtifactPresent;
+  const classification: OperatorCheckCleanIdleNudgeHandoffBoundary["classification"] = cleanIdleMainEcho
+    ? "clean-idle-handoff-artifact-required"
+    : explicitHandoffArtifactPresent
+      ? "explicit-handoff-artifact-present"
+      : "blocked-or-not-clean-idle";
+  const requiresExplicitHandoffArtifactBeforeDevelopmentClaim = classification === "clean-idle-handoff-artifact-required";
+
+  return {
+    schemaVersion: OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_ISSUE,
+    issueUrl: OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_ISSUE_URL,
+    source: OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SOURCE,
+    claimBoundary: OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_CLAIM_BOUNDARY,
+    readOnly: true,
+    classification,
+    preservesOperatorCheckVerdict: "idleRequiresActiveArtifact",
+    currentEvidence: {
+      clean: activity.worktree.clean,
+      branch: activity.worktree.branch,
+      openIssueCount,
+      openPullRequestCount,
+      mappedFooksTmuxSessionCount,
+      liveNonMainWorktreePresent,
+      postMergeMainCiEchoPresent: activity.postMergeMainCiEvidence.summary.allExactHeadConclusionsSuccessful,
+      staleResidueCount,
+      staleResidueIsActiveDevelopmentEvidence: false,
+      ciEchoIsActiveDevelopmentEvidence: false,
+    },
+    requiresExplicitHandoffArtifactBeforeDevelopmentClaim,
+    acceptableHandoffArtifacts: [
+      "open GitHub issue",
+      "non-main branch or live worktree",
+      "mapped fooks tmux session",
+      "open GitHub pull request",
+    ],
+    mutationBoundary: {
+      createsIssuesFromCli: false,
+      mutatesGitHub: false,
+      mutatesWorktrees: false,
+      changesRuntimeProviderFrontendOrMergeGatePolicy: false,
+    },
+    nudgeRule: requiresExplicitHandoffArtifactBeforeDevelopmentClaim
+      ? "A clean post-merge main nudge with no open issue, PR, mapped session, or live non-main branch/worktree remains idleRequiresActiveArtifact; CI echoes and stale residue are receipts only, so seed or resume an explicit issue, branch, session, or PR before claiming current development. The CLI must not auto-create the issue."
+      : explicitHandoffArtifactPresent
+        ? "Use the explicit issue, branch/worktree, mapped session, or PR evidence already present before reporting current development; CI echoes and stale residue remain non-authorizing receipts."
+        : "This boundary is only a clean-idle nudge handoff artifact; blocked or non-clean snapshots still use the ordinary operator-check verdict and active-artifact contract.",
+  };
+}
+
 function buildHandoffArtifactEvidence(
   activity: OperatorActivitySnapshot,
   receipts: OperatorCheckActiveWorkReceipt[],
@@ -2457,6 +2571,11 @@ function buildActiveWorkReceipts(
     nextChildEvidenceBoundary: buildNextChildEvidenceBoundary(activity),
     epicStaleChecklistReconciliation: buildEpicStaleChecklistReconciliation(activity),
     drainReadyCutoff: buildDrainReadyCutoff(activity),
+    cleanIdleNudgeHandoffBoundary: buildCleanIdleNudgeHandoffBoundary(
+      activity,
+      siblingReceipts.staleResidueLedger.totalCount + legacyLocalResidueCleanupReview.rowCount,
+      receipts,
+    ),
     currentRunReceipt: activity.currentRunEvidence.receipt,
     sessionWhipRunReceipt: buildSessionWhipRunReceipt({
       classification,
