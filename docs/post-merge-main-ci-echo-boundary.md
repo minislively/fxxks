@@ -102,6 +102,12 @@ no-new-child/drain-ready; stale checklist text cannot auto-create another child
 or be reported as active development. If concrete child issue, PR, branch,
 mapped session, worktree/process evidence, or blocker evidence exists, preserve
 the existing `activeWorkReceipts.nextChildEvidenceBoundary` behavior instead.
+For issue #1079, that same clean epic-only/no-active-development path exposes a
+bounded #960 closeout receipt next action through
+`activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary` and
+`operatorStatusCues.closeoutReceipt`; it does not auto-close #960, mutate
+GitHub, or weaken CI, approval, merge, provider, runtime, frontend, or product
+boundaries.
 
 ## Evidence surfaces
 
@@ -171,6 +177,10 @@ the existing `activeWorkReceipts.nextChildEvidenceBoundary` behavior instead.
   cited, prevents stale checklist text from auto-slicing another child, and
   defers to `activeWorkReceipts.nextChildEvidenceBoundary` whenever concrete
   child issue/session/PR/branch/worktree-process/blocker evidence exists.
+  Its issue #1079 `closeoutReceiptBoundary` is the bounded closeout-receipt path:
+  say no active development, name clean `main` plus only #960 open and the lack
+  of child/PR/branch/session/worktree-process/blocker evidence, cite landed-child
+  or completed-child receipt context, and do not close #960 or mutate GitHub.
 - `docs/dogfood/current-development-nudge-target-871.md` is the issue #871
   current-development nudge target artifact. It keeps PR #870 merged CI/release
   receipts receipt-only and documents that the answer to "what is being

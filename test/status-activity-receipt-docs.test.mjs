@@ -32,9 +32,11 @@ test("operator docs document next-child evidence cue as check-derived status act
     "operatorStatusCues.remoteCountsRequiredNextAction",
     "advisory/non-authorizing",
     "fooks status activity --include-remote-counts --json",
-    "if only #960 remains",
+    "before treating #960-only state as proven",
     "operatorStatusCues.nextChildEvidence",
+    "operatorStatusCues.closeoutReceipt",
     "activeWorkReceipts.nextChildEvidenceBoundary",
+    "bounded #960 closeout receipt",
     "operator-check JSON boundary remains the source of truth",
     "concrete child issue, PR, non-main branch, mapped fooks session, active worktree/process evidence, or blocker",
   ]) {

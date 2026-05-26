@@ -34,6 +34,14 @@ test("issue #1077 dogfood doc preserves drain-ready cutoff shape", () => {
   assert.equal(report.noNewChildBoundary.createChildFromStaleChecklistText, false);
   assert.equal(report.noNewChildBoundary.reportActiveDevelopmentFromEpicOnlyQueue, false);
   assert.equal(report.noNewChildBoundary.drainReadyLabelAllowed, true);
+  assert.equal(report.closeoutReceiptBoundary.issue, "#1079");
+  assert.equal(report.closeoutReceiptBoundary.activeDevelopmentEvidence, false);
+  assert.equal(report.closeoutReceiptBoundary.autoCloseEpic960, false);
+  assert.equal(report.closeoutReceiptBoundary.mutatesGitHub, false);
+  assert.equal(
+    report.closeoutReceiptBoundary.boundedNextAction,
+    "write-operator-closeout-receipt-for-960-without-closing-epic",
+  );
   assert.equal(
     report.preservesNextChildEvidenceBehavior.operatorCheckJsonPath,
     "activeWorkReceipts.nextChildEvidenceBoundary",
@@ -44,6 +52,8 @@ test("issue #1077 dogfood doc preserves drain-ready cutoff shape", () => {
   );
   assert.match(report.rule, /not active development/);
   assert.match(report.rule, /not another auto-sliced child/);
+  assert.match(report.rule, /bounded #960 closeout receipt/);
+  assert.match(report.rule, /without closing #960 or mutating GitHub/);
 });
 
 test("issue #1077 docs name read-only non-authorizing and next-child preservation boundaries", () => {
@@ -52,13 +62,18 @@ test("issue #1077 docs name read-only non-authorizing and next-child preservatio
     "narrow read-only dogfood/operator artifact for Epic `#960`",
     "prevents a clean `main` checkout with only Epic `#960` open from being reported as active development",
     "endlessly spawning another child from stale unchecked epic checklist text",
+    "bounded next action is an operator closeout receipt for `#960`",
+    "must say there is no active development",
+    "It must not auto-close `#960`",
     "no-new-child/drain-ready",
-    "not active development, merge authority, CI authority, or permission to mutate GitHub state",
     "Concrete child evidence still wins",
     "activeWorkReceipts.nextChildEvidenceBoundary",
     "does not update or close GitHub issues",
     "does not weaken approvals/CI/merge gates",
     "activeWorkReceipts.drainReadyCutoff",
+    "activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary",
+    "operatorStatusCues.closeoutReceipt",
+    "issue #1079 `closeoutReceiptBoundary`",
     "issue #1077 drain-ready cutoff summary",
     "stale checklist text cannot auto-create another child",
   ]) {

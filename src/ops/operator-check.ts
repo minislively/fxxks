@@ -53,6 +53,7 @@ export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SCHEMA_VERSION = 1;
+export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SCHEMA_VERSION = 1;
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_SOURCE = "operator/check active-work receipt projection";
 export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_SOURCE = "operator/check compact session-whip run receipt projection";
@@ -84,6 +85,7 @@ export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE = "#1062";
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE = "#1065";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE = "#1070";
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE = "#1077";
+export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE = "#1079";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_ISSUE_URL = "https://github.com/minislively/fooks/issues/736";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_ISSUE_URL = "https://github.com/minislively/fooks/issues/739";
 export const OPERATOR_CHECK_LEGACY_LOCAL_RESIDUE_CLEANUP_REVIEW_ISSUE_URL = "https://github.com/minislively/fooks/issues/778";
@@ -96,6 +98,7 @@ export const OPERATOR_CHECK_COMPLETED_CHILD_RECEIPT_BOUNDARY_ISSUE_URL = "https:
 export const OPERATOR_CHECK_NEXT_CHILD_EVIDENCE_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1065";
 export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_ISSUE_URL = "https://github.com/minislively/fooks/issues/1070";
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE_URL = "https://github.com/minislively/fooks/issues/1077";
+export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL = "https://github.com/minislively/fooks/issues/1079";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_ISSUE_URL = "https://github.com/minislively/fooks/issues/895";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_SOURCE = "operator/check stale worktree residue ledger projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_CLEANUP_REVIEW_MANIFEST_SOURCE = "operator/check stale worktree residue cleanup-review manifest projection";
@@ -114,6 +117,8 @@ export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_SOURCE =
   "operator/check issue #1070 stale epic checklist reconciliation projection";
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE =
   "operator/check issue #1077 drain-ready no-new-child cutoff projection";
+export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE =
+  "operator/status activity issue #1079 bounded #960 closeout receipt cue projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_STALE_RESIDUE_LEDGER_CLAIM_BOUNDARY =
   "Read-only issue #736 operator receipt for stale sibling worktree residue; groups existing triage classes by count and next review action only, without paths, cleanup commands, fetch, delete, push, or mutation authority.";
@@ -141,6 +146,8 @@ export const OPERATOR_CHECK_EPIC_STALE_CHECKLIST_RECONCILIATION_CLAIM_BOUNDARY =
   "Read-only issue #1070 dogfood stale epic checklist reconciliation artifact; stale unchecked #960 checklist text is advisory only until landed child evidence and current active artifacts prove the epic can be drained or the next child can be named.";
 export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_CLAIM_BOUNDARY =
   "Read-only issue #1077 dogfood drain-ready cutoff artifact; after landed child evidence, clean main with only epic #960 open may be reported as no-new-child/drain-ready instead of active development or an auto-sliced child, while concrete child issue, PR, session, branch, worktree/process, or blocker evidence continues to use the next-child evidence path.";
+export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY =
+  "Read-only issue #1079 dogfood #960 closeout receipt boundary; clean main with only epic #960 open is no active development and the bounded next action is an operator closeout receipt for #960, without auto-closing #960, mutating GitHub, creating children from stale checklist text, or weakening approval, CI, merge, provider, runtime, frontend, or product boundaries.";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
   "Read-only issue #895 operator guard for legacy review/refresh worktree residue after clean merges; preserves local residue as actionable cleanup-review evidence while keeping current active anchors limited to live issue, PR, branch, tmux, or proc evidence.";
 export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_ISSUE = "#720";
@@ -681,6 +688,27 @@ export type OperatorCheckDrainReadyCutoff = {
     reportActiveDevelopmentFromEpicOnlyQueue: false;
     drainReadyLabelAllowed: boolean;
   };
+  closeoutReceiptBoundary: {
+    schemaVersion: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION;
+    issue: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE;
+    issueUrl: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL;
+    claimBoundary: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY;
+    availableWhenCleanEpicOnly: boolean;
+    activeDevelopmentEvidence: false;
+    autoCloseEpic960: false;
+    mutatesGitHub: false;
+    createChildFromStaleChecklistText: false;
+    boundedNextAction:
+      | "write-operator-closeout-receipt-for-960-without-closing-epic"
+      | "not-applicable-use-next-child-evidence-boundary";
+    receiptMustName: [
+      "clean main",
+      "only epic #960 open",
+      "no child issue, PR, branch, session, worktree/process, or blocker evidence",
+      "landed child evidence or completed-child receipt context",
+      "no GitHub mutation or #960 auto-close",
+    ];
+  };
   preservesNextChildEvidenceBehavior: {
     concreteChildIssueOrSessionOrPrOrBlockerUsesNextChildEvidencePath: true;
     operatorCheckJsonPath: "activeWorkReceipts.nextChildEvidenceBoundary";
@@ -690,6 +718,27 @@ export type OperatorCheckDrainReadyCutoff = {
     | "use-next-child-evidence-boundary"
     | "ordinary-active-work-evidence-check";
   nudgeRule: string;
+};
+
+export type OperatorCheck960CloseoutReceiptStatusCue = {
+  schemaVersion: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION;
+  issue: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE;
+  issueUrl: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL;
+  source: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE;
+  derivedFrom: {
+    operatorCheckJsonPath: "activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary";
+    source: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE;
+    issue: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE;
+  };
+  claimBoundary: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY;
+  readOnly: true;
+  visible: boolean;
+  activeDevelopmentEvidence: false;
+  autoCloseEpic960: false;
+  mutatesGitHub: false;
+  currentEvidenceCue: string;
+  nextAction: string;
+  oneLine: string;
 };
 
 export type OperatorCheckActiveWorkReceipt = {
@@ -1881,6 +1930,7 @@ function buildNextChildEvidenceBoundary(
 
 export function buildOperatorCheckNextChildEvidenceStatusCue(
   boundary: OperatorCheckNextChildEvidenceBoundary,
+  options: { suppressWhenDrainReadyCloseoutVisible?: boolean } = {},
 ): OperatorCheckNextChildEvidenceStatusCue {
   const childIssueNumbers = boundary.currentEvidence.openIssueNumbers?.filter((issueNumber) =>
     issueNumber !== OPERATOR_ACTIVITY_PLANNING_EPIC_ISSUE_NUMBER
@@ -1924,11 +1974,49 @@ export function buildOperatorCheckNextChildEvidenceStatusCue(
       "Operator-visible status/activity cue only; the operator-check next-child evidence boundary remains the JSON source of truth and this cue adds no authority, telemetry, merge gate, approval, product, or frontend behavior.",
     readOnly: true,
     classification: boundary.classification,
-    visible: boundary.classification === "next-child-evidence-required" || concreteEvidence.length > 0,
+    visible: options.suppressWhenDrainReadyCloseoutVisible
+      ? concreteEvidence.length > 0
+      : boundary.classification === "next-child-evidence-required" || concreteEvidence.length > 0,
     requiresConcreteNextChildEvidence: boundary.requiresConcreteNextChildEvidence,
     currentEvidenceCue,
     requiredEvidenceCue,
     oneLine,
+  };
+}
+
+export function buildOperatorCheck960CloseoutReceiptStatusCue(
+  boundary: OperatorCheckDrainReadyCutoff,
+): OperatorCheck960CloseoutReceiptStatusCue {
+  const closeoutBoundary = boundary.closeoutReceiptBoundary;
+  const visible = closeoutBoundary.availableWhenCleanEpicOnly;
+  const currentEvidenceCue = visible
+    ? "clean main has only epic #960 open; no child issue, PR, non-main branch, mapped fooks session, worktree/process evidence, or blocker evidence is present"
+    : "concrete child evidence or a non-epic-only snapshot is present; use the next-child evidence boundary instead";
+  const nextAction = visible
+    ? "Write a bounded operator closeout receipt for #960 that names clean main, only #960 open, no current child/PR/branch/session/worktree-process/blocker evidence, and landed-child/completed-child receipt context; do not close #960, mutate GitHub, or create another child from stale checklist text."
+    : "Use activeWorkReceipts.nextChildEvidenceBoundary for the current concrete child evidence path.";
+
+  return {
+    schemaVersion: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION,
+    issue: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE,
+    issueUrl: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL,
+    source: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE,
+    derivedFrom: {
+      operatorCheckJsonPath: "activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary",
+      source: boundary.source,
+      issue: boundary.issue,
+    },
+    claimBoundary: closeoutBoundary.claimBoundary,
+    readOnly: true,
+    visible,
+    activeDevelopmentEvidence: false,
+    autoCloseEpic960: false,
+    mutatesGitHub: false,
+    currentEvidenceCue,
+    nextAction,
+    oneLine: visible
+      ? `No active development: ${currentEvidenceCue}; next action is a bounded #960 closeout receipt without GitHub mutation or #960 auto-close.`
+      : `#960 closeout receipt cue not active: ${currentEvidenceCue}.`,
   };
 }
 
@@ -2039,6 +2127,27 @@ function buildDrainReadyCutoff(
       reportActiveDevelopmentFromEpicOnlyQueue: false,
       drainReadyLabelAllowed,
     },
+    closeoutReceiptBoundary: {
+      schemaVersion: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION,
+      issue: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE,
+      issueUrl: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL,
+      claimBoundary: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY,
+      availableWhenCleanEpicOnly: drainReadyLabelAllowed,
+      activeDevelopmentEvidence: false,
+      autoCloseEpic960: false,
+      mutatesGitHub: false,
+      createChildFromStaleChecklistText: false,
+      boundedNextAction: drainReadyLabelAllowed
+        ? "write-operator-closeout-receipt-for-960-without-closing-epic"
+        : "not-applicable-use-next-child-evidence-boundary",
+      receiptMustName: [
+        "clean main",
+        "only epic #960 open",
+        "no child issue, PR, branch, session, worktree/process, or blocker evidence",
+        "landed child evidence or completed-child receipt context",
+        "no GitHub mutation or #960 auto-close",
+      ],
+    },
     preservesNextChildEvidenceBehavior: {
       concreteChildIssueOrSessionOrPrOrBlockerUsesNextChildEvidencePath: true,
       operatorCheckJsonPath: "activeWorkReceipts.nextChildEvidenceBoundary",
@@ -2049,7 +2158,7 @@ function buildDrainReadyCutoff(
         ? "use-next-child-evidence-boundary"
         : "ordinary-active-work-evidence-check",
     nudgeRule: classification === "no-new-child-drain-ready-after-landed-child-evidence"
-      ? "When clean main has only epic #960 open after landed child evidence is cited, report the queue as no-new-child/drain-ready; do not create another child from stale unchecked epic checklist text and do not call the epic-only queue active development."
+      ? "When clean main has only epic #960 open after landed child evidence is cited, report the queue as no-new-child/drain-ready with a bounded #960 operator closeout receipt next action; do not create another child from stale unchecked epic checklist text, do not call the epic-only queue active development, do not auto-close #960, and do not mutate GitHub state."
       : classification === "concrete-child-evidence-present-use-next-child-path"
         ? "Concrete child issue, PR, branch, mapped session, worktree/process, or blocker evidence is present; preserve the existing next-child evidence behavior instead of applying the drain-ready cutoff."
         : "This cutoff only applies to clean main with only epic #960 open after landed child evidence is cited; other states still need ordinary active-work evidence checks.",

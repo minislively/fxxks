@@ -1632,7 +1632,7 @@ function buildRemoteCountsRequiredNextActionCue(
       ? "remote issue/PR counts were explicitly requested; use operator-check-derived status cues for next-child evidence"
       : "local active or unknown evidence means remote-counts-required idle guidance is not the current cue";
   const nextAction = remoteCountsRequired
-    ? "Run fooks status activity --include-remote-counts --json or fooks check --json; if only planning epic #960 remains open, create or link a child issue, open PR, non-main branch, mapped fooks session, active worktree/process evidence, or concrete blocker before treating the run as active development."
+    ? "Run fooks status activity --include-remote-counts --json or fooks check --json before treating #960-only state as proven; concrete child issue/PR/branch/session/worktree-process/blocker evidence remains the active-work path, while clean main with only #960 open uses the bounded #960 closeout receipt cue and remains no active development."
     : "No default remote-counts-required next action is visible for this snapshot.";
 
   return {

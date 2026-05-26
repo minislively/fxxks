@@ -1779,6 +1779,26 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.equal(drainReadyCutoff.noNewChildBoundary.createChildFromStaleChecklistText, false);
   assert.equal(drainReadyCutoff.noNewChildBoundary.reportActiveDevelopmentFromEpicOnlyQueue, false);
   assert.equal(drainReadyCutoff.noNewChildBoundary.drainReadyLabelAllowed, true);
+  assert.equal(drainReadyCutoff.closeoutReceiptBoundary.issue, "#1079");
+  assert.equal(drainReadyCutoff.closeoutReceiptBoundary.availableWhenCleanEpicOnly, true);
+  assert.equal(drainReadyCutoff.closeoutReceiptBoundary.activeDevelopmentEvidence, false);
+  assert.equal(drainReadyCutoff.closeoutReceiptBoundary.autoCloseEpic960, false);
+  assert.equal(drainReadyCutoff.closeoutReceiptBoundary.mutatesGitHub, false);
+  assert.equal(drainReadyCutoff.closeoutReceiptBoundary.createChildFromStaleChecklistText, false);
+  assert.equal(
+    drainReadyCutoff.closeoutReceiptBoundary.boundedNextAction,
+    "write-operator-closeout-receipt-for-960-without-closing-epic",
+  );
+  assert.deepEqual(drainReadyCutoff.closeoutReceiptBoundary.receiptMustName, [
+    "clean main",
+    "only epic #960 open",
+    "no child issue, PR, branch, session, worktree/process, or blocker evidence",
+    "landed child evidence or completed-child receipt context",
+    "no GitHub mutation or #960 auto-close",
+  ]);
+  assert.match(drainReadyCutoff.closeoutReceiptBoundary.claimBoundary, /issue #1079/);
+  assert.match(drainReadyCutoff.closeoutReceiptBoundary.claimBoundary, /no active development/);
+  assert.match(drainReadyCutoff.closeoutReceiptBoundary.claimBoundary, /without auto-closing #960/);
   assert.equal(
     drainReadyCutoff.safeNextAction,
     "cite-landed-child-evidence-then-drain-epic-without-creating-new-child",
@@ -1797,8 +1817,11 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.match(drainReadyCutoff.claimBoundary, /no-new-child\/drain-ready/);
   assert.match(drainReadyCutoff.claimBoundary, /concrete child issue, PR, session, branch, worktree\/process, or blocker evidence continues to use the next-child evidence path/);
   assert.match(drainReadyCutoff.nudgeRule, /no-new-child\/drain-ready/);
+  assert.match(drainReadyCutoff.nudgeRule, /bounded #960 operator closeout receipt next action/);
   assert.match(drainReadyCutoff.nudgeRule, /do not create another child from stale unchecked epic checklist text/);
   assert.match(drainReadyCutoff.nudgeRule, /do not call the epic-only queue active development/);
+  assert.match(drainReadyCutoff.nudgeRule, /do not auto-close #960/);
+  assert.match(drainReadyCutoff.nudgeRule, /do not mutate GitHub state/);
   assert.equal(snapshot.sessionWhipRunReceipt.status, "idle");
   assert.equal(snapshot.sessionWhipRunReceipt.noOp.empty, true);
   assert.deepEqual(snapshot.sessionWhipRunReceipt.counts, {
@@ -2071,6 +2094,13 @@ test("CLI status activity receipt projection matches full active current-run rec
     "concrete-child-evidence-present-use-next-child-path",
   );
   assert.equal(check.activeWorkReceipts.drainReadyCutoff.noNewChildBoundary.drainReadyLabelAllowed, false);
+  assert.equal(check.activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary.availableWhenCleanEpicOnly, false);
+  assert.equal(
+    check.activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary.boundedNextAction,
+    "not-applicable-use-next-child-evidence-boundary",
+  );
+  assert.equal(check.activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary.autoCloseEpic960, false);
+  assert.equal(check.activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary.mutatesGitHub, false);
   assert.equal(check.activeWorkReceipts.drainReadyCutoff.safeNextAction, "use-next-child-evidence-boundary");
   assert.equal(
     check.activeWorkReceipts.drainReadyCutoff.preservesNextChildEvidenceBehavior.operatorCheckJsonPath,
@@ -4169,7 +4199,7 @@ test("status activity include-remote-counts surfaces next-child evidence cue fro
   const cue = activity.operatorStatusCues.nextChildEvidence;
   assert.equal(cue.issue, "#1067");
   assert.equal(cue.readOnly, true);
-  assert.equal(cue.visible, true);
+  assert.equal(cue.visible, false);
   assert.equal(cue.classification, "next-child-evidence-required");
   assert.equal(cue.requiresConcreteNextChildEvidence, true);
   assert.equal(cue.derivedFrom.operatorCheckJsonPath, "activeWorkReceipts.nextChildEvidenceBoundary");
@@ -4181,9 +4211,30 @@ test("status activity include-remote-counts surfaces next-child evidence cue fro
   assert.match(cue.requiredEvidenceCue, /mapped fooks tmux session/);
   assert.match(cue.requiredEvidenceCue, /active worktree or process evidence/);
   assert.match(cue.requiredEvidenceCue, /concrete blocker/);
-  assert.match(cue.oneLine, /Next-child evidence required/);
   assert.match(cue.claimBoundary, /operator-check next-child evidence boundary remains the JSON source of truth/);
   assert.match(cue.claimBoundary, /adds no authority, telemetry, merge gate, approval, product, or frontend behavior/);
+
+  const closeoutCue = activity.operatorStatusCues.closeoutReceipt;
+  assert.equal(closeoutCue.issue, "#1079");
+  assert.equal(closeoutCue.readOnly, true);
+  assert.equal(closeoutCue.visible, true);
+  assert.equal(closeoutCue.activeDevelopmentEvidence, false);
+  assert.equal(closeoutCue.autoCloseEpic960, false);
+  assert.equal(closeoutCue.mutatesGitHub, false);
+  assert.equal(
+    closeoutCue.derivedFrom.operatorCheckJsonPath,
+    "activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary",
+  );
+  assert.match(closeoutCue.currentEvidenceCue, /clean main has only epic #960 open/);
+  assert.match(closeoutCue.currentEvidenceCue, /no child issue, PR, non-main branch, mapped fooks session, worktree\/process evidence, or blocker evidence is present/);
+  assert.match(closeoutCue.nextAction, /bounded operator closeout receipt for #960/);
+  assert.match(closeoutCue.nextAction, /do not close #960/);
+  assert.match(closeoutCue.nextAction, /mutate GitHub/);
+  assert.match(closeoutCue.nextAction, /create another child from stale checklist text/);
+  assert.match(closeoutCue.oneLine, /No active development/);
+  assert.match(closeoutCue.oneLine, /bounded #960 closeout receipt/);
+  assert.match(closeoutCue.claimBoundary, /issue #1079/);
+  assert.match(closeoutCue.claimBoundary, /without auto-closing #960/);
 });
 
 test("default status activity surfaces remote-counts-required next action for clean local idle main", () => {
@@ -4213,11 +4264,7 @@ test("default status activity surfaces remote-counts-required next action for cl
   assert.match(readme, /`--include-remote-counts` belongs to `fooks status activity`/);
   assert.match(readme, /do not add it to `fooks check`/);
   assert.match(readme, /Use `fooks check --json` for the operator\/check source-of-truth projection/);
-  assert.match(cue.nextAction, /if only planning epic #960 remains open/);
-  assert.match(cue.nextAction, /child issue/);
-  assert.match(cue.nextAction, /open PR/);
-  assert.match(cue.nextAction, /mapped fooks session/);
-  assert.match(cue.nextAction, /concrete blocker/);
+  assert.match(cue.nextAction, /before treating #960-only state as proven/);
   assert.match(cue.claimBoundary, /adds no active-development evidence/);
   assert.match(cue.claimBoundary, /adds no active-development evidence, authority, telemetry, merge gate, approval, product, or frontend behavior/);
 });
