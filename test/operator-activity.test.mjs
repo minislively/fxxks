@@ -92,12 +92,29 @@ function makeTempProject() {
   return tempDir;
 }
 
-function syntheticPreflightSnapshot({ current = [], nonAuthorizing = [], advisoryOnly = [], historicalOnly = [], verdict = "idleRequiresActiveArtifact", blockers = [] } = {}) {
+function syntheticPreflightSnapshot({ current = [], nonAuthorizing = [], advisoryOnly = [], historicalOnly = [], verdict = "idleRequiresActiveArtifact", blockers = [], requiredActiveArtifact } = {}) {
   return {
     schemaVersion: 1,
     command: OPERATOR_CHECK_COMMAND,
     verdict,
     blockers,
+    requiredActiveArtifact: requiredActiveArtifact ?? {
+      required: verdict !== "activeArtifactPresent" && verdict !== "idleCloseoutReceiptBoundary" && blockers.length === 0,
+      acceptableArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"],
+      message: "synthetic active artifact guidance",
+      dogfoodHandoff: {
+        status: verdict === "blocked" || blockers.length > 0
+          ? "blocked"
+          : verdict === "idleCloseoutReceiptBoundary"
+            ? "closeout-receipt-boundary"
+            : verdict === "activeArtifactPresent"
+              ? "satisfied"
+              : "requires-live-artifact",
+        requiredBeforeNextDevelopmentAction: verdict !== "activeArtifactPresent" && verdict !== "idleCloseoutReceiptBoundary" && blockers.length === 0,
+        evidenceBoundary: "ci-echo-and-stale-residue-are-not-active-work",
+        nextAction: "synthetic next action",
+      },
+    },
     contextTrust: {
       schemaVersion: 1,
       source: OPERATOR_CONTEXT_TRUST_SOURCE,
@@ -468,6 +485,17 @@ test("preflight builder projects synthetic contextTrust without evidence reads",
   assert.match(noAuthorityText, /Do not treat as current:/);
   assert.match(noAuthorityText, /main-echo-boundary/);
   assert.match(noAuthorityText, /no cleanup, authority creation, hook enforcement, or new evidence collection was performed/);
+
+  const closeoutBoundary = buildPreflightPacket(syntheticPreflightSnapshot({
+    verdict: "idleCloseoutReceiptBoundary",
+  }));
+  assert.equal(closeoutBoundary.summary.authorityStatus, "missing");
+  assert.equal(closeoutBoundary.guidance.riskLevel, "low");
+  assert.equal(closeoutBoundary.guidance.recommendedAction, "write-bounded-closeout-receipt");
+  const closeoutBoundaryText = renderPreflightText(closeoutBoundary);
+  assert.match(closeoutBoundaryText, /Preflight: OK - write bounded closeout receipt/);
+  assert.match(closeoutBoundaryText, /Action: write-bounded-closeout-receipt/);
+  assert.match(closeoutBoundaryText, /without creating a new issue\/session, closing #960, or mutating GitHub/);
 
   const handoff = buildPreflightPacket(syntheticPreflightSnapshot({
     nonAuthorizing: [
@@ -1659,7 +1687,7 @@ test("operator check forces a concrete active artifact when post-merge main echo
   assert.deepEqual(snapshot.blockers, []);
 });
 
-test("operator check treats clean post-merge epic-only inventory as idle session-whip requiring a concrete child", () => {
+test("operator check treats clean post-merge epic-only inventory as direct closeout boundary without forcing a child", () => {
   const tempDir = makeTempProject();
   const snapshot = readOperatorCheckSnapshot(tempDir, {
     now: () => "2026-05-22T06:40:00.000Z",
@@ -1701,10 +1729,14 @@ test("operator check treats clean post-merge epic-only inventory as idle session
   assert.equal(snapshot.activity.currentRunEvidence.activeWorkEvidence, false);
   assert.match(snapshot.activity.currentRunEvidence.reasons.join("\n"), /only open issue is planning epic #960/);
   assert.match(snapshot.activity.currentRunEvidence.receipt.oneLine, /only planning epic #960 is open/);
-  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.verdict, "idleCloseoutReceiptBoundary");
   assert.deepEqual(snapshot.activeArtifacts, []);
-  assert.equal(snapshot.requiredActiveArtifact.required, true);
-  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "requires-live-artifact");
+  assert.equal(snapshot.requiredActiveArtifact.required, false);
+  assert.match(snapshot.requiredActiveArtifact.message, /no-new-child closeout boundary/);
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.status, "closeout-receipt-boundary");
+  assert.equal(snapshot.requiredActiveArtifact.dogfoodHandoff.requiredBeforeNextDevelopmentAction, false);
+  assert.match(snapshot.requiredActiveArtifact.dogfoodHandoff.nextAction, /Do not create a new child issue or session/);
+  assert.match(snapshot.requiredActiveArtifact.dogfoodHandoff.nextAction, /do not close #960 or mutate GitHub/);
   assert.equal(snapshot.activeWorkReceipts.classification, "mainEcho");
   assert.equal(snapshot.activeWorkReceipts.receipts.some((receipt) => receipt.kind === "issue"), false);
   assert.equal(

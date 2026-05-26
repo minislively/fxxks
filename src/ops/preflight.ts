@@ -13,6 +13,7 @@ export type PreflightRecommendedAction =
   | "continue-with-current-authority"
   | "create-or-link-active-artifact"
   | "adopt-or-report-live-handoff"
+  | "write-bounded-closeout-receipt"
   | "resolve-blockers-first";
 
 export type PreflightAuthorityStatus = "present" | "missing" | "blocked";
@@ -82,6 +83,10 @@ function headlineFor(packet: PreflightPacket): string {
 
   if (packet.guidance.recommendedAction === "adopt-or-report-live-handoff") {
     return "Preflight: BLOCK - adopt or report live handoff";
+  }
+
+  if (packet.guidance.recommendedAction === "write-bounded-closeout-receipt") {
+    return "Preflight: OK - write bounded closeout receipt";
   }
 
   return "Preflight: BLOCK - active authority needed";
@@ -186,6 +191,15 @@ function guidanceFor(
       recommendedAction: "adopt-or-report-live-handoff",
       rationale:
         "no top-level current authority exists, but a live non-authorizing handoff candidate exists; adopt/report that artifact instead of inventing current authority.",
+    };
+  }
+
+  if (snapshot.requiredActiveArtifact.dogfoodHandoff.status === "closeout-receipt-boundary") {
+    return {
+      riskLevel: "low",
+      recommendedAction: "write-bounded-closeout-receipt",
+      rationale:
+        "clean main with only epic #960 open is a no-new-child closeout boundary; write the bounded #960 closeout receipt without creating a new issue/session, closing #960, or mutating GitHub.",
     };
   }
 

@@ -157,7 +157,7 @@ export const OPERATOR_CHECK_ACTIVE_WORK_RECEIPT_CLAIM_BOUNDARY =
 export const OPERATOR_CHECK_SESSION_WHIP_RUN_RECEIPT_CLAIM_BOUNDARY =
   "Read-only compact receipt for the current session-whip/operator-check run; summarizes existing created/adopted issue, branch, session, PR, and worktree evidence from the current operator-check snapshot only, preserves empty/no-op shape, and never creates, deletes, fetches, pushes, comments, opens PRs/issues, changes tmux, or mutates worktrees during receipt rendering.";
 
-export type OperatorCheckVerdict = "activeArtifactPresent" | "idleRequiresActiveArtifact" | "blocked";
+export type OperatorCheckVerdict = "activeArtifactPresent" | "idleRequiresActiveArtifact" | "idleCloseoutReceiptBoundary" | "blocked";
 export type OperatorCheckActiveArtifactKind = "issue" | "pullRequest" | "session";
 export type OperatorCheckActiveWorkReceiptKind = "issue" | "pullRequest" | "branch" | "session" | "worktree";
 export type OperatorCheckActiveWorkReceiptClassification = "active" | "closedOrStale" | "mainEcho" | "blocked";
@@ -186,7 +186,7 @@ export type OperatorCheckRequiredActiveArtifact = {
   acceptableArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"];
   message: string;
   dogfoodHandoff: {
-    status: "requires-live-artifact" | "satisfied" | "blocked";
+    status: "requires-live-artifact" | "satisfied" | "closeout-receipt-boundary" | "blocked";
     requiredBeforeNextDevelopmentAction: boolean;
     evidenceBoundary: "ci-echo-and-stale-residue-are-not-active-work";
     nextAction: string;
@@ -2594,26 +2594,41 @@ function activeArtifactsFrom(activity: OperatorActivitySnapshot): OperatorCheckA
   return artifacts;
 }
 
-function requiredActiveArtifact(state: { blocked: boolean; hasActiveArtifact: boolean }): OperatorCheckRequiredActiveArtifact {
-  const required = !state.blocked && !state.hasActiveArtifact;
-  const status = state.blocked ? "blocked" : required ? "requires-live-artifact" : "satisfied";
+function requiredActiveArtifact(state: {
+  blocked: boolean;
+  hasActiveArtifact: boolean;
+  closeoutReceiptBoundaryAvailable: boolean;
+}): OperatorCheckRequiredActiveArtifact {
+  const closeoutReceiptBoundaryAvailable = !state.blocked && !state.hasActiveArtifact && state.closeoutReceiptBoundaryAvailable;
+  const required = !state.blocked && !state.hasActiveArtifact && !closeoutReceiptBoundaryAvailable;
+  const status = state.blocked
+    ? "blocked"
+    : closeoutReceiptBoundaryAvailable
+      ? "closeout-receipt-boundary"
+      : required
+        ? "requires-live-artifact"
+        : "satisfied";
   return {
     required,
     acceptableArtifacts: ["open GitHub issue", "open GitHub pull request", "mapped fooks tmux session"],
     message: state.blocked
       ? "Operator check is blocked; resolve blockers before deciding whether an active issue, PR, or mapped fooks session is required."
-      : required
-        ? "No concrete active issue, PR, or mapped fooks session is present; create or link one before treating post-merge main echoes as active work."
-        : "A concrete active issue, PR, or mapped fooks session is present, so the snapshot is not idle echo-only evidence.",
+      : closeoutReceiptBoundaryAvailable
+        ? "Clean main with only epic #960 open is a no-new-child closeout boundary, not active development; write the bounded #960 closeout receipt without creating a new issue or session."
+        : required
+          ? "No concrete active issue, PR, or mapped fooks session is present; create or link one before treating post-merge main echoes as active work."
+          : "A concrete active issue, PR, or mapped fooks session is present, so the snapshot is not idle echo-only evidence.",
     dogfoodHandoff: {
       status,
       requiredBeforeNextDevelopmentAction: required,
       evidenceBoundary: "ci-echo-and-stale-residue-are-not-active-work",
       nextAction: state.blocked
         ? "Resolve operator-check blockers before using this snapshot for session-whip handoff."
-        : required
-          ? "Create or link an open issue, open PR, or mapped fooks tmux session before reporting this clean post-merge snapshot as active work."
-          : "Continue using the concrete active artifact already present in this snapshot.",
+        : closeoutReceiptBoundaryAvailable
+          ? "Do not create a new child issue or session for clean main with only epic #960 open; write the bounded #960 operator closeout receipt and do not close #960 or mutate GitHub."
+          : required
+            ? "Create or link an open issue, open PR, or mapped fooks tmux session before reporting this clean post-merge snapshot as active work."
+            : "Continue using the concrete active artifact already present in this snapshot.",
     },
   };
 }
@@ -2834,13 +2849,20 @@ export function readOperatorCheckSnapshot(cwd = process.cwd(), options: Operator
   const optionalCountBlockers = activity.optionalCounts.enabled ? activity.optionalCounts.blockers : [];
   const blocked = activity.currentRunEvidence.blockers.length > 0 || optionalCountBlockers.length > 0 || !activity.tmux.available;
   const echoOnly = activity.currentRunEvidence.mainEchoEvidence && !hasActiveArtifact;
+  const closeoutReceiptBoundaryAvailable = activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary.availableWhenCleanEpicOnly;
   const verdict: OperatorCheckVerdict = blocked
     ? "blocked"
     : hasActiveArtifact
       ? "activeArtifactPresent"
-      : "idleRequiresActiveArtifact";
+      : closeoutReceiptBoundaryAvailable
+        ? "idleCloseoutReceiptBoundary"
+        : "idleRequiresActiveArtifact";
 
-  const requiredArtifact = timeDiagnosticPhase(timingPhases, "required-active-artifact", () => requiredActiveArtifact({ blocked, hasActiveArtifact }));
+  const requiredArtifact = timeDiagnosticPhase(timingPhases, "required-active-artifact", () => requiredActiveArtifact({
+    blocked,
+    hasActiveArtifact,
+    closeoutReceiptBoundaryAvailable,
+  }));
   const contextTrust = timeDiagnosticPhase(timingPhases, "build-operator-context-trust", () => buildOperatorContextTrust({
     activeArtifacts,
     activeWorkReceipts,

@@ -111,14 +111,18 @@ boundaries.
 
 ## Evidence surfaces
 
-- `fooks check --json` exposes the operator/check projection. The idle case is
-  `verdict: "idleRequiresActiveArtifact"` with
+- `fooks check --json` exposes the operator/check projection. Ordinary idle
+  post-merge echoes stay `verdict: "idleRequiresActiveArtifact"` with
   `requiredActiveArtifact.required: true`; `requiredActiveArtifact.dogfoodHandoff`
   must expose `status: "requires-live-artifact"`,
   `requiredBeforeNextDevelopmentAction: true`, and the
   `ci-echo-and-stale-residue-are-not-active-work` evidence boundary. The
   acceptable active artifacts are an open GitHub issue, an open GitHub pull
-  request, or a mapped fooks tmux session.
+  request, or a mapped fooks tmux session. The narrow clean `main` + only #960
+  closeout boundary instead reports `verdict: "idleCloseoutReceiptBoundary"`
+  with `requiredActiveArtifact.required: false` and
+  `status: "closeout-receipt-boundary"`; it is still not active development and
+  the bounded next action is the #960 closeout receipt, not a new child/session.
 - `fooks status activity --include-remote-counts --json` exposes
   `currentRunEvidence`. The non-active echo case is only
   `classification: "mainEchoNonActive"` with `mainEchoEvidence: true` and
