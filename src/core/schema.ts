@@ -481,6 +481,19 @@ export type ReactWebContextFormStateFlowEntry = {
   evidence: string[];
 };
 
+export type ReactWebContextFormStateRole = {
+  role:
+    | "form-root"
+    | "field-registration"
+    | "submit-flow"
+    | "error-display"
+    | "value-control-relation"
+    | "validation-defaults";
+  labels: string[];
+  source: "formStateFlow" | "editGuidance" | "extraction";
+  evidence: string[];
+};
+
 export type ReactWebContextMetadataV0 = {
   schemaVersion: typeof REACT_WEB_CONTEXT_METADATA_SCHEMA_VERSION;
   freshness: SourceFingerprint;
@@ -501,6 +514,7 @@ export type ReactWebContextMetadataV0 = {
   intentTargets?: ReactWebContextIntentTarget[];
   editTargetRouting?: ReactWebContextEditTargetRoute[];
   formStateFlow?: ReactWebContextFormStateFlowEntry[];
+  formStateRoles?: ReactWebContextFormStateRole[];
   warnings: string[];
 };
 

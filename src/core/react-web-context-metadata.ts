@@ -7,6 +7,7 @@ import {
   type ReactWebContextComponentApiHint,
   type ReactWebContextEditTargetRoute,
   type ReactWebContextFormStateFlowEntry,
+  type ReactWebContextFormStateRole,
   type ReactWebContextImportRoleHint,
   type ReactWebContextIntentTarget,
   type ReactWebContextLayoutRegionHint,
@@ -30,6 +31,7 @@ export const REACT_WEB_CONTEXT_METADATA_ITEM_CAPS = {
   intentTargets: 16,
   editTargetRouting: 8,
   formStateFlow: 10,
+  formStateRoles: 8,
 } as const;
 
 const REACT_WEB_CONTEXT_WARNINGS = [
@@ -739,6 +741,122 @@ function buildFormStateFlow(result: ExtractionResult): ReactWebContextFormStateF
   );
 }
 
+function pushRole(
+  roles: ReactWebContextFormStateRole[],
+  role: ReactWebContextFormStateRole["role"],
+  label: string,
+  source: ReactWebContextFormStateRole["source"],
+  evidence: string,
+): void {
+  const normalizedLabel = compact(label, 80);
+  const existing = roles.find((item) => item.role === role);
+  if (existing) {
+    if (!existing.labels.includes(normalizedLabel) && existing.labels.length < 4) existing.labels.push(normalizedLabel);
+    if (!existing.evidence.includes(evidence)) existing.evidence.push(evidence);
+    return;
+  }
+  roles.push({
+    role,
+    labels: [normalizedLabel],
+    source,
+    evidence: [evidence],
+  });
+}
+
+function validationDefaultAnchor(value: string): boolean {
+  return /^(?:defaultValues|resolver|validationSchema)$/i.test(value) || /schema/i.test(value);
+}
+
+function buildFormStateRoles(
+  result: ExtractionResult,
+  editGuidance: EditGuidance | undefined,
+  formStateFlow: ReactWebContextFormStateFlowEntry[] | undefined,
+): ReactWebContextFormStateRole[] {
+  const roles: ReactWebContextFormStateRole[] = [];
+
+  for (const anchor of result.behavior?.formSurface?.validationAnchors ?? []) {
+    if (anchor.value === "useForm") {
+      pushRole(roles, "form-root", anchor.value, "extraction", "behavior.formSurface.validationAnchors.useForm");
+    }
+    if (anchor.value === "register" || anchor.value === "Controller") {
+      pushRole(roles, "field-registration", anchor.value, "extraction", `behavior.formSurface.validationAnchors.${anchor.value}`);
+    }
+    if (validationDefaultAnchor(anchor.value)) {
+      pushRole(
+        roles,
+        "validation-defaults",
+        anchor.value,
+        "extraction",
+        "behavior.formSurface.validationAnchors.validation-defaults",
+      );
+    }
+    if (/error/i.test(anchor.value)) {
+      pushRole(roles, "error-display", anchor.value, "extraction", "behavior.formSurface.validationAnchors.error");
+    }
+  }
+
+  for (const control of result.behavior?.formSurface?.controls ?? []) {
+    if (control.tag === "Controller" || control.name) {
+      pushRole(roles, "field-registration", controlLabel(control), "extraction", "behavior.formSurface.controls");
+    }
+    if (
+      control.propValues?.value ||
+      control.propValues?.checked ||
+      control.handlerValues?.onChange ||
+      control.propValues?.disabled ||
+      control.props?.includes("disabled") ||
+      control.props?.includes("readOnly")
+    ) {
+      pushRole(roles, "value-control-relation", controlLabel(control), "extraction", "behavior.formSurface.controls");
+    }
+  }
+
+  for (const submit of result.behavior?.formSurface?.submitHandlers ?? []) {
+    pushRole(roles, "submit-flow", submit.value, "extraction", "behavior.formSurface.submitHandlers");
+  }
+
+  for (const anchor of result.behavior?.a11yAnchors ?? []) {
+    if (/alert|invalid|error/i.test(anchor.label) || anchor.kind === "error-text") {
+      pushRole(roles, "error-display", anchor.label, "extraction", "behavior.a11yAnchors");
+    }
+  }
+
+  for (const entry of formStateFlow ?? []) {
+    if (entry.kind === "submit-flow") {
+      pushRole(roles, "submit-flow", entry.label, "formStateFlow", "reactWebContext.formStateFlow.submit-flow");
+    }
+    if (entry.kind === "controlled-control" || (entry.kind === "state-condition" && entry.condition?.role === "disabled")) {
+      pushRole(roles, "value-control-relation", entry.label, "formStateFlow", `reactWebContext.formStateFlow.${entry.kind}`);
+    }
+    if (entry.kind === "state-condition" && entry.condition?.role === "error") {
+      pushRole(roles, "error-display", entry.label, "formStateFlow", "reactWebContext.formStateFlow.error-state");
+    }
+  }
+
+  for (const target of editGuidance?.patchTargets ?? []) {
+    if (target.kind === "validation-anchor") {
+      if (target.label === "useForm") pushRole(roles, "form-root", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
+      if (target.label === "register" || target.label === "Controller") {
+        pushRole(roles, "field-registration", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
+      }
+      if (validationDefaultAnchor(target.label)) {
+        pushRole(roles, "validation-defaults", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
+      }
+    }
+    if (target.kind === "form-control") {
+      pushRole(roles, "field-registration", target.label, "editGuidance", "editGuidance.patchTargets.form-control");
+    }
+    if (target.kind === "submit-handler") {
+      pushRole(roles, "submit-flow", target.label, "editGuidance", "editGuidance.patchTargets.submit-handler");
+    }
+  }
+
+  return dedupeBy(
+    roles,
+    (item) => `${item.role}:${item.source}:${item.labels.join(",")}:${item.evidence.join(",")}`,
+  );
+}
+
 function buildIntentTargets(result: ExtractionResult, editGuidance: EditGuidance | undefined): ReactWebContextIntentTarget[] {
   const targets: ReactWebContextIntentTarget[] = [];
 
@@ -794,6 +912,10 @@ export function buildReactWebContextMetadata(
     REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.editTargetRouting,
   );
   const formStateFlow = pruneArray(buildFormStateFlow(result), REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.formStateFlow);
+  const formStateRoles = pruneArray(
+    buildFormStateRoles(result, editGuidance, formStateFlow),
+    REACT_WEB_CONTEXT_METADATA_ITEM_CAPS.formStateRoles,
+  );
 
   const hasContext = Boolean(
     stateHints ||
@@ -806,7 +928,8 @@ export function buildReactWebContextMetadata(
       layoutRegionHints ||
       intentTargets ||
       editTargetRouting ||
-      formStateFlow,
+      formStateFlow ||
+      formStateRoles,
   );
   if (!hasContext) return undefined;
 
@@ -830,6 +953,7 @@ export function buildReactWebContextMetadata(
     ...(intentTargets ? { intentTargets } : {}),
     ...(editTargetRouting ? { editTargetRouting } : {}),
     ...(formStateFlow ? { formStateFlow } : {}),
+    ...(formStateRoles ? { formStateRoles } : {}),
     warnings: REACT_WEB_CONTEXT_WARNINGS,
   };
 }
