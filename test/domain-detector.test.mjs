@@ -12,6 +12,7 @@ const repoRoot = process.cwd();
 const require = createRequire(import.meta.url);
 const { detectDomain, detectDomainFromSource } = require(path.join(repoRoot, "dist", "core", "domain-detector.js"));
 const { lookupDomainMemoryReceipts } = require(path.join(repoRoot, "dist", "core", "domain-memory-lookup.js"));
+const { buildDomainMemoryReceipt } = require(path.join(repoRoot, "dist", "core", "domain-memory-receipt.js"));
 
 const fixtureRoot = path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations");
 const manifestPath = path.join(fixtureRoot, "manifest.json");
@@ -34,6 +35,20 @@ function assertProfile(result, expected) {
   } else {
     assert.equal(result.profile.boundaryReason, undefined);
   }
+}
+
+function writeDomainMemoryReceipt(tempDir, target, name = "receipt.json", mutate = (receipt) => receipt) {
+  const filePath = path.join(tempDir, target);
+  const sourceText = fs.readFileSync(filePath, "utf8");
+  const receipt = buildDomainMemoryReceipt({
+    filePath,
+    cwd: tempDir,
+    sourceText,
+    domainDetection: detectDomainFromSource(sourceText, filePath),
+  });
+  const receiptDir = path.join(tempDir, ".fooks", "domain-memory");
+  fs.mkdirSync(receiptDir, { recursive: true });
+  fs.writeFileSync(path.join(receiptDir, name), JSON.stringify(mutate(receipt), null, 2));
 }
 
 function expectedClassificationForLane(lane) {
@@ -705,6 +720,73 @@ test("CLI domain-memory lookup reports advisory-only receipt diagnostics", () =>
     assert.equal(unsupported.safeNextAction, "full-read");
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("domain-memory lookup aggregation preserves fail-closed precedence", () => {
+  const fixture = path.join(fixtureRoot, "react-web", "custom-form-shell.tsx");
+  const makeProject = () => {
+    const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-domain-memory-precedence-"));
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    fs.copyFileSync(fixture, path.join(tempDir, "src", "custom-form-shell.tsx"));
+    return tempDir;
+  };
+  const target = path.join("src", "custom-form-shell.tsx");
+  const incompatibleMutator = (receipt) => ({ ...receipt, domain: { ...receipt.domain, lane: "react-native" } });
+
+  const noCandidates = makeProject();
+  try {
+    assert.equal(lookupDomainMemoryReceipts(target, noCandidates).status, "not-found");
+  } finally {
+    fs.rmSync(noCandidates, { recursive: true, force: true });
+  }
+
+  const singleFresh = makeProject();
+  try {
+    writeDomainMemoryReceipt(singleFresh, target);
+    assert.equal(lookupDomainMemoryReceipts(target, singleFresh).status, "fresh");
+  } finally {
+    fs.rmSync(singleFresh, { recursive: true, force: true });
+  }
+
+  const multipleFresh = makeProject();
+  try {
+    writeDomainMemoryReceipt(multipleFresh, target, "one.json");
+    writeDomainMemoryReceipt(multipleFresh, target, "two.json");
+    assert.equal(lookupDomainMemoryReceipts(target, multipleFresh).status, "ambiguous");
+  } finally {
+    fs.rmSync(multipleFresh, { recursive: true, force: true });
+  }
+
+  const staleOverAmbiguous = makeProject();
+  try {
+    writeDomainMemoryReceipt(staleOverAmbiguous, target, "stale.json");
+    fs.appendFileSync(path.join(staleOverAmbiguous, target), "\nexport const changedAfterReceipt = true;\n");
+    writeDomainMemoryReceipt(staleOverAmbiguous, target, "fresh-one.json");
+    writeDomainMemoryReceipt(staleOverAmbiguous, target, "fresh-two.json");
+    assert.equal(lookupDomainMemoryReceipts(target, staleOverAmbiguous).status, "stale");
+  } finally {
+    fs.rmSync(staleOverAmbiguous, { recursive: true, force: true });
+  }
+
+  const incompatibleOverStale = makeProject();
+  try {
+    writeDomainMemoryReceipt(incompatibleOverStale, target, "stale.json");
+    fs.appendFileSync(path.join(incompatibleOverStale, target), "\nexport const changedAfterReceipt = true;\n");
+    writeDomainMemoryReceipt(incompatibleOverStale, target, "incompatible.json", incompatibleMutator);
+    assert.equal(lookupDomainMemoryReceipts(target, incompatibleOverStale).status, "incompatible");
+  } finally {
+    fs.rmSync(incompatibleOverStale, { recursive: true, force: true });
+  }
+
+  const unsupportedOverIncompatible = makeProject();
+  try {
+    writeDomainMemoryReceipt(unsupportedOverIncompatible, target, "incompatible.json", incompatibleMutator);
+    fs.mkdirSync(path.join(unsupportedOverIncompatible, ".fooks", "domain-memory"), { recursive: true });
+    fs.writeFileSync(path.join(unsupportedOverIncompatible, ".fooks", "domain-memory", "malformed.json"), "{not-json");
+    assert.equal(lookupDomainMemoryReceipts(target, unsupportedOverIncompatible).status, "unsupported");
+  } finally {
+    fs.rmSync(unsupportedOverIncompatible, { recursive: true, force: true });
   }
 });
 

@@ -1768,6 +1768,51 @@ test("cli codex-pre-read reuses the same decision seam and advertises the comman
   assert.match(usage, /codex-pre-read/);
 });
 
+test("codex-pre-read domain-memory lookup is explicit opt-in debug metadata only", () => {
+  const tempDir = makeTempProject();
+  const payloadTarget = path.join("src", "components", "FormSection.tsx");
+  writeDomainMemoryReceipt(tempDir, payloadTarget);
+
+  const noFlag = run(["codex-pre-read", payloadTarget], tempDir);
+  assert.equal(noFlag.debug.domainMemoryLookup, undefined);
+  const directNoFlag = decideCodexPreRead(path.join(tempDir, payloadTarget), tempDir);
+  assert.deepEqual(noFlag, directNoFlag);
+
+  const optedIn = run(["codex-pre-read", payloadTarget, "--json", "--include-domain-memory-lookup"], tempDir);
+  const directOptedIn = decideCodexPreRead(path.join(tempDir, payloadTarget), tempDir, { includeDomainMemoryLookup: true });
+  assert.deepEqual(optedIn, directOptedIn);
+  assert.equal(optedIn.decision, noFlag.decision);
+  assert.deepEqual(optedIn.reasons, noFlag.reasons);
+  assert.deepEqual(optedIn.payload, noFlag.payload);
+  assert.deepEqual(optedIn.readiness, noFlag.readiness);
+  assert.equal(optedIn.debug.domainMemoryLookup.source, "codex-pre-read opt-in domain-memory lookup");
+  assert.equal(optedIn.debug.domainMemoryLookup.status, "fresh");
+  assert.equal(optedIn.debug.domainMemoryLookup.authorization, "none");
+  assert.equal(optedIn.debug.domainMemoryLookup.advisoryOnly, true);
+  assert.equal(optedIn.debug.domainMemoryLookup.candidateCount, 1);
+  assert.equal(optedIn.debug.domainMemoryLookup.freshCandidateCount, 1);
+
+  const fallbackTarget = path.join("src", "components", "NativeFallback.tsx");
+  fs.copyFileSync(path.join(repoRoot, "test", "fixtures", "frontend-domain-expectations", "webview-boundary-basic.tsx"), path.join(tempDir, fallbackTarget));
+  const fallback = run(["codex-pre-read", fallbackTarget, "--include-domain-memory-lookup"], tempDir);
+  assert.equal(fallback.decision, "fallback");
+  assert.equal(fallback.eligible, true);
+  assert.equal(fallback.debug.domainMemoryLookup.status, "incompatible");
+
+  fs.writeFileSync(path.join(tempDir, "notes.md"), "# notes\n");
+  const ineligible = run(["codex-pre-read", "notes.md", "--include-domain-memory-lookup"], tempDir);
+  assert.equal(ineligible.debug.domainMemoryLookup, undefined);
+});
+
+test("codex-pre-read rejects unknown arguments after the file", () => {
+  try {
+    runText(["codex-pre-read", "fixtures/compressed/FormSection.tsx", "--bogus"]);
+    assert.fail("expected codex-pre-read to reject unknown argument");
+  } catch (error) {
+    assert.match(`${error.stderr ?? ""}`, /Unexpected codex-pre-read argument: --bogus/);
+  }
+});
+
 test("runtime prompt parser finds eligible tsx/jsx paths and escape hatches", () => {
   const promptDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-prompt-target-"));
   fs.mkdirSync(path.join(promptDir, "components"), { recursive: true });
