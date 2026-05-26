@@ -2019,13 +2019,22 @@ async function run(): Promise<void> {
       if (arg1 === "activity") {
         const options = parseStatusActivityArgs(rest.slice(1));
         if (options.includeRemoteCounts && !options.receiptJson) {
-          const { buildOperatorCheckNextChildEvidenceStatusCue, readOperatorCheckSnapshot } = await import("../ops/operator-check.js");
+          const {
+            buildOperatorCheck960CloseoutReceiptStatusCue,
+            buildOperatorCheckNextChildEvidenceStatusCue,
+            readOperatorCheckSnapshot,
+          } = await import("../ops/operator-check.js");
           const checkSnapshot = readOperatorCheckSnapshot(process.cwd());
+          const closeoutReceipt = buildOperatorCheck960CloseoutReceiptStatusCue(checkSnapshot.activeWorkReceipts.drainReadyCutoff);
           print({
             ...checkSnapshot.activity,
             operatorStatusCues: {
               ...checkSnapshot.activity.operatorStatusCues,
-              nextChildEvidence: buildOperatorCheckNextChildEvidenceStatusCue(checkSnapshot.activeWorkReceipts.nextChildEvidenceBoundary),
+              nextChildEvidence: buildOperatorCheckNextChildEvidenceStatusCue(
+                checkSnapshot.activeWorkReceipts.nextChildEvidenceBoundary,
+                { suppressWhenDrainReadyCloseoutVisible: closeoutReceipt.visible },
+              ),
+              closeoutReceipt,
             },
           });
           return;

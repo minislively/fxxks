@@ -10,9 +10,12 @@ spawning another child from stale unchecked epic checklist text.
 When the current snapshot is clean `main`, has zero local divergence, has no
 mapped fooks session, and the only open issue is Epic `#960`, stale epic
 checklist text is not a next-child source by itself. If the operator cites
-landed child evidence, the safe label is **no-new-child/drain-ready**. That
-label is not active development, merge authority, CI authority, or permission to
-mutate GitHub state.
+landed child evidence, the safe label is **no-new-child/drain-ready** and the
+bounded next action is an operator closeout receipt for `#960`. That receipt
+must say there is no active development, must name clean `main`, only `#960`
+open, no child/PR/branch/session/worktree-process/blocker evidence, and
+landed-child or completed-child receipt context. It must not auto-close `#960`,
+mutate GitHub state, or create another child from stale checklist text.
 
 Concrete child evidence still wins. If a current child issue, open PR,
 non-`main` branch, mapped fooks session, active worktree/process evidence, or
@@ -39,12 +42,19 @@ claims.
     "reportActiveDevelopmentFromEpicOnlyQueue": false,
     "drainReadyLabelAllowed": true
   },
+  "closeoutReceiptBoundary": {
+    "issue": "#1079",
+    "activeDevelopmentEvidence": false,
+    "autoCloseEpic960": false,
+    "mutatesGitHub": false,
+    "boundedNextAction": "write-operator-closeout-receipt-for-960-without-closing-epic"
+  },
   "preservesNextChildEvidenceBehavior": {
     "concreteChildIssueOrSessionOrPrOrBlockerUsesNextChildEvidencePath": true,
     "operatorCheckJsonPath": "activeWorkReceipts.nextChildEvidenceBoundary"
   },
   "safeNextAction": "cite-landed-child-evidence-then-drain-epic-without-creating-new-child",
-  "rule": "After landed child evidence, clean main with only epic #960 open is no-new-child/drain-ready, not active development and not another auto-sliced child from stale checklist text."
+  "rule": "After landed child evidence, clean main with only epic #960 open is no-new-child/drain-ready, not active development and not another auto-sliced child from stale checklist text; the next action is a bounded #960 closeout receipt without closing #960 or mutating GitHub."
 }
 ```
 
