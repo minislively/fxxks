@@ -1627,12 +1627,12 @@ function buildRemoteCountsRequiredNextActionCue(
     && currentRunEvidence.evidence.fooksSessionCount === 0;
   const remoteCountsRequired = !optionalCounts.enabled && locallyIdleMain;
   const currentEvidenceCue = remoteCountsRequired
-    ? "local snapshot is clean main with zero divergence and no mapped fooks session; remote issue/PR counts are disabled, so epic-only idle state is unproven"
+    ? "local snapshot is clean main with zero divergence and no mapped fooks session; remote issue/PR counts are disabled, so remote idle state is unproven"
     : optionalCounts.enabled
       ? "remote issue/PR counts were explicitly requested; use operator-check-derived status cues for next-child evidence"
       : "local active or unknown evidence means remote-counts-required idle guidance is not the current cue";
   const nextAction = remoteCountsRequired
-    ? "Run fooks status activity --include-remote-counts --json or fooks check --json before treating #960-only state as proven; concrete child issue/PR/branch/session/worktree-process/blocker evidence remains the active-work path, while clean main with only #960 open uses the bounded #960 closeout receipt cue and remains no active development."
+    ? "Run fooks status activity --include-remote-counts --json or fooks check --json before treating the remote idle state as proven; concrete child issue/PR/branch/session/worktree-process/blocker evidence remains the active-work path. If source-of-truth remote counts are zero, clean main with zero divergence and no mapped fooks session is reported as clean idle without historical issue-specific closeout wording."
     : "No default remote-counts-required next action is visible for this snapshot.";
 
   return {
