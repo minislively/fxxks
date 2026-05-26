@@ -1372,7 +1372,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
     }
     if (ts.isPropertyAssignment(node)) {
       const name = node.name.getText(sourceFile);
-      if (name === "resolver" || name === "validationSchema" || /schema/i.test(name)) {
+      if (name === "defaultValues" || name === "resolver" || name === "validationSchema" || /schema/i.test(name)) {
         addLocatedAnchor(validationAnchors, name, node);
       }
     }

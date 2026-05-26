@@ -336,6 +336,86 @@ test("React Web formStateFlow links controlled controls submit and state conditi
   );
 });
 
+test("React Web formStateRoles normalize source-backed form roles without deferred roles", () => {
+  const source = `
+    import React from "react";
+    import { Controller, useForm } from "react-hook-form";
+    import { z } from "zod";
+    import { zodResolver } from "@hookform/resolvers/zod";
+
+    const signupSchema = z.object({ email: z.string().email() });
+
+    export function SignupRolesForm() {
+      const { register, handleSubmit, control, formState: { errors } } = useForm({
+        resolver: zodResolver(signupSchema),
+        defaultValues: { email: "", role: "reader" },
+      });
+
+      return (
+        <form onSubmit={handleSubmit(() => undefined)}>
+          <input {...register("email")} value="" onChange={() => undefined} aria-invalid={Boolean(errors.email)} />
+          <Controller name="role" control={control} render={({ field }) => <input {...field} />} />
+          <button type="submit" disabled={Boolean(errors.email)}>Save</button>
+          {errors.email ? <p role="alert">Invalid email</p> : null}
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "SignupRolesForm.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.ok(payload.reactWebContext?.formStateRoles);
+  assert.ok(payload.reactWebContext.formStateRoles.length <= 8);
+  const roles = new Set(payload.reactWebContext.formStateRoles.map((item) => item.role));
+  for (const role of [
+    "form-root",
+    "field-registration",
+    "submit-flow",
+    "error-display",
+    "value-control-relation",
+    "validation-defaults",
+  ]) {
+    assert.equal(roles.has(role), true, `${role} role should be source-backed`);
+  }
+  assert.equal(roles.has("dynamic-fields"), false);
+  assert.equal(roles.has("observation"), false);
+  assert.ok(payload.reactWebContext.formStateRoles.every((item) => item.labels.length <= 4));
+  assert.ok(
+    payload.reactWebContext.formStateRoles
+      .find((item) => item.role === "validation-defaults")
+      ?.evidence.includes("behavior.formSurface.validationAnchors.validation-defaults"),
+  );
+});
+
+test("React Web formStateRoles do not emit validation-defaults from import-only validation evidence", () => {
+  const source = `
+    import React from "react";
+    import { useForm } from "react-hook-form";
+    import { z } from "zod";
+    import { zodResolver } from "@hookform/resolvers/zod";
+
+    export function ImportOnlyValidationForm() {
+      const { register, handleSubmit } = useForm();
+      return (
+        <form onSubmit={handleSubmit(() => undefined)}>
+          <input {...register("email")} />
+          <button type="submit">Save</button>
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "ImportOnlyValidationForm.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(payload.reactWebContext?.formStateRoles?.some((item) => item.role === "validation-defaults") ?? false, false);
+});
+
 test("React Web formStateFlow is omitted without form or relational state-flow facts", () => {
   const payload = payloadFor("fixtures/compressed/FormSection.tsx", {
     includeReactWebContextMetadata: true,
