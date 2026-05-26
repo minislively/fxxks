@@ -4390,14 +4390,21 @@ test("default status activity surfaces remote-counts-required next action for cl
   assert.equal(cue.activeDevelopmentEvidence, false);
   assert.match(cue.currentEvidenceCue, /clean main with zero divergence and no mapped fooks session/);
   assert.match(cue.currentEvidenceCue, /remote issue\/PR counts are disabled/);
+  assert.match(cue.currentEvidenceCue, /remote idle state is unproven/);
   assert.match(cue.nextAction, /fooks status activity --include-remote-counts --json/);
   assert.match(cue.nextAction, /fooks check --json/);
+  assert.match(cue.nextAction, /before treating the remote idle state as proven/);
+  assert.match(cue.nextAction, /concrete child issue\/PR\/branch\/session\/worktree-process\/blocker evidence remains the active-work path/);
+  assert.match(cue.nextAction, /source-of-truth remote counts are zero/);
+  assert.doesNotMatch(cue.nextAction, /#960-only/);
+  assert.doesNotMatch(cue.nextAction, /only #960 open/);
+  assert.doesNotMatch(cue.oneLine, /#960-only/);
+  assert.doesNotMatch(cue.oneLine, /only #960 open/);
 
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   assert.match(readme, /`--include-remote-counts` belongs to `fooks status activity`/);
   assert.match(readme, /do not add it to `fooks check`/);
   assert.match(readme, /Use `fooks check --json` for the operator\/check source-of-truth projection/);
-  assert.match(cue.nextAction, /before treating #960-only state as proven/);
   assert.match(cue.claimBoundary, /adds no active-development evidence/);
   assert.match(cue.claimBoundary, /adds no active-development evidence, authority, telemetry, merge gate, approval, product, or frontend behavior/);
 });

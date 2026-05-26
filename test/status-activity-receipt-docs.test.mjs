@@ -32,16 +32,19 @@ test("operator docs document next-child evidence cue as check-derived status act
     "operatorStatusCues.remoteCountsRequiredNextAction",
     "advisory/non-authorizing",
     "fooks status activity --include-remote-counts --json",
-    "before treating #960-only state as proven",
+    "before treating remote idle state as proven",
+    "source-of-truth remote counts are zero",
+    "clean idle without historical issue-specific closeout wording",
     "operatorStatusCues.nextChildEvidence",
-    "operatorStatusCues.closeoutReceipt",
     "activeWorkReceipts.nextChildEvidenceBoundary",
-    "bounded #960 closeout receipt",
     "operator-check JSON boundary remains the source of truth",
     "concrete child issue, PR, non-main branch, mapped fooks session, active worktree/process evidence, or blocker",
   ]) {
     assertDocsInclude(required);
   }
+
+  assert.doesNotMatch(docs, /remoteCountsRequiredNextAction[^.]*#960-only/u);
+  assert.doesNotMatch(docs, /remoteCountsRequiredNextAction[^.]*only #960 open/u);
 });
 
 test("source checkout docs keep receipt-json compatible with npm alias guidance", () => {
