@@ -3945,6 +3945,107 @@ test("operator check exposes issue #885 handoff artifact evidence rule", () => {
   assert.equal(/worktree remove|branch -d|deleteCommand|manualCleanupCommands|cleanupOrder|kill-session/.test(receiptJson), false);
 });
 
+test("operator check exposes issue #1085 clean-idle nudge handoff boundary without changing idle verdict", () => {
+  const tempDir = makeTempProject();
+  const staleSibling = path.join(path.dirname(tempDir), "issue-1085-closed-residue");
+  fs.mkdirSync(staleSibling, { recursive: true });
+  const mainHead = "issue-1085-main-head";
+  const workflowRuns = [
+    {
+      databaseId: 108501,
+      status: "completed",
+      conclusion: "success",
+      headBranch: "main",
+      headSha: mainHead,
+      workflowName: "CI",
+      updatedAt: "2026-05-26T06:00:00.000Z",
+    },
+    {
+      databaseId: 108502,
+      status: "completed",
+      conclusion: "success",
+      headBranch: "main",
+      headSha: mainHead,
+      workflowName: "React Web Release Report",
+      updatedAt: "2026-05-26T06:01:00.000Z",
+    },
+  ];
+  const snapshot = readOperatorCheckSnapshot(tempDir, {
+    now: () => "2026-05-26T06:30:00.000Z",
+    runner: () => "",
+    gitRunner: (_cwd, args) => {
+      if (args[0] === "symbolic-ref") return "main\n";
+      if (args[0] === "rev-parse") return `${mainHead}\n`;
+      if (args[0] === "rev-list") return "0\t0\n";
+      throw new Error(`unexpected git ${args.join(" ")}`);
+    },
+    commandRunner: (command, args, cwd) => {
+      const joined = args.join(" ");
+      if (command === "tmux") return "";
+      if (command === "gh" && joined === "issue list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number --limit 1000") return "[]";
+      if (command === "gh" && joined === "pr list --state open --json number,url,headRefName --limit 200") return "[]";
+      if (command === "gh" && joined === "pr list --state closed --json number,url,headRefName,state,closedAt --limit 200") {
+        return JSON.stringify([{ number: 1080, headRefName: "dogfood/issue-1085-closed-residue", state: "MERGED" }]);
+      }
+      if (command === "gh" && args[0] === "run") return JSON.stringify(workflowRuns);
+      if (command === "gh" && args[0] === "issue") return "[]";
+      if (command === "git" && joined === "config --get remote.origin.url") return "https://github.com/minislively/fooks.git\n";
+      if (command === "git" && joined === "worktree list --porcelain") {
+        return [
+          `worktree ${tempDir}`,
+          `HEAD ${mainHead}`,
+          "branch refs/heads/main",
+          "",
+          `worktree ${staleSibling}`,
+          "HEAD issue-1085-stale-head",
+          "branch refs/heads/dogfood/issue-1085-closed-residue",
+          "",
+        ].join("\n");
+      }
+      if (command === "git" && joined === "rev-parse --verify origin/main") return `${mainHead}\n`;
+      if (command === "git" && joined === "branch --format=%(refname:short)") return "main\ndogfood/issue-1085-closed-residue\n";
+      if (command === "git" && joined === "branch -r --format=%(refname:short)") return "origin/main\norigin/dogfood/issue-1085-closed-residue\n";
+      if (command === "git" && joined === "branch --merged origin/main") return "main\ndogfood/issue-1085-closed-residue\n";
+      if (command === "git" && joined === "status --porcelain=v1 -z") return "";
+      if (command === "git" && joined === "diff --shortstat origin/main...HEAD") return "";
+      if (command === "git" && joined === "rev-list --left-right --count origin/main...HEAD") return "0 0\n";
+      throw new Error(`unexpected command ${command} ${joined} cwd=${cwd}`);
+    },
+    pathExists: (targetPath) => targetPath === tempDir || targetPath === staleSibling,
+  });
+
+  assert.equal(snapshot.verdict, "idleRequiresActiveArtifact");
+  assert.equal(snapshot.requiredActiveArtifact.required, true);
+  assert.equal(snapshot.activeArtifacts.length, 0);
+  const boundary = snapshot.activeWorkReceipts.cleanIdleNudgeHandoffBoundary;
+  assert.equal(boundary.issue, "#1085");
+  assert.equal(boundary.readOnly, true);
+  assert.equal(boundary.classification, "clean-idle-handoff-artifact-required");
+  assert.equal(boundary.preservesOperatorCheckVerdict, "idleRequiresActiveArtifact");
+  assert.equal(boundary.currentEvidence.openIssueCount, 0);
+  assert.equal(boundary.currentEvidence.openPullRequestCount, 0);
+  assert.equal(boundary.currentEvidence.mappedFooksTmuxSessionCount, 0);
+  assert.equal(boundary.currentEvidence.liveNonMainWorktreePresent, false);
+  assert.equal(boundary.currentEvidence.postMergeMainCiEchoPresent, true);
+  assert.equal(boundary.currentEvidence.staleResidueCount, 1);
+  assert.equal(boundary.currentEvidence.staleResidueIsActiveDevelopmentEvidence, false);
+  assert.equal(boundary.currentEvidence.ciEchoIsActiveDevelopmentEvidence, false);
+  assert.equal(boundary.requiresExplicitHandoffArtifactBeforeDevelopmentClaim, true);
+  assert.deepEqual(boundary.acceptableHandoffArtifacts, [
+    "open GitHub issue",
+    "non-main branch or live worktree",
+    "mapped fooks tmux session",
+    "open GitHub pull request",
+  ]);
+  assert.equal(boundary.mutationBoundary.createsIssuesFromCli, false);
+  assert.equal(boundary.mutationBoundary.mutatesGitHub, false);
+  assert.equal(boundary.mutationBoundary.changesRuntimeProviderFrontendOrMergeGatePolicy, false);
+  assert.match(boundary.nudgeRule, /remains idleRequiresActiveArtifact/);
+  assert.match(boundary.nudgeRule, /CI echoes and stale residue are receipts only/);
+  assert.match(boundary.nudgeRule, /CLI must not auto-create the issue/);
+});
+
 test("operator activity keeps legacy worktree inference conservative when tmux is unavailable", () => {
   const tempDir = makeTempProject();
   fs.mkdirSync(path.join(tempDir, "docs"), { recursive: true });
