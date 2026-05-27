@@ -9,6 +9,7 @@ import {
   reactWebA11yAnchorSource,
   reactWebComponentApiSource,
   reactWebFormStateFlowSource,
+  reactWebFormStateRolesSource,
   reactWebLayoutRegionSource,
   reactWebStylingVariantSource,
   reactWebImportRoleSource,
@@ -97,6 +98,10 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.debug.reactWebContextPacking.included, true);
   assert.equal(secondInject.debug.reactWebContextPacking.reason, "packed");
   assert.equal(secondInject.debug.reactWebContextPacking.priority[0], "editTargetRouting");
+  assert.ok(
+    secondInject.debug.reactWebContextPacking.priority.indexOf("formStateRoles") >
+      secondInject.debug.reactWebContextPacking.priority.indexOf("intentTargets"),
+  );
   assert.equal(secondInject.debug.reactWebContextPacking.fields[0].name, "editTargetRouting");
   assert.equal(
     secondInject.debug.reactWebContextPacking.fields.find((field) => field.name === "editTargetRouting")?.count,
@@ -201,6 +206,22 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
     assert.ok(packedPayload.reactWebContext.editTargetRouting.length > 0);
     assert.equal(packedContext.debug.reactWebContextPacking.fields[0].name, "editTargetRouting");
     assert.ok(Array.isArray(packedPayload.reactWebContext.a11yAnchors));
+    assert.ok(
+      packedContext.debug.reactWebContextPacking.priority.indexOf("formStateRoles") >
+        packedContext.debug.reactWebContextPacking.priority.indexOf("editTargetRouting"),
+    );
+    assert.ok(
+      packedContext.debug.reactWebContextPacking.priority.indexOf("formStateRoles") >
+        packedContext.debug.reactWebContextPacking.priority.indexOf("formStateFlow"),
+    );
+    assert.ok(
+      packedContext.debug.reactWebContextPacking.priority.indexOf("formStateRoles") >
+        packedContext.debug.reactWebContextPacking.priority.indexOf("a11yAnchors"),
+    );
+    assert.ok(
+      packedContext.debug.reactWebContextPacking.priority.indexOf("formStateRoles") >
+        packedContext.debug.reactWebContextPacking.priority.indexOf("intentTargets"),
+    );
     assert.ok(Buffer.byteLength(packedContext.additionalContext, "utf8") <= Buffer.byteLength(largeReactSource, "utf8"));
     assert.equal("sourceRanges" in packedPayload.reactWebContext, false);
   } finally {
@@ -531,6 +552,59 @@ test("runtime bridge preserves React Web form state-flow in repeated-read contex
       payload.reactWebContext.formStateFlow.some(
         (item) => item.kind === "controlled-control" && item.label === "input[name=email]",
       ),
+    );
+    assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("runtime bridge preserves React Web form-state roles in repeated-read context when budget permits", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-runtime-form-role-retention-"));
+  try {
+    fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+    const source = reactWebFormStateRolesSource();
+    fs.writeFileSync(path.join(tempDir, "src", "InlineFormStateRolesForm.tsx"), source);
+
+    const sessionId = `bridge-contract-form-role-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    const first = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineFormStateRolesForm.tsx",
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: "Inspect src/InlineFormStateRolesForm.tsx again",
+      },
+      tempDir,
+    );
+    const payload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
+
+    assert.equal(first.action, "record");
+    assert.equal(second.action, "inject");
+    assert.equal(second.contextModeReason, "repeated-exact-file-react-web-payload");
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
+    assert.equal(second.debug.decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(Array.isArray(payload.reactWebContext.formStateRoles));
+    assert.ok(payload.reactWebContext.formStateRoles.length <= 8);
+
+    const roles = new Set(payload.reactWebContext.formStateRoles.map((item) => item.role));
+    assert.equal(roles.has("form-root"), true);
+    assert.equal(roles.has("field-registration"), true);
+    assert.equal(roles.has("submit-flow"), true);
+    assert.equal(roles.has("value-control-relation"), true);
+    assert.equal(roles.has("validation-defaults"), true);
+    assert.ok(payload.reactWebContext.formStateRoles.every((item) => item.labels.length <= 4));
+    assert.ok(payload.reactWebContext.formStateRoles.every((item) => item.evidence.length > 0));
+    assert.doesNotMatch(
+      JSON.stringify({ payload: payload.reactWebContext.formStateRoles, debug: second.debug.reactWebContextPacking }),
+      /authoriz|cross-file|typechecker|LSP-backed|billing|latency|provider-token|auto-apply/i,
     );
     assert.ok(Buffer.byteLength(second.additionalContext, "utf8") <= Buffer.byteLength(source, "utf8"));
   } finally {
