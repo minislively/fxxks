@@ -12,6 +12,10 @@ export type ReactWebContextSummary = {
   };
   fieldCounts: Record<string, number>;
   fieldOrder: string[];
+  formStateRoles?: {
+    roles: string[];
+    counts: Record<string, number>;
+  };
   totalAnchors: number;
   claimBoundary: typeof REACT_WEB_CONTEXT_SUMMARY_CLAIM_BOUNDARY;
 };
@@ -28,7 +32,23 @@ const REACT_WEB_CONTEXT_SUMMARY_FIELDS = [
   "importRoleHints",
   "renderStates",
   "localDependencies",
+  "formStateRoles",
 ] as const;
+
+function summarizeFormStateRoles(payload: ModelFacingPayload): ReactWebContextSummary["formStateRoles"] | undefined {
+  const roles = payload.reactWebContext?.formStateRoles;
+  if (!Array.isArray(roles) || roles.length === 0) return undefined;
+
+  const counts: Record<string, number> = {};
+  for (const role of roles) {
+    counts[role.role] = (counts[role.role] ?? 0) + 1;
+  }
+
+  return {
+    roles: Object.keys(counts).sort(),
+    counts,
+  };
+}
 
 export function reactWebContextSummaryFor(payload: ModelFacingPayload, useOriginal: boolean): ReactWebContextSummary | undefined {
   if (useOriginal || !payload.reactWebContext) return undefined;
@@ -44,6 +64,7 @@ export function reactWebContextSummaryFor(payload: ModelFacingPayload, useOrigin
   const fieldOrder = REACT_WEB_CONTEXT_SUMMARY_FIELDS.filter((field) => fieldCounts[field] > 0).sort(
     (left, right) => fieldCounts[right] - fieldCounts[left],
   );
+  const formStateRoles = summarizeFormStateRoles(payload);
 
   return {
     present: true,
@@ -55,6 +76,7 @@ export function reactWebContextSummaryFor(payload: ModelFacingPayload, useOrigin
     },
     fieldCounts,
     fieldOrder,
+    ...(formStateRoles ? { formStateRoles } : {}),
     totalAnchors: Object.values(fieldCounts).reduce((total, count) => total + count, 0),
     claimBoundary: REACT_WEB_CONTEXT_SUMMARY_CLAIM_BOUNDARY,
   };
@@ -66,5 +88,8 @@ export function formatReactWebContextSummary(summary: ReactWebContextSummary): s
     .map((field) => `${field}=${summary.fieldCounts[field]}`)
     .join(", ");
   const fieldDetails = topFields ? `; top fields: ${topFields}` : "";
-  return `React Web context: ${summary.totalAnchors} source-backed anchors across ${summary.fieldOrder.length} summary fields${fieldDetails} (source-only counts; see --json).`;
+  const roleDetails = summary.formStateRoles?.roles.length
+    ? `; form-state roles: ${summary.formStateRoles.roles.slice(0, 6).join(", ")}`
+    : "";
+  return `React Web context: ${summary.totalAnchors} source-backed anchors across ${summary.fieldOrder.length} summary fields${fieldDetails}${roleDetails} (source-only counts; see --json).`;
 }

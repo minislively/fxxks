@@ -502,6 +502,29 @@ test("extract can return model-facing payload without engine metadata", () => {
   assert.equal("domainPayload" in result, false);
 });
 
+test("extract summary surfaces advisory React Web form-state roles", () => {
+  const result = run(["extract", "fixtures/compressed/FormControls.tsx", "--model-payload"]);
+  const summary = result.reactWebContextSummary;
+
+  assert.equal(summary.present, true);
+  assert.equal(summary.schemaVersion, "react-web-context.v0");
+  assert.equal(summary.scope.filePath, path.join("fixtures", "compressed", "FormControls.tsx"));
+  assert.ok(summary.fieldCounts.formStateRoles > 0);
+  assert.ok(summary.fieldOrder.includes("formStateRoles"));
+  assert.deepEqual(summary.formStateRoles.roles, [
+    "field-registration",
+    "form-root",
+    "submit-flow",
+    "validation-defaults",
+    "value-control-relation",
+  ]);
+  assert.equal(summary.formStateRoles.counts["field-registration"], 1);
+  assert.equal(summary.formStateRoles.counts["validation-defaults"], 1);
+  assert.equal(summary.claimBoundary, "source-backed-react-web-context-counts-only");
+  assert.doesNotMatch(JSON.stringify(summary), /cross-file|typechecker|lsp|visual proof|billing|latency|authoriz/i);
+  assert.equal("reactWebContext" in result, false);
+});
+
 test("file commands accept --json before or after the file path", () => {
   const compareAfter = run(["compare", "fixtures/compressed/FormSection.tsx", "--json"]);
   const compareBefore = run(["compare", "--json", "fixtures/compressed/FormSection.tsx"]);
@@ -713,6 +736,15 @@ test("compare reports local estimated model-facing payload reduction", () => {
   assert.ok(result.excludes.includes("provider-tokenizer-behavior"));
   assert.ok(result.excludes.includes("runtime-hook-envelope-overhead"));
   assert.ok(result.excludes.includes("optional-edit-guidance-overhead"));
+});
+
+test("compare text names advisory React Web form-state roles when present", () => {
+  const output = runText(["compare", "fixtures/compressed/FormControls.tsx"]);
+
+  assert.match(output, /React Web context:/);
+  assert.match(output, /formStateRoles=/);
+  assert.match(output, /form-state roles: field-registration, form-root, submit-flow/);
+  assert.doesNotMatch(output, /authoriz|LSP-backed|runtime-token savings/i);
 });
 
 test("compare keeps tiny raw fallback from reporting false positive savings", () => {
