@@ -391,6 +391,21 @@ process.exit(2);
   return { tempDir, env: { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` } };
 }
 
+function assertInactiveCloseoutCueHasNeutralCurrentWording(cue) {
+  assert.equal(cue.readOnly, true);
+  assert.equal(cue.visible, false);
+  assert.equal(cue.activeDevelopmentEvidence, false);
+  assert.equal(cue.autoCloseEpic960, false);
+  assert.equal(cue.mutatesGitHub, false);
+  assert.match(cue.source, /historical closeout receipt cue inactive projection/);
+  assert.match(cue.claimBoundary, /historical closeout receipt cue is inactive for the current snapshot/);
+  assert.match(cue.claimBoundary, /without GitHub mutation, child\/session creation, active-work authority broadening/);
+  assert.match(cue.oneLine, /Historical closeout receipt cue is inactive for this snapshot/);
+  assert.doesNotMatch(cue.source, /#960|#960-only|only epic #960 open/);
+  assert.doesNotMatch(cue.claimBoundary, /#960|#960-only|only epic #960 open/);
+  assert.doesNotMatch(cue.oneLine, /#960|#960-only|only epic #960 open/);
+}
+
 function assertPostMergeMainCiDiagnostic(item, { workflow, reason, headSha }) {
   assert.equal(item.workflow, workflow);
   assert.equal(item.diagnostic.source, OPERATOR_ACTIVITY_POST_MERGE_MAIN_CI_SOURCE);
@@ -4368,6 +4383,17 @@ test("status activity include-remote-counts surfaces next-child evidence cue fro
   assert.match(closeoutCue.oneLine, /bounded #960 closeout receipt/);
   assert.match(closeoutCue.claimBoundary, /issue #1079/);
   assert.match(closeoutCue.claimBoundary, /without auto-closing #960/);
+});
+
+test("status activity include-remote-counts neutralizes inactive closeout receipt cue wording", () => {
+  const { tempDir, env } = makeNoTmuxServerCliFixture();
+  const activity = run(["status", "activity", "--include-remote-counts", "--json"], tempDir, env);
+
+  assert.equal(activity.optionalCounts.enabled, true);
+
+  const closeoutCue = activity.operatorStatusCues.closeoutReceipt;
+  assert.equal(closeoutCue.issue, "#1079");
+  assertInactiveCloseoutCueHasNeutralCurrentWording(closeoutCue);
 });
 
 test("default status activity surfaces remote-counts-required next action for clean local idle main", () => {

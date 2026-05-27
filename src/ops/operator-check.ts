@@ -122,6 +122,8 @@ export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE =
   "operator/check issue #1077 drain-ready no-new-child cutoff projection";
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE =
   "operator/status activity issue #1079 bounded #960 closeout receipt cue projection";
+export const OPERATOR_CHECK_INACTIVE_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE =
+  "operator/status activity historical closeout receipt cue inactive projection";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_SOURCE = "operator/check issue #895 legacy review residue cleanup-review guard projection";
 export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_SOURCE =
   "operator/check issue #1085 clean-idle nudge handoff boundary projection";
@@ -153,6 +155,8 @@ export const OPERATOR_CHECK_DRAIN_READY_CUTOFF_CLAIM_BOUNDARY =
   "Read-only issue #1077 dogfood drain-ready cutoff artifact; after landed child evidence, clean main with only epic #960 open may be reported as no-new-child/drain-ready instead of active development or an auto-sliced child, while concrete child issue, PR, session, branch, worktree/process, or blocker evidence continues to use the next-child evidence path.";
 export const OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #1079 dogfood #960 closeout receipt boundary; clean main with only epic #960 open is no active development and the bounded next action is an operator closeout receipt for #960, without auto-closing #960, mutating GitHub, creating children from stale checklist text, or weakening approval, CI, merge, provider, runtime, frontend, or product boundaries.";
+export const OPERATOR_CHECK_INACTIVE_CLOSEOUT_RECEIPT_STATUS_CUE_CLAIM_BOUNDARY =
+  "Read-only status/activity historical closeout receipt cue is inactive for the current snapshot; use the current next-child evidence boundary for concrete active work evidence, without GitHub mutation, child/session creation, active-work authority broadening, or changes to approval, CI, merge, provider, runtime, frontend, or product boundaries.";
 export const OPERATOR_CHECK_CLEAN_IDLE_NUDGE_HANDOFF_BOUNDARY_CLAIM_BOUNDARY =
   "Read-only issue #1085 dogfood clean-idle nudge handoff boundary; a clean post-merge main snapshot with no open issue, PR, live branch/worktree, or mapped session remains idleRequiresActiveArtifact, treats CI echoes and stale residue as non-active receipts, and requires the next nudge to seed or resume an explicit issue, branch, session, or PR before claiming current development without creating issues from the CLI.";
 export const OPERATOR_CHECK_LEGACY_REVIEW_RESIDUE_CLEANUP_REVIEW_GUARD_CLAIM_BOUNDARY =
@@ -731,13 +735,17 @@ export type OperatorCheck960CloseoutReceiptStatusCue = {
   schemaVersion: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION;
   issue: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE;
   issueUrl: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL;
-  source: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE;
+  source:
+    | typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE
+    | typeof OPERATOR_CHECK_INACTIVE_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE;
   derivedFrom: {
     operatorCheckJsonPath: "activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary";
     source: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_SOURCE;
     issue: typeof OPERATOR_CHECK_DRAIN_READY_CUTOFF_ISSUE;
   };
-  claimBoundary: typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY;
+  claimBoundary:
+    | typeof OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_CLAIM_BOUNDARY
+    | typeof OPERATOR_CHECK_INACTIVE_CLOSEOUT_RECEIPT_STATUS_CUE_CLAIM_BOUNDARY;
   readOnly: true;
   visible: boolean;
   activeDevelopmentEvidence: false;
@@ -2048,13 +2056,17 @@ export function buildOperatorCheck960CloseoutReceiptStatusCue(
     schemaVersion: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_SCHEMA_VERSION,
     issue: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE,
     issueUrl: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_BOUNDARY_ISSUE_URL,
-    source: OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE,
+    source: visible
+      ? OPERATOR_CHECK_960_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE
+      : OPERATOR_CHECK_INACTIVE_CLOSEOUT_RECEIPT_STATUS_CUE_SOURCE,
     derivedFrom: {
       operatorCheckJsonPath: "activeWorkReceipts.drainReadyCutoff.closeoutReceiptBoundary",
       source: boundary.source,
       issue: boundary.issue,
     },
-    claimBoundary: closeoutBoundary.claimBoundary,
+    claimBoundary: visible
+      ? closeoutBoundary.claimBoundary
+      : OPERATOR_CHECK_INACTIVE_CLOSEOUT_RECEIPT_STATUS_CUE_CLAIM_BOUNDARY,
     readOnly: true,
     visible,
     activeDevelopmentEvidence: false,
@@ -2064,7 +2076,7 @@ export function buildOperatorCheck960CloseoutReceiptStatusCue(
     nextAction,
     oneLine: visible
       ? `No active development: ${currentEvidenceCue}; next action is a bounded #960 closeout receipt without GitHub mutation or #960 auto-close.`
-      : `#960 closeout receipt cue not active: ${currentEvidenceCue}.`,
+      : `Historical closeout receipt cue is inactive for this snapshot: ${currentEvidenceCue}.`,
   };
 }
 
