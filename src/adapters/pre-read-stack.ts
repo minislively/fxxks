@@ -131,7 +131,6 @@ type ReactWebContextArrayKey = Exclude<{
 }[keyof ReactWebContext], undefined>;
 
 const REACT_WEB_CONTEXT_TRIM_POLICY: ReactWebContextArrayKey[] = [
-  "formStateRoles",
   "importRoleHints",
   "stylingVariantHints",
   "localDependencies",
@@ -139,6 +138,7 @@ const REACT_WEB_CONTEXT_TRIM_POLICY: ReactWebContextArrayKey[] = [
   "stateHints",
   "componentApiHints",
   "layoutRegionHints",
+  "formStateRoles",
   "intentTargets",
   "a11yAnchors",
   "formStateFlow",

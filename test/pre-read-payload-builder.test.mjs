@@ -11,6 +11,7 @@ import {
   reactWebA11yAnchorSource,
   reactWebComponentApiSource,
   reactWebFormStateFlowSource,
+  reactWebFormStateRolesSource,
   reactWebLayoutRegionSource,
   reactWebStylingVariantSource,
   reactWebImportRoleSource,
@@ -230,6 +231,65 @@ test("pre-read payload builder preserves React Web form state-flow when context 
       ),
     );
     assert.equal("concernProfiles" in decision.payload, false);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("pre-read payload builder trims lower-priority metadata before React Web form-state roles under budget pressure", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-form-role-trim-budget-"));
+  try {
+    const target = path.join(tempDir, "InlineFormStateRolesForm.tsx");
+    const pressuredSource = reactWebFormStateRolesSource().replace(
+      /\/\* form state role budget filler [\s\S]*?\*\//,
+      `/* ${"form state role budget filler ".repeat(390)} */`,
+    );
+    fs.writeFileSync(target, pressuredSource);
+
+    const decision = preRead.decidePreRead(target, repoRoot, "codex", {
+      includeEditGuidance: true,
+    });
+
+    assert.equal(decision.decision, "payload");
+    assert.ok(decision.payload.reactWebContext);
+    assert.equal(decision.debug.reactWebContextBudget.included, true);
+    assert.equal(decision.debug.reactWebContextBudget.reason, "within-budget");
+    assert.ok(decision.debug.reactWebContextBudget.estimatedPayloadBytes <= decision.debug.reactWebContextBudget.maxPayloadBytes);
+
+    for (const lowerPriorityField of [
+      "importRoleHints",
+      "stylingVariantHints",
+      "localDependencies",
+      "renderStates",
+      "stateHints",
+      "componentApiHints",
+      "layoutRegionHints",
+    ]) {
+      assert.equal(
+        lowerPriorityField in decision.payload.reactWebContext,
+        false,
+        `${lowerPriorityField} should trim before formStateRoles`,
+      );
+    }
+
+    for (const protectedField of ["editTargetRouting", "formStateFlow", "a11yAnchors", "intentTargets", "formStateRoles"]) {
+      assert.ok(Array.isArray(decision.payload.reactWebContext[protectedField]), `${protectedField} should survive pressured trim`);
+      assert.ok(
+        decision.payload.reactWebContext[protectedField].length > 0,
+        `${protectedField} should retain source-backed entries`,
+      );
+    }
+
+    const roles = new Set(decision.payload.reactWebContext.formStateRoles.map((item) => item.role));
+    assert.equal(roles.has("form-root"), true);
+    assert.equal(roles.has("field-registration"), true);
+    assert.equal(roles.has("submit-flow"), true);
+    assert.equal(roles.has("value-control-relation"), true);
+    assert.equal(roles.has("validation-defaults"), true);
+    assert.doesNotMatch(
+      JSON.stringify(decision.payload.reactWebContext.formStateRoles),
+      /authoriz|cross-file|typechecker|LSP-backed|billing|latency|provider-token|auto-apply/i,
+    );
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

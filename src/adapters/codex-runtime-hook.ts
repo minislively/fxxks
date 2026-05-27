@@ -58,6 +58,7 @@ const RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY: RuntimeReactWebContextArrayKey
   "formStateFlow",
   "a11yAnchors",
   "intentTargets",
+  "formStateRoles",
   "stateHints",
   "layoutRegionHints",
   "componentApiHints",
@@ -65,7 +66,6 @@ const RUNTIME_REACT_WEB_CONTEXT_PACKING_PRIORITY: RuntimeReactWebContextArrayKey
   "importRoleHints",
   "renderStates",
   "localDependencies",
-  "formStateRoles",
 ];
 
 function payloadContextMode(payload: ModelFacingPayload): ContextMode {

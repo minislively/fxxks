@@ -28,6 +28,39 @@ export function InlineRetentionForm({ onSubmit }: Props) {
 `;
 }
 
+export function reactWebFormStateRolesSource() {
+  return `import { useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+
+type FormStateRolesDraft = { email: string; role: string };
+type InlineFormStateRolesFormProps = { initialEmail?: string; disabled?: boolean; onSubmit?: (value: FormStateRolesDraft) => void };
+
+export function InlineFormStateRolesForm({ initialEmail = "", disabled = false, onSubmit }: InlineFormStateRolesFormProps) {
+  const [loading, setLoading] = useState(false);
+  const { register, handleSubmit, control, formState: { errors } } = useForm<FormStateRolesDraft>({
+    defaultValues: { email: initialEmail, role: "member" },
+  });
+  const busy = useMemo(() => loading || disabled, [disabled, loading]);
+  const submitForm = handleSubmit((value) => {
+    setLoading(true);
+    onSubmit?.(value);
+  });
+
+  return (
+    <form onSubmit={submitForm} className="grid gap-3" aria-busy={busy}>
+      <label htmlFor="email">Email</label>
+      <input id="email" {...register("email")} disabled={busy} aria-invalid={Boolean(errors.email)} />
+      {errors.email ? <p role="alert">{errors.email.message}</p> : null}
+      <Controller name="role" control={control} render={({ field }) => <input {...field} readOnly />} />
+      <button type="submit" disabled={busy}>Save</button>
+    </form>
+  );
+}
+
+/* ${"form state role budget filler ".repeat(620)} */
+`;
+}
+
 export function reactWebLayoutRegionSource() {
   return `type LayoutItem = { id: string; label: string };
 type LayoutPanelProps = { items: LayoutItem[]; loading?: boolean; error?: string };
