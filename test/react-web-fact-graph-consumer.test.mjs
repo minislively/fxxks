@@ -194,14 +194,18 @@ test("unknown freshness defers all source-backed candidates instead of selecting
   assert.match(dryRun.warnings.join("\n"), /stale or unknown/i);
 });
 
-test("consumer JSON preserves non-authorization boundary", () => {
+test("consumer JSON and text preserve non-authorization boundary", () => {
   const dryRun = buildReactWebFactGraphConsumerDryRun(supportedFixture(), repoRoot);
   const serialized = JSON.stringify(dryRun);
+  const text = runCli(["inspect", "react-web-fact-graph-consumer", "test/fixtures/frontend-domain-expectations/react-web/custom-form-shell.tsx"]).stdout;
 
   assert.doesNotMatch(serialized, /runtimeAuthorized\s*[:=]\s*true|preReadAuthorized|cacheAuthorized|compact-safe|modelFacingReuse/i);
   assert.doesNotMatch(serialized, /(?:proves?|guarantees?|establishes?|unlocks?)\s+[^.]{0,80}(?:token|cost|latency|provider|support-promotion|support promotion)/i);
   assert.ok(dryRun.nonClaims.some((claim) => /does not authorize runtime reuse/i.test(claim)));
   assert.ok(dryRun.nonClaims.some((claim) => /does not claim token/i.test(claim)));
+  assert.match(dryRun.warnings.join("\n"), /does not claim token, cost, latency/i);
+  assert.match(text, /Non-claims:/);
+  assert.match(text, /does not claim token/i);
 });
 
 test("CLI inspect react-web-fact-graph-consumer parses JSON and max-anchors flags", () => {

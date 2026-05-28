@@ -18,7 +18,7 @@ export const REACT_WEB_FACT_GRAPH_CONSUMER_DEFAULT_MAX_ANCHORS = 8 as const;
 export const REACT_WEB_FACT_GRAPH_CONSUMER_MIN_ANCHORS = 1 as const;
 export const REACT_WEB_FACT_GRAPH_CONSUMER_MAX_ANCHORS = 20 as const;
 export const REACT_WEB_FACT_GRAPH_CONSUMER_CLAIM_BOUNDARY =
-  "React Web fact graph consumer dry-run is advisory and report-only: it ranks source-backed graph anchors for inspection only and does not authorize runtime, pre-read, cache, setup-readiness, or model-facing reuse." as const;
+  "React Web fact graph consumer dry-run is advisory and report-only: it ranks source-backed graph anchors for inspection only and does not authorize runtime, pre-read, cache, setup-readiness, or model-facing reuse; it does not claim token, cost, latency, billing, cache-performance, provider-cost, or provider-token savings." as const;
 
 export type ReactWebFactGraphConsumerAuthorization = "none";
 export type ReactWebFactGraphAnchorType = "node" | "edge";
@@ -283,6 +283,9 @@ export function renderReactWebFactGraphConsumerDryRunText(dryRun: ReactWebFactGr
   ];
   if (dryRun.warnings.length > 0) {
     lines.push("Warnings:", ...dryRun.warnings.map((warning) => `- ${warning}`));
+  }
+  if (dryRun.nonClaims.length > 0) {
+    lines.push("Non-claims:", ...dryRun.nonClaims.map((claim) => `- ${claim}`));
   }
   return `${lines.join("\n")}\n`;
 }
