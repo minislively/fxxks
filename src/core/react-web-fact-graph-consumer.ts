@@ -26,6 +26,8 @@ export type ReactWebFactGraphAnchorDeferredReason = "budget-deferred" | "stale-o
 
 export type ReactWebFactGraphAnchor = {
   rank: number;
+  reportOnly: true;
+  authorization: ReactWebFactGraphConsumerAuthorization;
   anchorType: ReactWebFactGraphAnchorType;
   anchorId: string;
   nodeId?: string;
@@ -76,7 +78,7 @@ export type ReactWebFactGraphConsumerOptions = {
   maxAnchors?: number;
 };
 
-type Candidate = Omit<ReactWebFactGraphAnchor, "rank" | "deferredReason"> & {
+type Candidate = Omit<ReactWebFactGraphAnchor, "rank" | "reportOnly" | "authorization" | "deferredReason"> & {
   firstLine: number;
 };
 
@@ -193,6 +195,8 @@ function ranked(anchor: Candidate, rank: number, deferredReason?: ReactWebFactGr
   const { firstLine: _firstLine, ...publicAnchor } = anchor;
   return {
     rank,
+    reportOnly: true,
+    authorization: "none",
     ...publicAnchor,
     ...(deferredReason ? { deferredReason } : {}),
   };

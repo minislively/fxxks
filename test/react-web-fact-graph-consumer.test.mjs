@@ -51,6 +51,8 @@ test("React Web fact graph consumer dry-run selects fresh source-backed anchors"
   for (const anchor of dryRun.selectedAnchors) {
     assert.equal(anchor.freshnessStatus, "fresh");
     assert.ok(anchor.rank > 0);
+    assert.equal(anchor.reportOnly, true);
+    assert.equal(anchor.authorization, "none");
     assert.ok(anchor.anchorId.length > 0);
     assert.ok(anchor.kind.length > 0);
     assert.ok(anchor.reason.length > 0);
@@ -149,6 +151,7 @@ test("budget overflow is deferred with explicit reason", () => {
   assert.equal(dryRun.selectedAnchors.length, 1);
   assert.ok(dryRun.deferredAnchors.length > 0);
   assert.ok(dryRun.deferredAnchors.every((anchor) => anchor.deferredReason === "budget-deferred"));
+  assert.ok(dryRun.deferredAnchors.every((anchor) => anchor.reportOnly === true && anchor.authorization === "none"));
 });
 
 test("mixed and unsupported files fail closed without selected anchors", () => {
@@ -191,6 +194,7 @@ test("unknown freshness defers all source-backed candidates instead of selecting
   assert.equal(dryRun.selectedAnchors.length, 0);
   assert.ok(dryRun.deferredAnchors.length > 0);
   assert.ok(dryRun.deferredAnchors.every((anchor) => anchor.deferredReason === "stale-or-unknown-freshness"));
+  assert.ok(dryRun.deferredAnchors.every((anchor) => anchor.reportOnly === true && anchor.authorization === "none"));
   assert.match(dryRun.warnings.join("\n"), /stale or unknown/i);
 });
 
@@ -201,6 +205,7 @@ test("consumer JSON and text preserve non-authorization boundary", () => {
 
   assert.doesNotMatch(serialized, /runtimeAuthorized\s*[:=]\s*true|preReadAuthorized|cacheAuthorized|compact-safe|modelFacingReuse/i);
   assert.doesNotMatch(serialized, /(?:proves?|guarantees?|establishes?|unlocks?)\s+[^.]{0,80}(?:token|cost|latency|provider|support-promotion|support promotion)/i);
+  assert.ok([...dryRun.selectedAnchors, ...dryRun.deferredAnchors].every((anchor) => anchor.reportOnly === true && anchor.authorization === "none"));
   assert.ok(dryRun.nonClaims.some((claim) => /does not authorize runtime reuse/i.test(claim)));
   assert.ok(dryRun.nonClaims.some((claim) => /does not claim token/i.test(claim)));
   assert.match(dryRun.warnings.join("\n"), /does not claim token, cost, latency/i);
