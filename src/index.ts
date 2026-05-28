@@ -373,3 +373,29 @@ export type {
   LongRunBudgetWarningAction,
   LongRunBudgetWarningTrigger,
 } from "./ops/long-run-budget-warning";
+
+export {
+  FACT_GRAPH_REPORT_CLAIM_BOUNDARY,
+  FACT_GRAPH_REPORT_NON_CLAIMS,
+  FACT_GRAPH_REPORT_PRODUCER,
+  FACT_GRAPH_REPORT_SCHEMA_VERSION,
+  buildFactGraphMetrics,
+  buildFactGraphReport,
+} from "./core/fact-graph";
+export type {
+  BuildFactGraphReportOptions,
+  FactEdge,
+  FactGraphConfidence,
+  FactGraphDomain,
+  FactGraphExtractorRef,
+  FactGraphFreshness,
+  FactGraphFreshnessStatus,
+  FactGraphPrimitive,
+  FactGraphProperties,
+  FactGraphPropertyValue,
+  FactGraphReport,
+  FactGraphReportMetrics,
+  FactGraphReportPolicy,
+  FactGraphSourceRef,
+  FactNode,
+} from "./core/fact-graph";
