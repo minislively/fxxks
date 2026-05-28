@@ -3,10 +3,84 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync as realExecFileSync } from "node:child_process";
+import { runCli } from "../scripts/triage-ci-alerts.mjs";
 
 const repoRoot = process.cwd();
 const triageScript = path.join(repoRoot, "scripts", "triage-ci-alerts.mjs");
+
+function makeSpawnAdapter(options = {}) {
+  return (command, args) => {
+    if (command === "git" && args.join(" ") === "config --get remote.origin.url") {
+      return { status: 0, stdout: "https://github.com/minislively/fooks.git\n", stderr: "" };
+    }
+
+    if (command === "gh") {
+      const pathHead = options.env?.PATH?.split(path.delimiter)[0] ?? "";
+      const logPath = pathHead ? path.join(path.dirname(pathHead), "gh-args.log") : "";
+      if (logPath && fs.existsSync(path.dirname(logPath))) {
+        fs.appendFileSync(logPath, `${JSON.stringify(args)}\n`);
+      }
+
+      if (args[0] === "run" && args[1] === "list") {
+        return {
+          status: 0,
+          stdout: JSON.stringify([{
+            databaseId: 26300000013,
+            workflowName: "Merge Gate",
+            name: "Merge Gate",
+            headBranch: "fooks-issue-1094-rerun-status",
+            event: "pull_request_target",
+            status: "completed",
+            conclusion: "success",
+            createdAt: "2026-05-27T10:00:00Z",
+            updatedAt: "2026-05-27T10:10:00Z",
+            url: "https://github.com/minislively/fooks/actions/runs/26300000013",
+          }]),
+          stderr: "",
+        };
+      }
+
+      if (args[0] === "api" && args[1].includes("actions/runs/26300000013/jobs?filter=all&per_page=100")) {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ jobs: [
+            {
+              id: 78006573443,
+              name: "Validate approval review and linked issue",
+              status: "completed",
+              conclusion: "failure",
+              completed_at: "2026-05-27T10:04:00Z",
+            },
+            {
+              id: 78007392165,
+              name: "Validate approval review and linked issue",
+              status: "completed",
+              conclusion: "success",
+              completed_at: "2026-05-27T10:08:00Z",
+            },
+          ] }),
+          stderr: "",
+        };
+      }
+    }
+
+    return { status: 1, stdout: "", stderr: `unexpected spawn ${command} ${JSON.stringify(args)}` };
+  };
+}
+
+function execFileSync(file, args, options = {}) {
+  if (file !== process.execPath || args[0] !== triageScript) {
+    return realExecFileSync(file, args, options);
+  }
+
+  const chunks = [];
+  runCli(args.slice(1), {
+    stdout: { write: (chunk) => chunks.push(String(chunk)) },
+    spawn: makeSpawnAdapter(options),
+  });
+  return chunks.join("");
+}
 
 test("CI alert triage marks cancelled and superseded historical runs as stale", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-triage-"));
@@ -774,7 +848,7 @@ test("CI alert triage collapses success-heavy clawhip bursts to current head plu
     assert.deepEqual(result.alertSummary.currentHeadRunIds, ["700"]);
     assert.equal(result.alertSummary.batchVerdict, "historical-ci-replay-batch");
     assert.equal(result.alertSummary.batchDisposition, "suppress-historical-replay-before-current-main-echo");
-    assert.match(result.alertSummary.batchReason, /current GitHub Actions state for main remains authoritative/);
+    assert.match(result.alertSummary.batchReason, /current GitHub Actions reporting state for main is the freshest alert-triage evidence/);
     assert.equal(result.alertSummary.actionableAlertCount, 0);
     assert.equal(result.alertSummary.verificationOnlyCount, 1);
     assert.equal(result.alertSummary.staleReplayCount, 20);
@@ -950,6 +1024,568 @@ test("CI alert triage dedupes duplicate current main success run and job URLs", 
     assert.equal(result.alertSummary.actionableAlertCount, 0);
     assert.equal(result.counts.actionable ?? 0, 0);
     assert.equal(result.counts.watch ?? 0, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+test("CI alert triage marks superseded pull_request_target Merge Gate job failures as stale rerun echoes", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-rerun-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000000,
+      attempt: 2,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      headSha: "feed1094",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000000",
+      jobs: [
+        {
+          id: 78006573431,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:04:00Z",
+          url: "https://github.com/minislively/fooks/actions/runs/26300000000/job/78006573431",
+        },
+        {
+          id: 78007392157,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+          url: "https://github.com/minislively/fooks/actions/runs/26300000000/job/78007392157",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "PR #1094 old Merge Gate failure job https://github.com/minislively/fooks/actions/runs/26300000000/job/78006573431",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const alert = result.alerts[0];
+
+    assert.equal(result.counts.informational, 1);
+    assert.equal(alert.alertedRunId, "26300000000");
+    assert.equal(alert.alertedJobId, 78006573431);
+    assert.equal(alert.currentJobId, 78007392157);
+    assert.equal(alert.ciLane, "pull_request_target:merge-gate");
+    assert.equal(alert.evidence, "stale");
+    assert.equal(alert.verdict, "superseded-successful-rerun-job-echo");
+    assert.equal(alert.supersededSuccessfulRerunJobEcho, true);
+    assert.equal(alert.replay, true);
+    assert.equal(alert.disposition, "suppress-replay");
+    assert.match(alert.reason, /pull_request_target:merge-gate job 78006573431 superseded by newer successful job 78007392157/);
+    assert.match(alert.claimBoundary, /not authorization or merge authority/);
+    assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 1);
+    assert.equal(result.alertSummary.currentHeadRunIds.includes("26300000000"), false);
+    assert.equal(result.alertSummary.actionableAlertCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage does not suppress unrelated successful Merge Gate jobs in the same run", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-unrelated-job-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000001,
+      attempt: 1,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      headSha: "feed1094",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000001",
+      jobs: [
+        {
+          id: 78006573432,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:04:00Z",
+          url: "https://github.com/minislively/fooks/actions/runs/26300000001/job/78006573432",
+        },
+        {
+          id: 78007392158,
+          name: "Report triage summary",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+          url: "https://github.com/minislively/fooks/actions/runs/26300000001/job/78007392158",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "PR #1094 unrelated Merge Gate job https://github.com/minislively/fooks/actions/runs/26300000001/job/78006573432",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const alert = result.alerts[0];
+
+    assert.equal(alert.evidence, "review");
+    assert.equal(alert.verdict, "merge-gate-job-not-superseded");
+    assert.equal(alert.disposition, "review");
+    assert.equal(alert.mergeGateJobNotSuperseded, true);
+    assert.equal(alert.supersededSuccessfulRerunJobEcho, false);
+    assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage reviews Merge Gate job URLs when job-list evidence is unavailable", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-no-jobs-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000002,
+      attempt: 1,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      headSha: "feed1094",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000002",
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "PR #1094 needs job evidence https://github.com/minislively/fooks/actions/runs/26300000002/job/78006573433",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const alert = result.alerts[0];
+
+    assert.equal(alert.evidence, "review");
+    assert.equal(alert.verdict, "merge-gate-job-evidence-unavailable");
+    assert.equal(alert.disposition, "review");
+    assert.equal(alert.mergeGateJobEvidenceMissing, true);
+    assert.equal(alert.supersededSuccessfulRerunJobEcho, false);
+    assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage requires newer timestamps before suppressing Merge Gate job echoes", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-not-newer-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000003,
+      attempt: 1,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      headSha: "feed1094",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000003",
+      jobs: [
+        {
+          id: 78006573434,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:08:00Z",
+        },
+        {
+          id: 78007392159,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "PR #1094 same timestamp https://github.com/minislively/fooks/actions/runs/26300000003/job/78006573434",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const alert = result.alerts[0];
+
+    assert.equal(alert.evidence, "review");
+    assert.equal(alert.verdict, "merge-gate-job-not-superseded");
+    assert.equal(alert.disposition, "review");
+    assert.equal(alert.supersededSuccessfulRerunJobEcho, false);
+    assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage keeps distinct Merge Gate job URLs from the same run separate", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-distinct-jobs-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000004,
+      attempt: 1,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      headSha: "feed1094",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:10:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000004",
+      jobs: [
+        {
+          id: 78006573435,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:04:00Z",
+        },
+        {
+          id: 78007392160,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+        },
+        {
+          id: 78006573436,
+          name: "Unrelated required check",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:09:00Z",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "superseded job https://github.com/minislively/fooks/actions/runs/26300000004/job/78006573435",
+    "unsuperseded job https://github.com/minislively/fooks/actions/runs/26300000004/job/78006573436",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.alerts.length, 2);
+    const byJobId = new Map(result.alerts.map((alert) => [alert.alertedJobId, alert]));
+    assert.equal(byJobId.get(78006573435).verdict, "superseded-successful-rerun-job-echo");
+    assert.equal(byJobId.get(78006573435).disposition, "suppress-replay");
+    assert.equal(byJobId.get(78006573436).verdict, "merge-gate-job-not-superseded");
+    assert.equal(byJobId.get(78006573436).disposition, "review");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+
+test("CI alert triage does not suppress same-name rerun jobs outside pull_request_target Merge Gate", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-non-authority-lanes-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  const lanes = [
+    { id: 26300000020, event: "pull_request", workflowName: "CI", name: "CI" },
+    { id: 26300000021, event: "push", workflowName: "CI", name: "CI" },
+    { id: 26300000022, event: "pull_request_target", workflowName: "Security Audit", name: "Security Audit" },
+    { id: 26300000023, event: "pull_request_review", workflowName: "Merge Gate", name: "Merge Gate" },
+  ];
+  const runs = lanes.map((lane, index) => ({
+    databaseId: lane.id,
+    workflowName: lane.workflowName,
+    name: lane.name,
+    headBranch: "fooks-issue-1094-rerun-status",
+    event: lane.event,
+    status: "completed",
+    conclusion: "success",
+    createdAt: `2026-05-27T10:0${index}:00Z`,
+    updatedAt: `2026-05-27T10:1${index}:00Z`,
+    jobs: [
+      {
+        id: 78006573600 + index,
+        name: "Validate approval review and linked issue",
+        status: "completed",
+        conclusion: "failure",
+        completedAt: `2026-05-27T10:0${index}:00Z`,
+      },
+      {
+        id: 78007392200 + index,
+        name: "Validate approval review and linked issue",
+        status: "completed",
+        conclusion: "success",
+        completedAt: `2026-05-27T10:1${index}:00Z`,
+      },
+    ],
+  }));
+  fs.writeFileSync(runsPath, JSON.stringify(runs));
+  fs.writeFileSync(alertsPath, lanes.map((lane, index) => (
+    `non-authority lane https://github.com/minislively/fooks/actions/runs/${lane.id}/job/${78006573600 + index}`
+  )).join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+
+    assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 0);
+    assert.equal(result.alerts.some((alert) => alert.verdict === "superseded-successful-rerun-job-echo"), false);
+    assert.equal(result.alerts.every((alert) => alert.supersededSuccessfulRerunJobEcho === false), true);
+    assert.equal(result.alerts.find((alert) => alert.alertedRunId === "26300000023").ciLane, "pull_request_review");
+    assert.notEqual(result.alerts.find((alert) => alert.alertedRunId === "26300000023").disposition, "suppress-replay");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage markdown renders the read-only claim boundary", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-markdown-boundary-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000024,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      jobs: [
+        {
+          id: 78006573610,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:04:00Z",
+        },
+        {
+          id: 78007392210,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, "rerun job https://github.com/minislively/fooks/actions/runs/26300000024/job/78006573610\n");
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--markdown",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    assert.match(stdout, /Claim boundary: read-only alert triage only/);
+    assert.match(stdout, /not authorization or merge authority/);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage live job enrichment asks GitHub for all job executions", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-live-jobs-"));
+  const binDir = path.join(tempDir, "bin");
+  const logPath = path.join(tempDir, "gh-args.log");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+  fs.mkdirSync(binDir);
+  fs.writeFileSync(path.join(binDir, "gh"), `#!/usr/bin/env node
+const fs = require("node:fs");
+const logPath = ${JSON.stringify(logPath)};
+fs.appendFileSync(logPath, JSON.stringify(process.argv.slice(2)) + "\\n");
+const args = process.argv.slice(2);
+if (args[0] === "run" && args[1] === "list") {
+  process.stdout.write(JSON.stringify([{
+    databaseId: 26300000013,
+    workflowName: "Merge Gate",
+    name: "Merge Gate",
+    headBranch: "fooks-issue-1094-rerun-status",
+    event: "pull_request_target",
+    status: "completed",
+    conclusion: "success",
+    createdAt: "2026-05-27T10:00:00Z",
+    updatedAt: "2026-05-27T10:10:00Z",
+    url: "https://github.com/minislively/fooks/actions/runs/26300000013"
+  }]));
+  process.exit(0);
+}
+if (args[0] === "api" && args[1].includes("actions/runs/26300000013/jobs?filter=all&per_page=100")) {
+  process.stdout.write(JSON.stringify({ jobs: [
+    {
+      id: 78006573443,
+      name: "Validate approval review and linked issue",
+      status: "completed",
+      conclusion: "failure",
+      completed_at: "2026-05-27T10:04:00Z"
+    },
+    {
+      id: 78007392165,
+      name: "Validate approval review and linked issue",
+      status: "completed",
+      conclusion: "success",
+      completed_at: "2026-05-27T10:08:00Z"
+    }
+  ] }));
+  process.exit(0);
+}
+process.stderr.write("unexpected gh args " + JSON.stringify(args));
+process.exit(1);
+`);
+  fs.chmodSync(path.join(binDir, "gh"), 0o755);
+  fs.writeFileSync(alertsPath, "live job https://github.com/minislively/fooks/actions/runs/26300000013/job/78006573443\n");
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const ghCalls = fs.readFileSync(logPath, "utf8");
+
+    assert.match(ghCalls, /jobs\?filter=all&per_page=100/);
+    assert.equal(result.alerts[0].verdict, "superseded-successful-rerun-job-echo");
+    assert.equal(result.alerts[0].currentJobId, 78007392165);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
