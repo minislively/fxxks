@@ -683,6 +683,7 @@ Everyday commands:
   ${displayCliName} inspect activation-mode <id> [--json]
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect react-web-label-preview <file> [--json]
+  ${displayCliName} inspect react-web-fact-graph <file> [--json]
   ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
   ${displayCliName} inspect-domain <file> [--json] [--domain-memory-receipt] [--context-decision]
   ${displayCliName} domain-memory verify --receipt <receipt.json> --file <file> --json
@@ -1764,6 +1765,17 @@ async function run(): Promise<void> {
         }
         return;
       }
+      if (arg1 === "react-web-fact-graph") {
+        const { filePath: file, json } = parseCompareArgs(rest.slice(1));
+        const { buildReactWebFactGraphInspection, renderReactWebFactGraphInspectionText } = await import("../core/react-web-fact-graph.js");
+        const inspection = buildReactWebFactGraphInspection(file, process.cwd());
+        if (json) {
+          print(inspection);
+        } else {
+          process.stdout.write(renderReactWebFactGraphInspectionText(inspection));
+        }
+        return;
+      }
       if (arg1 === "react-web-issues") {
         const { filePath: file, outputMode } = parseReactWebIssuesArgs(rest.slice(1));
         const {
@@ -1784,7 +1796,7 @@ async function run(): Promise<void> {
         }
         return;
       }
-      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', 'react-web-label-preview', or 'react-web-issues'");
+      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', 'react-web-label-preview', 'react-web-fact-graph', or 'react-web-issues'");
     }
     case "attach": {
       const runtime = arg1;

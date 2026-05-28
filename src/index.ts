@@ -399,3 +399,14 @@ export type {
   FactGraphSourceRef,
   FactNode,
 } from "./core/fact-graph";
+
+export {
+  REACT_WEB_FACT_GRAPH_ADVISORY_BOUNDARY,
+  REACT_WEB_FACT_GRAPH_COMMAND,
+  REACT_WEB_FACT_GRAPH_EXTRACTOR_ID,
+  REACT_WEB_FACT_GRAPH_EXTRACTOR_VERSION,
+  REACT_WEB_FACT_GRAPH_INSPECTION_SCHEMA_VERSION,
+  buildReactWebFactGraphInspection,
+  renderReactWebFactGraphInspectionText,
+} from "./core/react-web-fact-graph";
+export type { ReactWebFactGraphInspection } from "./core/react-web-fact-graph";
