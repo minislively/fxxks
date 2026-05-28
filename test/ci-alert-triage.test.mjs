@@ -238,21 +238,34 @@ test("CI alert triage turns pasted GitHub Actions URLs into evidence", () => {
     });
     const result = JSON.parse(stdout);
     const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
+    const run204 = result.alerts.find((alert) => alert.alertedRunId === "204" && alert.alertedJobId === null);
+    const job204 = result.alerts.find((alert) => alert.alertedRunId === "204" && alert.alertedJobId === 123456789);
 
-    assert.equal(result.alerts.length, 5);
+    assert.equal(result.alerts.length, 6);
     assert.equal(byAlertId.has("444555666"), false);
     assert.equal(byAlertId.get("205").alertedRunId, "205");
+    assert.equal(byAlertId.get("205").alertedJobId, 444555666);
     assert.equal(byAlertId.get("205").alertedUrl, "https://github.com/minislively/fooks/actions/runs/205/job/444555666");
-    assert.equal(byAlertId.get("205").evidence, "current");
+    assert.equal(byAlertId.get("205").evidence, "review");
+    assert.equal(byAlertId.get("205").verdict, "non-merge-gate-job-review");
+    assert.equal(byAlertId.get("205").disposition, "review");
     assert.equal(byAlertId.get("205").branch, "main");
-    assert.equal(byAlertId.get("204").alertedUrl, "https://github.com/minislively/fooks/actions/runs/204");
-    assert.equal(byAlertId.get("204").evidence, "stale");
-    assert.equal(byAlertId.get("204").currentRunId, 205);
-    assert.equal(byAlertId.get("204").reason, "superseded by run 205");
-    assert.equal(byAlertId.get("204").appearances, 2);
-    assert.equal(byAlertId.get("203").evidence, "actionable");
+    assert.equal(run204.alertedUrl, "https://github.com/minislively/fooks/actions/runs/204");
+    assert.equal(run204.evidence, "stale");
+    assert.equal(run204.currentRunId, 205);
+    assert.equal(run204.reason, "superseded by run 205");
+    assert.equal(run204.appearances, 1);
+    assert.equal(job204.alertedUrl, "https://github.com/minislively/fooks/actions/runs/204/job/123456789");
+    assert.equal(job204.evidence, "review");
+    assert.equal(job204.verdict, "non-merge-gate-job-review");
+    assert.equal(job204.disposition, "review");
+    assert.equal(byAlertId.get("203").evidence, "review");
+    assert.equal(byAlertId.get("203").verdict, "non-merge-gate-job-review");
+    assert.equal(byAlertId.get("203").disposition, "review");
     assert.equal(byAlertId.get("203").alertedUrl, "https://github.com/minislively/fooks/actions/runs/203/job/987654321");
-    assert.equal(byAlertId.get("202").evidence, "actionable");
+    assert.equal(byAlertId.get("202").evidence, "review");
+    assert.equal(byAlertId.get("202").verdict, "non-merge-gate-job-review");
+    assert.equal(byAlertId.get("202").disposition, "review");
     assert.equal(byAlertId.get("202").alertedRunId, "202");
     assert.equal(byAlertId.get("202").alertedUrl, "https://github.com/minislively/fooks/actions/runs/202/job/333444555");
     assert.equal(byAlertId.get("202").branch, "ci-alert-pr-job-url-regression");
@@ -317,20 +330,25 @@ test("CI alert triage keeps explicit rerun attempt evidence distinct", () => {
     });
     const result = JSON.parse(stdout);
     const attempt301 = result.alerts.find((alert) => alert.alertedRunId === "301" && alert.alertedAttempt === 1);
-    const current301 = result.alerts.find((alert) => alert.alertedRunId === "301" && alert.alertedAttempt === null);
+    const current301 = result.alerts.find((alert) => alert.alertedRunId === "301" && alert.alertedAttempt === null && alert.alertedJobId === null);
+    const current301Job = result.alerts.find((alert) => alert.alertedRunId === "301" && alert.alertedJobId === 777888999);
     const missingCurrentAttempt = result.alerts.find((alert) => alert.alertedRunId === "302" && alert.alertedAttempt === 1);
 
-    assert.equal(result.alerts.length, 3);
+    assert.equal(result.alerts.length, 4);
     assert.equal(attempt301.alertedUrl, "https://github.com/minislively/fooks/actions/runs/301/attempts/1");
     assert.equal(attempt301.currentAttempt, 2);
     assert.equal(attempt301.evidence, "stale");
     assert.equal(attempt301.reason, "superseded by attempt 2");
 
     assert.equal(current301.alertedUrl, "https://github.com/minislively/fooks/actions/runs/301");
-    assert.equal(current301.appearances, 2);
+    assert.equal(current301.appearances, 1);
     assert.equal(current301.currentAttempt, 2);
     assert.equal(current301.evidence, "current");
     assert.equal(current301.reason, "verification-only current main success echo");
+    assert.equal(current301Job.alertedUrl, "https://github.com/minislively/fooks/actions/runs/301/job/777888999");
+    assert.equal(current301Job.evidence, "review");
+    assert.equal(current301Job.verdict, "non-merge-gate-job-review");
+    assert.equal(current301Job.disposition, "review");
 
     assert.equal(missingCurrentAttempt.alertedUrl, "https://github.com/minislively/fooks/actions/runs/302/attempts/1");
     assert.equal(missingCurrentAttempt.currentAttempt, null);
@@ -408,6 +426,7 @@ test("CI alert triage separates stale attempt replay from current main success e
     assert.equal(result.alertSummary.currentHeadCount, 1);
     assert.deepEqual(result.alertSummary.currentHeadRunIds, ["960"]);
     assert.equal(result.alertSummary.currentMainEchoCount, 1);
+    assert.equal(result.alertSummary.reviewAlertCount ?? 0, 0);
     assert.equal(result.alertSummary.verificationOnlyCount, 1);
     assert.equal(result.alertSummary.staleReplayCount, 1);
     assert.equal(result.alertSummary.staleSuccessReplayCount, 1);
@@ -878,7 +897,7 @@ test("CI alert triage collapses success-heavy clawhip bursts to current head plu
   }
 });
 
-test("CI alert triage classifies pasted current main CI success as verification-only echo", () => {
+test("CI alert triage keeps pasted current main CI job URLs reviewable", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-main-pass-echo-"));
   const runsPath = path.join(tempDir, "runs.json");
   const alertsPath = path.join(tempDir, "alerts.txt");
@@ -933,24 +952,25 @@ test("CI alert triage classifies pasted current main CI success as verification-
     const result = JSON.parse(stdout);
     const byAlertId = new Map(result.alerts.map((alert) => [alert.alertedRunId, alert]));
 
-    assert.equal(byAlertId.get("850").evidence, "current");
-    assert.equal(byAlertId.get("850").verdict, "current-main-echo");
-    assert.equal(byAlertId.get("850").echo, true);
-    assert.equal(byAlertId.get("850").disposition, "verification-only");
-    assert.equal(byAlertId.get("850").reason, "verification-only current main success echo");
+    assert.equal(byAlertId.get("850").evidence, "review");
+    assert.equal(byAlertId.get("850").verdict, "non-merge-gate-job-review");
+    assert.equal(byAlertId.get("850").echo, false);
+    assert.equal(byAlertId.get("850").disposition, "review");
+    assert.match(byAlertId.get("850").reason, /outside pull_request_target Merge Gate/);
     assert.equal(byAlertId.get("850").currentRunId, 850);
     assert.equal(byAlertId.get("849").evidence, "stale");
     assert.equal(byAlertId.get("849").replay, true);
     assert.equal(byAlertId.get("849").disposition, "suppress-replay");
-    assert.equal(result.alertSummary.currentHeadRunIds.includes("850"), true);
-    assert.equal(result.alertSummary.currentMainEchoCount, 1);
+    assert.equal(result.alertSummary.currentHeadRunIds.includes("850"), false);
+    assert.equal(result.alertSummary.currentMainEchoCount, 0);
+    assert.equal(result.alertSummary.reviewAlertCount, 1);
     assert.equal(result.alertSummary.staleReplayCount, 1);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
-test("CI alert triage dedupes duplicate current main success run and job URLs", () => {
+test("CI alert triage keeps current main success job URL reviewable beside run URL", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-current-success-dedupe-"));
   const runsPath = path.join(tempDir, "runs.json");
   const alertsPath = path.join(tempDir, "alerts.txt");
@@ -1006,19 +1026,26 @@ test("CI alert triage dedupes duplicate current main success run and job URLs", 
     const currentEchoes = result.alerts.filter((alert) => alert.alertedRunId === "902");
     const staleReplay = result.alerts.find((alert) => alert.alertedRunId === "901");
 
-    assert.equal(currentEchoes.length, 1);
-    assert.equal(currentEchoes[0].appearances, 2);
-    assert.equal(currentEchoes[0].alertedUrl, "https://github.com/minislively/fooks/actions/runs/902");
-    assert.equal(currentEchoes[0].evidence, "current");
-    assert.equal(currentEchoes[0].verdict, "current-main-echo");
-    assert.equal(currentEchoes[0].disposition, "verification-only");
+    const currentRunEcho = currentEchoes.find((alert) => alert.alertedJobId === null);
+    const currentJobReview = currentEchoes.find((alert) => alert.alertedJobId === 123456789);
+
+    assert.equal(currentEchoes.length, 2);
+    assert.equal(currentRunEcho.appearances, 1);
+    assert.equal(currentRunEcho.alertedUrl, "https://github.com/minislively/fooks/actions/runs/902");
+    assert.equal(currentRunEcho.evidence, "current");
+    assert.equal(currentRunEcho.verdict, "current-main-echo");
+    assert.equal(currentRunEcho.disposition, "verification-only");
+    assert.equal(currentJobReview.evidence, "review");
+    assert.equal(currentJobReview.verdict, "non-merge-gate-job-review");
+    assert.equal(currentJobReview.disposition, "review");
 
     assert.equal(staleReplay.evidence, "stale");
     assert.equal(staleReplay.replay, true);
     assert.equal(staleReplay.conclusion, "success");
-    assert.equal(result.alertSummary.total, 2);
+    assert.equal(result.alertSummary.total, 3);
     assert.equal(result.alertSummary.currentMainEchoCount, 1);
     assert.equal(result.alertSummary.verificationOnlyCount, 1);
+    assert.equal(result.alertSummary.reviewAlertCount, 1);
     assert.equal(result.alertSummary.staleReplayCount, 1);
     assert.equal(result.alertSummary.staleSuccessReplayCount, 1);
     assert.equal(result.alertSummary.actionableAlertCount, 0);

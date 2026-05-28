@@ -431,9 +431,7 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
     const nonMergeGateJobReview = !isStaleAttempt
       && ref.alertedJobId !== null
       && row
-      && row.ciLane !== "pull_request_target:merge-gate"
-      && Array.isArray(row.jobs)
-      && row.jobs.length > 0;
+      && row.ciLane !== "pull_request_target:merge-gate";
     const requiresMergeGateJobReview = mergeGateJobEvidenceMissing || mergeGateJobNotSuperseded || nonMergeGateJobReview;
     const replay = isHistoricalReplayEvidence(row, isStaleAttempt, focusBranch) || supersededSuccessfulRerunJobEcho;
     const echo = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && !requiresMergeGateJobReview && isCurrentMainSuccessEcho(row, focusBranch);
