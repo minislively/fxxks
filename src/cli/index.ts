@@ -684,6 +684,7 @@ Everyday commands:
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect react-web-label-preview <file> [--json]
   ${displayCliName} inspect react-web-fact-graph <file> [--json]
+  ${displayCliName} inspect react-web-fact-graph-consumer <file> [--json] [--max-anchors <n>]
   ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
   ${displayCliName} inspect-domain <file> [--json] [--domain-memory-receipt] [--context-decision]
   ${displayCliName} domain-memory verify --receipt <receipt.json> --file <file> --json
@@ -807,6 +808,39 @@ function parseCompareArgs(args: string[]): { filePath: string; json: boolean } {
   }
 
   return { filePath: requireFilePath(filePath), json };
+}
+
+
+function parseReactWebFactGraphConsumerArgs(args: string[]): { filePath: string; json: boolean; maxAnchors?: number } {
+  let filePath: string | undefined;
+  let json = false;
+  let maxAnchors: number | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--max-anchors") {
+      const value = args[index + 1];
+      if (!value) throw new Error("inspect react-web-fact-graph-consumer requires a value after --max-anchors");
+      maxAnchors = Number(value);
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--max-anchors=")) {
+      maxAnchors = Number(arg.slice("--max-anchors=".length));
+      continue;
+    }
+    if (!filePath) {
+      filePath = arg;
+      continue;
+    }
+    throw new Error(`Unexpected react-web-fact-graph-consumer argument: ${arg}`);
+  }
+
+  return { filePath: requireFilePath(filePath), json, ...(maxAnchors !== undefined ? { maxAnchors } : {}) };
 }
 
 function parseInspectDomainArgs(args: string[]): { filePath: string; json: boolean; domainMemoryReceipt: boolean; contextDecision: boolean } {
@@ -1776,6 +1810,20 @@ async function run(): Promise<void> {
         }
         return;
       }
+      if (arg1 === "react-web-fact-graph-consumer") {
+        const { filePath: file, json, maxAnchors } = parseReactWebFactGraphConsumerArgs(rest.slice(1));
+        const {
+          buildReactWebFactGraphConsumerDryRun,
+          renderReactWebFactGraphConsumerDryRunText,
+        } = await import("../core/react-web-fact-graph-consumer.js");
+        const dryRun = buildReactWebFactGraphConsumerDryRun(file, process.cwd(), { maxAnchors });
+        if (json) {
+          print(dryRun);
+        } else {
+          process.stdout.write(renderReactWebFactGraphConsumerDryRunText(dryRun));
+        }
+        return;
+      }
       if (arg1 === "react-web-issues") {
         const { filePath: file, outputMode } = parseReactWebIssuesArgs(rest.slice(1));
         const {
@@ -1796,7 +1844,7 @@ async function run(): Promise<void> {
         }
         return;
       }
-      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', 'react-web-label-preview', 'react-web-fact-graph', or 'react-web-issues'");
+      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', 'react-web-label-preview', 'react-web-fact-graph', 'react-web-fact-graph-consumer', or 'react-web-issues'");
     }
     case "attach": {
       const runtime = arg1;
