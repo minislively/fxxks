@@ -2,7 +2,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_LIMIT = 100;
@@ -12,8 +12,10 @@ const OMITTED_ALERT_RUN_EVIDENCE_LIMIT = 12;
 const STALE_CONCLUSIONS = new Set(["cancelled", "skipped"]);
 const ACTIONABLE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure"]);
 const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
+const SUPERSEDABLE_MERGE_GATE_JOB_CONCLUSIONS = new Set([...ACTIONABLE_CONCLUSIONS, "cancelled"]);
 const TMUX_BLOCKER_PATTERN = /\b(TS\d{4}|error|errors|failed|failure|exception)\b/i;
 const TMUX_NON_BLOCKER_PATTERN = /\b(?:0|zero|no)\s+errors?\b/i;
+const CLAIM_BOUNDARY = "read-only alert triage only; PR CI, push CI, and pull_request_target/pull_request_review Merge Gate evidence are reporting lanes, not authorization or merge authority";
 const TMUX_RECOVERY_PATTERNS = [
   /\bnpm\s+(?:run\s+)?test\b.*\bpass(?:ed|ing)?\b/i,
   /\btests?\s+pass(?:ed|ing)?\b/i,
@@ -77,7 +79,7 @@ Bulk replay behavior:
   stale sample, then summarizes omitted historical success/cancelled replay rows.`);
 }
 
-function readRuns(options) {
+function readRuns(options, spawn = spawnSync) {
   if (options.input) {
     return JSON.parse(fs.readFileSync(path.resolve(repoRoot, options.input), "utf8"));
   }
@@ -93,7 +95,7 @@ function readRuns(options) {
   if (options.branch) args.push("--branch", options.branch);
   if (options.workflow) args.push("--workflow", options.workflow);
 
-  const result = spawnSync("gh", args, {
+  const result = spawn("gh", args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -103,6 +105,58 @@ function readRuns(options) {
     throw new Error(result.stderr || `gh run list exited with status ${result.status}`);
   }
   return JSON.parse(result.stdout);
+}
+
+function repoSlugFromOrigin(spawn = spawnSync) {
+  const result = spawn("git", ["config", "--get", "remote.origin.url"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  const remoteUrl = result.stdout.trim();
+  const match = remoteUrl.match(/github\.com[:/](?<owner>[^/]+)\/(?<repo>[^/.]+)(?:\.git)?$/);
+  return match?.groups ? `${match.groups.owner}/${match.groups.repo}` : "";
+}
+
+function fetchRunJobs(repoSlug, runId, spawn = spawnSync) {
+  const result = spawn("gh", [
+    "api",
+    `repos/${repoSlug}/actions/runs/${runId}/jobs?filter=all&per_page=100`,
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error || result.status !== 0) return [];
+  try {
+    const payload = JSON.parse(result.stdout);
+    return Array.isArray(payload.jobs) ? payload.jobs : [];
+  } catch {
+    return [];
+  }
+}
+
+function isMergeGateRun(run) {
+  return String(run.event || "") === "pull_request_target"
+    && String(run.workflowName || run.name || "") === "Merge Gate";
+}
+
+function enrichRunsWithAlertJobs(rawRuns, alertRefs, options, spawn = spawnSync) {
+  if (options.input || alertRefs.every((ref) => ref.alertedJobId === null)) return rawRuns;
+  const repoSlug = repoSlugFromOrigin(spawn);
+  if (!repoSlug) return rawRuns;
+
+  const alertedJobRunIds = new Set(alertRefs
+    .filter((ref) => ref.alertedJobId !== null)
+    .map((ref) => String(ref.id)));
+
+  return rawRuns.map((run) => {
+    const runId = run.databaseId ?? run.id ?? null;
+    if (!alertedJobRunIds.has(String(runId)) || !isMergeGateRun(run)) return run;
+    if (Array.isArray(run.jobs) || Array.isArray(run.checkRuns)) return run;
+    const jobs = fetchRunJobs(repoSlug, runId, spawn);
+    return jobs.length > 0 ? { ...run, jobs } : run;
+  });
 }
 
 function readAlertText(alertsInput) {
@@ -181,14 +235,19 @@ function extractAlertRunRefs(alertText) {
   for (const match of alertText.matchAll(urlPattern)) {
     const id = match[1];
     const alertedAttempt = match[2] === "attempts" ? normalizePositiveInteger(match[3]) : null;
-    const key = alertedAttempt === null ? id : `${id}:attempt:${alertedAttempt}`;
+    const alertedJobId = (match[2] === "job" || match[2] === "jobs") ? normalizePositiveInteger(match[3]) : null;
+    const key = alertedJobId !== null
+      ? `${id}:job:${alertedJobId}`
+      : alertedAttempt === null ? id : `${id}:attempt:${alertedAttempt}`;
     const existing = refsByKey.get(key);
     if (existing) {
       existing.appearances += 1;
+      if (existing.alertedJobId === null && alertedJobId !== null) existing.alertedJobId = alertedJobId;
     } else {
       refsByKey.set(key, {
         id,
         alertedAttempt,
+        alertedJobId,
         url: match[0].replace(/[.,;:!?]+$/, ""),
         appearances: 1,
       });
@@ -198,7 +257,34 @@ function extractAlertRunRefs(alertText) {
   return [...refsByKey.values()];
 }
 
+function normalizeRunJobs(run) {
+  const jobs = Array.isArray(run.jobs) ? run.jobs : Array.isArray(run.checkRuns) ? run.checkRuns : [];
+  return jobs
+    .map((job) => ({
+      id: normalizePositiveInteger(job?.databaseId ?? job?.id ?? job?.jobId ?? job?.checkRunId),
+      name: job?.name ?? job?.checkName ?? "",
+      status: job?.status ?? "",
+      conclusion: job?.conclusion ?? "",
+      completedAt: job?.completedAt ?? job?.completed_at ?? job?.updatedAt ?? job?.updated_at ?? "",
+      url: job?.url ?? job?.htmlUrl ?? job?.html_url ?? "",
+    }))
+    .filter((job) => job.id !== null)
+    .sort((left, right) => (Date.parse(right.completedAt || "") || 0) - (Date.parse(left.completedAt || "") || 0) || Number(right.id) - Number(left.id));
+}
+
+function ciLaneForRun(run) {
+  const event = String(run.event || "");
+  const workflow = String(run.workflowName || run.name || "");
+  if (event === "pull_request_target" && workflow === "Merge Gate") return "pull_request_target:merge-gate";
+  if (event === "pull_request_target") return "pull_request_target";
+  if (event === "pull_request") return "pull_request";
+  if (event === "push") return "push";
+  return event || "unknown-event";
+}
+
 function normalizeRun(run) {
+  const jobs = normalizeRunJobs(run);
+  const latestJob = jobs[0] ?? null;
   return {
     id: run.databaseId ?? run.id ?? null,
     workflow: run.workflowName || run.name || "unknown-workflow",
@@ -209,6 +295,12 @@ function normalizeRun(run) {
     status: run.status || "unknown-status",
     conclusion: run.conclusion || "",
     attempt: normalizePositiveInteger(run.attempt),
+    latestJobId: normalizePositiveInteger(run.latestJobId ?? run.currentJobId ?? run.jobId ?? latestJob?.id),
+    latestJobName: run.latestJobName ?? run.currentJobName ?? latestJob?.name ?? "",
+    latestJobConclusion: run.latestJobConclusion ?? run.currentJobConclusion ?? latestJob?.conclusion ?? "",
+    latestJobUrl: run.latestJobUrl ?? run.currentJobUrl ?? latestJob?.url ?? "",
+    jobs,
+    ciLane: ciLaneForRun(run),
     createdAt: run.createdAt || "",
     updatedAt: run.updatedAt || run.createdAt || "",
     url: run.url || "",
@@ -272,6 +364,50 @@ function isCurrentMainSuccessEcho(row, focusBranch) {
     && String(row.latestRunId) === String(row.id);
 }
 
+function supersedingSuccessfulRerunJob(row, alertedJobId) {
+  if (!row
+    || alertedJobId === null
+    || row.ciLane !== "pull_request_target:merge-gate"
+    || row.status !== "completed") {
+    return null;
+  }
+
+  const alertedJob = Array.isArray(row.jobs)
+    ? row.jobs.find((job) => String(job.id) === String(alertedJobId))
+    : null;
+  if (alertedJob) {
+    if (!SUPERSEDABLE_MERGE_GATE_JOB_CONCLUSIONS.has(alertedJob.conclusion)) return null;
+    const alertedTime = Date.parse(alertedJob.completedAt || "");
+    if (!Number.isFinite(alertedTime)) return null;
+    return row.jobs.find((job) => {
+      const completedAt = Date.parse(job.completedAt || "");
+      const completedLater = Number.isFinite(completedAt) && completedAt > alertedTime;
+      return String(job.id) !== String(alertedJobId)
+        && job.name === alertedJob.name
+        && job.status === "completed"
+        && job.conclusion === "success"
+        && completedLater;
+    }) ?? null;
+  }
+
+  return null;
+}
+
+function needsMergeGateJobEvidence(row, alertedJobId) {
+  return row
+    && alertedJobId !== null
+    && row.ciLane === "pull_request_target:merge-gate"
+    && (!Array.isArray(row.jobs) || row.jobs.length === 0);
+}
+
+function hasMergeGateJobEvidence(row, alertedJobId) {
+  return row
+    && alertedJobId !== null
+    && row.ciLane === "pull_request_target:merge-gate"
+    && Array.isArray(row.jobs)
+    && row.jobs.length > 0;
+}
+
 function alertDisposition(evidence, replay, echo = false, review = false) {
   if (evidence === "actionable" || evidence === "watch") return "inspect";
   if (review) return "review";
@@ -288,40 +424,72 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
     const row = rowsById.get(ref.id);
     const currentAttempt = row?.attempt ?? null;
     const isStaleAttempt = ref.alertedAttempt !== null && currentAttempt !== null && ref.alertedAttempt < currentAttempt;
-    const replay = isHistoricalReplayEvidence(row, isStaleAttempt, focusBranch);
-    const echo = !isStaleAttempt && isCurrentMainSuccessEcho(row, focusBranch);
-    const supersededMainCancellationEcho = !isStaleAttempt && isSupersededMainCancellationEcho(row, focusBranch);
+    const supersedingJob = !isStaleAttempt ? supersedingSuccessfulRerunJob(row, ref.alertedJobId) : null;
+    const supersededSuccessfulRerunJobEcho = supersedingJob !== null;
+    const mergeGateJobEvidenceMissing = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && needsMergeGateJobEvidence(row, ref.alertedJobId);
+    const mergeGateJobNotSuperseded = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && hasMergeGateJobEvidence(row, ref.alertedJobId);
+    const nonMergeGateJobReview = !isStaleAttempt
+      && ref.alertedJobId !== null
+      && row
+      && row.ciLane !== "pull_request_target:merge-gate";
+    const requiresMergeGateJobReview = mergeGateJobEvidenceMissing || mergeGateJobNotSuperseded || nonMergeGateJobReview;
+    const replay = isHistoricalReplayEvidence(row, isStaleAttempt, focusBranch) || supersededSuccessfulRerunJobEcho;
+    const echo = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && !requiresMergeGateJobReview && isCurrentMainSuccessEcho(row, focusBranch);
+    const supersededMainCancellationEcho = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && isSupersededMainCancellationEcho(row, focusBranch);
     const cancellationNeedsSuccessEvidence = !isStaleAttempt && needsMainCancellationSuccessEvidence(row, focusBranch);
-    const evidence = isStaleAttempt ? "stale" : alertEvidenceState(row);
+    const evidence = requiresMergeGateJobReview ? "review" : (isStaleAttempt || supersededSuccessfulRerunJobEcho) ? "stale" : alertEvidenceState(row);
     const verdict = echo
       ? "current-main-echo"
-      : supersededMainCancellationEcho
-        ? "superseded-main-ci-cancel-echo"
-        : evidence;
+      : supersededSuccessfulRerunJobEcho
+        ? "superseded-successful-rerun-job-echo"
+        : mergeGateJobEvidenceMissing
+          ? "merge-gate-job-evidence-unavailable"
+          : mergeGateJobNotSuperseded
+            ? "merge-gate-job-not-superseded"
+            : nonMergeGateJobReview
+              ? "non-merge-gate-job-review"
+              : supersededMainCancellationEcho
+              ? "superseded-main-ci-cancel-echo"
+              : evidence;
     const reason = isStaleAttempt
       ? `superseded by attempt ${currentAttempt}`
-      : echo
-        ? `verification-only current ${focusBranch} success echo`
-        : supersededMainCancellationEcho
-          ? `cancelled ${focusBranch} run superseded by successful run ${row.latestRunId}`
-          : cancellationNeedsSuccessEvidence
-            ? `cancelled ${focusBranch} run has no later success evidence`
-            : row?.reason ?? "run URL was not present in the inspected gh run list window";
+      : supersededSuccessfulRerunJobEcho
+        ? `${row.ciLane} job ${ref.alertedJobId} superseded by newer successful job ${supersedingJob.id} in run ${row.id}`
+        : mergeGateJobEvidenceMissing
+          ? `${row.ciLane} job ${ref.alertedJobId} needs job-list evidence before suppressing as a rerun echo`
+          : mergeGateJobNotSuperseded
+            ? `${row.ciLane} job ${ref.alertedJobId} has no newer successful same-name job evidence`
+            : nonMergeGateJobReview
+              ? `${row.ciLane} job ${ref.alertedJobId} is outside pull_request_target Merge Gate rerun suppression scope`
+              : echo
+              ? `verification-only current ${focusBranch} success echo`
+              : supersededMainCancellationEcho
+                ? `cancelled ${focusBranch} run superseded by successful run ${row.latestRunId}`
+                : cancellationNeedsSuccessEvidence
+                  ? `cancelled ${focusBranch} run has no later success evidence`
+                  : row?.reason ?? "run URL was not present in the inspected gh run list window";
     return {
       alertedRunId: ref.id,
       alertedAttempt: ref.alertedAttempt,
+      alertedJobId: ref.alertedJobId,
       alertedUrl: ref.url,
       appearances: ref.appearances,
       evidence,
       verdict,
       echo,
       supersededMainCancellationEcho,
+      supersededSuccessfulRerunJobEcho,
+      mergeGateJobEvidenceMissing,
+      mergeGateJobNotSuperseded,
+      nonMergeGateJobReview,
       replay,
-      disposition: alertDisposition(evidence, replay, echo, cancellationNeedsSuccessEvidence),
+      disposition: alertDisposition(evidence, replay, echo, cancellationNeedsSuccessEvidence || requiresMergeGateJobReview),
       reason,
       replayReason: replay ? `historical replay of ${reason}` : "",
       currentRunId: row?.latestRunId ?? null,
       currentAttempt,
+      currentJobId: supersedingJob?.id ?? row?.latestJobId ?? null,
+      ciLane: row?.ciLane ?? "",
       workflow: row?.workflow ?? "",
       branch: row?.branch ?? "",
       status: row?.status ?? "",
@@ -332,12 +500,14 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
       latestConclusion: row?.latestConclusion ?? "",
       latestHeadSha: row?.latestHeadSha ?? "",
       latestUpdatedAt: row?.latestUpdatedAt ?? "",
+      claimBoundary: CLAIM_BOUNDARY,
       runUrl: ref.url,
     };
   });
 }
 
 function shouldKeepCompactAlert(alert, focusBranch) {
+  if (alert.disposition === "review") return true;
   if (alert.evidence === "actionable" || alert.evidence === "watch" || alert.evidence === "missing") return true;
   if (alert.evidence === "current" && alert.branch === focusBranch) return true;
   if (alert.evidence === "stale" && alert.conclusion && !["success", "cancelled", "skipped"].includes(alert.conclusion)) return true;
@@ -363,6 +533,7 @@ function summarizeOmittedAlerts(omitted) {
         disposition: alert.disposition || "review",
         replay: Boolean(alert.replay),
         supersededMainCancellationEcho: Boolean(alert.supersededMainCancellationEcho),
+        supersededSuccessfulRerunJobEcho: Boolean(alert.supersededSuccessfulRerunJobEcho),
       });
     }
   }
@@ -375,7 +546,26 @@ function summarizeOmittedAlerts(omitted) {
 }
 
 function alertKey(alert) {
-  return `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`;
+  return `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}:${alert.alertedJobId ?? "run"}`;
+}
+
+function coalesceGenericRunJobAlerts(allEvidence) {
+  const byRunAttempt = new Map();
+  for (const alert of allEvidence) {
+    const key = `${alert.alertedRunId}:${alert.alertedAttempt ?? "current"}`;
+    const alerts = byRunAttempt.get(key) ?? [];
+    alerts.push(alert);
+    byRunAttempt.set(key, alerts);
+  }
+
+  return [...byRunAttempt.values()].flatMap((alerts) => {
+    const hasReviewableJobAlert = alerts.some((alert) => alert.alertedJobId !== null && alert.disposition === "review");
+    if (hasReviewableJobAlert) return alerts;
+    const runAlert = alerts.find((alert) => alert.alertedJobId === null);
+    if (!runAlert) return alerts;
+    const appearances = alerts.reduce((total, alert) => total + alert.appearances, 0);
+    return [{ ...runAlert, appearances }];
+  });
 }
 
 function alertSummaryFields(allEvidence, focusBranch) {
@@ -392,8 +582,10 @@ function alertSummaryFields(allEvidence, focusBranch) {
     currentHeadRunIds,
     currentMainEchoCount: allEvidence.filter((alert) => alert.echo).length,
     supersededMainCancellationEchoCount: allEvidence.filter((alert) => alert.supersededMainCancellationEcho).length,
+    supersededSuccessfulRerunJobEchoCount: allEvidence.filter((alert) => alert.supersededSuccessfulRerunJobEcho).length,
     verificationOnlyCount: allEvidence.filter((alert) => alert.disposition === "verification-only").length,
     actionableAlertCount: allEvidence.filter((alert) => alert.disposition === "inspect").length,
+    reviewAlertCount: allEvidence.filter((alert) => alert.disposition === "review").length,
     staleReplayCount: allEvidence.filter((alert) => alert.replay).length,
     staleSuccessReplayCount: allEvidence.filter((alert) => alert.replay && alert.conclusion === "success").length,
   };
@@ -414,7 +606,7 @@ function historicalReplayBatchGuard(allEvidence, focusBranch, summaryFields) {
     return {
       batchVerdict: "historical-ci-replay-batch",
       batchDisposition: "suppress-historical-replay-before-current-main-echo",
-      batchReason: `current GitHub Actions state for ${focusBranch} remains authoritative; all non-current pasted run URLs are stale replay noise before ${summaryFields.currentHeadCount} current-head echo${summaryFields.currentHeadCount === 1 ? "" : "es"}`,
+      batchReason: `current GitHub Actions reporting state for ${focusBranch} is the freshest alert-triage evidence; all non-current pasted run URLs are stale replay noise before ${summaryFields.currentHeadCount} current-head echo${summaryFields.currentHeadCount === 1 ? "" : "es"}`,
     };
   }
 
@@ -429,7 +621,7 @@ function historicalReplayBatchGuard(allEvidence, focusBranch, summaryFields) {
 
 function buildAlertEvidence(alertRefs, rows, options = {}) {
   const focusBranch = options.branch || "main";
-  const allEvidence = buildRawAlertEvidence(alertRefs, rows, { branch: focusBranch });
+  const allEvidence = coalesceGenericRunJobAlerts(buildRawAlertEvidence(alertRefs, rows, { branch: focusBranch }));
   const limit = options.alertEvidenceLimit || DEFAULT_ALERT_EVIDENCE_LIMIT;
   const summaryFields = alertSummaryFields(allEvidence, focusBranch);
   const batchGuard = historicalReplayBatchGuard(allEvidence, focusBranch, summaryFields);
@@ -543,6 +735,7 @@ function classifyRuns(rawRuns) {
       latestConclusion: latest?.conclusion ?? "",
       latestHeadSha: latest?.headSha ?? "",
       latestUpdatedAt: latest?.updatedAt ?? latest?.createdAt ?? "",
+      latestJobId: latest?.latestJobId ?? null,
     };
   });
 
@@ -601,6 +794,8 @@ function alertEvidenceTable(alerts, summary) {
   const lines = [
     "## Pasted alert URL evidence",
     "",
+    `Claim boundary: ${escapeMarkdown(CLAIM_BOUNDARY)}.`,
+    "",
     compactNote,
     "",
     "| Evidence | Verdict | Disposition | Replay | Alerted run | Alerted attempt | Current run | Current attempt | Workflow | Branch | Status | Conclusion | Reason | Seen |",
@@ -658,9 +853,11 @@ Use this report to collapse replayed GitHub Actions alert buffers: inspect only 
 - Pasted alert URLs inspected: ${result.alertSummary?.total ?? result.alerts?.length ?? 0}
 - Pasted alert evidence shown: ${result.alertSummary?.shown ?? result.alerts?.length ?? 0}
 - Pasted alert evidence omitted: ${result.alertSummary?.omitted ?? 0}
-- Pasted alert evidence needing inspection: ${result.alertSummary?.actionableAlertCount ?? 0}
+- Pasted alert evidence needing inspection: ${(result.alertSummary?.actionableAlertCount ?? 0) + (result.alertSummary?.reviewAlertCount ?? 0)}
+- Pasted alert evidence requiring review: ${result.alertSummary?.reviewAlertCount ?? 0}
 - Verification-only current-main echoes: ${result.alertSummary?.verificationOnlyCount ?? 0}
 - Superseded main cancellation echoes: ${result.alertSummary?.supersededMainCancellationEchoCount ?? 0}
+- Superseded successful rerun job echoes: ${result.alertSummary?.supersededSuccessfulRerunJobEchoCount ?? 0}
 - Stale success replay evidence: ${result.alertSummary?.staleSuccessReplayCount ?? 0}
 - Tmux pane history fresh blockers: ${result.tmuxHistorySummary?.currentKeywordLines ?? 0}
 - Tmux pane history stale replay lines: ${result.tmuxHistorySummary?.staleKeywordLines ?? 0}
@@ -673,13 +870,16 @@ ${markdownTable(actionable)}
 ${markdownTable(stale)}`;
 }
 
-function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const rawRuns = readRuns(options);
-  if (!Array.isArray(rawRuns)) throw new Error("Expected an array of GitHub Actions runs");
+function runCli(argv = process.argv.slice(2), io = {}) {
+  const options = parseArgs(argv);
   const alertText = readAlertText(options.alertsInput);
-  const result = classifyRuns(rawRuns);
   const alertRefs = extractAlertRunRefs(alertText);
+  const spawn = io.spawn ?? spawnSync;
+  const baseRuns = readRuns(options, spawn);
+  if (!Array.isArray(baseRuns)) throw new Error("Expected an array of GitHub Actions runs");
+  const rawRuns = enrichRunsWithAlertJobs(baseRuns, alertRefs, options, spawn);
+  if (!Array.isArray(rawRuns)) throw new Error("Expected an array of GitHub Actions runs");
+  const result = classifyRuns(rawRuns);
   const alertEvidence = buildAlertEvidence(alertRefs, result.rows, options);
   const tmuxHistoryEvidence = buildTmuxHistoryEvidence(alertText);
   result.alerts = alertEvidence.alerts;
@@ -689,12 +889,23 @@ function main() {
   const output = options.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : renderMarkdown(result);
 
   if (options.output) fs.writeFileSync(path.resolve(repoRoot, options.output), output);
-  else process.stdout.write(output);
+  else (io.stdout ?? process.stdout).write(output);
+  return { result, output };
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+function main() {
+  runCli();
 }
+
+const isDirectCli = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectCli) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+export { runCli };
