@@ -1534,6 +1534,79 @@ test("CI alert triage does not suppress same-name rerun jobs outside pull_reques
   }
 });
 
+
+test("CI alert triage keeps non-authority job review evidence when matching run URL is also pasted", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-non-authority-run-job-mixed-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000030,
+      workflowName: "CI",
+      name: "CI",
+      headBranch: "fooks-issue-1094-rerun-status",
+      event: "pull_request",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000030",
+      jobs: [
+        {
+          id: 78006573700,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "failure",
+          completedAt: "2026-05-27T10:04:00Z",
+        },
+        {
+          id: 78007392300,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "run URL https://github.com/minislively/fooks/actions/runs/26300000030",
+    "job URL https://github.com/minislively/fooks/actions/runs/26300000030/job/78006573700",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const jobAlert = result.alerts.find((alert) => alert.alertedJobId === 78006573700);
+    const runAlert = result.alerts.find((alert) => alert.alertedJobId === null);
+
+    assert.equal(result.alerts.length, 2);
+    assert.equal(result.alertSummary.reviewAlertCount, 1);
+    assert.equal(result.alertSummary.verificationOnlyCount, 1);
+    assert.equal(runAlert.verdict, "current-main-echo");
+    assert.equal(runAlert.disposition, "verification-only");
+    assert.equal(jobAlert.verdict, "non-merge-gate-job-review");
+    assert.equal(jobAlert.disposition, "review");
+    assert.equal(jobAlert.nonMergeGateJobReview, true);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("CI alert triage markdown renders the read-only claim boundary", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-markdown-boundary-"));
   const runsPath = path.join(tempDir, "runs.json");

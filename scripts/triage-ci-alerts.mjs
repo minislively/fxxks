@@ -561,8 +561,8 @@ function coalesceGenericRunJobAlerts(allEvidence) {
   }
 
   return [...byRunAttempt.values()].flatMap((alerts) => {
-    const hasMergeGateJobAlert = alerts.some((alert) => alert.alertedJobId !== null && alert.ciLane === "pull_request_target:merge-gate");
-    if (hasMergeGateJobAlert) return alerts;
+    const hasReviewableJobAlert = alerts.some((alert) => alert.alertedJobId !== null && alert.disposition === "review");
+    if (hasReviewableJobAlert) return alerts;
     const runAlert = alerts.find((alert) => alert.alertedJobId === null);
     if (!runAlert) return alerts;
     const appearances = alerts.reduce((total, alert) => total + alert.appearances, 0);
