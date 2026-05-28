@@ -12,6 +12,7 @@ const OMITTED_ALERT_RUN_EVIDENCE_LIMIT = 12;
 const STALE_CONCLUSIONS = new Set(["cancelled", "skipped"]);
 const ACTIONABLE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure"]);
 const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
+const SUPERSEDABLE_MERGE_GATE_JOB_CONCLUSIONS = new Set([...ACTIONABLE_CONCLUSIONS, "cancelled"]);
 const TMUX_BLOCKER_PATTERN = /\b(TS\d{4}|error|errors|failed|failure|exception)\b/i;
 const TMUX_NON_BLOCKER_PATTERN = /\b(?:0|zero|no)\s+errors?\b/i;
 const CLAIM_BOUNDARY = "read-only alert triage only; PR CI, push CI, and pull_request_target/pull_request_review Merge Gate evidence are reporting lanes, not authorization or merge authority";
@@ -375,7 +376,7 @@ function supersedingSuccessfulRerunJob(row, alertedJobId) {
     ? row.jobs.find((job) => String(job.id) === String(alertedJobId))
     : null;
   if (alertedJob) {
-    if (!ACTIONABLE_CONCLUSIONS.has(alertedJob.conclusion)) return null;
+    if (!SUPERSEDABLE_MERGE_GATE_JOB_CONCLUSIONS.has(alertedJob.conclusion)) return null;
     const alertedTime = Date.parse(alertedJob.completedAt || "");
     if (!Number.isFinite(alertedTime)) return null;
     return row.jobs.find((job) => {
@@ -427,12 +428,18 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
     const supersededSuccessfulRerunJobEcho = supersedingJob !== null;
     const mergeGateJobEvidenceMissing = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && needsMergeGateJobEvidence(row, ref.alertedJobId);
     const mergeGateJobNotSuperseded = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && hasMergeGateJobEvidence(row, ref.alertedJobId);
-    const requiresMergeGateJobReview = mergeGateJobEvidenceMissing || mergeGateJobNotSuperseded;
+    const nonMergeGateJobReview = !isStaleAttempt
+      && ref.alertedJobId !== null
+      && row
+      && row.ciLane !== "pull_request_target:merge-gate"
+      && Array.isArray(row.jobs)
+      && row.jobs.length > 0;
+    const requiresMergeGateJobReview = mergeGateJobEvidenceMissing || mergeGateJobNotSuperseded || nonMergeGateJobReview;
     const replay = isHistoricalReplayEvidence(row, isStaleAttempt, focusBranch) || supersededSuccessfulRerunJobEcho;
-    const echo = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && !mergeGateJobEvidenceMissing && !mergeGateJobNotSuperseded && isCurrentMainSuccessEcho(row, focusBranch);
+    const echo = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && !requiresMergeGateJobReview && isCurrentMainSuccessEcho(row, focusBranch);
     const supersededMainCancellationEcho = !isStaleAttempt && !supersededSuccessfulRerunJobEcho && isSupersededMainCancellationEcho(row, focusBranch);
     const cancellationNeedsSuccessEvidence = !isStaleAttempt && needsMainCancellationSuccessEvidence(row, focusBranch);
-    const evidence = (mergeGateJobEvidenceMissing || mergeGateJobNotSuperseded) ? "review" : (isStaleAttempt || supersededSuccessfulRerunJobEcho) ? "stale" : alertEvidenceState(row);
+    const evidence = requiresMergeGateJobReview ? "review" : (isStaleAttempt || supersededSuccessfulRerunJobEcho) ? "stale" : alertEvidenceState(row);
     const verdict = echo
       ? "current-main-echo"
       : supersededSuccessfulRerunJobEcho
@@ -441,7 +448,9 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
           ? "merge-gate-job-evidence-unavailable"
           : mergeGateJobNotSuperseded
             ? "merge-gate-job-not-superseded"
-            : supersededMainCancellationEcho
+            : nonMergeGateJobReview
+              ? "non-merge-gate-job-review"
+              : supersededMainCancellationEcho
               ? "superseded-main-ci-cancel-echo"
               : evidence;
     const reason = isStaleAttempt
@@ -452,7 +461,9 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
           ? `${row.ciLane} job ${ref.alertedJobId} needs job-list evidence before suppressing as a rerun echo`
           : mergeGateJobNotSuperseded
             ? `${row.ciLane} job ${ref.alertedJobId} has no newer successful same-name job evidence`
-            : echo
+            : nonMergeGateJobReview
+              ? `${row.ciLane} job ${ref.alertedJobId} is outside pull_request_target Merge Gate rerun suppression scope`
+              : echo
               ? `verification-only current ${focusBranch} success echo`
               : supersededMainCancellationEcho
                 ? `cancelled ${focusBranch} run superseded by successful run ${row.latestRunId}`
@@ -472,6 +483,7 @@ function buildRawAlertEvidence(alertRefs, rows, options = {}) {
       supersededSuccessfulRerunJobEcho,
       mergeGateJobEvidenceMissing,
       mergeGateJobNotSuperseded,
+      nonMergeGateJobReview,
       replay,
       disposition: alertDisposition(evidence, replay, echo, cancellationNeedsSuccessEvidence || requiresMergeGateJobReview),
       reason,

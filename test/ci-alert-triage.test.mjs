@@ -1111,6 +1111,84 @@ test("CI alert triage marks superseded pull_request_target Merge Gate job failur
   }
 });
 
+
+test("CI alert triage marks superseded pull_request_target Merge Gate job cancellations as stale rerun echoes", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-cancelled-rerun-"));
+  const runsPath = path.join(tempDir, "runs.json");
+  const alertsPath = path.join(tempDir, "alerts.txt");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26300000010,
+      attempt: 2,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "fooks-issue-1094-rerun-status",
+      headSha: "feed1094",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-27T10:00:00Z",
+      updatedAt: "2026-05-27T10:08:00Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26300000010",
+      jobs: [
+        {
+          id: 78006573531,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "cancelled",
+          completedAt: "2026-05-27T10:04:00Z",
+          url: "https://github.com/minislively/fooks/actions/runs/26300000010/job/78006573531",
+        },
+        {
+          id: 78007392257,
+          name: "Validate approval review and linked issue",
+          status: "completed",
+          conclusion: "success",
+          completedAt: "2026-05-27T10:08:00Z",
+          url: "https://github.com/minislively/fooks/actions/runs/26300000010/job/78007392257",
+        },
+      ],
+    },
+  ]));
+  fs.writeFileSync(alertsPath, [
+    "PR #1094 old Merge Gate cancelled job https://github.com/minislively/fooks/actions/runs/26300000010/job/78006573531",
+  ].join("\n"));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--alerts",
+      alertsPath,
+      "--branch",
+      "fooks-issue-1094-rerun-status",
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const alert = result.alerts[0];
+
+    assert.equal(result.counts.informational, 1);
+    assert.equal(alert.alertedRunId, "26300000010");
+    assert.equal(alert.alertedJobId, 78006573531);
+    assert.equal(alert.currentJobId, 78007392257);
+    assert.equal(alert.evidence, "stale");
+    assert.equal(alert.verdict, "superseded-successful-rerun-job-echo");
+    assert.equal(alert.supersededSuccessfulRerunJobEcho, true);
+    assert.equal(alert.replay, true);
+    assert.equal(alert.disposition, "suppress-replay");
+    assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 1);
+    assert.equal(result.alertSummary.actionableAlertCount, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("CI alert triage does not suppress unrelated successful Merge Gate jobs in the same run", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-unrelated-job-"));
   const runsPath = path.join(tempDir, "runs.json");
@@ -1444,10 +1522,13 @@ test("CI alert triage does not suppress same-name rerun jobs outside pull_reques
     const result = JSON.parse(stdout);
 
     assert.equal(result.alertSummary.supersededSuccessfulRerunJobEchoCount, 0);
+    assert.equal(result.alertSummary.reviewAlertCount, lanes.length);
     assert.equal(result.alerts.some((alert) => alert.verdict === "superseded-successful-rerun-job-echo"), false);
     assert.equal(result.alerts.every((alert) => alert.supersededSuccessfulRerunJobEcho === false), true);
+    assert.equal(result.alerts.every((alert) => alert.verdict === "non-merge-gate-job-review"), true);
+    assert.equal(result.alerts.every((alert) => alert.disposition === "review"), true);
+    assert.equal(result.alerts.every((alert) => alert.nonMergeGateJobReview === true), true);
     assert.equal(result.alerts.find((alert) => alert.alertedRunId === "26300000023").ciLane, "pull_request_review");
-    assert.notEqual(result.alerts.find((alert) => alert.alertedRunId === "26300000023").disposition, "suppress-replay");
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
