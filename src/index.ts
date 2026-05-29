@@ -410,3 +410,24 @@ export {
   renderReactWebFactGraphInspectionText,
 } from "./core/react-web-fact-graph";
 export type { ReactWebFactGraphInspection } from "./core/react-web-fact-graph";
+
+export {
+  REACT_WEB_FACT_GRAPH_CONSUMER_CLAIM_BOUNDARY,
+  REACT_WEB_FACT_GRAPH_CONSUMER_COMMAND,
+  REACT_WEB_FACT_GRAPH_CONSUMER_DEFAULT_MAX_ANCHORS,
+  REACT_WEB_FACT_GRAPH_CONSUMER_MAX_ANCHORS,
+  REACT_WEB_FACT_GRAPH_CONSUMER_MIN_ANCHORS,
+  REACT_WEB_FACT_GRAPH_CONSUMER_SCHEMA_VERSION,
+  buildReactWebFactGraphConsumerDryRun,
+  normalizeReactWebFactGraphConsumerMaxAnchors,
+  renderReactWebFactGraphConsumerDryRunText,
+  selectReactWebFactGraphAnchors,
+} from "./core/react-web-fact-graph-consumer";
+export type {
+  ReactWebFactGraphAnchor,
+  ReactWebFactGraphAnchorDeferredReason,
+  ReactWebFactGraphAnchorType,
+  ReactWebFactGraphConsumerAuthorization,
+  ReactWebFactGraphConsumerDryRun,
+  ReactWebFactGraphConsumerOptions,
+} from "./core/react-web-fact-graph-consumer";
