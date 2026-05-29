@@ -31,6 +31,9 @@ export type ReactWebEvidenceArtifactInterop = typeof REACT_WEB_EVIDENCE_ARTIFACT
 export type ReactWebEvidenceArtifactRuntimeGraph = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebFactGraphPacking"]> & {
   diagnosticOnly: true;
 };
+export type ReactWebEvidenceArtifactAdditionalContextAdmission = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["additionalContextAdmission"]> & {
+  diagnosticOnly: true;
+};
 
 const REACT_WEB_RUNTIME_GRAPH_REASONS = new Set([
   "fresh-anchors-packed",
@@ -42,6 +45,13 @@ const REACT_WEB_RUNTIME_GRAPH_REASONS = new Set([
   "source-relative-budget-exceeded",
 ]);
 const REACT_WEB_RUNTIME_GRAPH_FRESHNESS_STATUSES = new Set(["fresh", "stale", "unknown"]);
+const REACT_WEB_ADDITIONAL_CONTEXT_ADMISSION_REASONS = new Set([
+  "admitted",
+  "unknown-source-size",
+  "source-too-small",
+  "candidate-not-smaller-than-source",
+  "reduction-below-threshold",
+]);
 
 export type ReactWebEvidenceArtifact = {
   schemaVersion: typeof REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION;
@@ -69,6 +79,7 @@ export type ReactWebEvidenceArtifact = {
   };
   files: ReactWebEvidenceArtifactFile[];
   runtimeGraph?: ReactWebEvidenceArtifactRuntimeGraph;
+  additionalContextAdmission?: ReactWebEvidenceArtifactAdditionalContextAdmission;
   editGuidance?: ModelFacingPayload["editGuidance"];
   concernProfiles?: ModelFacingPayload["concernProfiles"];
   domainPayload?: ModelFacingPayload["domainPayload"];
@@ -211,6 +222,17 @@ function runtimeGraphEvidence(
   };
 }
 
+function additionalContextAdmissionEvidence(
+  runtimeDecision: CodexRuntimeHookDecision,
+): ReactWebEvidenceArtifactAdditionalContextAdmission | undefined {
+  const admission = runtimeDecision.debug?.additionalContextAdmission;
+  if (!admission) return undefined;
+  return {
+    ...admission,
+    diagnosticOnly: true,
+  };
+}
+
 function isCanonicalReactWebInterop(
   interop: Partial<ReactWebEvidenceArtifactInterop> | undefined,
 ): interop is ReactWebEvidenceArtifactInterop {
@@ -278,6 +300,25 @@ function assertValidArtifact(artifact: unknown): asserts artifact is ReactWebEvi
       throw new Error("React Web evidence artifact runtimeGraph contract changed");
     }
   }
+  if (candidate.additionalContextAdmission !== undefined) {
+    const admission = candidate.additionalContextAdmission as Partial<ReactWebEvidenceArtifactAdditionalContextAdmission>;
+    if (
+      typeof admission.admitted !== "boolean" ||
+      typeof admission.reason !== "string" ||
+      !REACT_WEB_ADDITIONAL_CONTEXT_ADMISSION_REASONS.has(admission.reason) ||
+      typeof admission.candidateBytes !== "number" ||
+      !Number.isFinite(admission.candidateBytes) ||
+      admission.candidateBytes < 0 ||
+      typeof admission.minSourceBytes !== "number" ||
+      !Number.isFinite(admission.minSourceBytes) ||
+      admission.minSourceBytes < 0 ||
+      typeof admission.minReductionPct !== "number" ||
+      !Number.isFinite(admission.minReductionPct) ||
+      admission.diagnosticOnly !== true
+    ) {
+      throw new Error("React Web evidence artifact additionalContextAdmission contract changed");
+    }
+  }
 }
 
 export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookDecision): ReactWebEvidenceArtifact | null {
@@ -295,6 +336,7 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
   const decision = artifactDecision(runtimeDecision, classification);
   const whySelected = buildWhySelected(runtimeDecision, payload);
   const graphEvidence = runtimeGraphEvidence(runtimeDecision);
+  const admissionEvidence = additionalContextAdmissionEvidence(runtimeDecision);
   const generatedAt = new Date().toISOString();
   const id = evidenceArtifactId({
     filePath,
@@ -330,6 +372,7 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
     },
     files: [buildFileEntry(filePath, payload, whySelected)],
     ...(graphEvidence ? { runtimeGraph: graphEvidence } : {}),
+    ...(admissionEvidence ? { additionalContextAdmission: admissionEvidence } : {}),
     ...(payload?.editGuidance ? { editGuidance: payload.editGuidance } : {}),
     ...(payload?.concernProfiles ? { concernProfiles: payload.concernProfiles } : {}),
     ...(payload?.domainPayload ? { domainPayload: payload.domainPayload } : {}),
@@ -415,6 +458,18 @@ export function renderReactWebEvidenceArtifactMarkdown(artifact: ReactWebEvidenc
         `- diagnostic only: ${artifact.runtimeGraph.diagnosticOnly ? "yes" : "no"}`,
       ].join("\n")
     : "- none";
+  const admission = artifact.additionalContextAdmission
+    ? [
+        `- admitted: ${artifact.additionalContextAdmission.admitted ? "yes" : "no"}`,
+        `- reason: ${artifact.additionalContextAdmission.reason}`,
+        `- source bytes: ${artifact.additionalContextAdmission.sourceBytes ?? "unknown"}`,
+        `- candidate bytes: ${artifact.additionalContextAdmission.candidateBytes}`,
+        `- reduction: ${artifact.additionalContextAdmission.reductionPct ?? "unknown"}%`,
+        `- minimum source bytes: ${artifact.additionalContextAdmission.minSourceBytes}`,
+        `- minimum reduction: ${artifact.additionalContextAdmission.minReductionPct}%`,
+        `- diagnostic only: ${artifact.additionalContextAdmission.diagnosticOnly ? "yes" : "no"}`,
+      ].join("\n")
+    : "- none";
 
-  return `# React Web evidence artifact\n\n${artifact.claimBoundary}\n\n## Summary\n\n- id: ${artifact.id}\n- producer: ${artifact.producer}\n- profile: ${artifact.profile}\n- payload kind: ${artifact.payloadKind}\n- decision: ${artifact.decision}\n- evidence strength: ${artifact.evidenceStrength}\n- file: ${artifact.filePath}\n- context mode: ${artifact.contextMode ?? "none"}\n- context mode reason: ${artifact.contextModeReason ?? "none"}\n- compression policy: ${artifact.compressionPolicy}\n- interop: stored=${artifact.interop.mayBeStored ? "yes" : "no"}, summarized=${artifact.interop.mayBeSummarized ? "yes" : "no"}, override=${artifact.interop.mayOverrideDecision ? "yes" : "no"}\n\n## Freshness\n\n- source fingerprint: ${artifact.sourceFingerprint ? `${artifact.sourceFingerprint.fileHash} / ${artifact.sourceFingerprint.lineCount} lines` : "none"}\n- stale when: ${artifact.freshness.staleWhen.join(", ")}\n\n## Runtime graph diagnostics\n\n${runtimeGraph}\n\n## Reasons\n\n${artifact.reasons.length > 0 ? artifact.reasons.map((reason) => `- ${reason}`).join("\n") : "- none"}\n\n## Why denied\n\n${whyDenied}\n\n## Selected files\n\n${fileLines}\n\n## Concern profiles\n\n${concernProfiles}\n\n## Patch targets\n\n${patchTargets}\n`;
+  return `# React Web evidence artifact\n\n${artifact.claimBoundary}\n\n## Summary\n\n- id: ${artifact.id}\n- producer: ${artifact.producer}\n- profile: ${artifact.profile}\n- payload kind: ${artifact.payloadKind}\n- decision: ${artifact.decision}\n- evidence strength: ${artifact.evidenceStrength}\n- file: ${artifact.filePath}\n- context mode: ${artifact.contextMode ?? "none"}\n- context mode reason: ${artifact.contextModeReason ?? "none"}\n- compression policy: ${artifact.compressionPolicy}\n- interop: stored=${artifact.interop.mayBeStored ? "yes" : "no"}, summarized=${artifact.interop.mayBeSummarized ? "yes" : "no"}, override=${artifact.interop.mayOverrideDecision ? "yes" : "no"}\n\n## Freshness\n\n- source fingerprint: ${artifact.sourceFingerprint ? `${artifact.sourceFingerprint.fileHash} / ${artifact.sourceFingerprint.lineCount} lines` : "none"}\n- stale when: ${artifact.freshness.staleWhen.join(", ")}\n\n## Runtime graph diagnostics\n\n${runtimeGraph}\n\n## Additional context admission\n\n${admission}\n\n## Reasons\n\n${artifact.reasons.length > 0 ? artifact.reasons.map((reason) => `- ${reason}`).join("\n") : "- none"}\n\n## Why denied\n\n${whyDenied}\n\n## Selected files\n\n${fileLines}\n\n## Concern profiles\n\n${concernProfiles}\n\n## Patch targets\n\n${patchTargets}\n`;
 }

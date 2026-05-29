@@ -34,11 +34,24 @@ import { buildReactWebFactGraphConsumerDryRun, type ReactWebFactGraphConsumerDry
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const EDIT_GUIDANCE_CONTEXT_MAX_BYTES = 8_192;
+const ADDITIONAL_CONTEXT_ADMISSION_MIN_SOURCE_BYTES = 1_024;
+const ADDITIONAL_CONTEXT_ADMISSION_MIN_REDUCTION_PCT = 25;
 const PREFLIGHT_ADVISORY_CONTEXT_MARKER = "FOOKS PREFLIGHT ADVISORY";
 const DOMAIN_MEMORY_ADVISORY_CONTEXT_MARKER = "FOOKS DOMAIN MEMORY ADVISORY";
 const PREFLIGHT_ISSUE_OR_PR_PATTERN = /(?:#\d+\b|\b(?:issue|issues|pr|pull\s+request)\s*#?\d+\b)/iu;
 const PREFLIGHT_TEST_COMMAND_PATTERN = /(?:\bnpm\s+(?:run\s+)?test\b|\bnode\s+--test\b|\bpytest\b|\bvitest\b|\bjest\b|테스트)/iu;
 const PREFLIGHT_STACK_OR_ERROR_PATTERN = /(?:\b(?:typeerror|referenceerror|syntaxerror|stack\s+trace|traceback|failed|failure|exception|error)\b|에러|오류|실패|스택|이상한데)/iu;
+
+type RuntimeAdditionalContextAdmissionReason = "admitted" | "unknown-source-size" | "source-too-small" | "candidate-not-smaller-than-source" | "reduction-below-threshold";
+type RuntimeAdditionalContextAdmission = {
+  admitted: boolean;
+  reason: RuntimeAdditionalContextAdmissionReason;
+  sourceBytes?: number;
+  candidateBytes: number;
+  reductionPct?: number;
+  minSourceBytes: number;
+  minReductionPct: number;
+};
 
 type RuntimeReactWebContext = NonNullable<ModelFacingPayload["reactWebContext"]>;
 type RuntimeReactWebContextArrayKey = Exclude<{
@@ -543,6 +556,23 @@ function attachReactWebFactGraphPackingDebug(
   return runtimeDecision;
 }
 
+function attachReactWebContextPackingDebug(
+  runtimeDecision: CodexRuntimeHookDecision,
+  packing: RuntimeReactWebContextPackingSummary | undefined,
+): CodexRuntimeHookDecision {
+  if (!packing) return runtimeDecision;
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
+  };
+  runtimeDecision.debug = {
+    ...debug,
+    reactWebContextPacking: packing,
+  };
+  return runtimeDecision;
+}
+
 function buildAdditionalContext(
   filePath: string,
   payload: ModelFacingPayload,
@@ -692,6 +722,57 @@ function shouldSkipReactWebFactGraphForSourceRelativeBudget(originalEstimatedByt
   if (originalEstimatedBytes === undefined) return false;
   if (originalEstimatedBytes >= 4_096) return false;
   return contextWithGraphBytes > originalEstimatedBytes;
+}
+
+function evaluateAdditionalContextAdmission(
+  originalEstimatedBytes: number | undefined,
+  candidateBytes: number,
+): RuntimeAdditionalContextAdmission {
+  const base = {
+    candidateBytes,
+    minSourceBytes: ADDITIONAL_CONTEXT_ADMISSION_MIN_SOURCE_BYTES,
+    minReductionPct: ADDITIONAL_CONTEXT_ADMISSION_MIN_REDUCTION_PCT,
+  };
+
+  if (originalEstimatedBytes === undefined) {
+    return { ...base, admitted: true, reason: "unknown-source-size" };
+  }
+
+  if (originalEstimatedBytes < ADDITIONAL_CONTEXT_ADMISSION_MIN_SOURCE_BYTES) {
+    return { ...base, admitted: false, reason: "source-too-small", sourceBytes: originalEstimatedBytes };
+  }
+
+  const reductionPct = Number.parseFloat(((1 - candidateBytes / originalEstimatedBytes) * 100).toFixed(3));
+  if (candidateBytes >= originalEstimatedBytes) {
+    return { ...base, admitted: false, reason: "candidate-not-smaller-than-source", sourceBytes: originalEstimatedBytes, reductionPct };
+  }
+
+  if (reductionPct < ADDITIONAL_CONTEXT_ADMISSION_MIN_REDUCTION_PCT) {
+    return { ...base, admitted: false, reason: "reduction-below-threshold", sourceBytes: originalEstimatedBytes, reductionPct };
+  }
+
+  return { ...base, admitted: true, reason: "admitted", sourceBytes: originalEstimatedBytes, reductionPct };
+}
+
+function isReactWebOptimizedPayload(payload: ModelFacingPayload | undefined): payload is ModelFacingPayload {
+  return payload?.domainPayload?.domain === "react-web" && !payload.useOriginal;
+}
+
+function attachAdditionalContextAdmissionDebug(
+  runtimeDecision: CodexRuntimeHookDecision,
+  admission: RuntimeAdditionalContextAdmission | undefined,
+): CodexRuntimeHookDecision {
+  if (!admission) return runtimeDecision;
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
+  };
+  runtimeDecision.debug = {
+    ...debug,
+    additionalContextAdmission: admission,
+  };
+  return runtimeDecision;
 }
 
 function recordRuntimeDecisionMetric(
@@ -1128,7 +1209,12 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       attachDomainMemoryLookupDebug(runtimeDecision, domainMemoryLookupDebug);
     }
 
-    if (decision.payload.domainPayload?.domain === "react-web" && !decision.payload.useOriginal) {
+    const admission = isReactWebOptimizedPayload(decision.payload) && editGuidanceIncluded
+      ? evaluateAdditionalContextAdmission(originalEstimatedBytes, estimateTextBytes(additionalContext))
+      : undefined;
+    attachAdditionalContextAdmissionDebug(runtimeDecision, admission);
+
+    if (isReactWebOptimizedPayload(decision.payload)) {
       const activationMode = buildReactWebActivationModeFromRuntimeDecision(cwd, runtimeDecision);
       const promoted =
         activationMode?.profileGate.verdict === "would-activate" || activationMode?.globMatch.verdict === "would-activate";
@@ -1162,6 +1248,51 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       }
 
       attachReactWebActivationDebug(runtimeDecision, { promoted: true }, cwd);
+
+      if (admission && !admission.admitted) {
+        const admissionFallbackBase = fallbackDecision(
+          hookEventName,
+          target,
+          statePath,
+          [
+            "repeated-file",
+            ...(editGuidanceIncluded ? ["edit-guidance-opt-in"] : []),
+            "additional-context-compression-inefficient",
+            `additional-context-admission:${admission.reason}`,
+          ],
+          true,
+          true,
+          false,
+          "additional-context-compression-inefficient",
+          policy,
+          decision,
+        );
+        const admissionFallback = attachReactWebActivationDebug(
+          attachAdditionalContextAdmissionDebug(
+            attachReactWebContextPackingDebug(
+              attachReactWebFactGraphPackingDebug(
+                attachPreflightAdvisoryDebug(admissionFallbackBase, preflightAdvisoryIntent),
+                reactWebFactGraphPacking,
+              ),
+              reactWebContextPacking,
+            ),
+            admission,
+          ),
+          { promoted: true },
+          cwd,
+        );
+        if (domainMemoryAdvisory.requested) {
+          attachDomainMemoryAdvisoryDebug(admissionFallback, domainMemoryAdvisory.debug);
+        } else if (domainMemoryLookupDebug) {
+          attachDomainMemoryLookupDebug(admissionFallback, domainMemoryLookupDebug);
+        }
+        recordRuntimeDecisionMetric(cwd, sessionKey, admissionFallback, {
+          originalEstimatedBytes,
+          actualEstimatedBytes: originalEstimatedBytes,
+          comparableForSavings: originalEstimatedBytes !== undefined,
+        });
+        return attachReactWebEvidenceArtifact(cwd, admissionFallback);
+      }
     }
 
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {

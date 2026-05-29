@@ -31,6 +31,11 @@ function writeFixture(tempDir, fixturePath, fileName) {
   fs.writeFileSync(path.join(tempDir, fileName), fs.readFileSync(path.join(repoRoot, fixturePath), "utf8"));
 }
 
+function writeLargeFixture(tempDir, fixturePath, fileName) {
+  const source = fs.readFileSync(path.join(repoRoot, fixturePath), "utf8");
+  fs.writeFileSync(path.join(tempDir, fileName), `${source}\n{/* ${"admission budget filler ".repeat(1000)} */}\n`);
+}
+
 function runRepeatedDecision(tempDir, fileName, secondPrompt) {
   const sessionId = `react-web-status-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
@@ -122,7 +127,7 @@ test("status react-web reports blocked without failing when no latest evidence e
 
 test("status react-web reports ready from a current repeated same-file use artifact", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-status-ready-"));
-  writeFixture(tempDir, "fixtures/compressed/FormSection.tsx", "FormSection.tsx");
+  writeLargeFixture(tempDir, "fixtures/compressed/FormSection.tsx", "FormSection.tsx");
 
   const second = runRepeatedDecision(
     tempDir,

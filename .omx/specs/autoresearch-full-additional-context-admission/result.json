@@ -1,0 +1,12 @@
+{
+  "validator_prompt": "Approve only if the report cites upstream context-management examples, connects them to the local post-PR-1118 evidence, and gives an implementable gate with diagnostics and validation criteria.",
+  "architect_review": {
+    "verdict": "approved",
+    "rationale": "The report ties upstream context-selection patterns to local evidence, narrows the implementation to edit-guidance candidates to avoid breaking read-only anchors, and defines measurable admission/discard diagnostics."
+  },
+  "output_artifact_path": ".omx/specs/autoresearch-full-additional-context-admission/report.md",
+  "evidence": {
+    "live_hook_evidence_path": ".omx/specs/autoresearch-full-additional-context-admission/live-hook-evidence.json",
+    "validation_passed": true
+  }
+}

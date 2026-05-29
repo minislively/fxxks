@@ -110,7 +110,7 @@ test("inspect activation-mode reads a repeated React Web artifact and stays advi
   const second = runRepeatedDecision(
     tempDir,
     "FormSection.tsx",
-    "Please update FormSection.tsx again and keep the same-file React Web context compact if safe",
+    "Please inspect FormSection.tsx again and keep the same-file React Web context compact if safe",
   );
 
   assert.equal(second.action, "inject");
