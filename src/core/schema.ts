@@ -681,6 +681,20 @@ export type PreReadDecision = {
       maxPayloadBytes: number;
       reason?: "within-budget" | "budget-exceeded" | "not-requested" | "not-emitted";
     };
+    reactWebFactGraphConsumer?: {
+      schemaVersion: "react-web-fact-graph-consumer-dry-run.v1";
+      advisoryOnly: true;
+      authorization: "none";
+      inScope: boolean;
+      skippedReason?: string;
+      freshnessStatus: "fresh" | "stale" | "unknown";
+      selectedAnchorCount: number;
+      deferredAnchorCount: number;
+      maxAnchors: number;
+      staleBehavior: "defer-all";
+      warningsCount: number;
+      nonClaimsCount: number;
+    };
     domainMemoryLookup?: {
       source: "codex-pre-read opt-in domain-memory lookup";
       status: DomainMemoryLookupResult["status"];

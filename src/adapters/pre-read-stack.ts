@@ -3,6 +3,7 @@ import { extractFile } from "../core/extract";
 import { toModelFacingPayload } from "../core/payload/model-facing";
 import { assessPayloadReadiness } from "../core/payload/readiness";
 import { assessFrontendProfilePayloadReuse } from "../core/payload-policy/profile-gate";
+import { buildReactWebFactGraphConsumerDryRun, type ReactWebFactGraphConsumerDryRun } from "../core/react-web-fact-graph-consumer";
 import { toFrontendPayloadBuildOptions } from "../core/payload-policy/registry";
 import type { FrontendPayloadPolicyDecision } from "../core/payload-policy/types";
 import type { PreReadDecision } from "../core/schema";
@@ -191,6 +192,42 @@ function trimReactWebContextToBudget(
   return { payload: trimmedPayload, estimatedPayloadBytes };
 }
 
+function summarizePreReadReactWebFactGraphConsumer(
+  dryRun: ReactWebFactGraphConsumerDryRun,
+): NonNullable<PreReadDecision["debug"]>["reactWebFactGraphConsumer"] {
+  return {
+    schemaVersion: dryRun.schemaVersion,
+    advisoryOnly: true,
+    authorization: dryRun.selectionPolicy.authorization,
+    inScope: dryRun.inScope,
+    ...(dryRun.skippedReason ? { skippedReason: dryRun.skippedReason } : {}),
+    freshnessStatus: dryRun.graphSummary.freshnessStatus,
+    selectedAnchorCount: dryRun.selectedAnchors.length,
+    deferredAnchorCount: dryRun.deferredAnchors.length,
+    maxAnchors: dryRun.selectionPolicy.maxAnchors,
+    staleBehavior: dryRun.selectionPolicy.staleBehavior,
+    warningsCount: dryRun.warnings.length,
+    nonClaimsCount: dryRun.nonClaims.length,
+  };
+}
+
+function buildReactWebFactGraphConsumerDebug(
+  resolvedPath: string,
+  cwd: string,
+  payload: NonNullable<PreReadDecision["payload"]>,
+): NonNullable<PreReadDecision["debug"]>["reactWebFactGraphConsumer"] | undefined {
+  if (payload.domainPayload?.domain !== "react-web") return undefined;
+  try {
+    return summarizePreReadReactWebFactGraphConsumer(
+      buildReactWebFactGraphConsumerDryRun(resolvedPath, cwd, {
+        verifyFreshness: true,
+      }),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreReadPayloadPlan {
   const { frontendPayloadPolicy } = input;
   const result = extractFile(input.resolvedPath);
@@ -247,6 +284,10 @@ export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreRead
   });
   if (reactWebContextBudget) {
     debug.reactWebContextBudget = reactWebContextBudget;
+  }
+  const reactWebFactGraphConsumer = buildReactWebFactGraphConsumerDebug(input.resolvedPath, input.cwd, payload);
+  if (reactWebFactGraphConsumer) {
+    debug.reactWebFactGraphConsumer = reactWebFactGraphConsumer;
   }
 
   return { payload, readiness, debug };

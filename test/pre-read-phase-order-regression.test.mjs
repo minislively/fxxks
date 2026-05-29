@@ -28,6 +28,7 @@ const PAYLOAD_DEBUG_KEYS = [
   "language",
   "mode",
   "reactWebContextBudget",
+  "reactWebFactGraphConsumer",
 ];
 
 function assertNoPayloadPlanningArtifacts(decision) {
@@ -81,6 +82,8 @@ test("pre-read adapter phase ordering preserves boundary short-circuit and paylo
   assert.equal(payloadDecision.debug.language, "tsx");
   assert.equal(payloadDecision.debug.domainDetection.classification, "react-web");
   assert.equal(payloadDecision.debug.frontendPayloadPolicy.allowed, true);
+  assert.equal(payloadDecision.debug.reactWebFactGraphConsumer.advisoryOnly, true);
+  assert.equal(payloadDecision.debug.reactWebFactGraphConsumer.authorization, "none");
 });
 
 test("pre-read payload-plan seam keeps live fallback reasons ahead of stale cached domain payloads", () => {
