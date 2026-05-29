@@ -684,6 +684,7 @@ Everyday commands:
   ${displayCliName} inspect ranked-bundle <id> [--json]
   ${displayCliName} inspect react-web-label-preview <file> [--json]
   ${displayCliName} inspect react-web-fact-graph <file> [--json]
+  ${displayCliName} inspect react-web-fact-graph-freshness <file> [--json]
   ${displayCliName} inspect react-web-fact-graph-consumer <file> [--json] [--max-anchors <n>]
   ${displayCliName} inspect react-web-issues <file> [--json|--summary-json|--dry-run-json]
   ${displayCliName} inspect-domain <file> [--json] [--domain-memory-receipt] [--context-decision]
@@ -1810,6 +1811,20 @@ async function run(): Promise<void> {
         }
         return;
       }
+      if (arg1 === "react-web-fact-graph-freshness") {
+        const { filePath: file, json } = parseCompareArgs(rest.slice(1));
+        const {
+          buildReactWebFactGraphFreshnessVerification,
+          renderReactWebFactGraphFreshnessVerificationText,
+        } = await import("../core/react-web-fact-graph-freshness.js");
+        const verification = buildReactWebFactGraphFreshnessVerification(file, process.cwd());
+        if (json) {
+          print(verification);
+        } else {
+          process.stdout.write(renderReactWebFactGraphFreshnessVerificationText(verification));
+        }
+        return;
+      }
       if (arg1 === "react-web-fact-graph-consumer") {
         const { filePath: file, json, maxAnchors } = parseReactWebFactGraphConsumerArgs(rest.slice(1));
         const {
@@ -1844,7 +1859,7 @@ async function run(): Promise<void> {
         }
         return;
       }
-      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', 'react-web-label-preview', 'react-web-fact-graph', 'react-web-fact-graph-consumer', or 'react-web-issues'");
+      throw new Error("inspect expects 'evidence', 'activation-mode', 'ranked-bundle', 'react-web-label-preview', 'react-web-fact-graph', 'react-web-fact-graph-freshness', 'react-web-fact-graph-consumer', or 'react-web-issues'");
     }
     case "attach": {
       const runtime = arg1;

@@ -11,6 +11,13 @@ import {
   buildReactWebFactGraphInspection,
   type ReactWebFactGraphInspection,
 } from "./react-web-fact-graph";
+import {
+  buildReactWebFactGraphFreshnessExpected,
+  summarizeReactWebFactGraphFreshnessVerification,
+  verifyReactWebFactGraphFreshness,
+  type ReactWebFactGraphFreshnessSummary,
+  type ReactWebFactGraphFreshnessVerification,
+} from "./react-web-fact-graph-freshness";
 
 export const REACT_WEB_FACT_GRAPH_CONSUMER_SCHEMA_VERSION = "react-web-fact-graph-consumer-dry-run.v1" as const;
 export const REACT_WEB_FACT_GRAPH_CONSUMER_COMMAND = "inspect react-web-fact-graph-consumer" as const;
@@ -57,6 +64,7 @@ export type ReactWebFactGraphConsumerDryRun = {
     maxAnchors: number;
     staleBehavior: "defer-all";
   };
+  freshnessVerification?: ReactWebFactGraphFreshnessSummary;
   graphSummary: {
     schemaVersion: FactGraphReport["schemaVersion"];
     files: string[];
@@ -76,6 +84,8 @@ export type ReactWebFactGraphConsumerDryRun = {
 
 export type ReactWebFactGraphConsumerOptions = {
   maxAnchors?: number;
+  freshnessVerification?: ReactWebFactGraphFreshnessVerification;
+  verifyFreshness?: boolean;
 };
 
 type Candidate = Omit<ReactWebFactGraphAnchor, "rank" | "reportOnly" | "authorization" | "deferredReason"> & {
@@ -202,11 +212,11 @@ function ranked(anchor: Candidate, rank: number, deferredReason?: ReactWebFactGr
   };
 }
 
-function buildCandidates(graph: FactGraphReport): Candidate[] {
+function buildCandidates(graph: FactGraphReport, freshnessStatus: FactGraphFreshnessStatus = graph.freshness.status): Candidate[] {
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
   return [
-    ...graph.nodes.map((node) => nodeCandidate(node, graph.freshness.status)),
-    ...graph.edges.map((edge) => edgeCandidate(edge, nodesById, graph.freshness.status)),
+    ...graph.nodes.map((node) => nodeCandidate(node, freshnessStatus)),
+    ...graph.edges.map((edge) => edgeCandidate(edge, nodesById, freshnessStatus)),
   ].filter((candidate): candidate is Candidate => candidate !== null).sort(compareCandidates);
 }
 
@@ -216,7 +226,9 @@ export function selectReactWebFactGraphAnchors(
 ): ReactWebFactGraphConsumerDryRun {
   const maxAnchors = boundedMaxAnchors(options.maxAnchors);
   const graph = inspection.graph;
-  const candidates = inspection.inScope ? buildCandidates(graph) : [];
+  const verification = options.freshnessVerification;
+  const effectiveFreshnessStatus = verification?.status ?? graph.freshness.status;
+  const candidates = inspection.inScope ? buildCandidates(graph, effectiveFreshnessStatus) : [];
   const warnings = [
     REACT_WEB_FACT_GRAPH_CONSUMER_CLAIM_BOUNDARY,
     ...graph.warnings,
@@ -225,7 +237,7 @@ export function selectReactWebFactGraphAnchors(
     warnings.push("React Web fact graph consumer found no source-backed anchors to select.");
   }
 
-  const staleOrUnknown = graph.freshness.status !== "fresh";
+  const staleOrUnknown = effectiveFreshnessStatus !== "fresh";
   const selectedAnchors = staleOrUnknown ? [] : candidates.slice(0, maxAnchors).map((candidate, index) => ranked(candidate, index + 1));
   const deferredCandidates = staleOrUnknown ? candidates : candidates.slice(maxAnchors);
   const deferredReason: ReactWebFactGraphAnchorDeferredReason = staleOrUnknown ? "stale-or-unknown-freshness" : "budget-deferred";
@@ -233,6 +245,9 @@ export function selectReactWebFactGraphAnchors(
 
   if (staleOrUnknown && candidates.length > 0) {
     warnings.push("React Web fact graph freshness is stale or unknown; all source-backed anchors were deferred.");
+  }
+  if (verification && verification.status !== "fresh") {
+    warnings.push(`React Web fact graph freshness verification is ${verification.status}; all source-backed anchors were deferred.`);
   }
 
   return {
@@ -248,11 +263,12 @@ export function selectReactWebFactGraphAnchors(
       maxAnchors,
       staleBehavior: "defer-all",
     },
+    ...(verification ? { freshnessVerification: summarizeReactWebFactGraphFreshnessVerification(verification) } : {}),
     graphSummary: {
       schemaVersion: graph.schemaVersion,
       files: graph.scope.files,
       domain: graph.scope.domain,
-      freshnessStatus: graph.freshness.status,
+      freshnessStatus: effectiveFreshnessStatus,
       nodeCount: graph.metrics.nodeCount,
       edgeCount: graph.metrics.edgeCount,
       knownCount: graph.metrics.knownCount,
@@ -271,7 +287,11 @@ export function buildReactWebFactGraphConsumerDryRun(
   cwd = process.cwd(),
   options: ReactWebFactGraphConsumerOptions = {},
 ): ReactWebFactGraphConsumerDryRun {
-  return selectReactWebFactGraphAnchors(buildReactWebFactGraphInspection(filePath, cwd), options);
+  const inspection = buildReactWebFactGraphInspection(filePath, cwd);
+  const freshnessVerification = options.freshnessVerification ?? (options.verifyFreshness
+    ? verifyReactWebFactGraphFreshness(inspection, buildReactWebFactGraphFreshnessExpected(inspection))
+    : undefined);
+  return selectReactWebFactGraphAnchors(inspection, { ...options, freshnessVerification });
 }
 
 export function renderReactWebFactGraphConsumerDryRunText(dryRun: ReactWebFactGraphConsumerDryRun): string {
@@ -285,6 +305,12 @@ export function renderReactWebFactGraphConsumerDryRunText(dryRun: ReactWebFactGr
     ...dryRun.selectedAnchors.map((anchor) => `- #${anchor.rank} ${anchor.anchorType}:${anchor.kind} ${anchor.label} (${anchor.confidence}, priority=${anchor.priority})`),
     `Deferred anchors: ${dryRun.deferredAnchors.length}`,
   ];
+  if (dryRun.freshnessVerification) {
+    lines.push(`Freshness verification: ${dryRun.freshnessVerification.status}`);
+    for (const [check, status] of Object.entries(dryRun.freshnessVerification.checks)) {
+      lines.push(`- ${check}: ${status}`);
+    }
+  }
   if (dryRun.warnings.length > 0) {
     lines.push("Warnings:", ...dryRun.warnings.map((warning) => `- ${warning}`));
   }
