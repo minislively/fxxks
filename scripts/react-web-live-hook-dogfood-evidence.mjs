@@ -8,9 +8,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
 
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v1";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v2";
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
+export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = [
+  "fixtures/compressed/FormSection.tsx",
+  "fixtures/compressed/HookEffectPanel.tsx",
+  "fixtures/hybrid/DashboardPanel.tsx",
+  "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+  "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+  "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+];
 
 const NON_CLAIMS = [
   "provider-token-savings",
@@ -23,6 +31,15 @@ const NON_CLAIMS = [
   "react-native-webview-or-tui-support-expansion",
   "stale-graph-reuse",
 ];
+
+function byteLength(value) {
+  return Buffer.byteLength(value, "utf8");
+}
+
+function percentReduction(beforeBytes, afterBytes) {
+  if (!Number.isFinite(beforeBytes) || beforeBytes <= 0) return 0;
+  return Number.parseFloat(((1 - afterBytes / beforeBytes) * 100).toFixed(3));
+}
 
 function copyFile(src, dest) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -42,6 +59,10 @@ export function createLiveHookReplayProject({ repoRoot = defaultRepoRoot } = {})
     path.join(projectRoot, "package.json"),
     `${JSON.stringify({ name: "fooks-live-hook-dogfood-project", repository: { url: "https://github.com/minislively/fooks-live-hook-dogfood-project.git" } }, null, 2)}\n`,
   );
+
+  for (const fixture of DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES) {
+    copyFile(path.join(repoRoot, fixture), path.join(projectRoot, fixture));
+  }
 
   return { projectRoot, codexHome };
 }
@@ -172,6 +193,70 @@ function assertBoundaryPath(boundary) {
   return failures;
 }
 
+function summarizeLiveHookSuiteRow({ projectRoot, relativeFile, preRead, firstNative, secondNative, artifactRef }) {
+  const source = fs.readFileSync(path.join(projectRoot, relativeFile), "utf8");
+  const sourceBytes = byteLength(source);
+  const additionalContextBytes = secondNative.additionalContextBytes;
+  const artifact = summarizeArtifact(artifactRef, relativeFile);
+
+  return {
+    file: relativeFile,
+    sourceBytes,
+    additionalContextBytes,
+    additionalContextReductionPct: percentReduction(sourceBytes, additionalContextBytes),
+    additionalContextLargerThanSource: additionalContextBytes > sourceBytes,
+    preReadGraphDiagnostics: summarizePreReadGraph(preRead),
+    firstNative,
+    secondNative,
+    evidenceArtifact: artifact,
+    diagnosticOnly: true,
+    claimable: false,
+  };
+}
+
+function summarizeLiveHookSuite(rows) {
+  const reductionValues = rows.map((row) => row.additionalContextReductionPct);
+  const graphObservedCount = rows.filter((row) => row.secondNative.containsReactWebFactGraph).length;
+  const firstPromptEmptyCount = rows.filter((row) => !row.firstNative.emitted).length;
+  const artifactIdentityMatchCount = rows.filter((row) => row.evidenceArtifact.filePathMatchesTarget).length;
+  const allAdditionalContextsSmaller = rows.every((row) => !row.additionalContextLargerThanSource && row.additionalContextBytes > 0);
+  const compactRowsCount = rows.filter((row) => !row.additionalContextLargerThanSource && row.additionalContextBytes > 0).length;
+  const expandedRowsCount = rows.length - compactRowsCount;
+  const allFreshGraphs = rows.every(
+    (row) => row.preReadGraphDiagnostics.freshnessStatus === "fresh" && row.evidenceArtifact.runtimeGraph?.freshnessStatus === "fresh",
+  );
+
+  return {
+    diagnosticOnly: true,
+    claimable: false,
+    measurement: "built-cli-native-hook-fixture-matrix-additional-context-bytes",
+    fixtureCount: rows.length,
+    graphObservedCount,
+    firstPromptEmptyCount,
+    artifactIdentityMatchCount,
+    compactRowsCount,
+    expandedRowsCount,
+    allAdditionalContextsSmaller,
+    allFreshGraphs,
+    minAdditionalContextReductionPct: Math.min(...reductionValues),
+    maxAdditionalContextReductionPct: Math.max(...reductionValues),
+    blocker:
+      graphObservedCount === rows.length && artifactIdentityMatchCount === rows.length
+        ? null
+        : "one or more live/native hook fixture rows did not emit graph-assisted additionalContext with matching evidence artifact identity",
+  };
+}
+
+function assertLiveHookSuite(suite) {
+  const failures = [];
+  if (suite.summary.fixtureCount === 0) failures.push("live hook suite had no fixtures");
+  if (suite.summary.graphObservedCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture observed reactWebFactGraph");
+  if (suite.summary.firstPromptEmptyCount !== suite.summary.fixtureCount) failures.push("not every live hook suite first prompt was record-only empty stdout");
+  if (suite.summary.artifactIdentityMatchCount !== suite.summary.fixtureCount) failures.push("not every live hook suite artifact matched its replay target");
+  if (!suite.summary.allFreshGraphs) failures.push("not every live hook suite fixture had fresh pre-read/runtime graph diagnostics");
+  return failures;
+}
+
 export async function buildReactWebLiveHookDogfoodEvidence({
   repoRoot = defaultRepoRoot,
   runId = new Date().toISOString().replace(/[:.]/g, "-"),
@@ -224,6 +309,42 @@ export async function buildReactWebLiveHookDogfoodEvidence({
     secondNative: summarizeNativeResult(secondNative),
     evidenceArtifact: summarizeArtifact(artifactRef, DEFAULT_LIVE_HOOK_REACT_WEB_TARGET),
   };
+
+  const suiteRows = [];
+  for (const relativeFile of DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES) {
+    const suiteSessionId = `react-web-live-hook-suite-${runId}-${relativeFile.replace(/[^a-z0-9]+/gi, "-")}`;
+    const suiteFirstPrompt = `Please update ${relativeFile}`;
+    const suiteSecondPrompt = `Again, update ${relativeFile} and keep graph diagnostics compact if safe`;
+    recordCommand(`suite-codex-pre-read:${relativeFile}`, ["codex-pre-read", relativeFile, "--json"]);
+    const suitePreRead = runCliJson({ repoRoot, projectRoot, args: ["codex-pre-read", relativeFile, "--json"], env }, `suite codex-pre-read ${relativeFile}`);
+    recordCommand(`suite-native-hook-first:${relativeFile}`, ["codex-runtime-hook", "--native-hook"]);
+    const suiteFirstNative = runCliJson(
+      { repoRoot, projectRoot, args: ["codex-runtime-hook", "--native-hook"], input: nativePayload({ projectRoot, sessionId: suiteSessionId, prompt: suiteFirstPrompt }), env },
+      `suite native hook first ${relativeFile}`,
+    );
+    recordCommand(`suite-native-hook-second:${relativeFile}`, ["codex-runtime-hook", "--native-hook"]);
+    const suiteSecondNative = runCliJson(
+      { repoRoot, projectRoot, args: ["codex-runtime-hook", "--native-hook"], input: nativePayload({ projectRoot, sessionId: suiteSessionId, prompt: suiteSecondPrompt }), env },
+      `suite native hook second ${relativeFile}`,
+    );
+    suiteRows.push(
+      summarizeLiveHookSuiteRow({
+        projectRoot,
+        relativeFile,
+        preRead: suitePreRead,
+        firstNative: summarizeNativeResult(suiteFirstNative),
+        secondNative: summarizeNativeResult(suiteSecondNative),
+        artifactRef: latestReactWebArtifact(projectRoot),
+      }),
+    );
+  }
+  const suite = {
+    diagnosticOnly: true,
+    claimBoundary:
+      "Live/native hook fixture-matrix evidence only: local source bytes are compared with host-facing additionalContext bytes after built CLI replay. This is not provider tokenizer output, not provider billing/cost proof, and not a broad runtime-token claim.",
+    fixtures: suiteRows,
+    summary: summarizeLiveHookSuite(suiteRows),
+  };
   const boundary = {
     targetFile: DEFAULT_LIVE_HOOK_BOUNDARY_TARGET,
     prompts: { first: boundaryFirstPrompt, second: boundarySecondPrompt, editIntent: true },
@@ -234,12 +355,13 @@ export async function buildReactWebLiveHookDogfoodEvidence({
   };
   const successFailures = assertSuccessPath(success);
   const boundaryFailures = assertBoundaryPath(boundary);
+  const suiteFailures = assertLiveHookSuite(suite);
   const graphAssistedContextPath = {
     diagnosticOnly: true,
     claimable: false,
-    observed: successFailures.length === 0,
+    observed: successFailures.length === 0 && suite.summary.graphObservedCount > 0,
     measurement: "built-cli-native-hook-react-web-graph-assisted-replay",
-    blocker: successFailures.length === 0 ? null : successFailures.join("; "),
+    blocker: successFailures.length === 0 && suiteFailures.length === 0 ? null : [...successFailures, ...suiteFailures].join("; "),
   };
 
   return {
@@ -259,11 +381,13 @@ export async function buildReactWebLiveHookDogfoodEvidence({
     },
     commands,
     success,
+    suite,
     boundary,
     graphAssistedContextPath,
     validation: {
-      passed: successFailures.length === 0 && boundaryFailures.length === 0,
+      passed: successFailures.length === 0 && boundaryFailures.length === 0 && suiteFailures.length === 0,
       successFailures,
+      suiteFailures,
       boundaryFailures,
     },
     nonClaims: Object.fromEntries(NON_CLAIMS.map((claim) => [claim, false])),
@@ -291,6 +415,18 @@ ${evidence.claimBoundary}
 - Second native hook: additionalContext=${evidence.success.secondNative.hasAdditionalContext ? "yes" : "no"}, contains reactWebFactGraph=${evidence.success.secondNative.containsReactWebFactGraph ? "yes" : "no"}
 - Runtime graph artifact: reason=${evidence.success.evidenceArtifact.runtimeGraph?.reason ?? "none"}, freshness=${evidence.success.evidenceArtifact.runtimeGraph?.freshnessStatus ?? "none"}, selected=${evidence.success.evidenceArtifact.runtimeGraph?.selectedAnchorCount ?? 0}, diagnostic-only=${evidence.success.evidenceArtifact.runtimeGraph?.diagnosticOnly ? "yes" : "no"}
 - Artifact identity matches replay target: ${evidence.success.evidenceArtifact.filePathMatchesTarget ? "yes" : "no"}
+
+## Fixture matrix
+
+- Fixture count: ${evidence.suite.summary.fixtureCount}
+- Graph observed: ${evidence.suite.summary.graphObservedCount}/${evidence.suite.summary.fixtureCount}
+- First prompts record-only: ${evidence.suite.summary.firstPromptEmptyCount}/${evidence.suite.summary.fixtureCount}
+- Artifact identity matches: ${evidence.suite.summary.artifactIdentityMatchCount}/${evidence.suite.summary.fixtureCount}
+- AdditionalContext smaller than local source: ${evidence.suite.summary.compactRowsCount}/${evidence.suite.summary.fixtureCount}
+- Expanded additionalContext rows: ${evidence.suite.summary.expandedRowsCount}/${evidence.suite.summary.fixtureCount}
+- Local additionalContext reduction range: ${evidence.suite.summary.minAdditionalContextReductionPct}% to ${evidence.suite.summary.maxAdditionalContextReductionPct}%
+- Claimable as broad token/cost savings: no
+- Claim boundary: ${evidence.suite.claimBoundary}
 
 ## Boundary replay
 

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
+  DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
   buildReactWebLiveHookDogfoodEvidence,
   renderReactWebLiveHookDogfoodEvidenceMarkdown,
 } from "../scripts/react-web-live-hook-dogfood-evidence.mjs";
@@ -44,6 +45,34 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.equal(evidence.success.evidenceArtifact.runtimeGraph.freshnessStatus, "fresh");
   assert.ok(evidence.success.evidenceArtifact.runtimeGraph.selectedAnchorCount > 0);
 
+  assert.equal(evidence.suite.diagnosticOnly, true);
+  assert.match(evidence.suite.claimBoundary, /not provider tokenizer output/);
+  assert.equal(evidence.suite.summary.measurement, "built-cli-native-hook-fixture-matrix-additional-context-bytes");
+  assert.equal(evidence.suite.summary.diagnosticOnly, true);
+  assert.equal(evidence.suite.summary.fixtureCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.equal(evidence.suite.summary.graphObservedCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.equal(evidence.suite.summary.firstPromptEmptyCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.equal(evidence.suite.summary.artifactIdentityMatchCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.equal(evidence.suite.summary.claimable, false);
+  assert.equal(evidence.suite.summary.allFreshGraphs, true);
+  assert.ok(evidence.suite.summary.compactRowsCount > 0);
+  assert.ok(evidence.suite.summary.expandedRowsCount > 0);
+  assert.ok(evidence.suite.summary.minAdditionalContextReductionPct < 0);
+  assert.ok(evidence.suite.summary.maxAdditionalContextReductionPct > 0);
+  assert.deepEqual(evidence.suite.fixtures.map((row) => row.file), DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES);
+  for (const row of evidence.suite.fixtures) {
+    assert.equal(row.diagnosticOnly, true);
+    assert.equal(row.claimable, false);
+    assert.equal(row.firstNative.emitted, false);
+    assert.equal(row.secondNative.containsReactWebFactGraph, true);
+    assert.equal(row.preReadGraphDiagnostics.classification, "react-web");
+    assert.equal(row.preReadGraphDiagnostics.freshnessStatus, "fresh");
+    assert.equal(row.evidenceArtifact.filePathMatchesTarget, true);
+    assert.equal(row.evidenceArtifact.runtimeGraph.freshnessStatus, "fresh");
+    assert.equal(row.evidenceArtifact.runtimeGraph.reason, "fresh-anchors-packed");
+    assert.equal(typeof row.additionalContextReductionPct, "number");
+  }
+
   assert.equal(evidence.boundary.diagnosticOnly, true);
   assert.equal(evidence.boundary.claimable, false);
   assert.equal(evidence.boundary.secondNative.containsReactWebFactGraph, false);
@@ -52,6 +81,7 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.equal(evidence.graphAssistedContextPath.observed, true);
   assert.equal(evidence.validation.passed, true);
   assert.deepEqual(evidence.validation.successFailures, []);
+  assert.deepEqual(evidence.validation.suiteFailures, []);
   assert.deepEqual(evidence.validation.boundaryFailures, []);
 
   assert.equal(evidence.nonClaims["provider-token-savings"], false);
@@ -72,6 +102,12 @@ test("React Web live hook dogfood evidence Markdown keeps diagnostic-only bounda
   assert.match(markdown, /First native hook: emitted=no \(record-only empty stdout expected\)/);
   assert.match(markdown, /contains reactWebFactGraph=yes/);
   assert.match(markdown, /Artifact identity matches replay target: yes/);
+  assert.match(markdown, /Fixture matrix/);
+  assert.match(markdown, /Graph observed: \d+\/\d+/);
+  assert.match(markdown, /AdditionalContext smaller than local source: \d+\/\d+/);
+  assert.match(markdown, /Expanded additionalContext rows: \d+\/\d+/);
+  assert.match(markdown, /Local additionalContext reduction range:/);
+  assert.match(markdown, /Claimable as broad token\/cost savings: no/);
   assert.match(markdown, /Graph context leaked: no/);
   assert.match(markdown, /Provider token\/cost\/billing\/invoice savings: no/);
   assert.match(markdown, /Cache performance or latency improvement: no/);
