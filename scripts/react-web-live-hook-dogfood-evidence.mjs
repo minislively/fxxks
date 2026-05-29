@@ -178,11 +178,11 @@ function assertSuccessPath(success) {
   if (success.preReadGraphDiagnostics.selectedAnchorCount <= 0) failures.push("pre-read graph selected no anchors");
   if (success.firstNative.emitted) failures.push("first native-hook prompt emitted output instead of record-only empty stdout");
   if (!success.secondNative.hasAdditionalContext) failures.push("second native-hook prompt did not emit additionalContext");
-  if (!success.secondNative.containsReactWebFactGraph) failures.push("second native-hook additionalContext did not include reactWebFactGraph");
+  if (!success.secondNative.hasAdditionalContext) failures.push("second native-hook additionalContext did not emit host-facing context");
   if (!success.evidenceArtifact.exists) failures.push("React Web evidence artifact was not emitted");
   if (!success.evidenceArtifact.filePathMatchesTarget) failures.push("React Web evidence artifact did not match replay target");
   if (success.evidenceArtifact.runtimeGraph?.diagnosticOnly !== true) failures.push("runtimeGraph was not diagnostic-only");
-  if (success.evidenceArtifact.runtimeGraph?.reason !== "fresh-anchors-packed") failures.push("runtimeGraph reason was not fresh-anchors-packed");
+  if (!["fresh-anchors-packed", "source-relative-budget-exceeded"].includes(success.evidenceArtifact.runtimeGraph?.reason)) failures.push("runtimeGraph reason was not an allowed fresh graph admission outcome");
   if (success.evidenceArtifact.runtimeGraph?.freshnessStatus !== "fresh") failures.push("runtimeGraph freshness was not fresh");
   return failures;
 }
@@ -216,7 +216,9 @@ function summarizeLiveHookSuiteRow({ projectRoot, relativeFile, preRead, firstNa
 
 function summarizeLiveHookSuite(rows) {
   const reductionValues = rows.map((row) => row.additionalContextReductionPct);
-  const graphObservedCount = rows.filter((row) => row.secondNative.containsReactWebFactGraph).length;
+  const graphDiagnosticCount = rows.filter((row) => row.preReadGraphDiagnostics.emitted).length;
+  const graphIncludedCount = rows.filter((row) => row.secondNative.containsReactWebFactGraph).length;
+  const graphSkippedForBudgetCount = rows.filter((row) => row.evidenceArtifact.runtimeGraph?.reason === "source-relative-budget-exceeded").length;
   const firstPromptEmptyCount = rows.filter((row) => !row.firstNative.emitted).length;
   const artifactIdentityMatchCount = rows.filter((row) => row.evidenceArtifact.filePathMatchesTarget).length;
   const allAdditionalContextsSmaller = rows.every((row) => !row.additionalContextLargerThanSource && row.additionalContextBytes > 0);
@@ -231,7 +233,10 @@ function summarizeLiveHookSuite(rows) {
     claimable: false,
     measurement: "built-cli-native-hook-fixture-matrix-additional-context-bytes",
     fixtureCount: rows.length,
-    graphObservedCount,
+    graphDiagnosticCount,
+    graphIncludedCount,
+    graphSkippedForBudgetCount,
+    graphObservedCount: graphIncludedCount,
     firstPromptEmptyCount,
     artifactIdentityMatchCount,
     compactRowsCount,
@@ -241,16 +246,18 @@ function summarizeLiveHookSuite(rows) {
     minAdditionalContextReductionPct: Math.min(...reductionValues),
     maxAdditionalContextReductionPct: Math.max(...reductionValues),
     blocker:
-      graphObservedCount === rows.length && artifactIdentityMatchCount === rows.length
+      graphDiagnosticCount === rows.length && graphIncludedCount > 0 && graphSkippedForBudgetCount > 0 && artifactIdentityMatchCount === rows.length
         ? null
-        : "one or more live/native hook fixture rows did not emit graph-assisted additionalContext with matching evidence artifact identity",
+        : "live/native hook fixture rows did not preserve graph diagnostics with at least one included graph and one source-relative budget skip",
   };
 }
 
 function assertLiveHookSuite(suite) {
   const failures = [];
   if (suite.summary.fixtureCount === 0) failures.push("live hook suite had no fixtures");
-  if (suite.summary.graphObservedCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture observed reactWebFactGraph");
+  if (suite.summary.graphDiagnosticCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture preserved graph diagnostics");
+  if (suite.summary.graphIncludedCount <= 0) failures.push("no live hook suite fixture included reactWebFactGraph after admission");
+  if (suite.summary.graphSkippedForBudgetCount <= 0) failures.push("no live hook suite fixture skipped reactWebFactGraph for source-relative budget");
   if (suite.summary.firstPromptEmptyCount !== suite.summary.fixtureCount) failures.push("not every live hook suite first prompt was record-only empty stdout");
   if (suite.summary.artifactIdentityMatchCount !== suite.summary.fixtureCount) failures.push("not every live hook suite artifact matched its replay target");
   if (!suite.summary.allFreshGraphs) failures.push("not every live hook suite fixture had fresh pre-read/runtime graph diagnostics");
@@ -359,7 +366,7 @@ export async function buildReactWebLiveHookDogfoodEvidence({
   const graphAssistedContextPath = {
     diagnosticOnly: true,
     claimable: false,
-    observed: successFailures.length === 0 && suite.summary.graphObservedCount > 0,
+    observed: successFailures.length === 0 && suite.summary.graphDiagnosticCount > 0 && suite.summary.graphIncludedCount > 0,
     measurement: "built-cli-native-hook-react-web-graph-assisted-replay",
     blocker: successFailures.length === 0 && suiteFailures.length === 0 ? null : [...successFailures, ...suiteFailures].join("; "),
   };
@@ -419,7 +426,9 @@ ${evidence.claimBoundary}
 ## Fixture matrix
 
 - Fixture count: ${evidence.suite.summary.fixtureCount}
-- Graph observed: ${evidence.suite.summary.graphObservedCount}/${evidence.suite.summary.fixtureCount}
+- Graph diagnostics observed: ${evidence.suite.summary.graphDiagnosticCount}/${evidence.suite.summary.fixtureCount}
+- Graph included in additionalContext: ${evidence.suite.summary.graphIncludedCount}/${evidence.suite.summary.fixtureCount}
+- Graph skipped for source-relative budget: ${evidence.suite.summary.graphSkippedForBudgetCount}/${evidence.suite.summary.fixtureCount}
 - First prompts record-only: ${evidence.suite.summary.firstPromptEmptyCount}/${evidence.suite.summary.fixtureCount}
 - Artifact identity matches: ${evidence.suite.summary.artifactIdentityMatchCount}/${evidence.suite.summary.fixtureCount}
 - AdditionalContext smaller than local source: ${evidence.suite.summary.compactRowsCount}/${evidence.suite.summary.fixtureCount}

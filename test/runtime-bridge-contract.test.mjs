@@ -82,6 +82,10 @@ test("runtime graph packing reasons cover every canonical omission and success s
   assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture({ selectedAnchors: [] })).reason, "no-anchors-selected");
   assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture({ inScope: false, selectedAnchors: [] })).reason, "out-of-scope");
   assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture(), { budgetExceeded: true }).reason, "budget-exceeded");
+  assert.equal(
+    summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture(), { sourceRelativeBudgetExceeded: true }).reason,
+    "source-relative-budget-exceeded",
+  );
 });
 
 test("runtime bridge contract keeps repeated-read inject and fallback semantics stable", () => {
@@ -122,24 +126,11 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(optimizedEditPayload.editGuidance.freshness.fileHash, optimizedEditPayload.sourceFingerprint.fileHash);
   assert.ok(Array.isArray(optimizedEditPayload.reactWebContext.editTargetRouting));
   assert.ok(optimizedEditPayload.reactWebContext.editTargetRouting.length > 0);
-  assert.equal(optimizedEditPayload.reactWebFactGraph.schemaVersion, "react-web-fact-graph-runtime-context.v1");
-  assert.equal(optimizedEditPayload.reactWebFactGraph.freshnessStatus, "fresh");
-  assert.equal(optimizedEditPayload.reactWebFactGraph.freshnessVerified, true);
-  assert.equal(optimizedEditPayload.reactWebFactGraph.boundary, "advisory-current-source-only");
-  assert.ok(Array.isArray(optimizedEditPayload.reactWebFactGraph.selectedAnchors));
-  assert.ok(optimizedEditPayload.reactWebFactGraph.selectedAnchors.length > 0);
-  assert.equal(optimizedEditPayload.reactWebFactGraph.selectedAnchors[0].label.includes("FormSection"), true);
-  assert.equal(secondInject.debug.reactWebFactGraphPacking.included, true);
-  assert.equal(secondInject.debug.reactWebFactGraphPacking.reason, "fresh-anchors-packed");
+  assert.equal(secondInject.debug.reactWebFactGraphPacking.included, false);
+  assert.equal(secondInject.debug.reactWebFactGraphPacking.reason, "source-relative-budget-exceeded");
   assert.equal(secondInject.debug.reactWebFactGraphPacking.freshnessStatus, "fresh");
-  assert.equal(
-    secondInject.debug.reactWebFactGraphPacking.selectedAnchorCount,
-    optimizedEditPayload.reactWebFactGraph.selectedAnchors.length,
-  );
-  assert.doesNotMatch(
-    JSON.stringify(optimizedEditPayload.reactWebFactGraph),
-    /provider|billing|latency|cost|cache-performance|auto-apply|runtimeAuthorized|preReadAuthorized/i,
-  );
+  assert.ok(secondInject.debug.reactWebFactGraphPacking.selectedAnchorCount > 0);
+  assert.equal("reactWebFactGraph" in optimizedEditPayload, false);
   assert.equal(secondInject.debug.reactWebContextPacking.included, true);
   assert.equal(secondInject.debug.reactWebContextPacking.reason, "packed");
   assert.equal(secondInject.debug.reactWebContextPacking.priority[0], "editTargetRouting");

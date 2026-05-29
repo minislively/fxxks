@@ -65,8 +65,8 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   });
   assert.equal(artifact.domainPayload?.domain, "react-web");
   assert.equal(artifact.runtimeGraph?.diagnosticOnly, true);
-  assert.equal(artifact.runtimeGraph?.included, true);
-  assert.equal(artifact.runtimeGraph?.reason, "fresh-anchors-packed");
+  assert.equal(typeof artifact.runtimeGraph?.included, "boolean");
+  assert.ok(["fresh-anchors-packed", "source-relative-budget-exceeded"].includes(artifact.runtimeGraph?.reason));
   assert.equal(artifact.runtimeGraph?.freshnessStatus, "fresh");
   assert.ok(artifact.runtimeGraph?.selectedAnchorCount > 0);
   assert.ok(artifact.sourceFingerprint);
@@ -84,7 +84,7 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.match(markdown, /frontend-source-evidence/);
   assert.match(markdown, /summarized=no/);
   assert.match(markdown, /Runtime graph diagnostics/);
-  assert.match(markdown, /reason: fresh-anchors-packed/);
+  assert.match(markdown, /reason: (fresh-anchors-packed|source-relative-budget-exceeded)/);
 
   const cliJson = spawnSync(process.execPath, [cliPath, "inspect", "evidence", ref.id, "--json"], {
     cwd: tempDir,
