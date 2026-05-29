@@ -423,6 +423,26 @@ export {
   renderReactWebFactGraphConsumerDryRunText,
   selectReactWebFactGraphAnchors,
 } from "./core/react-web-fact-graph-consumer";
+
+export {
+  REACT_WEB_FACT_GRAPH_FRESHNESS_CLAIM_BOUNDARY,
+  REACT_WEB_FACT_GRAPH_FRESHNESS_COMMAND,
+  REACT_WEB_FACT_GRAPH_FRESHNESS_SCHEMA_VERSION,
+  buildReactWebFactGraphFreshnessExpected,
+  buildReactWebFactGraphFreshnessVerification,
+  renderReactWebFactGraphFreshnessVerificationText,
+  summarizeReactWebFactGraphFreshnessVerification,
+  verifyReactWebFactGraphFreshness,
+} from "./core/react-web-fact-graph-freshness";
+export type {
+  ReactWebFactGraphFreshnessActual,
+  ReactWebFactGraphFreshnessCheck,
+  ReactWebFactGraphFreshnessCheckStatus,
+  ReactWebFactGraphFreshnessExpected,
+  ReactWebFactGraphFreshnessSummary,
+  ReactWebFactGraphFreshnessVerification,
+} from "./core/react-web-fact-graph-freshness";
+
 export type {
   ReactWebFactGraphAnchor,
   ReactWebFactGraphAnchorDeferredReason,
