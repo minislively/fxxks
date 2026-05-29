@@ -1,0 +1,664 @@
+{
+  "schemaVersion": "react-web-live-hook-dogfood-evidence.v3",
+  "generatedAt": "2026-05-29T08:41:56.887Z",
+  "runId": "admission-final",
+  "measurement": "built-cli-native-hook-dogfood-replay",
+  "claimBoundary": "Local built-CLI/native-hook dogfood evidence only: proves bounded React Web graph-assisted context is observable through an isolated attached replay path. It is not provider tokenizer output, not runtime-token savings, not cache performance, not latency, not provider cost, billing, invoice, or charged-cost proof, and not broad React Web/RN/WebView/TUI support.",
+  "isolatedReplay": {
+    "projectRoot": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7",
+    "codexHome": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-codex-home-M8dK0m",
+    "attached": true,
+    "globalSettingsMutated": false,
+    "attachRuntimeProofStatus": "passed",
+    "trustLifecycleState": "ready"
+  },
+  "commands": [
+    {
+      "name": "attach-codex",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js attach codex --json"
+    },
+    {
+      "name": "codex-pre-read",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read src/components/FormSection.tsx --json"
+    },
+    {
+      "name": "native-hook-success-first",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "native-hook-success-second",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "native-hook-boundary-first",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "native-hook-boundary-second",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-codex-pre-read:fixtures/compressed/FormSection.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read fixtures/compressed/FormSection.tsx --json"
+    },
+    {
+      "name": "suite-native-hook-first:fixtures/compressed/FormSection.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-native-hook-second:fixtures/compressed/FormSection.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-codex-pre-read:fixtures/compressed/HookEffectPanel.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read fixtures/compressed/HookEffectPanel.tsx --json"
+    },
+    {
+      "name": "suite-native-hook-first:fixtures/compressed/HookEffectPanel.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-native-hook-second:fixtures/compressed/HookEffectPanel.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-codex-pre-read:fixtures/hybrid/DashboardPanel.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read fixtures/hybrid/DashboardPanel.tsx --json"
+    },
+    {
+      "name": "suite-native-hook-first:fixtures/hybrid/DashboardPanel.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-native-hook-second:fixtures/hybrid/DashboardPanel.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-codex-pre-read:test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx --json"
+    },
+    {
+      "name": "suite-native-hook-first:test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-native-hook-second:test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-codex-pre-read:test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx --json"
+    },
+    {
+      "name": "suite-native-hook-first:test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-native-hook-second:test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-codex-pre-read:test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-pre-read test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx --json"
+    },
+    {
+      "name": "suite-native-hook-first:test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    },
+    {
+      "name": "suite-native-hook-second:test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+      "command": "/Users/veluga/.nvm/versions/node/v24.14.0/bin/node /Users/veluga/Documents/Workspace_Minseol/fooks/dist/cli/index.js codex-runtime-hook --native-hook"
+    }
+  ],
+  "success": {
+    "targetFile": "src/components/FormSection.tsx",
+    "prompts": {
+      "first": "Please update src/components/FormSection.tsx",
+      "second": "Again, update src/components/FormSection.tsx and keep graph diagnostics compact if safe",
+      "editIntent": true
+    },
+    "preReadGraphDiagnostics": {
+      "diagnosticOnly": true,
+      "claimable": false,
+      "decision": "payload",
+      "filePath": "src/components/FormSection.tsx",
+      "classification": "react-web",
+      "freshnessStatus": "fresh",
+      "selectedAnchorCount": 8,
+      "deferredAnchorCount": 27,
+      "advisoryOnly": true,
+      "authorization": "none",
+      "emitted": true
+    },
+    "firstNative": {
+      "emitted": false,
+      "hookEventName": null,
+      "hasAdditionalContext": false,
+      "additionalContextBytes": 0,
+      "containsReactWebFactGraph": false,
+      "firstLine": null
+    },
+    "secondNative": {
+      "emitted": true,
+      "hookEventName": "UserPromptSubmit",
+      "hasAdditionalContext": true,
+      "additionalContextBytes": 144,
+      "containsReactWebFactGraph": false,
+      "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: src/components/FormSection.tsx · Read the full source file for this turn."
+    },
+    "evidenceArtifact": {
+      "diagnosticOnly": true,
+      "claimable": false,
+      "exists": true,
+      "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-b7ab6a4bf6ea49bd.json",
+      "filePath": "src/components/FormSection.tsx",
+      "expectedFilePath": "src/components/FormSection.tsx",
+      "filePathMatchesTarget": true,
+      "decision": "fallback",
+      "evidenceStrength": "adjacent",
+      "runtimeGraph": {
+        "diagnosticOnly": true,
+        "included": false,
+        "reason": "source-relative-budget-exceeded",
+        "selectedAnchorCount": 3,
+        "deferredAnchorCount": 32,
+        "freshnessStatus": "fresh"
+      },
+      "additionalContextAdmission": {
+        "diagnosticOnly": true,
+        "admitted": false,
+        "reason": "candidate-not-smaller-than-source",
+        "sourceBytes": 1541,
+        "candidateBytes": 3048,
+        "reductionPct": -97.794,
+        "minSourceBytes": 1024,
+        "minReductionPct": 25
+      }
+    }
+  },
+  "suite": {
+    "diagnosticOnly": true,
+    "claimBoundary": "Live/native hook fixture-matrix evidence only: local source bytes are compared with host-facing additionalContext bytes after built CLI replay. This is not provider tokenizer output, not provider billing/cost proof, and not a broad runtime-token claim.",
+    "fixtures": [
+      {
+        "file": "fixtures/compressed/FormSection.tsx",
+        "sourceBytes": 1541,
+        "additionalContextBytes": 149,
+        "additionalContextReductionPct": 90.331,
+        "additionalContextLargerThanSource": false,
+        "preReadGraphDiagnostics": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "decision": "payload",
+          "filePath": "fixtures/compressed/FormSection.tsx",
+          "classification": "react-web",
+          "freshnessStatus": "fresh",
+          "selectedAnchorCount": 8,
+          "deferredAnchorCount": 27,
+          "advisoryOnly": true,
+          "authorization": "none",
+          "emitted": true
+        },
+        "firstNative": {
+          "emitted": false,
+          "hookEventName": null,
+          "hasAdditionalContext": false,
+          "additionalContextBytes": 0,
+          "containsReactWebFactGraph": false,
+          "firstLine": null
+        },
+        "secondNative": {
+          "emitted": true,
+          "hookEventName": "UserPromptSubmit",
+          "hasAdditionalContext": true,
+          "additionalContextBytes": 149,
+          "containsReactWebFactGraph": false,
+          "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: fixtures/compressed/FormSection.tsx · Read the full source file for this turn."
+        },
+        "evidenceArtifact": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "exists": true,
+          "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-1672cacd32bcf527.json",
+          "filePath": "fixtures/compressed/FormSection.tsx",
+          "expectedFilePath": "fixtures/compressed/FormSection.tsx",
+          "filePathMatchesTarget": true,
+          "decision": "fallback",
+          "evidenceStrength": "adjacent",
+          "runtimeGraph": {
+            "diagnosticOnly": true,
+            "included": false,
+            "reason": "source-relative-budget-exceeded",
+            "selectedAnchorCount": 3,
+            "deferredAnchorCount": 32,
+            "freshnessStatus": "fresh"
+          },
+          "additionalContextAdmission": {
+            "diagnosticOnly": true,
+            "admitted": false,
+            "reason": "candidate-not-smaller-than-source",
+            "sourceBytes": 1541,
+            "candidateBytes": 3063,
+            "reductionPct": -98.767,
+            "minSourceBytes": 1024,
+            "minReductionPct": 25
+          }
+        },
+        "diagnosticOnly": true,
+        "claimable": false
+      },
+      {
+        "file": "fixtures/compressed/HookEffectPanel.tsx",
+        "sourceBytes": 1321,
+        "additionalContextBytes": 153,
+        "additionalContextReductionPct": 88.418,
+        "additionalContextLargerThanSource": false,
+        "preReadGraphDiagnostics": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "decision": "payload",
+          "filePath": "fixtures/compressed/HookEffectPanel.tsx",
+          "classification": "react-web",
+          "freshnessStatus": "fresh",
+          "selectedAnchorCount": 8,
+          "deferredAnchorCount": 43,
+          "advisoryOnly": true,
+          "authorization": "none",
+          "emitted": true
+        },
+        "firstNative": {
+          "emitted": false,
+          "hookEventName": null,
+          "hasAdditionalContext": false,
+          "additionalContextBytes": 0,
+          "containsReactWebFactGraph": false,
+          "firstLine": null
+        },
+        "secondNative": {
+          "emitted": true,
+          "hookEventName": "UserPromptSubmit",
+          "hasAdditionalContext": true,
+          "additionalContextBytes": 153,
+          "containsReactWebFactGraph": false,
+          "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: fixtures/compressed/HookEffectPanel.tsx · Read the full source file for this turn."
+        },
+        "evidenceArtifact": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "exists": true,
+          "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-0c06c3587feb45eb.json",
+          "filePath": "fixtures/compressed/HookEffectPanel.tsx",
+          "expectedFilePath": "fixtures/compressed/HookEffectPanel.tsx",
+          "filePathMatchesTarget": true,
+          "decision": "fallback",
+          "evidenceStrength": "adjacent",
+          "runtimeGraph": {
+            "diagnosticOnly": true,
+            "included": false,
+            "reason": "source-relative-budget-exceeded",
+            "selectedAnchorCount": 3,
+            "deferredAnchorCount": 48,
+            "freshnessStatus": "fresh"
+          },
+          "additionalContextAdmission": {
+            "diagnosticOnly": true,
+            "admitted": false,
+            "reason": "candidate-not-smaller-than-source",
+            "sourceBytes": 1321,
+            "candidateBytes": 3099,
+            "reductionPct": -134.595,
+            "minSourceBytes": 1024,
+            "minReductionPct": 25
+          }
+        },
+        "diagnosticOnly": true,
+        "claimable": false
+      },
+      {
+        "file": "fixtures/hybrid/DashboardPanel.tsx",
+        "sourceBytes": 4392,
+        "additionalContextBytes": 148,
+        "additionalContextReductionPct": 96.63,
+        "additionalContextLargerThanSource": false,
+        "preReadGraphDiagnostics": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "decision": "payload",
+          "filePath": "fixtures/hybrid/DashboardPanel.tsx",
+          "classification": "react-web",
+          "freshnessStatus": "fresh",
+          "selectedAnchorCount": 8,
+          "deferredAnchorCount": 73,
+          "advisoryOnly": true,
+          "authorization": "none",
+          "emitted": true
+        },
+        "firstNative": {
+          "emitted": false,
+          "hookEventName": null,
+          "hasAdditionalContext": false,
+          "additionalContextBytes": 0,
+          "containsReactWebFactGraph": false,
+          "firstLine": null
+        },
+        "secondNative": {
+          "emitted": true,
+          "hookEventName": "UserPromptSubmit",
+          "hasAdditionalContext": true,
+          "additionalContextBytes": 148,
+          "containsReactWebFactGraph": false,
+          "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: fixtures/hybrid/DashboardPanel.tsx · Read the full source file for this turn."
+        },
+        "evidenceArtifact": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "exists": true,
+          "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-3ad9104baf3345d9.json",
+          "filePath": "fixtures/hybrid/DashboardPanel.tsx",
+          "expectedFilePath": "fixtures/hybrid/DashboardPanel.tsx",
+          "filePathMatchesTarget": true,
+          "decision": "fallback",
+          "evidenceStrength": "adjacent",
+          "runtimeGraph": {
+            "diagnosticOnly": true,
+            "included": true,
+            "reason": "fresh-anchors-packed",
+            "selectedAnchorCount": 3,
+            "deferredAnchorCount": 78,
+            "freshnessStatus": "fresh"
+          },
+          "additionalContextAdmission": {
+            "diagnosticOnly": true,
+            "admitted": false,
+            "reason": "reduction-below-threshold",
+            "sourceBytes": 4392,
+            "candidateBytes": 4203,
+            "reductionPct": 4.303,
+            "minSourceBytes": 1024,
+            "minReductionPct": 25
+          }
+        },
+        "diagnosticOnly": true,
+        "claimable": false
+      },
+      {
+        "file": "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+        "sourceBytes": 4247,
+        "additionalContextBytes": 189,
+        "additionalContextReductionPct": 95.55,
+        "additionalContextLargerThanSource": false,
+        "preReadGraphDiagnostics": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "decision": "payload",
+          "filePath": "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+          "classification": "react-web",
+          "freshnessStatus": "fresh",
+          "selectedAnchorCount": 8,
+          "deferredAnchorCount": 105,
+          "advisoryOnly": true,
+          "authorization": "none",
+          "emitted": true
+        },
+        "firstNative": {
+          "emitted": false,
+          "hookEventName": null,
+          "hasAdditionalContext": false,
+          "additionalContextBytes": 0,
+          "containsReactWebFactGraph": false,
+          "firstLine": null
+        },
+        "secondNative": {
+          "emitted": true,
+          "hookEventName": "UserPromptSubmit",
+          "hasAdditionalContext": true,
+          "additionalContextBytes": 189,
+          "containsReactWebFactGraph": false,
+          "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx · Read the full source file for this turn."
+        },
+        "evidenceArtifact": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "exists": true,
+          "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-f36f734e590c7f02.json",
+          "filePath": "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+          "expectedFilePath": "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+          "filePathMatchesTarget": true,
+          "decision": "fallback",
+          "evidenceStrength": "adjacent",
+          "runtimeGraph": {
+            "diagnosticOnly": true,
+            "included": true,
+            "reason": "fresh-anchors-packed",
+            "selectedAnchorCount": 3,
+            "deferredAnchorCount": 110,
+            "freshnessStatus": "fresh"
+          },
+          "additionalContextAdmission": {
+            "diagnosticOnly": true,
+            "admitted": false,
+            "reason": "candidate-not-smaller-than-source",
+            "sourceBytes": 4247,
+            "candidateBytes": 4370,
+            "reductionPct": -2.896,
+            "minSourceBytes": 1024,
+            "minReductionPct": 25
+          }
+        },
+        "diagnosticOnly": true,
+        "claimable": false
+      },
+      {
+        "file": "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+        "sourceBytes": 2491,
+        "additionalContextBytes": 184,
+        "additionalContextReductionPct": 92.613,
+        "additionalContextLargerThanSource": false,
+        "preReadGraphDiagnostics": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "decision": "payload",
+          "filePath": "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+          "classification": "react-web",
+          "freshnessStatus": "fresh",
+          "selectedAnchorCount": 8,
+          "deferredAnchorCount": 57,
+          "advisoryOnly": true,
+          "authorization": "none",
+          "emitted": true
+        },
+        "firstNative": {
+          "emitted": false,
+          "hookEventName": null,
+          "hasAdditionalContext": false,
+          "additionalContextBytes": 0,
+          "containsReactWebFactGraph": false,
+          "firstLine": null
+        },
+        "secondNative": {
+          "emitted": true,
+          "hookEventName": "UserPromptSubmit",
+          "hasAdditionalContext": true,
+          "additionalContextBytes": 184,
+          "containsReactWebFactGraph": false,
+          "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx · Read the full source file for this turn."
+        },
+        "evidenceArtifact": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "exists": true,
+          "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-38170a89d3cf227a.json",
+          "filePath": "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+          "expectedFilePath": "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+          "filePathMatchesTarget": true,
+          "decision": "fallback",
+          "evidenceStrength": "adjacent",
+          "runtimeGraph": {
+            "diagnosticOnly": true,
+            "included": false,
+            "reason": "source-relative-budget-exceeded",
+            "selectedAnchorCount": 3,
+            "deferredAnchorCount": 62,
+            "freshnessStatus": "fresh"
+          },
+          "additionalContextAdmission": {
+            "diagnosticOnly": true,
+            "admitted": false,
+            "reason": "candidate-not-smaller-than-source",
+            "sourceBytes": 2491,
+            "candidateBytes": 2780,
+            "reductionPct": -11.602,
+            "minSourceBytes": 1024,
+            "minReductionPct": 25
+          }
+        },
+        "diagnosticOnly": true,
+        "claimable": false
+      },
+      {
+        "file": "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+        "sourceBytes": 2811,
+        "additionalContextBytes": 190,
+        "additionalContextReductionPct": 93.241,
+        "additionalContextLargerThanSource": false,
+        "preReadGraphDiagnostics": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "decision": "payload",
+          "filePath": "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+          "classification": "react-web",
+          "freshnessStatus": "fresh",
+          "selectedAnchorCount": 8,
+          "deferredAnchorCount": 63,
+          "advisoryOnly": true,
+          "authorization": "none",
+          "emitted": true
+        },
+        "firstNative": {
+          "emitted": false,
+          "hookEventName": null,
+          "hasAdditionalContext": false,
+          "additionalContextBytes": 0,
+          "containsReactWebFactGraph": false,
+          "firstLine": null
+        },
+        "secondNative": {
+          "emitted": true,
+          "hookEventName": "UserPromptSubmit",
+          "hasAdditionalContext": true,
+          "additionalContextBytes": 190,
+          "containsReactWebFactGraph": false,
+          "firstLine": "fooks: fallback (additional-context-compression-inefficient) · file: test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx · Read the full source file for this turn."
+        },
+        "evidenceArtifact": {
+          "diagnosticOnly": true,
+          "claimable": false,
+          "exists": true,
+          "artifactPath": "/var/folders/mz/z4mzg9s550q6jc8t3b9qyjvw0000gn/T/fooks-live-hook-dogfood-IBkce7/.fooks/artifacts/react-web-evidence/react-web-evidence-7a176746b1014e89.json",
+          "filePath": "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+          "expectedFilePath": "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+          "filePathMatchesTarget": true,
+          "decision": "fallback",
+          "evidenceStrength": "adjacent",
+          "runtimeGraph": {
+            "diagnosticOnly": true,
+            "included": false,
+            "reason": "source-relative-budget-exceeded",
+            "selectedAnchorCount": 3,
+            "deferredAnchorCount": 68,
+            "freshnessStatus": "fresh"
+          },
+          "additionalContextAdmission": {
+            "diagnosticOnly": true,
+            "admitted": false,
+            "reason": "candidate-not-smaller-than-source",
+            "sourceBytes": 2811,
+            "candidateBytes": 3323,
+            "reductionPct": -18.214,
+            "minSourceBytes": 1024,
+            "minReductionPct": 25
+          }
+        },
+        "diagnosticOnly": true,
+        "claimable": false
+      }
+    ],
+    "summary": {
+      "diagnosticOnly": true,
+      "claimable": false,
+      "measurement": "built-cli-native-hook-fixture-matrix-additional-context-bytes",
+      "fixtureCount": 6,
+      "graphDiagnosticCount": 6,
+      "graphIncludedCount": 0,
+      "runtimeGraphIncludedArtifactCount": 2,
+      "graphSkippedForBudgetCount": 4,
+      "graphObservedCount": 0,
+      "firstPromptEmptyCount": 6,
+      "artifactIdentityMatchCount": 6,
+      "compactRowsCount": 6,
+      "expandedRowsCount": 0,
+      "admissionObservedCount": 6,
+      "admittedAdditionalContextCount": 0,
+      "discardedAdditionalContextCount": 6,
+      "discardedReasonCounts": {
+        "candidate-not-smaller-than-source": 5,
+        "reduction-below-threshold": 1
+      },
+      "allAdditionalContextsSmaller": true,
+      "allFreshGraphs": true,
+      "minAdditionalContextReductionPct": 88.418,
+      "maxAdditionalContextReductionPct": 96.63,
+      "blocker": null
+    }
+  },
+  "boundary": {
+    "targetFile": "src/components/SimpleButton.tsx",
+    "prompts": {
+      "first": "Please update src/components/SimpleButton.tsx",
+      "second": "Again, update src/components/SimpleButton.tsx",
+      "editIntent": true
+    },
+    "firstNative": {
+      "emitted": false,
+      "hookEventName": null,
+      "hasAdditionalContext": false,
+      "additionalContextBytes": 0,
+      "containsReactWebFactGraph": false,
+      "firstLine": null
+    },
+    "secondNative": {
+      "emitted": true,
+      "hookEventName": "UserPromptSubmit",
+      "hasAdditionalContext": true,
+      "additionalContextBytes": 1674,
+      "containsReactWebFactGraph": false,
+      "firstLine": "fooks: reused pre-read (raw) · file: src/components/SimpleButton.tsx · context-mode: light-minimal"
+    },
+    "diagnosticOnly": true,
+    "claimable": false
+  },
+  "graphAssistedContextPath": {
+    "diagnosticOnly": true,
+    "claimable": false,
+    "observed": true,
+    "measurement": "built-cli-native-hook-react-web-graph-assisted-replay",
+    "blocker": null
+  },
+  "validation": {
+    "passed": true,
+    "successFailures": [],
+    "suiteFailures": [],
+    "boundaryFailures": []
+  },
+  "nonClaims": {
+    "provider-token-savings": false,
+    "provider-cost-savings": false,
+    "provider-billing-or-invoice-savings": false,
+    "cache-performance-improvement": false,
+    "latency-improvement": false,
+    "broad-runtime-token-savings": false,
+    "broad-react-web-support": false,
+    "react-native-webview-or-tui-support-expansion": false,
+    "stale-graph-reuse": false
+  }
+}

@@ -2778,19 +2778,12 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
     },
     repoRoot,
   );
-  assert.equal(second.action, "inject");
-  assert.equal(second.contextMode, "light");
-  assert.equal(second.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.equal(second.action, "fallback");
+  assert.equal(second.contextMode, "full");
+  assert.equal(second.contextModeReason, "additional-context-compression-inefficient");
+  assert.equal(second.fallback.reason, "additional-context-compression-inefficient");
   assert.equal(second.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
-  assert.ok(
-    second.additionalContext.startsWith(
-      `fooks: reused pre-read (compressed) · file: ${path.join("fixtures", "compressed", "FormSection.tsx")}`,
-    ),
-  );
-  assert.equal(second.additionalContext.includes("#fooks-full-read"), false);
-  assert.equal(second.additionalContext.includes("#fooks-disable-pre-read"), false);
-  assert.equal(second.additionalContext.includes("\"editGuidance\""), true);
-  assert.equal(second.additionalContext.includes("\"reactWebContext\""), true);
+  assert.equal(second.additionalContext, undefined);
   assert.ok(second.reasons.includes("edit-guidance-opt-in"));
   assert.equal(second.reasons.includes("preflight-advisory-attached"), false);
   assert.equal(second.debug.repeatedFile, true);
@@ -2799,38 +2792,17 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.ok(second.debug.decision.payload.editGuidance.patchTargets.length <= 12);
   assert.equal(second.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
   assert.equal(second.debug.decision.debug.reactWebContextBudget.included, true);
-  assert.deepEqual(second.debug.reactWebActivationMode, {
-    available: true,
-    verdict: "would-activate",
-    repeatedFilePositive: true,
-    profileGateVerdict: "would-activate",
-    profileGateReasons: [
-      "current-supported-lane-claim",
-      "direct-evidence-strength",
-      "direct-file-evidence-present",
-      "freshness-current",
-      "planner-decision-compact-safe",
-      "react-web-domain-payload-present",
-      "runtime-decision-use",
-    ],
-    globMatchVerdict: "would-activate",
-    globMatchReasons: [
-      "current-supported-lane-claim",
-      "direct-evidence-strength",
-      "file-path-glob-react-extension-match",
-      "freshness-current",
-      "planner-decision-compact-safe",
-      "react-web-domain-payload-present",
-      "runtime-decision-use",
-    ],
-    promotedTrigger: "profile-gate",
-    promoted: true,
-    deferredTriggers: ["always-on", "model-decision"],
-    blockedReasons: [],
-  });
-  const runtimePayload = JSON.parse(second.additionalContext.split("\n").slice(1).join("\n"));
-  assert.ok(Array.isArray(runtimePayload.reactWebContext.editTargetRouting));
-  assert.ok(runtimePayload.reactWebContext.editTargetRouting.length > 0);
+  assert.equal(second.debug.reactWebActivationMode.available, true);
+  assert.equal(second.debug.reactWebActivationMode.verdict, "deferred");
+  assert.equal(second.debug.reactWebActivationMode.repeatedFilePositive, false);
+  assert.equal(second.debug.reactWebActivationMode.profileGateVerdict, "deferred");
+  assert.equal(second.debug.reactWebActivationMode.globMatchVerdict, "deferred");
+  assert.equal(second.debug.reactWebActivationMode.promotedTrigger, null);
+  assert.equal(second.debug.reactWebActivationMode.promoted, true);
+  assert.ok(second.debug.reactWebActivationMode.profileGateReasons.includes("runtime-decision-fallback"));
+  assert.ok(second.debug.reactWebActivationMode.profileGateReasons.includes("evidence-strength-adjacent"));
+  assert.equal(second.debug.additionalContextAdmission.admitted, false);
+  assert.ok(["candidate-not-smaller-than-source", "reduction-below-threshold"].includes(second.debug.additionalContextAdmission.reason));
 
   fs.writeFileSync(second.statePath, "{not-json");
   const afterCorruptState = handleCodexRuntimeHook(
@@ -2887,11 +2859,10 @@ test("runtime hook treats implement and rename prompts as safe edit-intent guida
     },
     repoRoot,
   );
-  assert.equal(implementSecond.action, "inject");
-  assert.equal(implementSecond.contextModeReason, "repeated-exact-file-edit-guidance");
-  assert.equal(implementSecond.additionalContext.includes("\"editGuidance\""), true);
-  assert.equal(implementSecond.additionalContext.includes("\"reactWebContext\""), true);
+  assert.equal(implementSecond.action, "fallback");
+  assert.equal(implementSecond.contextModeReason, "additional-context-compression-inefficient");
   assert.equal(implementSecond.reasons.includes("edit-guidance-opt-in"), true);
+  assert.equal(implementSecond.debug.additionalContextAdmission.admitted, false);
 
   const renameSession = `hook-rename-edit-guidance-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: renameSession }, repoRoot);
@@ -2911,11 +2882,10 @@ test("runtime hook treats implement and rename prompts as safe edit-intent guida
     },
     repoRoot,
   );
-  assert.equal(renameSecond.action, "inject");
-  assert.equal(renameSecond.contextModeReason, "repeated-exact-file-edit-guidance");
-  assert.equal(renameSecond.additionalContext.includes("\"editGuidance\""), true);
-  assert.equal(renameSecond.additionalContext.includes("\"reactWebContext\""), true);
+  assert.equal(renameSecond.action, "fallback");
+  assert.equal(renameSecond.contextModeReason, "additional-context-compression-inefficient");
   assert.equal(renameSecond.reasons.includes("edit-guidance-opt-in"), true);
+  assert.equal(renameSecond.debug.additionalContextAdmission.admitted, false);
 });
 
 test("runtime hook gates edit guidance to repeated exact-file edit intent prompts", () => {
@@ -3656,7 +3626,7 @@ test("native hook bridge only activates inside attached codex projects", () => {
   assert.equal(second.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(
     second.hookSpecificOutput.additionalContext,
-    /fooks: reused pre-read \(compressed\) · file: src\/components\/FormSection\.tsx/,
+    /fooks: fallback \(additional-context-compression-inefficient\) · file: src\/components\/FormSection\.tsx/,
   );
 });
 
@@ -3779,7 +3749,7 @@ test("cli codex-runtime-hook can read native hook payloads from stdin", () => {
   assert.equal(cliSecond.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(
     cliSecond.hookSpecificOutput.additionalContext,
-    /fooks: reused pre-read \(compressed\) · file: src\/components\/FormSection\.tsx/,
+    /fooks: fallback \(additional-context-compression-inefficient\) · file: src\/components\/FormSection\.tsx/,
   );
 });
 

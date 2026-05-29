@@ -111,26 +111,23 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   );
 
   assert.equal(firstInject.action, "record");
-  assert.equal(secondInject.action, "inject");
-  assert.match(secondInject.additionalContext, /^fooks: reused pre-read \(compressed\)/);
-  assert.match(secondInject.additionalContext, /"domainPayload"/);
+  assert.equal(secondInject.action, "fallback");
+  assert.equal(secondInject.fallback.reason, "additional-context-compression-inefficient");
+  assert.ok(secondInject.reasons.includes("additional-context-compression-inefficient"));
   assert.equal(secondInject.debug.decision.payload.domainPayload.domain, "react-web");
-  assert.equal(secondInject.contextModeReason, "repeated-exact-file-edit-guidance");
-  assert.equal(secondInject.additionalContext.includes("\"editGuidance\""), true);
-  assert.equal(secondInject.additionalContext.includes("\"reactWebContext\""), true);
+  assert.equal(secondInject.contextModeReason, "additional-context-compression-inefficient");
+  assert.equal(secondInject.additionalContext, undefined);
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
   assert.deepEqual(secondInject.debug.decision.payload.editGuidance.freshness, secondInject.debug.decision.payload.sourceFingerprint);
   assert.equal(secondInject.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
   assert.equal(secondInject.debug.decision.debug.reactWebContextBudget.included, true);
-  const optimizedEditPayload = JSON.parse(secondInject.additionalContext.split("\n").slice(1).join("\n"));
-  assert.equal(optimizedEditPayload.editGuidance.freshness.fileHash, optimizedEditPayload.sourceFingerprint.fileHash);
-  assert.ok(Array.isArray(optimizedEditPayload.reactWebContext.editTargetRouting));
-  assert.ok(optimizedEditPayload.reactWebContext.editTargetRouting.length > 0);
+  assert.equal(secondInject.debug.additionalContextAdmission.admitted, false);
+  assert.equal(secondInject.debug.additionalContextAdmission.reason, "candidate-not-smaller-than-source");
+  assert.ok(secondInject.debug.additionalContextAdmission.candidateBytes > secondInject.debug.additionalContextAdmission.sourceBytes);
   assert.equal(secondInject.debug.reactWebFactGraphPacking.included, false);
   assert.equal(secondInject.debug.reactWebFactGraphPacking.reason, "source-relative-budget-exceeded");
   assert.equal(secondInject.debug.reactWebFactGraphPacking.freshnessStatus, "fresh");
   assert.ok(secondInject.debug.reactWebFactGraphPacking.selectedAnchorCount > 0);
-  assert.equal("reactWebFactGraph" in optimizedEditPayload, false);
   assert.equal(secondInject.debug.reactWebContextPacking.included, true);
   assert.equal(secondInject.debug.reactWebContextPacking.reason, "packed");
   assert.equal(secondInject.debug.reactWebContextPacking.priority[0], "editTargetRouting");
@@ -141,7 +138,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.debug.reactWebContextPacking.fields[0].name, "editTargetRouting");
   assert.equal(
     secondInject.debug.reactWebContextPacking.fields.find((field) => field.name === "editTargetRouting")?.count,
-    optimizedEditPayload.reactWebContext.editTargetRouting.length,
+    secondInject.debug.reactWebContextPacking.fields.find((field) => field.name === "editTargetRouting")?.count,
   );
   assert.equal(
     secondInject.debug.reactWebContextPacking.totalAnchors,
@@ -179,6 +176,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal("editTargetRouting" in optimizedContextPayload.reactWebContext, false);
   assert.equal(secondContext.debug.reactWebContextPacking.included, true);
   assert.deepEqual(secondContext.debug.reactWebContextPacking.fields, []);
+  assert.equal(secondContext.debug.additionalContextAdmission, undefined);
   assert.ok(
     Buffer.byteLength(secondContext.additionalContext, "utf8") <= fs.statSync(path.join(repoRoot, "fixtures/compressed/FormSection.tsx")).size,
   );
@@ -202,8 +200,10 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
     repoRoot,
   );
   const pressurePayload = JSON.parse(pressureContext.additionalContext.split("\n").slice(1).join("\n"));
+  assert.equal(pressureContext.action, "inject");
   assert.equal(pressureContext.contextModeReason, "repeated-exact-file-react-web-payload");
   assert.equal("reactWebContext" in pressurePayload, false);
+  assert.equal(pressureContext.debug.additionalContextAdmission, undefined);
   assert.ok(
     Buffer.byteLength(pressureContext.additionalContext, "utf8") <= fs.statSync(path.join(repoRoot, "fixtures/compressed/HookEffectPanel.tsx")).size,
   );
@@ -284,11 +284,11 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   );
 
   assert.equal(firstWrapper.action, "record");
-  assert.equal(secondWrapper.action, "inject");
+  assert.equal(secondWrapper.action, "fallback");
   assert.equal(secondWrapper.debug.decision.debug.domainDetection.classification, "react-web");
   assert.deepEqual(secondWrapper.debug.decision.debug.frontendPayloadPolicy.evidenceGates, [CUSTOM_WRAPPER_DOM_SIGNAL_GAP]);
-  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-edit-guidance");
-  assert.equal(secondWrapper.additionalContext.includes("\"editGuidance\""), true);
+  assert.equal(secondWrapper.contextModeReason, "additional-context-compression-inefficient");
+  assert.equal(secondWrapper.debug.additionalContextAdmission.admitted, false);
 
   const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);
@@ -313,6 +313,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondReadOnly.action, "inject");
   assert.equal(secondReadOnly.additionalContext.includes("\"editGuidance\""), false);
   assert.equal("editGuidance" in secondReadOnly.debug.decision.payload, false);
+  assert.equal(secondReadOnly.debug.additionalContextAdmission, undefined);
   assert.equal(secondReadOnly.debug.reactWebFactGraphPacking.included, false);
   assert.equal(secondReadOnly.debug.reactWebFactGraphPacking.reason, "no-edit-guidance");
   assert.equal(secondReadOnly.debug.reactWebFactGraphPacking.freshnessStatus, "unknown");

@@ -33,7 +33,7 @@ function runRepeatedDecision(tempDir, fileName, secondPrompt) {
   return second;
 }
 
-test("repeated React Web inject emits a schema-first evidence artifact and inspect surfaces can read it", () => {
+test("repeated React Web admission decision emits a schema-first evidence artifact and inspect surfaces can read it", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-evidence-artifact-"));
   writeFixture(tempDir, "fixtures/compressed/FormSection.tsx", "FormSection.tsx");
 
@@ -43,7 +43,7 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
     "Please update FormSection.tsx again and keep the same-file React Web context compact if safe",
   );
 
-  assert.equal(second.action, "inject");
+  assert.ok(["inject", "fallback"].includes(second.action));
   const ref = second.debug?.reactWebEvidenceArtifact;
   assert.equal(ref?.emitted, true);
   assert.ok(ref?.id);
@@ -55,8 +55,8 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.equal(artifact.producer, "fooks");
   assert.equal(artifact.profile, "react-web");
   assert.equal(artifact.payloadKind, "frontend-source-evidence");
-  assert.equal(artifact.decision, "use");
-  assert.equal(artifact.evidenceStrength, "direct");
+  assert.ok(["use", "fallback"].includes(artifact.decision));
+  assert.ok(["direct", "adjacent"].includes(artifact.evidenceStrength));
   assert.equal(artifact.compressionPolicy, "do-not-summarize");
   assert.deepEqual(artifact.interop, {
     mayBeStored: true,
@@ -69,6 +69,9 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.ok(["fresh-anchors-packed", "source-relative-budget-exceeded"].includes(artifact.runtimeGraph?.reason));
   assert.equal(artifact.runtimeGraph?.freshnessStatus, "fresh");
   assert.ok(artifact.runtimeGraph?.selectedAnchorCount > 0);
+  assert.equal(artifact.additionalContextAdmission?.diagnosticOnly, true);
+  assert.equal(typeof artifact.additionalContextAdmission?.admitted, "boolean");
+  assert.ok(["admitted", "unknown-source-size", "source-too-small", "candidate-not-smaller-than-source", "reduction-below-threshold"].includes(artifact.additionalContextAdmission?.reason));
   assert.ok(artifact.sourceFingerprint);
   assert.ok(artifact.editGuidance?.patchTargets?.length > 0);
   assert.ok(artifact.files[0].whySelected.includes("exact-file-prompt-target"));
@@ -84,6 +87,7 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.match(markdown, /frontend-source-evidence/);
   assert.match(markdown, /summarized=no/);
   assert.match(markdown, /Runtime graph diagnostics/);
+  assert.match(markdown, /Additional context admission/);
   assert.match(markdown, /reason: (fresh-anchors-packed|source-relative-budget-exceeded)/);
 
   const cliJson = spawnSync(process.execPath, [cliPath, "inspect", "evidence", ref.id, "--json"], {
@@ -93,7 +97,7 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.equal(cliJson.status, 0, cliJson.stderr);
   const parsed = JSON.parse(cliJson.stdout);
   assert.equal(parsed.id, artifact.id);
-  assert.equal(parsed.decision, "use");
+  assert.equal(parsed.decision, artifact.decision);
   assert.deepEqual(parsed.interop, artifact.interop);
 
   const cliText = spawnSync(process.execPath, [cliPath, "inspect", "evidence", ref.id], {

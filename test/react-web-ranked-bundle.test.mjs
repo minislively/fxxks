@@ -35,6 +35,11 @@ function writeFixture(tempDir, fixturePath, fileName) {
   fs.writeFileSync(path.join(tempDir, fileName), fs.readFileSync(path.join(repoRoot, fixturePath), "utf8"));
 }
 
+function writeLargeFixture(tempDir, fixturePath, fileName) {
+  const source = fs.readFileSync(path.join(repoRoot, fixturePath), "utf8");
+  fs.writeFileSync(path.join(tempDir, fileName), `${source}\n{/* ${"admission budget filler ".repeat(1000)} */}\n`);
+}
+
 function runRepeatedDecision(tempDir, fileName, secondPrompt) {
   const sessionId = `react-web-ranked-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
@@ -119,7 +124,7 @@ function makeArtifact(overrides = {}) {
 
 test("inspect ranked-bundle reads a repeated React Web artifact and exposes a shadow diagnostic bundle", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-react-web-ranked-bundle-runtime-"));
-  writeFixture(tempDir, "fixtures/compressed/FormSection.tsx", "FormSection.tsx");
+  writeLargeFixture(tempDir, "fixtures/compressed/FormSection.tsx", "FormSection.tsx");
 
   const second = runRepeatedDecision(
     tempDir,

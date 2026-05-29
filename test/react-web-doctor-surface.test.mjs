@@ -50,7 +50,7 @@ test("doctor codex reports ready React Web activation readiness from a current r
   const second = runRepeatedDecision(
     tempDir,
     "FormSection.tsx",
-    "Please update FormSection.tsx again and keep the same-file React Web context compact if safe",
+    "Please inspect FormSection.tsx again and keep the same-file React Web context compact if safe",
   );
   assert.equal(second.action, "inject");
 
@@ -81,7 +81,7 @@ test("doctor codex reports partial React Web activation readiness when freshness
   const second = runRepeatedDecision(
     tempDir,
     "FormSection.tsx",
-    "Please update FormSection.tsx again and keep the same-file React Web context compact if safe",
+    "Please inspect FormSection.tsx again and keep the same-file React Web context compact if safe",
   );
   assert.equal(second.action, "inject");
   fs.appendFileSync(path.join(tempDir, "FormSection.tsx"), "\n// stale now\n");

@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
 
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v2";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
 export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = [
@@ -149,6 +149,7 @@ function summarizeNativeResult(result) {
 function summarizeArtifact(artifactRef, expectedFile) {
   const artifact = artifactRef?.artifact ?? null;
   const runtimeGraph = artifact?.runtimeGraph ?? null;
+  const admission = artifact?.additionalContextAdmission ?? null;
   return {
     diagnosticOnly: true,
     claimable: false,
@@ -167,6 +168,18 @@ function summarizeArtifact(artifactRef, expectedFile) {
           selectedAnchorCount: runtimeGraph.selectedAnchorCount ?? 0,
           deferredAnchorCount: runtimeGraph.deferredAnchorCount ?? 0,
           freshnessStatus: runtimeGraph.freshnessStatus ?? "unknown",
+        }
+      : null,
+    additionalContextAdmission: admission
+      ? {
+          diagnosticOnly: admission.diagnosticOnly === true,
+          admitted: admission.admitted === true,
+          reason: admission.reason,
+          sourceBytes: admission.sourceBytes ?? null,
+          candidateBytes: admission.candidateBytes ?? 0,
+          reductionPct: admission.reductionPct ?? null,
+          minSourceBytes: admission.minSourceBytes ?? null,
+          minReductionPct: admission.minReductionPct ?? null,
         }
       : null,
   };
@@ -218,12 +231,23 @@ function summarizeLiveHookSuite(rows) {
   const reductionValues = rows.map((row) => row.additionalContextReductionPct);
   const graphDiagnosticCount = rows.filter((row) => row.preReadGraphDiagnostics.emitted).length;
   const graphIncludedCount = rows.filter((row) => row.secondNative.containsReactWebFactGraph).length;
+  const runtimeGraphIncludedArtifactCount = rows.filter((row) => row.evidenceArtifact.runtimeGraph?.included === true).length;
   const graphSkippedForBudgetCount = rows.filter((row) => row.evidenceArtifact.runtimeGraph?.reason === "source-relative-budget-exceeded").length;
   const firstPromptEmptyCount = rows.filter((row) => !row.firstNative.emitted).length;
   const artifactIdentityMatchCount = rows.filter((row) => row.evidenceArtifact.filePathMatchesTarget).length;
   const allAdditionalContextsSmaller = rows.every((row) => !row.additionalContextLargerThanSource && row.additionalContextBytes > 0);
   const compactRowsCount = rows.filter((row) => !row.additionalContextLargerThanSource && row.additionalContextBytes > 0).length;
   const expandedRowsCount = rows.length - compactRowsCount;
+  const admissionObservedCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.diagnosticOnly === true).length;
+  const admittedAdditionalContextCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.admitted === true).length;
+  const discardedAdditionalContextCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.admitted === false).length;
+  const discardedReasonCounts = rows.reduce((counts, row) => {
+    const admission = row.evidenceArtifact.additionalContextAdmission;
+    if (admission && !admission.admitted) {
+      counts[admission.reason] = (counts[admission.reason] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
   const allFreshGraphs = rows.every(
     (row) => row.preReadGraphDiagnostics.freshnessStatus === "fresh" && row.evidenceArtifact.runtimeGraph?.freshnessStatus === "fresh",
   );
@@ -235,20 +259,30 @@ function summarizeLiveHookSuite(rows) {
     fixtureCount: rows.length,
     graphDiagnosticCount,
     graphIncludedCount,
+    runtimeGraphIncludedArtifactCount,
     graphSkippedForBudgetCount,
     graphObservedCount: graphIncludedCount,
     firstPromptEmptyCount,
     artifactIdentityMatchCount,
     compactRowsCount,
     expandedRowsCount,
+    admissionObservedCount,
+    admittedAdditionalContextCount,
+    discardedAdditionalContextCount,
+    discardedReasonCounts,
     allAdditionalContextsSmaller,
     allFreshGraphs,
     minAdditionalContextReductionPct: Math.min(...reductionValues),
     maxAdditionalContextReductionPct: Math.max(...reductionValues),
     blocker:
-      graphDiagnosticCount === rows.length && graphIncludedCount > 0 && graphSkippedForBudgetCount > 0 && artifactIdentityMatchCount === rows.length
+      graphDiagnosticCount === rows.length &&
+      runtimeGraphIncludedArtifactCount > 0 &&
+      graphSkippedForBudgetCount > 0 &&
+      artifactIdentityMatchCount === rows.length &&
+      admissionObservedCount === rows.length &&
+      discardedAdditionalContextCount > 0
         ? null
-        : "live/native hook fixture rows did not preserve graph diagnostics with at least one included graph and one source-relative budget skip",
+        : "live/native hook fixture rows did not preserve graph diagnostics, admission diagnostics, and at least one discard",
   };
 }
 
@@ -256,10 +290,13 @@ function assertLiveHookSuite(suite) {
   const failures = [];
   if (suite.summary.fixtureCount === 0) failures.push("live hook suite had no fixtures");
   if (suite.summary.graphDiagnosticCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture preserved graph diagnostics");
-  if (suite.summary.graphIncludedCount <= 0) failures.push("no live hook suite fixture included reactWebFactGraph after admission");
+  if (suite.summary.runtimeGraphIncludedArtifactCount <= 0) failures.push("no live hook suite fixture preserved an included runtime graph diagnostic in the artifact");
   if (suite.summary.graphSkippedForBudgetCount <= 0) failures.push("no live hook suite fixture skipped reactWebFactGraph for source-relative budget");
   if (suite.summary.firstPromptEmptyCount !== suite.summary.fixtureCount) failures.push("not every live hook suite first prompt was record-only empty stdout");
   if (suite.summary.artifactIdentityMatchCount !== suite.summary.fixtureCount) failures.push("not every live hook suite artifact matched its replay target");
+  if (suite.summary.admissionObservedCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture recorded additionalContext admission diagnostics");
+  if (suite.summary.discardedAdditionalContextCount <= 0) failures.push("no live hook suite fixture discarded inefficient additionalContext");
+  if (suite.summary.admittedAdditionalContextCount > suite.summary.compactRowsCount) failures.push("admitted additionalContext count exceeded compact final output rows");
   if (!suite.summary.allFreshGraphs) failures.push("not every live hook suite fixture had fresh pre-read/runtime graph diagnostics");
   return failures;
 }
@@ -366,7 +403,7 @@ export async function buildReactWebLiveHookDogfoodEvidence({
   const graphAssistedContextPath = {
     diagnosticOnly: true,
     claimable: false,
-    observed: successFailures.length === 0 && suite.summary.graphDiagnosticCount > 0 && suite.summary.graphIncludedCount > 0,
+    observed: successFailures.length === 0 && suite.summary.graphDiagnosticCount > 0 && suite.summary.runtimeGraphIncludedArtifactCount > 0,
     measurement: "built-cli-native-hook-react-web-graph-assisted-replay",
     blocker: successFailures.length === 0 && suiteFailures.length === 0 ? null : [...successFailures, ...suiteFailures].join("; "),
   };
@@ -427,12 +464,17 @@ ${evidence.claimBoundary}
 
 - Fixture count: ${evidence.suite.summary.fixtureCount}
 - Graph diagnostics observed: ${evidence.suite.summary.graphDiagnosticCount}/${evidence.suite.summary.fixtureCount}
-- Graph included in additionalContext: ${evidence.suite.summary.graphIncludedCount}/${evidence.suite.summary.fixtureCount}
+- Graph included in final additionalContext: ${evidence.suite.summary.graphIncludedCount}/${evidence.suite.summary.fixtureCount}
+- Runtime graph included in artifact diagnostics: ${evidence.suite.summary.runtimeGraphIncludedArtifactCount}/${evidence.suite.summary.fixtureCount}
 - Graph skipped for source-relative budget: ${evidence.suite.summary.graphSkippedForBudgetCount}/${evidence.suite.summary.fixtureCount}
 - First prompts record-only: ${evidence.suite.summary.firstPromptEmptyCount}/${evidence.suite.summary.fixtureCount}
 - Artifact identity matches: ${evidence.suite.summary.artifactIdentityMatchCount}/${evidence.suite.summary.fixtureCount}
 - AdditionalContext smaller than local source: ${evidence.suite.summary.compactRowsCount}/${evidence.suite.summary.fixtureCount}
 - Expanded additionalContext rows: ${evidence.suite.summary.expandedRowsCount}/${evidence.suite.summary.fixtureCount}
+- AdditionalContext admission diagnostics: ${evidence.suite.summary.admissionObservedCount}/${evidence.suite.summary.fixtureCount}
+- AdditionalContext admitted rows: ${evidence.suite.summary.admittedAdditionalContextCount}/${evidence.suite.summary.fixtureCount}
+- AdditionalContext discarded rows: ${evidence.suite.summary.discardedAdditionalContextCount}/${evidence.suite.summary.fixtureCount}
+- AdditionalContext discard reasons: ${JSON.stringify(evidence.suite.summary.discardedReasonCounts)}
 - Local additionalContext reduction range: ${evidence.suite.summary.minAdditionalContextReductionPct}% to ${evidence.suite.summary.maxAdditionalContextReductionPct}%
 - Claimable as broad token/cost savings: no
 - Claim boundary: ${evidence.suite.claimBoundary}

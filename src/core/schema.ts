@@ -784,6 +784,20 @@ export type CodexRuntimeHookDecision = {
       deferredAnchorCount: number;
       freshnessStatus: "fresh" | "stale" | "unknown";
     };
+    additionalContextAdmission?: {
+      admitted: boolean;
+      reason:
+        | "admitted"
+        | "unknown-source-size"
+        | "source-too-small"
+        | "candidate-not-smaller-than-source"
+        | "reduction-below-threshold";
+      sourceBytes?: number;
+      candidateBytes: number;
+      reductionPct?: number;
+      minSourceBytes: number;
+      minReductionPct: number;
+    };
     reactWebActivationMode?: {
       available: boolean;
       verdict: "would-activate" | "deferred" | "blocked" | "unavailable";
