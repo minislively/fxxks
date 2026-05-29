@@ -374,3 +374,41 @@ test("pre-read payload-plan seam surfaces frontend profile reuse denial", () => 
   assert.equal(preReadDecision.debug.domainDetection.classification, "react-web");
   assert.equal(preReadDecision.debug.frontendPayloadPolicy.allowed, true);
 });
+
+test("pre-read attaches diagnostic-only React Web graph consumer summary", () => {
+  const filePath = path.join(repoRoot, "test", "fixtures", "react-web-context-expansion", "modal-dialog-preferences-form.tsx");
+  const { decidePreRead } = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
+  const decision = decidePreRead(filePath, repoRoot, "codex", {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  assert.equal(decision.decision, "payload");
+  assert.equal(decision.debug.domainDetection.classification, "react-web");
+  assert.equal(decision.debug.reactWebFactGraphConsumer.advisoryOnly, true);
+  assert.equal(decision.debug.reactWebFactGraphConsumer.authorization, "none");
+  assert.equal(decision.debug.reactWebFactGraphConsumer.inScope, true);
+  assert.equal(decision.debug.reactWebFactGraphConsumer.freshnessStatus, "fresh");
+  assert.ok(decision.debug.reactWebFactGraphConsumer.selectedAnchorCount > 0);
+  assert.equal(decision.debug.reactWebFactGraphConsumer.staleBehavior, "defer-all");
+  assert.equal("reactWebFactGraph" in decision.payload, false);
+});
+
+test("pre-read graph diagnostics stay absent for unsupported fallback lanes", () => {
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".tmp-pre-read-graph-fallback-"));
+  try {
+    const filePath = path.join(tempDir, "Cli.tsx");
+    fs.writeFileSync(filePath, `import { Box } from "ink"; export function Cli() { return <Box />; }`);
+    const { decidePreRead } = require(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
+    const decision = decidePreRead(filePath, tempDir, "codex", {
+      includeEditGuidance: true,
+      includeReactWebContextMetadata: true,
+    });
+
+    assert.equal(decision.decision, "fallback");
+    assert.equal(decision.debug.domainDetection.classification, "tui-ink");
+    assert.equal("reactWebFactGraphConsumer" in decision.debug, false);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
