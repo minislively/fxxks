@@ -829,11 +829,14 @@ function evaluateAdditionalContextAdmission(
     return { ...base, admitted: true, reason: "unknown-source-size" };
   }
 
+  const reductionPct = originalEstimatedBytes > 0
+    ? Number.parseFloat(((1 - candidateBytes / originalEstimatedBytes) * 100).toFixed(3))
+    : 0;
+
   if (originalEstimatedBytes < ADDITIONAL_CONTEXT_ADMISSION_MIN_SOURCE_BYTES) {
-    return { ...base, admitted: false, reason: "source-too-small", sourceBytes: originalEstimatedBytes };
+    return { ...base, admitted: false, reason: "source-too-small", sourceBytes: originalEstimatedBytes, reductionPct };
   }
 
-  const reductionPct = Number.parseFloat(((1 - candidateBytes / originalEstimatedBytes) * 100).toFixed(3));
   if (candidateBytes >= originalEstimatedBytes) {
     return { ...base, admitted: false, reason: "candidate-not-smaller-than-source", sourceBytes: originalEstimatedBytes, reductionPct };
   }
