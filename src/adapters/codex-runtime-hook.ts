@@ -29,6 +29,7 @@ import {
 import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "../reporting/worktree-evidence";
 import { emitReactWebEvidenceArtifact } from "../reporting/react-web-evidence-artifact";
 import { buildReactWebActivationModeFromRuntimeDecision, summarizeReactWebActivationMode } from "../reporting/react-web-activation-mode";
+import { buildReactWebFactGraphConsumerDryRun, type ReactWebFactGraphConsumerDryRun } from "../core/react-web-fact-graph-consumer";
 
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
@@ -43,6 +44,21 @@ type RuntimeReactWebContext = NonNullable<ModelFacingPayload["reactWebContext"]>
 type RuntimeReactWebContextArrayKey = Exclude<{
   [Key in keyof RuntimeReactWebContext]: RuntimeReactWebContext[Key] extends unknown[] | undefined ? Key : never;
 }[keyof RuntimeReactWebContext], undefined>;
+type PackedRuntimeReactWebFactGraph = {
+  schemaVersion: "react-web-fact-graph-runtime-context.v1";
+  freshnessStatus: ReactWebFactGraphConsumerDryRun["graphSummary"]["freshnessStatus"];
+  freshnessVerified: true;
+  selectedAnchors: Array<{
+    rank: number;
+    type: string;
+    kind: string;
+    label: string;
+    loc?: string;
+  }>;
+  deferredAnchorCount: number;
+  boundary: "advisory-current-source-only";
+};
+
 type PackedRuntimeReactWebContext = {
   schemaVersion: RuntimeReactWebContext["schemaVersion"];
   freshness: RuntimeReactWebContext["freshness"];
@@ -101,21 +117,30 @@ function minimalRuntimeReactWebContext(reactWebContext: RuntimeReactWebContext):
   };
 }
 
-function optimizedReactWebRuntimePayload(payload: ModelFacingPayload, reactWebContext?: PackedRuntimeReactWebContext): unknown {
+function optimizedReactWebRuntimePayload(
+  payload: ModelFacingPayload,
+  reactWebContext?: PackedRuntimeReactWebContext,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
+): unknown {
   return {
     filePath: payload.filePath,
     sourceFingerprint: payload.sourceFingerprint,
     domainPayload: payload.domainPayload,
     ...(payload.editGuidance ? { editGuidance: payload.editGuidance } : {}),
     ...(reactWebContext ? { reactWebContext } : {}),
+    ...(reactWebFactGraph ? { reactWebFactGraph } : {}),
   };
 }
 
-function buildRuntimeContextPayload(payload: ModelFacingPayload, reactWebContext?: PackedRuntimeReactWebContext): { optimized: boolean; payload: unknown } {
+function buildRuntimeContextPayload(
+  payload: ModelFacingPayload,
+  reactWebContext?: PackedRuntimeReactWebContext,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
+): { optimized: boolean; payload: unknown } {
   if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
     return {
       optimized: true,
-      payload: optimizedReactWebRuntimePayload(payload, reactWebContext),
+      payload: optimizedReactWebRuntimePayload(payload, reactWebContext, reactWebFactGraph),
     };
   }
   return { optimized: false, payload };
@@ -138,8 +163,9 @@ function renderOptimizedReactWebAdditionalContext(
   payload: ModelFacingPayload,
   contextMode: ContextMode,
   reactWebContext?: PackedRuntimeReactWebContext,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
 ): string {
-  return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload, reactWebContext));
+  return renderAdditionalContext(filePath, payload.mode, contextMode, buildRuntimeContextPayload(payload, reactWebContext, reactWebFactGraph));
 }
 
 function compactRuntimeReactWebContext(
@@ -147,12 +173,13 @@ function compactRuntimeReactWebContext(
   payload: ModelFacingPayload,
   contextMode: ContextMode,
   maxOptimizedContextBytes?: number,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
 ): PackedRuntimeReactWebContext | undefined {
   if (!payload.reactWebContext) return undefined;
 
   const fits = (reactWebContext?: PackedRuntimeReactWebContext): boolean => {
     if (maxOptimizedContextBytes === undefined) return true;
-    const additionalContext = renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext);
+    const additionalContext = renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph);
     return estimateTextBytes(additionalContext) <= maxOptimizedContextBytes;
   };
 
@@ -182,6 +209,7 @@ function compactRuntimeReactWebContext(
 }
 
 type RuntimeReactWebContextPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebContextPacking"]>;
+type RuntimeReactWebFactGraphPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebFactGraphPacking"]>;
 type CodexRuntimeDebug = NonNullable<CodexRuntimeHookDecision["debug"]>;
 type PreflightAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["preflightAdvisoryIntent"]>;
 type DomainMemoryAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["domainMemoryAdvisory"]>;
@@ -425,20 +453,69 @@ function summarizeRuntimeReactWebContextPacking(
   };
 }
 
+function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): PackedRuntimeReactWebFactGraph | undefined {
+  const dryRun = buildReactWebFactGraphConsumerDryRun(path.join(cwd, filePath), cwd, {
+    verifyFreshness: true,
+    maxAnchors: 3,
+  });
+  if (!dryRun.inScope || dryRun.graphSummary.freshnessStatus !== "fresh" || dryRun.selectedAnchors.length === 0) {
+    return undefined;
+  }
+  return {
+    schemaVersion: "react-web-fact-graph-runtime-context.v1",
+    freshnessStatus: dryRun.graphSummary.freshnessStatus,
+    freshnessVerified: true,
+    selectedAnchors: dryRun.selectedAnchors.map((anchor) => {
+      const loc = anchor.sourceRefs[0]?.loc;
+      return {
+        rank: anchor.rank,
+        type: anchor.anchorType,
+        kind: anchor.kind,
+        label: anchor.label,
+        ...(loc ? { loc: `${loc.startLine}-${loc.endLine}` } : {}),
+      };
+    }),
+    deferredAnchorCount: dryRun.deferredAnchors.length,
+    boundary: "advisory-current-source-only",
+  };
+}
+
+function summarizeRuntimeReactWebFactGraphPacking(
+  reactWebFactGraph: PackedRuntimeReactWebFactGraph | undefined,
+): RuntimeReactWebFactGraphPackingSummary {
+  return {
+    included: Boolean(reactWebFactGraph),
+    reason: reactWebFactGraph ? "fresh-anchors-packed" : "not-emitted",
+    selectedAnchorCount: reactWebFactGraph?.selectedAnchors.length ?? 0,
+    deferredAnchorCount: reactWebFactGraph?.deferredAnchorCount ?? 0,
+    freshnessStatus: reactWebFactGraph?.freshnessStatus ?? "unknown",
+  };
+}
+
 function buildAdditionalContext(
   filePath: string,
   payload: ModelFacingPayload,
   contextMode: ContextMode,
   maxOptimizedContextBytes?: number,
-): { additionalContext: string; reactWebContextPacking?: RuntimeReactWebContextPackingSummary } {
+  cwd = process.cwd(),
+  includeReactWebFactGraph = true,
+): { additionalContext: string; reactWebContextPacking?: RuntimeReactWebContextPackingSummary; reactWebFactGraphPacking?: RuntimeReactWebFactGraphPackingSummary } {
   if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
     const runtimeReactWebContextBudget = payload.editGuidance
       ? editGuidanceBudgetLimit(maxOptimizedContextBytes)
       : maxOptimizedContextBytes;
     const reactWebContext = compactRuntimeReactWebContext(filePath, payload, contextMode, runtimeReactWebContextBudget);
+    let reactWebFactGraph = includeReactWebFactGraph && payload.editGuidance ? compactRuntimeReactWebFactGraph(filePath, cwd) : undefined;
+    if (reactWebFactGraph && runtimeReactWebContextBudget !== undefined) {
+      const contextWithGraph = renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph);
+      if (estimateTextBytes(contextWithGraph) > runtimeReactWebContextBudget) {
+        reactWebFactGraph = undefined;
+      }
+    }
     return {
-      additionalContext: renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext),
+      additionalContext: renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph),
       reactWebContextPacking: summarizeRuntimeReactWebContextPacking(reactWebContext),
+      reactWebFactGraphPacking: summarizeRuntimeReactWebFactGraphPacking(reactWebFactGraph),
     };
   }
 
@@ -900,7 +977,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       });
       if (optInDecision.decision === "payload" && optInDecision.payload && hasMatchingEditGuidance(optInDecision.payload)) {
         const optInContextMode = payloadContextMode(optInDecision.payload);
-        const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode, originalEstimatedBytes);
+        const optInAdditionalContext = buildAdditionalContext(target, optInDecision.payload, optInContextMode, originalEstimatedBytes, cwd, false);
         const estimatedContextBytes = estimateTextBytes(optInAdditionalContext.additionalContext);
         if (estimatedContextBytes <= editGuidanceBudgetLimit(originalEstimatedBytes)) {
           decision = optInDecision;
@@ -913,7 +990,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
 
   if (decision.decision === "payload" && decision.payload) {
     const contextMode = payloadContextMode(decision.payload);
-    const runtimeContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes);
+    const runtimeContext = buildAdditionalContext(target, decision.payload, contextMode, originalEstimatedBytes, cwd);
     const projectKnowledge = resolveProjectKnowledgeContext(prompt, [target], cwd);
     let domainMemoryLookupDebug: DomainMemoryLookupDebugReceipt | undefined;
     let automaticAdvisoryContext: string | undefined;
@@ -939,7 +1016,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       [runtimeContext.additionalContext, advisoryContext].filter(Boolean).join("\n\n"),
       projectKnowledge?.block,
     );
-    const { reactWebContextPacking } = runtimeContext;
+    const { reactWebContextPacking, reactWebFactGraphPacking } = runtimeContext;
     markCodexAttachPrepared({ filePath: target, source: "prompt-target" }, cwd);
     const editGuidanceIncluded = hasMatchingEditGuidance(decision.payload);
     const runtimeDecision: CodexRuntimeHookDecision = {
@@ -968,6 +1045,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
         escapeHatchUsed: false,
         decision,
         ...(reactWebContextPacking ? { reactWebContextPacking } : {}),
+        ...(reactWebFactGraphPacking ? { reactWebFactGraphPacking } : {}),
       },
     };
     attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);

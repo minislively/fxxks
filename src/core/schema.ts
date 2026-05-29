@@ -756,6 +756,13 @@ export type CodexRuntimeHookDecision = {
       totalAnchors: number;
       priority: string[];
     };
+    reactWebFactGraphPacking?: {
+      included: boolean;
+      reason: "fresh-anchors-packed" | "not-emitted";
+      selectedAnchorCount: number;
+      deferredAnchorCount: number;
+      freshnessStatus: "fresh" | "stale" | "unknown";
+    };
     reactWebActivationMode?: {
       available: boolean;
       verdict: "would-activate" | "deferred" | "blocked" | "unavailable";
