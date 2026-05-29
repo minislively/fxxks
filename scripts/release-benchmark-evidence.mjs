@@ -85,8 +85,18 @@ export async function buildReleaseBenchmarkEvidence({
         maxPct: finite(contextEvidence.summary.fullRuntimePayloadReduction.maxPct),
         blocker: contextEvidence.summary.fullRuntimePayloadReduction.blocker,
       },
+      preReadGraphDiagnostics: {
+        ...contextEvidence.summary.preReadGraphDiagnostics,
+        diagnosticOnly: true,
+        claimable: false,
+      },
       runtimeGraphDiagnostics: {
         ...contextEvidence.summary.runtimeGraphDiagnostics,
+        diagnosticOnly: true,
+        claimable: false,
+      },
+      graphAssistedContextPath: {
+        ...contextEvidence.summary.graphAssistedContextPath,
         diagnosticOnly: true,
         claimable: false,
       },
@@ -131,7 +141,9 @@ export function buildReleaseBenchmarkSmokeSummary(evidence) {
     npmUpdateClaimable: evidence.releaseClaims.npmUpdateClaimable,
     headline: evidence.releaseClaims.headline,
     actualInjectedContextReduction: evidence.context.actualInjectedContextReduction,
+    preReadGraphDiagnostics: evidence.context.preReadGraphDiagnostics,
     runtimeGraphDiagnostics: evidence.context.runtimeGraphDiagnostics,
+    graphAssistedContextPath: evidence.context.graphAssistedContextPath,
     reuseCorrectnessClaimable: evidence.reuse.reuseCorrectnessClaimable,
     nonClaims: {
       cachePerformanceImprovement: evidence.nonClaims.cachePerformanceImprovement.claimable,
@@ -189,7 +201,9 @@ ${evidence.releaseClaims.headline}
 - npm update wording claimable: ${evidence.releaseClaims.npmUpdateClaimable ? "yes" : "no"}
 - React Web actual injected context reduction: ${evidence.context.actualInjectedContextReduction.claimable ? "yes" : "no"} (${evidence.context.actualInjectedContextReduction.minPct}% to ${evidence.context.actualInjectedContextReduction.maxPct}% smaller actual additionalContext)
 - React Web domainPayload reduction diagnostic-only: ${evidence.context.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.context.domainPayloadReduction.minPct}% to ${evidence.context.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads)
+- React Web pre-read graph diagnostics: ${evidence.context.preReadGraphDiagnostics.emittedCount}/${evidence.context.preReadGraphDiagnostics.fixtureCount} emitted, diagnostic-only=yes
 - React Web runtime graph diagnostics: ${evidence.context.runtimeGraphDiagnostics.emittedCount}/${evidence.context.runtimeGraphDiagnostics.fixtureCount} emitted, diagnostic-only=yes
+- React Web graph-assisted context path: ${evidence.context.graphAssistedContextPath.correlatedFreshPathCount}/${evidence.context.graphAssistedContextPath.fixtureCount} correlated, diagnostic-only=yes
 - React Web reuse correctness: ${evidence.reuse.reuseCorrectnessClaimable ? "yes" : "no"}
 
 ## Fixture context-size measurements
