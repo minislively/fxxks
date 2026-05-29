@@ -32,7 +32,7 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.equal(evidence.success.secondNative.emitted, true);
   assert.equal(evidence.success.secondNative.hookEventName, "UserPromptSubmit");
   assert.equal(evidence.success.secondNative.hasAdditionalContext, true);
-  assert.equal(evidence.success.secondNative.containsReactWebFactGraph, true);
+  assert.equal(typeof evidence.success.secondNative.containsReactWebFactGraph, "boolean");
   assert.match(evidence.success.secondNative.firstLine, /fooks: reused pre-read \(compressed\)/);
 
   assert.equal(evidence.success.evidenceArtifact.exists, true);
@@ -40,8 +40,8 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.equal(evidence.success.evidenceArtifact.filePathMatchesTarget, true);
   assert.equal(evidence.success.evidenceArtifact.decision, "use");
   assert.equal(evidence.success.evidenceArtifact.runtimeGraph.diagnosticOnly, true);
-  assert.equal(evidence.success.evidenceArtifact.runtimeGraph.included, true);
-  assert.equal(evidence.success.evidenceArtifact.runtimeGraph.reason, "fresh-anchors-packed");
+  assert.equal(typeof evidence.success.evidenceArtifact.runtimeGraph.included, "boolean");
+  assert.ok(["fresh-anchors-packed", "source-relative-budget-exceeded"].includes(evidence.success.evidenceArtifact.runtimeGraph.reason));
   assert.equal(evidence.success.evidenceArtifact.runtimeGraph.freshnessStatus, "fresh");
   assert.ok(evidence.success.evidenceArtifact.runtimeGraph.selectedAnchorCount > 0);
 
@@ -50,7 +50,9 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.equal(evidence.suite.summary.measurement, "built-cli-native-hook-fixture-matrix-additional-context-bytes");
   assert.equal(evidence.suite.summary.diagnosticOnly, true);
   assert.equal(evidence.suite.summary.fixtureCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
-  assert.equal(evidence.suite.summary.graphObservedCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.equal(evidence.suite.summary.graphDiagnosticCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.ok(evidence.suite.summary.graphIncludedCount > 0);
+  assert.ok(evidence.suite.summary.graphSkippedForBudgetCount > 0);
   assert.equal(evidence.suite.summary.firstPromptEmptyCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
   assert.equal(evidence.suite.summary.artifactIdentityMatchCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
   assert.equal(evidence.suite.summary.claimable, false);
@@ -64,12 +66,12 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
     assert.equal(row.diagnosticOnly, true);
     assert.equal(row.claimable, false);
     assert.equal(row.firstNative.emitted, false);
-    assert.equal(row.secondNative.containsReactWebFactGraph, true);
+    assert.equal(typeof row.secondNative.containsReactWebFactGraph, "boolean");
     assert.equal(row.preReadGraphDiagnostics.classification, "react-web");
     assert.equal(row.preReadGraphDiagnostics.freshnessStatus, "fresh");
     assert.equal(row.evidenceArtifact.filePathMatchesTarget, true);
     assert.equal(row.evidenceArtifact.runtimeGraph.freshnessStatus, "fresh");
-    assert.equal(row.evidenceArtifact.runtimeGraph.reason, "fresh-anchors-packed");
+    assert.ok(["fresh-anchors-packed", "source-relative-budget-exceeded"].includes(row.evidenceArtifact.runtimeGraph.reason));
     assert.equal(typeof row.additionalContextReductionPct, "number");
   }
 
@@ -100,10 +102,12 @@ test("React Web live hook dogfood evidence Markdown keeps diagnostic-only bounda
   assert.match(markdown, /Graph-assisted path observed: yes \(diagnostic-only\)/);
   assert.match(markdown, /Prompt shape: repeated same-file edit-intent prompts/);
   assert.match(markdown, /First native hook: emitted=no \(record-only empty stdout expected\)/);
-  assert.match(markdown, /contains reactWebFactGraph=yes/);
+  assert.match(markdown, /contains reactWebFactGraph=(yes|no)/);
   assert.match(markdown, /Artifact identity matches replay target: yes/);
   assert.match(markdown, /Fixture matrix/);
-  assert.match(markdown, /Graph observed: \d+\/\d+/);
+  assert.match(markdown, /Graph diagnostics observed: \d+\/\d+/);
+  assert.match(markdown, /Graph included in additionalContext: \d+\/\d+/);
+  assert.match(markdown, /Graph skipped for source-relative budget: \d+\/\d+/);
   assert.match(markdown, /AdditionalContext smaller than local source: \d+\/\d+/);
   assert.match(markdown, /Expanded additionalContext rows: \d+\/\d+/);
   assert.match(markdown, /Local additionalContext reduction range:/);

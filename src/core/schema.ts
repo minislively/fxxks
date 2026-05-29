@@ -778,7 +778,8 @@ export type CodexRuntimeHookDecision = {
         | "out-of-scope"
         | "freshness-not-fresh"
         | "no-anchors-selected"
-        | "budget-exceeded";
+        | "budget-exceeded"
+        | "source-relative-budget-exceeded";
       selectedAnchorCount: number;
       deferredAnchorCount: number;
       freshnessStatus: "fresh" | "stale" | "unknown";

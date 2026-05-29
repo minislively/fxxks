@@ -470,7 +470,7 @@ export function runtimeReactWebFactGraphPackingSummary(
 
 export function summarizeRuntimeReactWebFactGraphDryRun(
   dryRun: ReactWebFactGraphConsumerDryRun,
-  options: { budgetExceeded?: boolean } = {},
+  options: { budgetExceeded?: boolean; sourceRelativeBudgetExceeded?: boolean } = {},
 ): RuntimeReactWebFactGraphPackingSummary {
   if (!dryRun.inScope) {
     return runtimeReactWebFactGraphPackingSummary("out-of-scope", undefined, dryRun);
@@ -483,6 +483,9 @@ export function summarizeRuntimeReactWebFactGraphDryRun(
   }
   if (options.budgetExceeded) {
     return runtimeReactWebFactGraphPackingSummary("budget-exceeded", undefined, dryRun);
+  }
+  if (options.sourceRelativeBudgetExceeded) {
+    return runtimeReactWebFactGraphPackingSummary("source-relative-budget-exceeded", undefined, dryRun);
   }
   return runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", undefined, dryRun);
 }
@@ -564,10 +567,14 @@ function buildAdditionalContext(
       reactWebFactGraph = compacted.graph;
       reactWebFactGraphPacking = compacted.packing;
     }
-    if (reactWebFactGraph && runtimeReactWebContextBudget !== undefined) {
+    if (reactWebFactGraph) {
       const contextWithGraph = renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph);
-      if (estimateTextBytes(contextWithGraph) > runtimeReactWebContextBudget) {
+      const contextWithGraphBytes = estimateTextBytes(contextWithGraph);
+      if (runtimeReactWebContextBudget !== undefined && contextWithGraphBytes > runtimeReactWebContextBudget) {
         reactWebFactGraphPacking = runtimeReactWebFactGraphPackingSummary("budget-exceeded", reactWebFactGraph);
+        reactWebFactGraph = undefined;
+      } else if (shouldSkipReactWebFactGraphForSourceRelativeBudget(maxOptimizedContextBytes, contextWithGraphBytes)) {
+        reactWebFactGraphPacking = runtimeReactWebFactGraphPackingSummary("source-relative-budget-exceeded", reactWebFactGraph);
         reactWebFactGraph = undefined;
       }
     }
@@ -679,6 +686,12 @@ function hasMatchingEditGuidance(payload: ModelFacingPayload): boolean {
 function editGuidanceBudgetLimit(originalEstimatedBytes: number | undefined): number {
   if (originalEstimatedBytes === undefined) return EDIT_GUIDANCE_CONTEXT_MAX_BYTES;
   return Math.min(EDIT_GUIDANCE_CONTEXT_MAX_BYTES, Math.max(originalEstimatedBytes * 2, 4_096));
+}
+
+function shouldSkipReactWebFactGraphForSourceRelativeBudget(originalEstimatedBytes: number | undefined, contextWithGraphBytes: number): boolean {
+  if (originalEstimatedBytes === undefined) return false;
+  if (originalEstimatedBytes >= 4_096) return false;
+  return contextWithGraphBytes > originalEstimatedBytes;
 }
 
 function recordRuntimeDecisionMetric(

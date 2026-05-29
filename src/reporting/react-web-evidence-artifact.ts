@@ -39,6 +39,7 @@ const REACT_WEB_RUNTIME_GRAPH_REASONS = new Set([
   "freshness-not-fresh",
   "no-anchors-selected",
   "budget-exceeded",
+  "source-relative-budget-exceeded",
 ]);
 const REACT_WEB_RUNTIME_GRAPH_FRESHNESS_STATUSES = new Set(["fresh", "stale", "unknown"]);
 
