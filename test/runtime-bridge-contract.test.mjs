@@ -18,7 +18,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const { handleCodexRuntimeHook } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const { handleCodexRuntimeHook, summarizeRuntimeReactWebFactGraphDryRun } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
@@ -55,6 +55,33 @@ test.after(async () => {
   await cleanupMetricSessions(repoRoot, ["bridge-contract-"]);
   cleanupRuntimeSessions(repoRoot, "codex-runtime", ["bridge-contract-"]);
   cleanupRuntimeSessions(repoRoot, "claude-runtime", ["bridge-contract-claude-"]);
+});
+
+function graphDryRunFixture(overrides = {}) {
+  return {
+    inScope: true,
+    graphSummary: {
+      freshnessStatus: "fresh",
+    },
+    selectedAnchors: [{ rank: 1 }],
+    deferredAnchors: [],
+    ...overrides,
+  };
+}
+
+test("runtime graph packing reasons cover every canonical omission and success state", () => {
+  assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture()).reason, "fresh-anchors-packed");
+  assert.equal(
+    summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture({ graphSummary: { freshnessStatus: "stale" }, selectedAnchors: [], deferredAnchors: [{ rank: 1 }] })).reason,
+    "freshness-not-fresh",
+  );
+  assert.equal(
+    summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture({ graphSummary: { freshnessStatus: "unknown" }, selectedAnchors: [], deferredAnchors: [{ rank: 1 }] })).reason,
+    "freshness-not-fresh",
+  );
+  assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture({ selectedAnchors: [] })).reason, "no-anchors-selected");
+  assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture({ inScope: false, selectedAnchors: [] })).reason, "out-of-scope");
+  assert.equal(summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture(), { budgetExceeded: true }).reason, "budget-exceeded");
 });
 
 test("runtime bridge contract keeps repeated-read inject and fallback semantics stable", () => {
@@ -295,6 +322,9 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondReadOnly.action, "inject");
   assert.equal(secondReadOnly.additionalContext.includes("\"editGuidance\""), false);
   assert.equal("editGuidance" in secondReadOnly.debug.decision.payload, false);
+  assert.equal(secondReadOnly.debug.reactWebFactGraphPacking.included, false);
+  assert.equal(secondReadOnly.debug.reactWebFactGraphPacking.reason, "no-edit-guidance");
+  assert.equal(secondReadOnly.debug.reactWebFactGraphPacking.freshnessStatus, "unknown");
 
   const smallRawSession = `bridge-contract-small-raw-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: smallRawSession }, repoRoot);
@@ -335,6 +365,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
 
   assert.equal(override.action, "fallback");
   assert.equal(override.fallback.reason, "escape-hatch-full-read");
+  assert.equal(override.debug.reactWebFactGraphPacking.included, false);
+  assert.equal(override.debug.reactWebFactGraphPacking.reason, "out-of-scope");
 
   const legacyOverride = handleCodexRuntimeHook(
     {
