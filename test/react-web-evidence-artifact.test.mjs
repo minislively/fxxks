@@ -64,6 +64,11 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
     mayOverrideDecision: false,
   });
   assert.equal(artifact.domainPayload?.domain, "react-web");
+  assert.equal(artifact.runtimeGraph?.diagnosticOnly, true);
+  assert.equal(artifact.runtimeGraph?.included, true);
+  assert.equal(artifact.runtimeGraph?.reason, "fresh-anchors-packed");
+  assert.equal(artifact.runtimeGraph?.freshnessStatus, "fresh");
+  assert.ok(artifact.runtimeGraph?.selectedAnchorCount > 0);
   assert.ok(artifact.sourceFingerprint);
   assert.ok(artifact.editGuidance?.patchTargets?.length > 0);
   assert.ok(artifact.files[0].whySelected.includes("exact-file-prompt-target"));
@@ -78,6 +83,8 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.match(markdown, /do-not-summarize/);
   assert.match(markdown, /frontend-source-evidence/);
   assert.match(markdown, /summarized=no/);
+  assert.match(markdown, /Runtime graph diagnostics/);
+  assert.match(markdown, /reason: fresh-anchors-packed/);
 
   const cliJson = spawnSync(process.execPath, [cliPath, "inspect", "evidence", ref.id, "--json"], {
     cwd: tempDir,
@@ -96,6 +103,19 @@ test("repeated React Web inject emits a schema-first evidence artifact and inspe
   assert.equal(cliText.status, 0, cliText.stderr);
   assert.match(cliText.stdout, /React Web evidence artifact/);
   assert.match(cliText.stdout, new RegExp(artifact.id));
+
+  const malformed = {
+    ...artifact,
+    runtimeGraph: {
+      ...artifact.runtimeGraph,
+      reason: "not-emitted",
+    },
+  };
+  fs.writeFileSync(ref.path, `${JSON.stringify(malformed, null, 2)}\n`);
+  assert.throws(
+    () => readReactWebEvidenceArtifact(tempDir, ref.id),
+    /React Web evidence artifact runtimeGraph contract changed/,
+  );
 });
 
 test("repeated unsupported boundary emits a denied evidence artifact instead of widening support", () => {
@@ -115,6 +135,9 @@ test("repeated unsupported boundary emits a denied evidence artifact instead of 
   const artifact = readReactWebEvidenceArtifact(tempDir, ref.id);
   assert.equal(artifact.decision, "deny");
   assert.equal(artifact.evidenceStrength, "denied");
+  assert.equal(artifact.runtimeGraph?.diagnosticOnly, true);
+  assert.equal(artifact.runtimeGraph?.included, false);
+  assert.equal(artifact.runtimeGraph?.reason, "out-of-scope");
   assert.deepEqual(artifact.interop, {
     mayBeStored: true,
     mayBeSummarized: false,

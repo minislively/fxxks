@@ -210,6 +210,7 @@ function compactRuntimeReactWebContext(
 
 type RuntimeReactWebContextPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebContextPacking"]>;
 type RuntimeReactWebFactGraphPackingSummary = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebFactGraphPacking"]>;
+type RuntimeReactWebFactGraphPackingReason = RuntimeReactWebFactGraphPackingSummary["reason"];
 type CodexRuntimeDebug = NonNullable<CodexRuntimeHookDecision["debug"]>;
 type PreflightAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["preflightAdvisoryIntent"]>;
 type DomainMemoryAdvisoryDebugReceipt = NonNullable<CodexRuntimeDebug["domainMemoryAdvisory"]>;
@@ -453,15 +454,52 @@ function summarizeRuntimeReactWebContextPacking(
   };
 }
 
-function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): PackedRuntimeReactWebFactGraph | undefined {
+export function runtimeReactWebFactGraphPackingSummary(
+  reason: RuntimeReactWebFactGraphPackingReason,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
+  dryRun?: ReactWebFactGraphConsumerDryRun,
+): RuntimeReactWebFactGraphPackingSummary {
+  return {
+    included: reason === "fresh-anchors-packed",
+    reason,
+    selectedAnchorCount: reactWebFactGraph?.selectedAnchors.length ?? dryRun?.selectedAnchors.length ?? 0,
+    deferredAnchorCount: reactWebFactGraph?.deferredAnchorCount ?? dryRun?.deferredAnchors.length ?? 0,
+    freshnessStatus: reactWebFactGraph?.freshnessStatus ?? dryRun?.graphSummary.freshnessStatus ?? "unknown",
+  };
+}
+
+export function summarizeRuntimeReactWebFactGraphDryRun(
+  dryRun: ReactWebFactGraphConsumerDryRun,
+  options: { budgetExceeded?: boolean } = {},
+): RuntimeReactWebFactGraphPackingSummary {
+  if (!dryRun.inScope) {
+    return runtimeReactWebFactGraphPackingSummary("out-of-scope", undefined, dryRun);
+  }
+  if (dryRun.graphSummary.freshnessStatus !== "fresh") {
+    return runtimeReactWebFactGraphPackingSummary("freshness-not-fresh", undefined, dryRun);
+  }
+  if (dryRun.selectedAnchors.length === 0) {
+    return runtimeReactWebFactGraphPackingSummary("no-anchors-selected", undefined, dryRun);
+  }
+  if (options.budgetExceeded) {
+    return runtimeReactWebFactGraphPackingSummary("budget-exceeded", undefined, dryRun);
+  }
+  return runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", undefined, dryRun);
+}
+
+function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): {
+  graph?: PackedRuntimeReactWebFactGraph;
+  packing: RuntimeReactWebFactGraphPackingSummary;
+} {
   const dryRun = buildReactWebFactGraphConsumerDryRun(path.join(cwd, filePath), cwd, {
     verifyFreshness: true,
     maxAnchors: 3,
   });
-  if (!dryRun.inScope || dryRun.graphSummary.freshnessStatus !== "fresh" || dryRun.selectedAnchors.length === 0) {
-    return undefined;
+  const basePacking = summarizeRuntimeReactWebFactGraphDryRun(dryRun);
+  if (basePacking.reason !== "fresh-anchors-packed") {
+    return { packing: basePacking };
   }
-  return {
+  const graph: PackedRuntimeReactWebFactGraph = {
     schemaVersion: "react-web-fact-graph-runtime-context.v1",
     freshnessStatus: dryRun.graphSummary.freshnessStatus,
     freshnessVerified: true,
@@ -478,18 +516,28 @@ function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): PackedR
     deferredAnchorCount: dryRun.deferredAnchors.length,
     boundary: "advisory-current-source-only",
   };
+  return { graph, packing: runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", graph, dryRun) };
 }
 
-function summarizeRuntimeReactWebFactGraphPacking(
-  reactWebFactGraph: PackedRuntimeReactWebFactGraph | undefined,
-): RuntimeReactWebFactGraphPackingSummary {
-  return {
-    included: Boolean(reactWebFactGraph),
-    reason: reactWebFactGraph ? "fresh-anchors-packed" : "not-emitted",
-    selectedAnchorCount: reactWebFactGraph?.selectedAnchors.length ?? 0,
-    deferredAnchorCount: reactWebFactGraph?.deferredAnchorCount ?? 0,
-    freshnessStatus: reactWebFactGraph?.freshnessStatus ?? "unknown",
+function runtimeReactWebFactGraphOutOfScopePacking(): RuntimeReactWebFactGraphPackingSummary {
+  return runtimeReactWebFactGraphPackingSummary("out-of-scope");
+}
+
+function attachReactWebFactGraphPackingDebug(
+  runtimeDecision: CodexRuntimeHookDecision,
+  packing: RuntimeReactWebFactGraphPackingSummary | undefined,
+): CodexRuntimeHookDecision {
+  if (!packing) return runtimeDecision;
+  const debug = runtimeDecision.debug ?? {
+    repeatedFile: false,
+    eligible: false,
+    escapeHatchUsed: false,
   };
+  runtimeDecision.debug = {
+    ...debug,
+    reactWebFactGraphPacking: packing,
+  };
+  return runtimeDecision;
 }
 
 function buildAdditionalContext(
@@ -505,17 +553,28 @@ function buildAdditionalContext(
       ? editGuidanceBudgetLimit(maxOptimizedContextBytes)
       : maxOptimizedContextBytes;
     const reactWebContext = compactRuntimeReactWebContext(filePath, payload, contextMode, runtimeReactWebContextBudget);
-    let reactWebFactGraph = includeReactWebFactGraph && payload.editGuidance ? compactRuntimeReactWebFactGraph(filePath, cwd) : undefined;
+    let reactWebFactGraph: PackedRuntimeReactWebFactGraph | undefined;
+    let reactWebFactGraphPacking: RuntimeReactWebFactGraphPackingSummary;
+    if (!payload.editGuidance) {
+      reactWebFactGraphPacking = runtimeReactWebFactGraphPackingSummary("no-edit-guidance");
+    } else if (!includeReactWebFactGraph) {
+      reactWebFactGraphPacking = runtimeReactWebFactGraphOutOfScopePacking();
+    } else {
+      const compacted = compactRuntimeReactWebFactGraph(filePath, cwd);
+      reactWebFactGraph = compacted.graph;
+      reactWebFactGraphPacking = compacted.packing;
+    }
     if (reactWebFactGraph && runtimeReactWebContextBudget !== undefined) {
       const contextWithGraph = renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph);
       if (estimateTextBytes(contextWithGraph) > runtimeReactWebContextBudget) {
+        reactWebFactGraphPacking = runtimeReactWebFactGraphPackingSummary("budget-exceeded", reactWebFactGraph);
         reactWebFactGraph = undefined;
       }
     }
     return {
       additionalContext: renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph),
       reactWebContextPacking: summarizeRuntimeReactWebContextPacking(reactWebContext),
-      reactWebFactGraphPacking: summarizeRuntimeReactWebFactGraphPacking(reactWebFactGraph),
+      reactWebFactGraphPacking,
     };
   }
 
@@ -861,6 +920,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
       "escape-hatch-full-read",
       policy,
     );
+    attachReactWebFactGraphPackingDebug(runtimeDecision, runtimeReactWebFactGraphOutOfScopePacking());
     attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
     recordRuntimeDecisionMetric(cwd, sessionKey, runtimeDecision, {
       originalEstimatedBytes,
@@ -1073,7 +1133,10 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
           decision,
         );
         const activationFallback = attachReactWebActivationDebug(
-          attachPreflightAdvisoryDebug(activationFallbackBase, preflightAdvisoryIntent),
+          attachReactWebFactGraphPackingDebug(
+            attachPreflightAdvisoryDebug(activationFallbackBase, preflightAdvisoryIntent),
+            runtimeReactWebFactGraphOutOfScopePacking(),
+          ),
           { promoted: false },
           cwd,
         );
@@ -1109,6 +1172,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     policy,
     decision,
   );
+  attachReactWebFactGraphPackingDebug(runtimeDecision, runtimeReactWebFactGraphOutOfScopePacking());
   attachPreflightAdvisoryDebug(runtimeDecision, preflightAdvisoryIntent);
   if (domainMemoryAdvisory.requested) {
     attachDomainMemoryAdvisoryDebug(runtimeDecision, domainMemoryAdvisory.debug);

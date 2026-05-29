@@ -75,6 +75,14 @@ test("React Web context evidence measures actual injected additionalContext with
   assert.match(evidence.summary.cachePerformanceImprovement.blocker, /no wall-clock, cache-hit-rate, or end-to-end runtime benchmark/);
   assert.equal(evidence.summary.providerBillingSavings.claimable, false);
   assert.match(evidence.summary.providerBillingSavings.blocker, /no provider usage, billing dashboard, invoice, or charged-cost data/);
+  assert.equal(evidence.summary.runtimeGraphDiagnostics.diagnosticOnly, true);
+  assert.equal(evidence.summary.runtimeGraphDiagnostics.claimable, false);
+  assert.equal(evidence.summary.runtimeGraphDiagnostics.fixtureCount, EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES.length);
+  assert.ok(evidence.summary.runtimeGraphDiagnostics.emittedCount > 0);
+  assert.equal(evidence.summary.runtimeGraphDiagnostics.reasonCounts["fresh-anchors-packed"] > 0, true);
+  assert.equal(evidence.runtimeGraphDiagnostics.diagnosticOnly, true);
+  assert.equal(evidence.runtimeGraphDiagnostics.claimable, false);
+  assert.equal(evidence.runtimeGraphDiagnostics.fixtures.length, EXPECTED_DEFAULT_REACT_WEB_EVIDENCE_FIXTURES.length);
 
   for (const row of evidence.fixtures) {
     assert.equal(row.firstAction, "record");
@@ -108,6 +116,8 @@ test("React Web context evidence Markdown keeps the public claim boundary explic
   assert.match(markdown, /Actual injected context reduction claimable: yes/);
   assert.match(markdown, /Domain payload reduction diagnostic-only: yes/);
   assert.match(markdown, /Internal runtime payload reduction diagnostic-only: no/);
+  assert.match(markdown, /Runtime graph diagnostics emitted:/);
+  assert.match(markdown, /Runtime graph omission reasons:/);
   assert.match(markdown, /Cache performance improvement claimable: no/);
   assert.match(markdown, /Provider billing savings claimable: no/);
   assert.match(markdown, /Metric provenance/);

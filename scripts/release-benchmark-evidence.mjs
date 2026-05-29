@@ -85,6 +85,11 @@ export async function buildReleaseBenchmarkEvidence({
         maxPct: finite(contextEvidence.summary.fullRuntimePayloadReduction.maxPct),
         blocker: contextEvidence.summary.fullRuntimePayloadReduction.blocker,
       },
+      runtimeGraphDiagnostics: {
+        ...contextEvidence.summary.runtimeGraphDiagnostics,
+        diagnosticOnly: true,
+        claimable: false,
+      },
       fixtures: contextEvidence.fixtures.map((row) => ({
         file: row.file,
         sourceBytes: row.sourceBytes,
@@ -126,6 +131,7 @@ export function buildReleaseBenchmarkSmokeSummary(evidence) {
     npmUpdateClaimable: evidence.releaseClaims.npmUpdateClaimable,
     headline: evidence.releaseClaims.headline,
     actualInjectedContextReduction: evidence.context.actualInjectedContextReduction,
+    runtimeGraphDiagnostics: evidence.context.runtimeGraphDiagnostics,
     reuseCorrectnessClaimable: evidence.reuse.reuseCorrectnessClaimable,
     nonClaims: {
       cachePerformanceImprovement: evidence.nonClaims.cachePerformanceImprovement.claimable,
@@ -183,6 +189,7 @@ ${evidence.releaseClaims.headline}
 - npm update wording claimable: ${evidence.releaseClaims.npmUpdateClaimable ? "yes" : "no"}
 - React Web actual injected context reduction: ${evidence.context.actualInjectedContextReduction.claimable ? "yes" : "no"} (${evidence.context.actualInjectedContextReduction.minPct}% to ${evidence.context.actualInjectedContextReduction.maxPct}% smaller actual additionalContext)
 - React Web domainPayload reduction diagnostic-only: ${evidence.context.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.context.domainPayloadReduction.minPct}% to ${evidence.context.domainPayloadReduction.maxPct}% smaller source-derived domainPayloads)
+- React Web runtime graph diagnostics: ${evidence.context.runtimeGraphDiagnostics.emittedCount}/${evidence.context.runtimeGraphDiagnostics.fixtureCount} emitted, diagnostic-only=yes
 - React Web reuse correctness: ${evidence.reuse.reuseCorrectnessClaimable ? "yes" : "no"}
 
 ## Fixture context-size measurements

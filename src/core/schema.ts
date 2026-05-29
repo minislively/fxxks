@@ -758,7 +758,13 @@ export type CodexRuntimeHookDecision = {
     };
     reactWebFactGraphPacking?: {
       included: boolean;
-      reason: "fresh-anchors-packed" | "not-emitted";
+      reason:
+        | "fresh-anchors-packed"
+        | "no-edit-guidance"
+        | "out-of-scope"
+        | "freshness-not-fresh"
+        | "no-anchors-selected"
+        | "budget-exceeded";
       selectedAnchorCount: number;
       deferredAnchorCount: number;
       freshnessStatus: "fresh" | "stale" | "unknown";

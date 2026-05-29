@@ -28,6 +28,19 @@ export type ReactWebEvidenceArtifactFile = {
 };
 
 export type ReactWebEvidenceArtifactInterop = typeof REACT_WEB_EVIDENCE_ARTIFACT_INTEROP;
+export type ReactWebEvidenceArtifactRuntimeGraph = NonNullable<NonNullable<CodexRuntimeHookDecision["debug"]>["reactWebFactGraphPacking"]> & {
+  diagnosticOnly: true;
+};
+
+const REACT_WEB_RUNTIME_GRAPH_REASONS = new Set([
+  "fresh-anchors-packed",
+  "no-edit-guidance",
+  "out-of-scope",
+  "freshness-not-fresh",
+  "no-anchors-selected",
+  "budget-exceeded",
+]);
+const REACT_WEB_RUNTIME_GRAPH_FRESHNESS_STATUSES = new Set(["fresh", "stale", "unknown"]);
 
 export type ReactWebEvidenceArtifact = {
   schemaVersion: typeof REACT_WEB_EVIDENCE_ARTIFACT_SCHEMA_VERSION;
@@ -54,6 +67,7 @@ export type ReactWebEvidenceArtifact = {
     staleWhen: string[];
   };
   files: ReactWebEvidenceArtifactFile[];
+  runtimeGraph?: ReactWebEvidenceArtifactRuntimeGraph;
   editGuidance?: ModelFacingPayload["editGuidance"];
   concernProfiles?: ModelFacingPayload["concernProfiles"];
   domainPayload?: ModelFacingPayload["domainPayload"];
@@ -185,6 +199,17 @@ function defaultReactWebEvidenceArtifactInterop(): ReactWebEvidenceArtifactInter
   return { ...REACT_WEB_EVIDENCE_ARTIFACT_INTEROP };
 }
 
+function runtimeGraphEvidence(
+  runtimeDecision: CodexRuntimeHookDecision,
+): ReactWebEvidenceArtifactRuntimeGraph | undefined {
+  const packing = runtimeDecision.debug?.reactWebFactGraphPacking;
+  if (!packing) return undefined;
+  return {
+    ...packing,
+    diagnosticOnly: true,
+  };
+}
+
 function isCanonicalReactWebInterop(
   interop: Partial<ReactWebEvidenceArtifactInterop> | undefined,
 ): interop is ReactWebEvidenceArtifactInterop {
@@ -233,6 +258,25 @@ function assertValidArtifact(artifact: unknown): asserts artifact is ReactWebEvi
   if (candidate.interop !== undefined && !isCanonicalReactWebInterop(candidate.interop)) {
     throw new Error("React Web evidence artifact interop contract changed");
   }
+  if (candidate.runtimeGraph !== undefined) {
+    const graph = candidate.runtimeGraph as Partial<ReactWebEvidenceArtifactRuntimeGraph>;
+    if (
+      typeof graph.included !== "boolean" ||
+      typeof graph.reason !== "string" ||
+      !REACT_WEB_RUNTIME_GRAPH_REASONS.has(graph.reason) ||
+      typeof graph.selectedAnchorCount !== "number" ||
+      !Number.isFinite(graph.selectedAnchorCount) ||
+      graph.selectedAnchorCount < 0 ||
+      typeof graph.deferredAnchorCount !== "number" ||
+      !Number.isFinite(graph.deferredAnchorCount) ||
+      graph.deferredAnchorCount < 0 ||
+      typeof graph.freshnessStatus !== "string" ||
+      !REACT_WEB_RUNTIME_GRAPH_FRESHNESS_STATUSES.has(graph.freshnessStatus) ||
+      graph.diagnosticOnly !== true
+    ) {
+      throw new Error("React Web evidence artifact runtimeGraph contract changed");
+    }
+  }
 }
 
 export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookDecision): ReactWebEvidenceArtifact | null {
@@ -249,6 +293,7 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
 
   const decision = artifactDecision(runtimeDecision, classification);
   const whySelected = buildWhySelected(runtimeDecision, payload);
+  const graphEvidence = runtimeGraphEvidence(runtimeDecision);
   const generatedAt = new Date().toISOString();
   const id = evidenceArtifactId({
     filePath,
@@ -283,6 +328,7 @@ export function buildReactWebEvidenceArtifact(runtimeDecision: CodexRuntimeHookD
       staleWhen: staleWhen(payload),
     },
     files: [buildFileEntry(filePath, payload, whySelected)],
+    ...(graphEvidence ? { runtimeGraph: graphEvidence } : {}),
     ...(payload?.editGuidance ? { editGuidance: payload.editGuidance } : {}),
     ...(payload?.concernProfiles ? { concernProfiles: payload.concernProfiles } : {}),
     ...(payload?.domainPayload ? { domainPayload: payload.domainPayload } : {}),
@@ -358,6 +404,16 @@ export function renderReactWebEvidenceArtifactMarkdown(artifact: ReactWebEvidenc
     ? artifact.concernProfiles.map((profile) => `- ${profile.id}`).join("\n")
     : "- none";
   const whyDenied = artifact.whyDenied.length > 0 ? artifact.whyDenied.map((reason) => `- ${reason}`).join("\n") : "- none";
+  const runtimeGraph = artifact.runtimeGraph
+    ? [
+        `- included: ${artifact.runtimeGraph.included ? "yes" : "no"}`,
+        `- reason: ${artifact.runtimeGraph.reason}`,
+        `- selected anchors: ${artifact.runtimeGraph.selectedAnchorCount}`,
+        `- deferred anchors: ${artifact.runtimeGraph.deferredAnchorCount}`,
+        `- freshness: ${artifact.runtimeGraph.freshnessStatus}`,
+        `- diagnostic only: ${artifact.runtimeGraph.diagnosticOnly ? "yes" : "no"}`,
+      ].join("\n")
+    : "- none";
 
-  return `# React Web evidence artifact\n\n${artifact.claimBoundary}\n\n## Summary\n\n- id: ${artifact.id}\n- producer: ${artifact.producer}\n- profile: ${artifact.profile}\n- payload kind: ${artifact.payloadKind}\n- decision: ${artifact.decision}\n- evidence strength: ${artifact.evidenceStrength}\n- file: ${artifact.filePath}\n- context mode: ${artifact.contextMode ?? "none"}\n- context mode reason: ${artifact.contextModeReason ?? "none"}\n- compression policy: ${artifact.compressionPolicy}\n- interop: stored=${artifact.interop.mayBeStored ? "yes" : "no"}, summarized=${artifact.interop.mayBeSummarized ? "yes" : "no"}, override=${artifact.interop.mayOverrideDecision ? "yes" : "no"}\n\n## Freshness\n\n- source fingerprint: ${artifact.sourceFingerprint ? `${artifact.sourceFingerprint.fileHash} / ${artifact.sourceFingerprint.lineCount} lines` : "none"}\n- stale when: ${artifact.freshness.staleWhen.join(", ")}\n\n## Reasons\n\n${artifact.reasons.length > 0 ? artifact.reasons.map((reason) => `- ${reason}`).join("\n") : "- none"}\n\n## Why denied\n\n${whyDenied}\n\n## Selected files\n\n${fileLines}\n\n## Concern profiles\n\n${concernProfiles}\n\n## Patch targets\n\n${patchTargets}\n`;
+  return `# React Web evidence artifact\n\n${artifact.claimBoundary}\n\n## Summary\n\n- id: ${artifact.id}\n- producer: ${artifact.producer}\n- profile: ${artifact.profile}\n- payload kind: ${artifact.payloadKind}\n- decision: ${artifact.decision}\n- evidence strength: ${artifact.evidenceStrength}\n- file: ${artifact.filePath}\n- context mode: ${artifact.contextMode ?? "none"}\n- context mode reason: ${artifact.contextModeReason ?? "none"}\n- compression policy: ${artifact.compressionPolicy}\n- interop: stored=${artifact.interop.mayBeStored ? "yes" : "no"}, summarized=${artifact.interop.mayBeSummarized ? "yes" : "no"}, override=${artifact.interop.mayOverrideDecision ? "yes" : "no"}\n\n## Freshness\n\n- source fingerprint: ${artifact.sourceFingerprint ? `${artifact.sourceFingerprint.fileHash} / ${artifact.sourceFingerprint.lineCount} lines` : "none"}\n- stale when: ${artifact.freshness.staleWhen.join(", ")}\n\n## Runtime graph diagnostics\n\n${runtimeGraph}\n\n## Reasons\n\n${artifact.reasons.length > 0 ? artifact.reasons.map((reason) => `- ${reason}`).join("\n") : "- none"}\n\n## Why denied\n\n${whyDenied}\n\n## Selected files\n\n${fileLines}\n\n## Concern profiles\n\n${concernProfiles}\n\n## Patch targets\n\n${patchTargets}\n`;
 }

@@ -49,6 +49,11 @@ async function loadRuntimeHook(repoRoot) {
   return import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 }
 
+function incrementCount(target, key) {
+  const normalizedKey = key ?? "unknown";
+  target[normalizedKey] = (target[normalizedKey] ?? 0) + 1;
+}
+
 export async function measureReactWebFixture({ repoRoot = defaultRepoRoot, relativeFile, runId = Date.now().toString() }) {
   const { handleCodexRuntimeHook } = await loadRuntimeHook(repoRoot);
   const sessionPrefix = `react-web-context-evidence-${runId}-`;
@@ -100,6 +105,67 @@ export async function measureReactWebFixture({ repoRoot = defaultRepoRoot, relat
     domainPayloadLargerThanSource: domainPayloadBytes > sourceBytes,
     claimBoundary: domainPayload?.claimBoundary ?? null,
     claimStatus: domainPayload?.claimStatus ?? null,
+    runtimeGraph: second.debug?.reactWebFactGraphPacking ?? null,
+  };
+}
+
+export async function measureReactWebGraphDiagnosticFixture({ repoRoot = defaultRepoRoot, relativeFile, runId = Date.now().toString() }) {
+  const { handleCodexRuntimeHook } = await loadRuntimeHook(repoRoot);
+  const sessionPrefix = `react-web-context-evidence-graph-${runId}-`;
+  const sessionId = `${sessionPrefix}${relativeFile.replace(/[^a-z0-9]+/gi, "-")}`;
+
+  handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, repoRoot);
+  handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Please update ${relativeFile}`,
+    },
+    repoRoot,
+  );
+  const second = handleCodexRuntimeHook(
+    {
+      hookEventName: "UserPromptSubmit",
+      sessionId,
+      prompt: `Again, update ${relativeFile} and keep graph diagnostics compact if safe`,
+    },
+    repoRoot,
+  );
+
+  return {
+    file: relativeFile,
+    firstPromptKind: "edit-path-diagnostic",
+    secondAction: second.action,
+    runtimeGraph: second.debug?.reactWebFactGraphPacking ?? null,
+    diagnosticOnly: true,
+    claimable: false,
+  };
+}
+
+function summarizeRuntimeGraphDiagnostics(rows) {
+  const reasonCounts = {};
+  const freshnessStatusCounts = {};
+  let emittedCount = 0;
+  let omittedCount = 0;
+
+  for (const row of rows) {
+    const graph = row.runtimeGraph;
+    if (graph?.included) emittedCount += 1;
+    else omittedCount += 1;
+    incrementCount(reasonCounts, graph?.reason);
+    incrementCount(freshnessStatusCounts, graph?.freshnessStatus);
+  }
+
+  return {
+    diagnosticOnly: true,
+    claimable: false,
+    measurement: "separate-edit-path-runtime-graph-diagnostic-probe",
+    fixtureCount: rows.length,
+    emittedCount,
+    omittedCount,
+    reasonCounts,
+    freshnessStatusCounts,
+    blocker: emittedCount > 0 ? null : "no edit-path diagnostic fixture emitted fresh graph anchors",
   };
 }
 
@@ -110,10 +176,13 @@ export async function buildReactWebContextEvidence({
 } = {}) {
   cleanupRuntimeSessions(repoRoot, `react-web-context-evidence-${runId}-`);
   const rows = [];
+  const graphDiagnosticRows = [];
   for (const relativeFile of fixtures) {
     rows.push(await measureReactWebFixture({ repoRoot, relativeFile, runId }));
+    graphDiagnosticRows.push(await measureReactWebGraphDiagnosticFixture({ repoRoot, relativeFile, runId }));
   }
   cleanupRuntimeSessions(repoRoot, `react-web-context-evidence-${runId}-`);
+  cleanupRuntimeSessions(repoRoot, `react-web-context-evidence-graph-${runId}-`);
 
   const domainReductionValues = rows.map((row) => row.domainPayloadReductionPct);
   const runtimeReductionValues = rows.map((row) => row.runtimePayloadReductionPct);
@@ -166,6 +235,12 @@ export async function buildReactWebContextEvidence({
         claimable: false,
         blocker: "no provider usage, billing dashboard, invoice, or charged-cost data is measured by this artifact",
       },
+      runtimeGraphDiagnostics: summarizeRuntimeGraphDiagnostics(graphDiagnosticRows),
+    },
+    runtimeGraphDiagnostics: {
+      diagnosticOnly: true,
+      claimable: false,
+      fixtures: graphDiagnosticRows,
     },
   };
 }
@@ -188,6 +263,8 @@ ${evidence.claimBoundary}
 - Actual injected context reduction claimable: ${evidence.summary.actualInjectedContextReduction.claimable ? "yes" : "no"} (${evidence.summary.actualInjectedContextReduction.minPct}% to ${evidence.summary.actualInjectedContextReduction.maxPct}% local byte reduction)
 - Domain payload reduction diagnostic-only: ${evidence.summary.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.summary.domainPayloadReduction.minPct}% to ${evidence.summary.domainPayloadReduction.maxPct}% local byte reduction)
 - Internal runtime payload reduction diagnostic-only: ${evidence.summary.fullRuntimePayloadReduction.claimable ? "yes" : "no"}
+- Runtime graph diagnostics emitted: ${evidence.summary.runtimeGraphDiagnostics.emittedCount}/${evidence.summary.runtimeGraphDiagnostics.fixtureCount} (diagnostic-only)
+- Runtime graph omission reasons: ${JSON.stringify(evidence.summary.runtimeGraphDiagnostics.reasonCounts)}
 - Cache performance improvement claimable: no
 - Provider billing savings claimable: no
 
