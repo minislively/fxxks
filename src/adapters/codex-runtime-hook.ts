@@ -16,7 +16,7 @@ import {
   markCodexRuntimeSeenFile,
   resolveCodexRuntimeSessionKey,
 } from "./codex-runtime-session";
-import type { CodexRuntimeHookDecision, CodexRuntimeHookInput, ContextMode, ModelFacingPayload } from "../core/schema";
+import type { CodexRuntimeHookDecision, CodexRuntimeHookInput, ContextMode, ModelFacingPayload, SourceRange } from "../core/schema";
 import { decidePreflightAdvisoryIntent } from "../ops/preflight-advisory-intent";
 import type { PreflightAdvisoryDecision, PreflightAdvisoryRuntimeSignals } from "../ops/preflight-advisory-intent";
 import {
@@ -46,6 +46,7 @@ type RuntimeAdditionalContextAdmissionReason = "admitted" | "unknown-source-size
 type RuntimeAdditionalContextAdmission = {
   admitted: boolean;
   reason: RuntimeAdditionalContextAdmissionReason;
+  candidateKind?: "optimized-react-web-runtime-payload" | "react-web-edit-card.v1";
   sourceBytes?: number;
   candidateBytes: number;
   reductionPct?: number;
@@ -57,6 +58,15 @@ type RuntimeReactWebContext = NonNullable<ModelFacingPayload["reactWebContext"]>
 type RuntimeReactWebContextArrayKey = Exclude<{
   [Key in keyof RuntimeReactWebContext]: RuntimeReactWebContext[Key] extends unknown[] | undefined ? Key : never;
 }[keyof RuntimeReactWebContext], undefined>;
+type RuntimeReactWebEditCard = {
+  kind: "react-web-edit-card.v1";
+  f: string;
+  fp?: string;
+  targets: Array<[number, number, string, string]>;
+  hints: string[];
+  readIfNeeded: true;
+};
+
 type PackedRuntimeReactWebFactGraph = {
   schemaVersion: "react-web-fact-graph-runtime-context.v1";
   freshnessStatus: ReactWebFactGraphConsumerDryRun["graphSummary"]["freshnessStatus"];
@@ -116,6 +126,67 @@ function payloadContextModeReason(
   return payload.domainPayload?.domain === "react-web"
     ? `${phase}-${targetPrefix}-react-web-payload`
     : `${phase}-${targetPrefix}-narrow-payload`;
+}
+
+function compactFingerprint(sourceFingerprint: ModelFacingPayload["sourceFingerprint"]): string | undefined {
+  if (!sourceFingerprint) return undefined;
+  return `${sourceFingerprint.fileHash.slice(0, 12)}:${sourceFingerprint.lineCount}`;
+}
+
+function locTuple(loc: SourceRange | undefined, kind: string, label: string): [number, number, string, string] | undefined {
+  if (!loc) return undefined;
+  return [loc.startLine, loc.endLine, kind, label];
+}
+
+function uniqueLimited(values: string[], limit: number): string[] {
+  return [...new Set(values.filter(Boolean))].slice(0, limit);
+}
+
+function buildReactWebEditCard(payload: ModelFacingPayload): RuntimeReactWebEditCard | undefined {
+  if (payload.domainPayload?.domain !== "react-web" || !payload.editGuidance || payload.useOriginal) return undefined;
+
+  const patchTargets = payload.editGuidance.patchTargets
+    .map((target) => locTuple(target.loc, target.kind, target.label))
+    .filter((target): target is [number, number, string, string] => Boolean(target))
+    .slice(0, 4);
+  const routingTargets = [...(payload.reactWebContext?.editTargetRouting ?? [])]
+    .sort((left, right) => left.priority - right.priority)
+    .map((target) => locTuple(target.loc, target.kind, target.label))
+    .filter((target): target is [number, number, string, string] => Boolean(target))
+    .slice(0, Math.max(0, 4 - patchTargets.length));
+  const targets = [...patchTargets, ...routingTargets];
+
+  const hints = uniqueLimited([
+    ...payload.editGuidance.patchTargets.slice(0, 4).map((target) => `patch:${target.kind}`),
+    ...(payload.reactWebContext?.editTargetRouting ?? []).slice(0, 3).map((target) => `route:${target.kind}`),
+    ...(payload.reactWebContext?.intentTargets ?? []).slice(0, 3).map((target) => `intent:${target.intent}`),
+    ...(payload.reactWebContext?.a11yAnchors ?? []).slice(0, 2).map((anchor) => `a11y:${anchor.kind}`),
+    ...(payload.reactWebContext?.formStateRoles ?? []).slice(0, 2).map((role) => `form:${role.role}`),
+  ], 8);
+
+  if (targets.length === 0 && hints.length === 0) return undefined;
+
+  return {
+    kind: "react-web-edit-card.v1",
+    f: payload.filePath,
+    ...(compactFingerprint(payload.sourceFingerprint) ? { fp: compactFingerprint(payload.sourceFingerprint) } : {}),
+    targets,
+    hints,
+    readIfNeeded: true,
+  };
+}
+
+function renderReactWebEditCardAdditionalContext(
+  filePath: string,
+  payload: ModelFacingPayload,
+  contextMode: ContextMode,
+): string | undefined {
+  const card = buildReactWebEditCard(payload);
+  if (!card) return undefined;
+  return [
+    `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode} · candidate: react-web-edit-card.v1`,
+    JSON.stringify(card),
+  ].join("\n");
 }
 
 function minimalRuntimeReactWebContext(reactWebContext: RuntimeReactWebContext): PackedRuntimeReactWebContext {
@@ -580,8 +651,25 @@ function buildAdditionalContext(
   maxOptimizedContextBytes?: number,
   cwd = process.cwd(),
   includeReactWebFactGraph = true,
-): { additionalContext: string; reactWebContextPacking?: RuntimeReactWebContextPackingSummary; reactWebFactGraphPacking?: RuntimeReactWebFactGraphPackingSummary } {
+): { additionalContext: string; reactWebContextPacking?: RuntimeReactWebContextPackingSummary; reactWebFactGraphPacking?: RuntimeReactWebFactGraphPackingSummary; candidateKind?: RuntimeAdditionalContextAdmission["candidateKind"] } {
   if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
+    if (payload.editGuidance) {
+      const editCardContext = renderReactWebEditCardAdditionalContext(filePath, payload, contextMode);
+      if (editCardContext) {
+        let editCardGraphPacking: RuntimeReactWebFactGraphPackingSummary | undefined;
+        if (includeReactWebFactGraph) {
+          editCardGraphPacking = compactRuntimeReactWebFactGraph(filePath, cwd).packing;
+        } else {
+          editCardGraphPacking = runtimeReactWebFactGraphOutOfScopePacking();
+        }
+        return {
+          additionalContext: editCardContext,
+          ...(payload.reactWebContext ? { reactWebContextPacking: summarizeRuntimeReactWebContextPacking(minimalRuntimeReactWebContext(payload.reactWebContext)) } : {}),
+          reactWebFactGraphPacking: editCardGraphPacking,
+          candidateKind: "react-web-edit-card.v1",
+        };
+      }
+    }
     const runtimeReactWebContextBudget = payload.editGuidance
       ? editGuidanceBudgetLimit(maxOptimizedContextBytes)
       : maxOptimizedContextBytes;
@@ -612,6 +700,7 @@ function buildAdditionalContext(
       additionalContext: renderOptimizedReactWebAdditionalContext(filePath, payload, contextMode, reactWebContext, reactWebFactGraph),
       reactWebContextPacking: summarizeRuntimeReactWebContextPacking(reactWebContext),
       reactWebFactGraphPacking,
+      candidateKind: "optimized-react-web-runtime-payload",
     };
   }
 
@@ -727,9 +816,11 @@ function shouldSkipReactWebFactGraphForSourceRelativeBudget(originalEstimatedByt
 function evaluateAdditionalContextAdmission(
   originalEstimatedBytes: number | undefined,
   candidateBytes: number,
+  candidateKind?: RuntimeAdditionalContextAdmission["candidateKind"],
 ): RuntimeAdditionalContextAdmission {
   const base = {
     candidateBytes,
+    ...(candidateKind ? { candidateKind } : {}),
     minSourceBytes: ADDITIONAL_CONTEXT_ADMISSION_MIN_SOURCE_BYTES,
     minReductionPct: ADDITIONAL_CONTEXT_ADMISSION_MIN_REDUCTION_PCT,
   };
@@ -1166,8 +1257,9 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     const advisoryContext = domainMemoryAdvisory.result?.status === "fresh"
       ? renderDomainMemoryAdvisoryContext(domainMemoryAdvisory.result)
       : automaticAdvisoryContext;
+    const candidateAdditionalContext = runtimeContext.additionalContext;
     const additionalContext = appendProjectKnowledgeBlock(
-      [runtimeContext.additionalContext, advisoryContext].filter(Boolean).join("\n\n"),
+      [candidateAdditionalContext, advisoryContext].filter(Boolean).join("\n\n"),
       projectKnowledge?.block,
     );
     const { reactWebContextPacking, reactWebFactGraphPacking } = runtimeContext;
@@ -1210,7 +1302,7 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     }
 
     const admission = isReactWebOptimizedPayload(decision.payload) && editGuidanceIncluded
-      ? evaluateAdditionalContextAdmission(originalEstimatedBytes, estimateTextBytes(additionalContext))
+      ? evaluateAdditionalContextAdmission(originalEstimatedBytes, estimateTextBytes(candidateAdditionalContext), runtimeContext.candidateKind)
       : undefined;
     attachAdditionalContextAdmissionDebug(runtimeDecision, admission);
 
