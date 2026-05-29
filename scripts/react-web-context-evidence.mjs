@@ -49,6 +49,10 @@ async function loadRuntimeHook(repoRoot) {
   return import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 }
 
+async function loadPreRead(repoRoot) {
+  return import(path.join(repoRoot, "dist", "adapters", "pre-read.js"));
+}
+
 function incrementCount(target, key) {
   const normalizedKey = key ?? "unknown";
   target[normalizedKey] = (target[normalizedKey] ?? 0) + 1;
@@ -109,6 +113,24 @@ export async function measureReactWebFixture({ repoRoot = defaultRepoRoot, relat
   };
 }
 
+export async function measureReactWebPreReadGraphDiagnosticFixture({ repoRoot = defaultRepoRoot, relativeFile }) {
+  const { decidePreRead } = await loadPreRead(repoRoot);
+  const decision = decidePreRead(path.join(repoRoot, relativeFile), repoRoot, "codex", {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+  const graph = decision.debug?.reactWebFactGraphConsumer ?? null;
+  return {
+    file: relativeFile,
+    decision: decision.decision,
+    classification: decision.debug?.domainDetection?.classification ?? null,
+    preReadGraph: graph,
+    diagnosticOnly: true,
+    claimable: false,
+    payloadContainsGraph: Boolean(decision.payload?.reactWebFactGraph),
+  };
+}
+
 export async function measureReactWebGraphDiagnosticFixture({ repoRoot = defaultRepoRoot, relativeFile, runId = Date.now().toString() }) {
   const { handleCodexRuntimeHook } = await loadRuntimeHook(repoRoot);
   const sessionPrefix = `react-web-context-evidence-graph-${runId}-`;
@@ -139,6 +161,65 @@ export async function measureReactWebGraphDiagnosticFixture({ repoRoot = default
     runtimeGraph: second.debug?.reactWebFactGraphPacking ?? null,
     diagnosticOnly: true,
     claimable: false,
+  };
+}
+
+function summarizePreReadGraphDiagnostics(rows) {
+  const freshnessStatusCounts = {};
+  let emittedCount = 0;
+  let omittedCount = 0;
+  let selectedAnchorTotal = 0;
+  let deferredAnchorTotal = 0;
+  let payloadGraphLeakCount = 0;
+
+  for (const row of rows) {
+    const graph = row.preReadGraph;
+    if (graph?.selectedAnchorCount > 0) emittedCount += 1;
+    else omittedCount += 1;
+    if (row.payloadContainsGraph) payloadGraphLeakCount += 1;
+    selectedAnchorTotal += graph?.selectedAnchorCount ?? 0;
+    deferredAnchorTotal += graph?.deferredAnchorCount ?? 0;
+    incrementCount(freshnessStatusCounts, graph?.freshnessStatus);
+  }
+
+  return {
+    diagnosticOnly: true,
+    claimable: false,
+    measurement: "pre-read-react-web-graph-consumer-debug",
+    fixtureCount: rows.length,
+    emittedCount,
+    omittedCount,
+    selectedAnchorTotal,
+    deferredAnchorTotal,
+    freshnessStatusCounts,
+    payloadGraphLeakCount,
+    blocker: emittedCount > 0 && payloadGraphLeakCount === 0 ? null : "pre-read graph diagnostics were missing or leaked into model-facing payload",
+  };
+}
+
+function summarizeGraphAssistedContextPath(preReadRows, runtimeRows) {
+  const runtimeByFile = new Map(runtimeRows.map((row) => [row.file, row]));
+  const joined = preReadRows.map((row) => {
+    const runtime = runtimeByFile.get(row.file);
+    return {
+      file: row.file,
+      preReadFreshSelected: row.preReadGraph?.freshnessStatus === "fresh" && (row.preReadGraph?.selectedAnchorCount ?? 0) > 0,
+      runtimeFreshPacked: runtime?.runtimeGraph?.reason === "fresh-anchors-packed" && runtime?.runtimeGraph?.freshnessStatus === "fresh",
+    };
+  });
+  const preReadFreshSelectedCount = joined.filter((row) => row.preReadFreshSelected).length;
+  const runtimeFreshPackedCount = joined.filter((row) => row.runtimeFreshPacked).length;
+  const correlatedFreshPathCount = joined.filter((row) => row.preReadFreshSelected && row.runtimeFreshPacked).length;
+
+  return {
+    diagnosticOnly: true,
+    claimable: false,
+    measurement: "pre-read-to-runtime-graph-dogfood-correlation",
+    fixtureCount: joined.length,
+    preReadFreshSelectedCount,
+    runtimeFreshPackedCount,
+    correlatedFreshPathCount,
+    blocker: correlatedFreshPathCount > 0 ? null : "no fixture showed both pre-read fresh selected graph diagnostics and runtime fresh graph packing",
   };
 }
 
@@ -176,9 +257,11 @@ export async function buildReactWebContextEvidence({
 } = {}) {
   cleanupRuntimeSessions(repoRoot, `react-web-context-evidence-${runId}-`);
   const rows = [];
+  const preReadGraphDiagnosticRows = [];
   const graphDiagnosticRows = [];
   for (const relativeFile of fixtures) {
     rows.push(await measureReactWebFixture({ repoRoot, relativeFile, runId }));
+    preReadGraphDiagnosticRows.push(await measureReactWebPreReadGraphDiagnosticFixture({ repoRoot, relativeFile }));
     graphDiagnosticRows.push(await measureReactWebGraphDiagnosticFixture({ repoRoot, relativeFile, runId }));
   }
   cleanupRuntimeSessions(repoRoot, `react-web-context-evidence-${runId}-`);
@@ -235,7 +318,14 @@ export async function buildReactWebContextEvidence({
         claimable: false,
         blocker: "no provider usage, billing dashboard, invoice, or charged-cost data is measured by this artifact",
       },
+      preReadGraphDiagnostics: summarizePreReadGraphDiagnostics(preReadGraphDiagnosticRows),
       runtimeGraphDiagnostics: summarizeRuntimeGraphDiagnostics(graphDiagnosticRows),
+      graphAssistedContextPath: summarizeGraphAssistedContextPath(preReadGraphDiagnosticRows, graphDiagnosticRows),
+    },
+    preReadGraphDiagnostics: {
+      diagnosticOnly: true,
+      claimable: false,
+      fixtures: preReadGraphDiagnosticRows,
     },
     runtimeGraphDiagnostics: {
       diagnosticOnly: true,
@@ -263,8 +353,10 @@ ${evidence.claimBoundary}
 - Actual injected context reduction claimable: ${evidence.summary.actualInjectedContextReduction.claimable ? "yes" : "no"} (${evidence.summary.actualInjectedContextReduction.minPct}% to ${evidence.summary.actualInjectedContextReduction.maxPct}% local byte reduction)
 - Domain payload reduction diagnostic-only: ${evidence.summary.domainPayloadReduction.claimable ? "yes" : "no"} (${evidence.summary.domainPayloadReduction.minPct}% to ${evidence.summary.domainPayloadReduction.maxPct}% local byte reduction)
 - Internal runtime payload reduction diagnostic-only: ${evidence.summary.fullRuntimePayloadReduction.claimable ? "yes" : "no"}
+- Pre-read graph diagnostics emitted: ${evidence.summary.preReadGraphDiagnostics.emittedCount}/${evidence.summary.preReadGraphDiagnostics.fixtureCount} (diagnostic-only)
 - Runtime graph diagnostics emitted: ${evidence.summary.runtimeGraphDiagnostics.emittedCount}/${evidence.summary.runtimeGraphDiagnostics.fixtureCount} (diagnostic-only)
 - Runtime graph omission reasons: ${JSON.stringify(evidence.summary.runtimeGraphDiagnostics.reasonCounts)}
+- Graph-assisted context path observed: ${evidence.summary.graphAssistedContextPath.correlatedFreshPathCount}/${evidence.summary.graphAssistedContextPath.fixtureCount} fixtures (diagnostic-only)
 - Cache performance improvement claimable: no
 - Provider billing savings claimable: no
 
@@ -282,7 +374,7 @@ ${rows}
 
 ## Claim boundary
 
-This artifact supports bounded statements only when actual host-facing additionalContext is smaller than source for the measured React Web current-lane fixtures. The source-derived domainPayload metric is diagnostic-only. It does not support broad runtime-token, latency, cache-performance, provider-cost, billing, invoice, or charged-cost claims.
+This artifact supports bounded statements only when actual host-facing additionalContext is smaller than source for the measured React Web current-lane fixtures. The source-derived domainPayload metric and graph-assisted context path are diagnostic-only. It does not support broad runtime-token, latency, cache-performance, provider-cost, billing, invoice, or charged-cost claims.
 `;
 }
 

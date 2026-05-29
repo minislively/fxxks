@@ -36,10 +36,16 @@ test("release benchmark evidence gates npm wording on actual injected context an
   assert.ok(evidence.context.domainPayloadReduction.maxPct > 70);
   assert.equal(evidence.context.fullRuntimePayloadReduction.claimable, false);
   assert.match(evidence.context.fullRuntimePayloadReduction.blocker, /not smaller than source for every fixture/);
+  assert.equal(evidence.context.preReadGraphDiagnostics.diagnosticOnly, true);
+  assert.equal(evidence.context.preReadGraphDiagnostics.claimable, false);
+  assert.ok(evidence.context.preReadGraphDiagnostics.emittedCount > 0);
   assert.equal(evidence.context.runtimeGraphDiagnostics.diagnosticOnly, true);
   assert.equal(evidence.context.runtimeGraphDiagnostics.claimable, false);
   assert.ok(evidence.context.runtimeGraphDiagnostics.emittedCount > 0);
   assert.equal(evidence.context.runtimeGraphDiagnostics.reasonCounts["fresh-anchors-packed"] > 0, true);
+  assert.equal(evidence.context.graphAssistedContextPath.diagnosticOnly, true);
+  assert.equal(evidence.context.graphAssistedContextPath.claimable, false);
+  assert.ok(evidence.context.graphAssistedContextPath.correlatedFreshPathCount > 0);
 
   assert.equal(evidence.reuse.reuseCorrectnessClaimable, true);
   assert.equal(evidence.reuse.sameFileReactWebReuse.firstAction, "record");
@@ -71,9 +77,14 @@ test("release benchmark smoke summary exposes only release-safe compact evidence
   assert.ok(summary.actualInjectedContextReduction.minPct > 0);
   assert.ok(summary.actualInjectedContextReduction.maxPct > 70);
   assert.equal(summary.reuseCorrectnessClaimable, true);
+  assert.equal(summary.preReadGraphDiagnostics.diagnosticOnly, true);
+  assert.equal(summary.preReadGraphDiagnostics.claimable, false);
   assert.equal(summary.runtimeGraphDiagnostics.diagnosticOnly, true);
   assert.equal(summary.runtimeGraphDiagnostics.claimable, false);
   assert.ok(summary.runtimeGraphDiagnostics.emittedCount > 0);
+  assert.equal(summary.graphAssistedContextPath.diagnosticOnly, true);
+  assert.equal(summary.graphAssistedContextPath.claimable, false);
+  assert.ok(summary.graphAssistedContextPath.correlatedFreshPathCount > 0);
   assert.deepEqual(summary.nonClaims, {
     cachePerformanceImprovement: false,
     runtimeTokenSavings: false,
@@ -115,7 +126,9 @@ test("release benchmark evidence Markdown gives safe public wording and explicit
   assert.match(markdown, /npm update wording claimable: yes/);
   assert.match(markdown, /React Web actual injected context reduction: yes/);
   assert.match(markdown, /React Web domainPayload reduction diagnostic-only: yes/);
+  assert.match(markdown, /React Web pre-read graph diagnostics:/);
   assert.match(markdown, /React Web runtime graph diagnostics:/);
+  assert.match(markdown, /React Web graph-assisted context path:/);
   assert.match(markdown, /React Web reuse correctness: yes/);
   assert.match(markdown, /Cache performance improvement: no/);
   assert.match(markdown, /Runtime-token savings: no/);
