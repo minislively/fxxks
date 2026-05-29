@@ -309,6 +309,9 @@ function assertValidArtifact(artifact: unknown): asserts artifact is ReactWebEvi
       typeof admission.candidateBytes !== "number" ||
       !Number.isFinite(admission.candidateBytes) ||
       admission.candidateBytes < 0 ||
+      (admission.candidateKind !== undefined &&
+        admission.candidateKind !== "optimized-react-web-runtime-payload" &&
+        admission.candidateKind !== "react-web-edit-card.v1") ||
       typeof admission.minSourceBytes !== "number" ||
       !Number.isFinite(admission.minSourceBytes) ||
       admission.minSourceBytes < 0 ||
@@ -463,6 +466,7 @@ export function renderReactWebEvidenceArtifactMarkdown(artifact: ReactWebEvidenc
         `- admitted: ${artifact.additionalContextAdmission.admitted ? "yes" : "no"}`,
         `- reason: ${artifact.additionalContextAdmission.reason}`,
         `- source bytes: ${artifact.additionalContextAdmission.sourceBytes ?? "unknown"}`,
+        `- candidate kind: ${artifact.additionalContextAdmission.candidateKind ?? "unknown"}`,
         `- candidate bytes: ${artifact.additionalContextAdmission.candidateBytes}`,
         `- reduction: ${artifact.additionalContextAdmission.reductionPct ?? "unknown"}%`,
         `- minimum source bytes: ${artifact.additionalContextAdmission.minSourceBytes}`,

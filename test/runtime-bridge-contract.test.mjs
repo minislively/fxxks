@@ -111,21 +111,23 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   );
 
   assert.equal(firstInject.action, "record");
-  assert.equal(secondInject.action, "fallback");
-  assert.equal(secondInject.fallback.reason, "additional-context-compression-inefficient");
-  assert.ok(secondInject.reasons.includes("additional-context-compression-inefficient"));
+  assert.equal(secondInject.action, "inject");
   assert.equal(secondInject.debug.decision.payload.domainPayload.domain, "react-web");
-  assert.equal(secondInject.contextModeReason, "additional-context-compression-inefficient");
-  assert.equal(secondInject.additionalContext, undefined);
+  assert.equal(secondInject.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.match(secondInject.additionalContext, /candidate: react-web-edit-card\.v1/);
+  assert.doesNotMatch(secondInject.additionalContext, /domainPayload/);
+  assert.doesNotMatch(secondInject.additionalContext, /editGuidance/);
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
   assert.deepEqual(secondInject.debug.decision.payload.editGuidance.freshness, secondInject.debug.decision.payload.sourceFingerprint);
   assert.equal(secondInject.debug.decision.payload.reactWebContext.schemaVersion, "react-web-context.v0");
   assert.equal(secondInject.debug.decision.debug.reactWebContextBudget.included, true);
-  assert.equal(secondInject.debug.additionalContextAdmission.admitted, false);
-  assert.equal(secondInject.debug.additionalContextAdmission.reason, "candidate-not-smaller-than-source");
-  assert.ok(secondInject.debug.additionalContextAdmission.candidateBytes > secondInject.debug.additionalContextAdmission.sourceBytes);
-  assert.equal(secondInject.debug.reactWebFactGraphPacking.included, false);
-  assert.equal(secondInject.debug.reactWebFactGraphPacking.reason, "source-relative-budget-exceeded");
+  assert.equal(secondInject.debug.additionalContextAdmission.admitted, true);
+  assert.equal(secondInject.debug.additionalContextAdmission.reason, "admitted");
+  assert.equal(secondInject.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.ok(secondInject.debug.additionalContextAdmission.candidateBytes < secondInject.debug.additionalContextAdmission.sourceBytes);
+  assert.ok(secondInject.debug.additionalContextAdmission.reductionPct >= secondInject.debug.additionalContextAdmission.minReductionPct);
+  assert.equal(secondInject.debug.reactWebFactGraphPacking.included, true);
+  assert.equal(secondInject.debug.reactWebFactGraphPacking.reason, "fresh-anchors-packed");
   assert.equal(secondInject.debug.reactWebFactGraphPacking.freshnessStatus, "fresh");
   assert.ok(secondInject.debug.reactWebFactGraphPacking.selectedAnchorCount > 0);
   assert.equal(secondInject.debug.reactWebContextPacking.included, true);
@@ -135,11 +137,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
     secondInject.debug.reactWebContextPacking.priority.indexOf("formStateRoles") >
       secondInject.debug.reactWebContextPacking.priority.indexOf("intentTargets"),
   );
-  assert.equal(secondInject.debug.reactWebContextPacking.fields[0].name, "editTargetRouting");
-  assert.equal(
-    secondInject.debug.reactWebContextPacking.fields.find((field) => field.name === "editTargetRouting")?.count,
-    secondInject.debug.reactWebContextPacking.fields.find((field) => field.name === "editTargetRouting")?.count,
-  );
+  assert.deepEqual(secondInject.debug.reactWebContextPacking.fields, []);
   assert.equal(
     secondInject.debug.reactWebContextPacking.totalAnchors,
     secondInject.debug.reactWebContextPacking.fields.reduce((total, field) => total + field.count, 0),
@@ -284,11 +282,12 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   );
 
   assert.equal(firstWrapper.action, "record");
-  assert.equal(secondWrapper.action, "fallback");
+  assert.equal(secondWrapper.action, "inject");
   assert.equal(secondWrapper.debug.decision.debug.domainDetection.classification, "react-web");
   assert.deepEqual(secondWrapper.debug.decision.debug.frontendPayloadPolicy.evidenceGates, [CUSTOM_WRAPPER_DOM_SIGNAL_GAP]);
-  assert.equal(secondWrapper.contextModeReason, "additional-context-compression-inefficient");
-  assert.equal(secondWrapper.debug.additionalContextAdmission.admitted, false);
+  assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-edit-guidance");
+  assert.equal(secondWrapper.debug.additionalContextAdmission.admitted, true);
+  assert.equal(secondWrapper.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
 
   const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);

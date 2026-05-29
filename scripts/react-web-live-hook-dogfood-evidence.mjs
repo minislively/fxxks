@@ -14,6 +14,7 @@ export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", 
 export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = [
   "fixtures/compressed/FormSection.tsx",
   "fixtures/compressed/HookEffectPanel.tsx",
+  "fixtures/compressed/TinyEditCard.tsx",
   "fixtures/hybrid/DashboardPanel.tsx",
   "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
   "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
@@ -176,6 +177,7 @@ function summarizeArtifact(artifactRef, expectedFile) {
           admitted: admission.admitted === true,
           reason: admission.reason,
           sourceBytes: admission.sourceBytes ?? null,
+          candidateKind: admission.candidateKind ?? null,
           candidateBytes: admission.candidateBytes ?? 0,
           reductionPct: admission.reductionPct ?? null,
           minSourceBytes: admission.minSourceBytes ?? null,
@@ -217,6 +219,8 @@ function summarizeLiveHookSuiteRow({ projectRoot, relativeFile, preRead, firstNa
     sourceBytes,
     additionalContextBytes,
     additionalContextReductionPct: percentReduction(sourceBytes, additionalContextBytes),
+    finalInjectionBytes: additionalContextBytes,
+    finalInjectionByteReductionPct: percentReduction(sourceBytes, additionalContextBytes),
     additionalContextLargerThanSource: additionalContextBytes > sourceBytes,
     preReadGraphDiagnostics: summarizePreReadGraph(preRead),
     firstNative,
@@ -227,8 +231,25 @@ function summarizeLiveHookSuiteRow({ projectRoot, relativeFile, preRead, firstNa
   };
 }
 
+function distribution(values) {
+  if (values.length === 0) return { min: null, max: null, avg: null };
+  return {
+    min: Math.min(...values),
+    max: Math.max(...values),
+    avg: Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(3)),
+  };
+}
+
+function rate(numerator, denominator) {
+  return denominator > 0 ? Number((numerator / denominator).toFixed(3)) : null;
+}
+
 function summarizeLiveHookSuite(rows) {
   const reductionValues = rows.map((row) => row.additionalContextReductionPct);
+  const candidateReductionValues = rows
+    .map((row) => row.evidenceArtifact.additionalContextAdmission?.reductionPct)
+    .filter((value) => typeof value === "number");
+  const finalInjectionReductionValues = rows.map((row) => row.finalInjectionByteReductionPct);
   const graphDiagnosticCount = rows.filter((row) => row.preReadGraphDiagnostics.emitted).length;
   const graphIncludedCount = rows.filter((row) => row.secondNative.containsReactWebFactGraph).length;
   const runtimeGraphIncludedArtifactCount = rows.filter((row) => row.evidenceArtifact.runtimeGraph?.included === true).length;
@@ -240,7 +261,16 @@ function summarizeLiveHookSuite(rows) {
   const expandedRowsCount = rows.length - compactRowsCount;
   const admissionObservedCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.diagnosticOnly === true).length;
   const admittedAdditionalContextCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.admitted === true).length;
+  const compressionSuccessCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.reason === "admitted").length;
   const discardedAdditionalContextCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.admitted === false).length;
+  const fallbackUsedCount = rows.filter((row) => row.secondNative.firstLine?.includes("Read the full source file for this turn") === true).length;
+  const badCandidateObservedCount = rows.filter((row) => row.evidenceArtifact.additionalContextAdmission?.admitted === false).length;
+  const badCandidateBlockCount = discardedAdditionalContextCount;
+  const candidateAdmissionRate = rate(admittedAdditionalContextCount, admissionObservedCount);
+  const candidateCompressionSuccessRate = rate(compressionSuccessCount, admissionObservedCount);
+  const badCandidateBlockRate = rate(badCandidateBlockCount, badCandidateObservedCount);
+  const fallbackUsageRate = rate(fallbackUsedCount, rows.length);
+
   const discardedReasonCounts = rows.reduce((counts, row) => {
     const admission = row.evidenceArtifact.additionalContextAdmission;
     if (admission && !admission.admitted) {
@@ -270,6 +300,31 @@ function summarizeLiveHookSuite(rows) {
     admittedAdditionalContextCount,
     discardedAdditionalContextCount,
     discardedReasonCounts,
+    candidateMetrics: {
+      observedCount: admissionObservedCount,
+      admittedCount: admittedAdditionalContextCount,
+      discardedCount: discardedAdditionalContextCount,
+      admissionRate: candidateAdmissionRate,
+      compressionSuccessRate: candidateCompressionSuccessRate,
+      badCandidateBlockRate,
+      byteReduction: distribution(candidateReductionValues),
+      discardReasons: discardedReasonCounts,
+    },
+    fallbackMetrics: {
+      usedCount: fallbackUsedCount,
+      usageRate: fallbackUsageRate,
+    },
+    finalInjectionMetrics: {
+      byteReduction: distribution(finalInjectionReductionValues),
+    },
+    metricAliases: {
+      candidate_admission_rate: candidateAdmissionRate,
+      candidate_compression_success_rate: candidateCompressionSuccessRate,
+      bad_candidate_block_rate: badCandidateBlockRate,
+      fallback_used_rate: fallbackUsageRate,
+      candidate_byte_reduction: distribution(candidateReductionValues),
+      final_injection_byte_reduction: distribution(finalInjectionReductionValues),
+    },
     allAdditionalContextsSmaller,
     allFreshGraphs,
     minAdditionalContextReductionPct: Math.min(...reductionValues),
@@ -277,12 +332,11 @@ function summarizeLiveHookSuite(rows) {
     blocker:
       graphDiagnosticCount === rows.length &&
       runtimeGraphIncludedArtifactCount > 0 &&
-      graphSkippedForBudgetCount > 0 &&
       artifactIdentityMatchCount === rows.length &&
       admissionObservedCount === rows.length &&
-      discardedAdditionalContextCount > 0
+      admittedAdditionalContextCount > 0
         ? null
-        : "live/native hook fixture rows did not preserve graph diagnostics, admission diagnostics, and at least one discard",
+        : "live/native hook fixture rows did not preserve graph diagnostics, admission diagnostics, and at least one admitted compact candidate",
   };
 }
 
@@ -291,11 +345,10 @@ function assertLiveHookSuite(suite) {
   if (suite.summary.fixtureCount === 0) failures.push("live hook suite had no fixtures");
   if (suite.summary.graphDiagnosticCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture preserved graph diagnostics");
   if (suite.summary.runtimeGraphIncludedArtifactCount <= 0) failures.push("no live hook suite fixture preserved an included runtime graph diagnostic in the artifact");
-  if (suite.summary.graphSkippedForBudgetCount <= 0) failures.push("no live hook suite fixture skipped reactWebFactGraph for source-relative budget");
   if (suite.summary.firstPromptEmptyCount !== suite.summary.fixtureCount) failures.push("not every live hook suite first prompt was record-only empty stdout");
   if (suite.summary.artifactIdentityMatchCount !== suite.summary.fixtureCount) failures.push("not every live hook suite artifact matched its replay target");
   if (suite.summary.admissionObservedCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture recorded additionalContext admission diagnostics");
-  if (suite.summary.discardedAdditionalContextCount <= 0) failures.push("no live hook suite fixture discarded inefficient additionalContext");
+  if (suite.summary.admittedAdditionalContextCount <= 0) failures.push("no live hook suite fixture admitted compact additionalContext");
   if (suite.summary.admittedAdditionalContextCount > suite.summary.compactRowsCount) failures.push("admitted additionalContext count exceeded compact final output rows");
   if (!suite.summary.allFreshGraphs) failures.push("not every live hook suite fixture had fresh pre-read/runtime graph diagnostics");
   return failures;
@@ -469,13 +522,31 @@ ${evidence.claimBoundary}
 - Graph skipped for source-relative budget: ${evidence.suite.summary.graphSkippedForBudgetCount}/${evidence.suite.summary.fixtureCount}
 - First prompts record-only: ${evidence.suite.summary.firstPromptEmptyCount}/${evidence.suite.summary.fixtureCount}
 - Artifact identity matches: ${evidence.suite.summary.artifactIdentityMatchCount}/${evidence.suite.summary.fixtureCount}
-- AdditionalContext smaller than local source: ${evidence.suite.summary.compactRowsCount}/${evidence.suite.summary.fixtureCount}
-- Expanded additionalContext rows: ${evidence.suite.summary.expandedRowsCount}/${evidence.suite.summary.fixtureCount}
+- Final hook output smaller than local source: ${evidence.suite.summary.compactRowsCount}/${evidence.suite.summary.fixtureCount}
+- Expanded final hook output rows: ${evidence.suite.summary.expandedRowsCount}/${evidence.suite.summary.fixtureCount}
+
+### Candidate generation quality
+
+- candidate_admission_rate: ${evidence.suite.summary.metricAliases.candidate_admission_rate}
+- candidate_compression_success_rate: ${evidence.suite.summary.metricAliases.candidate_compression_success_rate}
+- candidate_byte_reduction: ${JSON.stringify(evidence.suite.summary.metricAliases.candidate_byte_reduction)}
+
+### Gate/admission outcome
+
 - AdditionalContext admission diagnostics: ${evidence.suite.summary.admissionObservedCount}/${evidence.suite.summary.fixtureCount}
 - AdditionalContext admitted rows: ${evidence.suite.summary.admittedAdditionalContextCount}/${evidence.suite.summary.fixtureCount}
 - AdditionalContext discarded rows: ${evidence.suite.summary.discardedAdditionalContextCount}/${evidence.suite.summary.fixtureCount}
+- bad_candidate_block_rate: ${evidence.suite.summary.metricAliases.bad_candidate_block_rate}
 - AdditionalContext discard reasons: ${JSON.stringify(evidence.suite.summary.discardedReasonCounts)}
-- Local additionalContext reduction range: ${evidence.suite.summary.minAdditionalContextReductionPct}% to ${evidence.suite.summary.maxAdditionalContextReductionPct}%
+
+### Fallback behavior
+
+- fallback_used_rate: ${evidence.suite.summary.metricAliases.fallback_used_rate}
+
+### Final injection size
+
+- final_injection_byte_reduction: ${JSON.stringify(evidence.suite.summary.metricAliases.final_injection_byte_reduction)}
+- Note: final_injection_byte_reduction is final hook-output size after admission/fallback and is not proof of candidate compression success.
 - Claimable as broad token/cost savings: no
 - Claim boundary: ${evidence.suite.claimBoundary}
 
