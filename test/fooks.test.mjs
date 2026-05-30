@@ -2782,7 +2782,7 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(second.contextMode, "light");
   assert.equal(second.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(second.filePath, path.join("fixtures", "compressed", "FormSection.tsx"));
-  assert.match(second.additionalContext, /candidate: react-web-edit-card\.v1/);
+  assert.match(second.additionalContext, /candidate: react-web-edit-card\.v2/);
   assert.doesNotMatch(second.additionalContext, /domainPayload|editGuidance/);
   assert.ok(second.reasons.includes("edit-guidance-opt-in"));
   assert.equal(second.reasons.includes("preflight-advisory-attached"), false);
@@ -2798,7 +2798,8 @@ test("runtime hook reuses payload only on repeated same-file prompts in one sess
   assert.equal(second.debug.reactWebActivationMode.promoted, true);
   assert.equal(second.debug.additionalContextAdmission.admitted, true);
   assert.equal(second.debug.additionalContextAdmission.reason, "admitted");
-  assert.equal(second.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.equal(second.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v2");
+  assert.equal(typeof second.debug.additionalContextAdmission.candidateVariant, "string");
 
   fs.writeFileSync(second.statePath, "{not-json");
   const afterCorruptState = handleCodexRuntimeHook(
@@ -2879,7 +2880,7 @@ test("runtime hook admits raw edit-card candidate before project knowledge appen
   assert.equal(withKnowledge.action, "inject");
   assert.match(withKnowledge.additionalContext, /PROJECT KNOWLEDGE CONTEXT/);
   assert.ok(withKnowledge.additionalContext.length > baseline.additionalContext.length);
-  assert.equal(withKnowledge.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.equal(withKnowledge.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v2");
   assert.equal(withKnowledge.debug.additionalContextAdmission.admitted, true);
   assert.equal(
     withKnowledge.debug.additionalContextAdmission.candidateBytes,
@@ -3006,7 +3007,7 @@ test("runtime hook treats implement and rename prompts as safe edit-intent guida
   assert.equal(implementSecond.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(implementSecond.reasons.includes("edit-guidance-opt-in"), true);
   assert.equal(implementSecond.debug.additionalContextAdmission.admitted, true);
-  assert.equal(implementSecond.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.equal(implementSecond.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v2");
 
   const renameSession = `hook-rename-edit-guidance-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: renameSession }, repoRoot);
@@ -3030,7 +3031,7 @@ test("runtime hook treats implement and rename prompts as safe edit-intent guida
   assert.equal(renameSecond.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(renameSecond.reasons.includes("edit-guidance-opt-in"), true);
   assert.equal(renameSecond.debug.additionalContextAdmission.admitted, true);
-  assert.equal(renameSecond.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.equal(renameSecond.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v2");
 });
 
 test("runtime hook gates edit guidance to repeated exact-file edit intent prompts", () => {
@@ -3771,7 +3772,7 @@ test("native hook bridge only activates inside attached codex projects", () => {
   assert.equal(second.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(
     second.hookSpecificOutput.additionalContext,
-    /fooks: reused pre-read \(compressed\) · file: src\/components\/FormSection\.tsx · context-mode: light · candidate: react-web-edit-card\.v1/,
+    /fooks: reused pre-read \(compressed\) · file: src\/components\/FormSection\.tsx · context-mode: light · candidate: react-web-edit-card\.v2/,
   );
 });
 
@@ -3894,7 +3895,7 @@ test("cli codex-runtime-hook can read native hook payloads from stdin", () => {
   assert.equal(cliSecond.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(
     cliSecond.hookSpecificOutput.additionalContext,
-    /fooks: reused pre-read \(compressed\) · file: src\/components\/FormSection\.tsx · context-mode: light · candidate: react-web-edit-card\.v1/,
+    /fooks: reused pre-read \(compressed\) · file: src\/components\/FormSection\.tsx · context-mode: light · candidate: react-web-edit-card\.v2/,
   );
 });
 

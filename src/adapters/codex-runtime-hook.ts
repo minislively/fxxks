@@ -46,7 +46,8 @@ type RuntimeAdditionalContextAdmissionReason = "admitted" | "unknown-source-size
 type RuntimeAdditionalContextAdmission = {
   admitted: boolean;
   reason: RuntimeAdditionalContextAdmissionReason;
-  candidateKind?: "optimized-react-web-runtime-payload" | "react-web-edit-card.v1";
+  candidateKind?: "optimized-react-web-runtime-payload" | "react-web-edit-card.v1" | "react-web-edit-card.v2";
+  candidateVariant?: RuntimeReactWebEditCardV2Variant;
   sourceBytes?: number;
   candidateBytes: number;
   reductionPct?: number;
@@ -66,6 +67,25 @@ type RuntimeReactWebEditCard = {
   hints: string[];
   readIfNeeded: true;
 };
+export type RuntimeReactWebEditCardV2 = {
+  k: "rw.edit.v2";
+  f: string;
+  fp?: string;
+  c?: string;
+  t: Array<[number, number, string, string]>;
+  r?: string[];
+  h?: string[];
+  d?: string[];
+  g?: Array<[number, string, string]>;
+  p?: string[];
+  ri: true;
+};
+export type RuntimeReactWebEditCardV2Variant =
+  | "full"
+  | "no-graph"
+  | "no-dependencies"
+  | "targets-roles-hooks"
+  | "targets-roles";
 
 type PackedRuntimeReactWebFactGraph = {
   schemaVersion: "react-web-fact-graph-runtime-context.v1";
@@ -142,6 +162,10 @@ function uniqueLimited(values: string[], limit: number): string[] {
   return [...new Set(values.filter(Boolean))].slice(0, limit);
 }
 
+function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
+}
+
 function buildReactWebEditCard(payload: ModelFacingPayload): RuntimeReactWebEditCard | undefined {
   if (payload.domainPayload?.domain !== "react-web" || !payload.editGuidance || payload.useOriginal) return undefined;
 
@@ -187,6 +211,149 @@ function renderReactWebEditCardAdditionalContext(
     `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode} · candidate: react-web-edit-card.v1`,
     JSON.stringify(card),
   ].join("\n");
+}
+
+function compactGraphAnchors(reactWebFactGraph: PackedRuntimeReactWebFactGraph | undefined): RuntimeReactWebEditCardV2["g"] | undefined {
+  const anchors = reactWebFactGraph?.selectedAnchors
+    .map((anchor): [number, string, string] => [anchor.rank, anchor.kind, anchor.label])
+    .slice(0, 3);
+  return anchors && anchors.length > 0 ? anchors : undefined;
+}
+
+function buildReactWebEditCardV2(
+  payload: ModelFacingPayload,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
+): RuntimeReactWebEditCardV2 | undefined {
+  if (payload.domainPayload?.domain !== "react-web" || !payload.editGuidance || payload.useOriginal) return undefined;
+
+  const patchTargets = payload.editGuidance.patchTargets
+    .map((target) => locTuple(target.loc, target.kind, target.label))
+    .filter((target): target is [number, number, string, string] => Boolean(target))
+    .slice(0, 4);
+  const routingTargets = [...(payload.reactWebContext?.editTargetRouting ?? [])]
+    .sort((left, right) => left.priority - right.priority)
+    .map((target) => locTuple(target.loc, target.kind, target.label))
+    .filter((target): target is [number, number, string, string] => Boolean(target))
+    .slice(0, Math.max(0, 4 - patchTargets.length));
+  const targets = [...patchTargets, ...routingTargets];
+
+  const roles = uniqueLimited([
+    ...(payload.reactWebContext?.formStateRoles ?? []).map((role) => `form:${role.role}`),
+    ...(payload.reactWebContext?.intentTargets ?? []).map((target) => `intent:${target.intent}`),
+    ...(payload.reactWebContext?.formStateFlow ?? []).map((flow) => `flow:${flow.kind}`),
+    ...(payload.reactWebContext?.stateHints ?? []).map((hint) => `state:${hint.kind}`),
+    ...(payload.reactWebContext?.a11yAnchors ?? []).map((anchor) => `a11y:${anchor.kind}`),
+    ...(payload.reactWebContext?.layoutRegionHints ?? []).map((hint) => `layout:${hint.kind}`),
+    ...(payload.reactWebContext?.componentApiHints ?? []).map((hint) => `api:${hint.kind}`),
+    ...(payload.reactWebContext?.stylingVariantHints ?? []).map((hint) => `style:${hint.kind}`),
+  ], 6);
+
+  const hooks = uniqueLimited([
+    ...(payload.behavior?.hooks ?? []),
+    ...(payload.reactWebContext?.formStateFlow ?? []).flatMap((flow) => (flow.hook ? [flow.hook.hook, ...flow.hook.deps] : [])),
+    ...(payload.reactWebContext?.importRoleHints ?? []).flatMap((hint) => [
+      hint.role,
+      hint.moduleSpecifier,
+      ...(hint.importedSymbols ?? []),
+    ]),
+  ], 6);
+
+  const dependencies = uniqueLimited([
+    ...(payload.reactWebContext?.localDependencies ?? []).map((dependency) => dependency.symbol),
+    ...(payload.reactWebContext?.importRoleHints ?? []).map((hint) => hint.moduleSpecifier),
+  ], 6);
+  const graphAnchors = compactGraphAnchors(reactWebFactGraph);
+  const provenance = uniqueLimited([
+    targets.length > 0 ? "source" : "",
+    roles.length > 0 || hooks.length > 0 || dependencies.length > 0 ? "context" : "",
+    graphAnchors ? "graph" : "",
+  ], 3);
+
+  if (targets.length === 0 && roles.length === 0 && hooks.length === 0) return undefined;
+
+  return withoutUndefined({
+    k: "rw.edit.v2" as const,
+    f: payload.filePath,
+    fp: compactFingerprint(payload.sourceFingerprint),
+    c: payload.reactWebContext?.scope.componentName ?? payload.componentName,
+    t: targets,
+    r: roles.length > 0 ? roles : undefined,
+    h: hooks.length > 0 ? hooks : undefined,
+    d: dependencies.length > 0 ? dependencies : undefined,
+    g: graphAnchors,
+    p: provenance.length > 0 ? provenance : undefined,
+    ri: true as const,
+  });
+}
+
+function renderReactWebEditCardV2(card: RuntimeReactWebEditCardV2, prefix: string): string {
+  return [prefix, JSON.stringify(card)].join("\n");
+}
+
+function reactWebEditCardV2Provenance(card: RuntimeReactWebEditCardV2): string[] | undefined {
+  const provenance = uniqueLimited([
+    card.t.length > 0 ? "source" : "",
+    (card.r?.length ?? 0) > 0 || (card.h?.length ?? 0) > 0 || (card.d?.length ?? 0) > 0 ? "context" : "",
+    (card.g?.length ?? 0) > 0 ? "graph" : "",
+  ], 3);
+  return provenance.length > 0 ? provenance : undefined;
+}
+
+function withReactWebEditCardV2Provenance(card: RuntimeReactWebEditCardV2): RuntimeReactWebEditCardV2 {
+  return withoutUndefined({ ...card, p: reactWebEditCardV2Provenance(card) });
+}
+
+export function selectReactWebEditCardV2VariantForBudget(
+  card: RuntimeReactWebEditCardV2,
+  options: { maxCandidateBytes?: number; renderPrefix?: string } = {},
+): { card?: RuntimeReactWebEditCardV2; variant?: RuntimeReactWebEditCardV2Variant; bytes: number } {
+  const prefix = options.renderPrefix ?? "fooks: candidate: react-web-edit-card.v2";
+  const maxCandidateBytes = options.maxCandidateBytes;
+  const variants: Array<{ variant: RuntimeReactWebEditCardV2Variant; card: RuntimeReactWebEditCardV2 }> = [
+    { variant: "full", card: withReactWebEditCardV2Provenance(card) },
+    { variant: "no-graph", card: withReactWebEditCardV2Provenance(withoutUndefined({ ...card, g: undefined })) },
+    { variant: "no-dependencies", card: withReactWebEditCardV2Provenance(withoutUndefined({ ...card, g: undefined, d: undefined })) },
+    {
+      variant: "targets-roles-hooks",
+      card: withoutUndefined({ k: card.k, f: card.f, fp: card.fp, c: card.c, t: card.t, r: card.r, h: card.h, ri: card.ri }),
+    },
+    {
+      variant: "targets-roles",
+      card: withoutUndefined({ k: card.k, f: card.f, fp: card.fp, c: card.c, t: card.t, r: card.r, ri: card.ri }),
+    },
+  ];
+
+  for (const candidate of variants) {
+    if (candidate.card.t.length === 0 && (candidate.card.r?.length ?? 0) === 0 && (candidate.card.h?.length ?? 0) === 0) continue;
+    const bytes = estimateTextBytes(renderReactWebEditCardV2(candidate.card, prefix));
+    if (maxCandidateBytes === undefined || bytes <= maxCandidateBytes) {
+      return { ...candidate, bytes };
+    }
+  }
+
+  return {
+    bytes: estimateTextBytes(renderReactWebEditCardV2(variants[variants.length - 1].card, prefix)),
+  };
+}
+
+function renderReactWebEditCardV2AdditionalContext(
+  filePath: string,
+  payload: ModelFacingPayload,
+  contextMode: ContextMode,
+  reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
+  maxCandidateBytes?: number,
+): { additionalContext?: string; variant?: RuntimeReactWebEditCardV2Variant; bytes?: number; graphIncluded: boolean } {
+  const card = buildReactWebEditCardV2(payload, reactWebFactGraph);
+  if (!card) return { graphIncluded: false };
+  const prefix = `${buildPreReadReuseStatus(payload.mode)} · file: ${filePath} · context-mode: ${contextMode} · candidate: react-web-edit-card.v2`;
+  const selected = selectReactWebEditCardV2VariantForBudget(card, { maxCandidateBytes, renderPrefix: prefix });
+  if (!selected.card) return { graphIncluded: false, bytes: selected.bytes };
+  return {
+    additionalContext: renderReactWebEditCardV2(selected.card, prefix),
+    variant: selected.variant,
+    bytes: selected.bytes,
+    graphIncluded: Boolean(selected.card.g?.length),
+  };
 }
 
 function minimalRuntimeReactWebContext(reactWebContext: RuntimeReactWebContext): PackedRuntimeReactWebContext {
@@ -651,21 +818,50 @@ function buildAdditionalContext(
   maxOptimizedContextBytes?: number,
   cwd = process.cwd(),
   includeReactWebFactGraph = true,
-): { additionalContext: string; reactWebContextPacking?: RuntimeReactWebContextPackingSummary; reactWebFactGraphPacking?: RuntimeReactWebFactGraphPackingSummary; candidateKind?: RuntimeAdditionalContextAdmission["candidateKind"] } {
+): {
+  additionalContext: string;
+  reactWebContextPacking?: RuntimeReactWebContextPackingSummary;
+  reactWebFactGraphPacking?: RuntimeReactWebFactGraphPackingSummary;
+  candidateKind?: RuntimeAdditionalContextAdmission["candidateKind"];
+  candidateVariant?: RuntimeAdditionalContextAdmission["candidateVariant"];
+} {
   if (payload.domainPayload?.domain === "react-web" && !payload.useOriginal) {
     if (payload.editGuidance) {
+      const compactedGraph = includeReactWebFactGraph
+        ? compactRuntimeReactWebFactGraph(filePath, cwd)
+        : { packing: runtimeReactWebFactGraphOutOfScopePacking() };
+      const maxCandidateBytes = maxOptimizedContextBytes === undefined
+        ? EDIT_GUIDANCE_CONTEXT_MAX_BYTES
+        : Math.min(maxOptimizedContextBytes, EDIT_GUIDANCE_CONTEXT_MAX_BYTES);
+      const editCardV2 = renderReactWebEditCardV2AdditionalContext(
+        filePath,
+        payload,
+        contextMode,
+        compactedGraph.graph,
+        maxCandidateBytes,
+      );
+      if (editCardV2.additionalContext) {
+        const editCardGraphPacking =
+          compactedGraph.graph && !editCardV2.graphIncluded
+            ? runtimeReactWebFactGraphPackingSummary(
+                maxOptimizedContextBytes === undefined ? "budget-exceeded" : "source-relative-budget-exceeded",
+                compactedGraph.graph,
+              )
+            : compactedGraph.packing;
+        return {
+          additionalContext: editCardV2.additionalContext,
+          ...(payload.reactWebContext ? { reactWebContextPacking: summarizeRuntimeReactWebContextPacking(minimalRuntimeReactWebContext(payload.reactWebContext)) } : {}),
+          reactWebFactGraphPacking: editCardGraphPacking,
+          candidateKind: "react-web-edit-card.v2",
+          candidateVariant: editCardV2.variant,
+        };
+      }
       const editCardContext = renderReactWebEditCardAdditionalContext(filePath, payload, contextMode);
       if (editCardContext) {
-        let editCardGraphPacking: RuntimeReactWebFactGraphPackingSummary | undefined;
-        if (includeReactWebFactGraph) {
-          editCardGraphPacking = compactRuntimeReactWebFactGraph(filePath, cwd).packing;
-        } else {
-          editCardGraphPacking = runtimeReactWebFactGraphOutOfScopePacking();
-        }
         return {
           additionalContext: editCardContext,
           ...(payload.reactWebContext ? { reactWebContextPacking: summarizeRuntimeReactWebContextPacking(minimalRuntimeReactWebContext(payload.reactWebContext)) } : {}),
-          reactWebFactGraphPacking: editCardGraphPacking,
+          reactWebFactGraphPacking: compactedGraph.packing,
           candidateKind: "react-web-edit-card.v1",
         };
       }
@@ -817,10 +1013,12 @@ function evaluateAdditionalContextAdmission(
   originalEstimatedBytes: number | undefined,
   candidateBytes: number,
   candidateKind?: RuntimeAdditionalContextAdmission["candidateKind"],
+  candidateVariant?: RuntimeAdditionalContextAdmission["candidateVariant"],
 ): RuntimeAdditionalContextAdmission {
   const base = {
     candidateBytes,
     ...(candidateKind ? { candidateKind } : {}),
+    ...(candidateVariant ? { candidateVariant } : {}),
     minSourceBytes: ADDITIONAL_CONTEXT_ADMISSION_MIN_SOURCE_BYTES,
     minReductionPct: ADDITIONAL_CONTEXT_ADMISSION_MIN_REDUCTION_PCT,
   };
@@ -1305,7 +1503,12 @@ export function handleCodexRuntimeHook(input: CodexRuntimeHookInput, cwd = proce
     }
 
     const admission = isReactWebOptimizedPayload(decision.payload) && editGuidanceIncluded
-      ? evaluateAdditionalContextAdmission(originalEstimatedBytes, estimateTextBytes(candidateAdditionalContext), runtimeContext.candidateKind)
+      ? evaluateAdditionalContextAdmission(
+          originalEstimatedBytes,
+          estimateTextBytes(candidateAdditionalContext),
+          runtimeContext.candidateKind,
+          runtimeContext.candidateVariant,
+        )
       : undefined;
     attachAdditionalContextAdmissionDebug(runtimeDecision, admission);
 
