@@ -2888,6 +2888,78 @@ test("runtime hook admits raw edit-card candidate before project knowledge appen
   assert.ok(withKnowledge.debug.additionalContextAdmission.candidateBytes < Buffer.byteLength(withKnowledge.additionalContext, "utf8"));
 });
 
+test("runtime hook keeps zero-byte source-too-small edit-card reductions finite", () => {
+  const tempDir = makeTempProject();
+  const target = path.join("src", "components", "EmptyEditCard.tsx");
+  fs.writeFileSync(path.join(tempDir, target), "");
+  const donorDecision = decideCodexPreRead(path.join(tempDir, "src", "components", "FormSection.tsx"), tempDir);
+  assert.equal(donorDecision.decision, "payload");
+  const emptySourceFingerprint = {
+    fileHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    lineCount: 1,
+  };
+
+  withPatchedCodexPreRead((decision) => {
+    if (decision.filePath !== target) return decision;
+    return {
+      ...donorDecision,
+      filePath: target,
+      debug: {
+        ...donorDecision.debug,
+        domainDetection: {
+          ...donorDecision.debug.domainDetection,
+          filePath: target,
+        },
+      },
+      payload: {
+        ...donorDecision.payload,
+        filePath: target,
+        sourceFingerprint: emptySourceFingerprint,
+        reactWebContext: {
+          ...donorDecision.payload.reactWebContext,
+          freshness: emptySourceFingerprint,
+          scope: {
+            ...donorDecision.payload.reactWebContext.scope,
+            filePath: target,
+          },
+        },
+        editGuidance: {
+          freshness: emptySourceFingerprint,
+          patchTargets: donorDecision.payload.reactWebContext.editTargetRouting,
+        },
+      },
+    };
+  }, () => {
+    const sessionId = `hook-edit-card-zero-byte-${Date.now()}`;
+    handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId }, tempDir);
+    handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Please update ${target}`,
+      },
+      tempDir,
+    );
+    const second = handleCodexRuntimeHook(
+      {
+        hookEventName: "UserPromptSubmit",
+        sessionId,
+        prompt: `Again, update ${target}`,
+      },
+      tempDir,
+    );
+
+    assert.equal(second.action, "fallback");
+    assert.ok(second.debug.additionalContextAdmission, JSON.stringify(second, null, 2));
+    assert.equal(second.debug.additionalContextAdmission.reason, "source-too-small");
+    assert.equal(second.debug.additionalContextAdmission.sourceBytes, 0);
+    assert.equal(second.debug.additionalContextAdmission.reductionPct, 0);
+    assert.equal(Number.isFinite(second.debug.additionalContextAdmission.reductionPct), true);
+    const artifact = JSON.parse(fs.readFileSync(second.debug.reactWebEvidenceArtifact.path, "utf8"));
+    assert.equal(artifact.additionalContextAdmission.reductionPct, 0);
+  });
+});
+
 test("edit intent detection includes common exact-file coding verbs used by Codex prompts", () => {
   for (const prompt of [
     "Please implement fixtures/compressed/FormSection.tsx",

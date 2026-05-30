@@ -78,8 +78,22 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
     assert.ok(["fresh-anchors-packed", "source-relative-budget-exceeded"].includes(row.evidenceArtifact.runtimeGraph.reason));
     assert.equal(row.evidenceArtifact.additionalContextAdmission.diagnosticOnly, true);
     assert.equal(typeof row.evidenceArtifact.additionalContextAdmission.admitted, "boolean");
+    assert.equal(typeof row.evidenceArtifact.additionalContextAdmission.reductionPct, "number");
     assert.equal(typeof row.additionalContextReductionPct, "number");
   }
+  const sourceTooSmallRows = evidence.suite.fixtures.filter(
+    (row) => row.evidenceArtifact.additionalContextAdmission.reason === "source-too-small",
+  );
+  assert.ok(sourceTooSmallRows.length > 0);
+  for (const row of sourceTooSmallRows) {
+    const admission = row.evidenceArtifact.additionalContextAdmission;
+    const expectedReductionPct = Number.parseFloat(((1 - admission.candidateBytes / admission.sourceBytes) * 100).toFixed(3));
+    assert.equal(admission.reductionPct, expectedReductionPct);
+  }
+  assert.equal(
+    evidence.suite.summary.metricAliases.candidate_byte_reduction.min,
+    Math.min(...evidence.suite.fixtures.map((row) => row.evidenceArtifact.additionalContextAdmission.reductionPct)),
+  );
 
   assert.equal(evidence.boundary.diagnosticOnly, true);
   assert.equal(evidence.boundary.claimable, false);
