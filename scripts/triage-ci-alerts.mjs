@@ -136,9 +136,81 @@ function fetchRunJobs(repoSlug, runId, spawn = spawnSync) {
   }
 }
 
+function fetchPullRequestsForBranch(repoSlug, branch, spawn = spawnSync) {
+  if (!repoSlug || !branch || branch === "unknown-branch") return [];
+  const result = spawn("gh", [
+    "pr",
+    "list",
+    "--repo",
+    repoSlug,
+    "--head",
+    branch,
+    "--state",
+    "all",
+    "--limit",
+    "20",
+    "--json",
+    "number,state,headRefName,baseRefName,mergedAt,closedAt,url",
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error || result.status !== 0) return [];
+  try {
+    const payload = JSON.parse(result.stdout);
+    return Array.isArray(payload) ? payload : [];
+  } catch {
+    return [];
+  }
+}
+
 function isMergeGateRun(run) {
   return String(run.event || "") === "pull_request_target"
     && String(run.workflowName || run.name || "") === "Merge Gate";
+}
+
+function enrichRunsWithPullRequestState(rawRuns, options, spawn = spawnSync) {
+  if (options.input) return rawRuns;
+  const mergeGateBranches = [
+    ...new Set(rawRuns
+      .filter((run) => isMergeGateRun(run))
+      .map((run) => run.headBranch)
+      .filter(Boolean)),
+  ];
+  if (mergeGateBranches.length === 0) return rawRuns;
+
+  const repoSlug = repoSlugFromOrigin(spawn);
+  if (!repoSlug) return rawRuns;
+
+  const prsByBranch = new Map();
+  for (const branch of mergeGateBranches) {
+    const prs = fetchPullRequestsForBranch(repoSlug, branch, spawn)
+      .filter((pr) => pr?.headRefName === branch)
+      .sort((left, right) => {
+        const leftOpen = String(left.state || "").toUpperCase() === "OPEN" ? 1 : 0;
+        const rightOpen = String(right.state || "").toUpperCase() === "OPEN" ? 1 : 0;
+        if (leftOpen !== rightOpen) return rightOpen - leftOpen;
+        const leftTime = Date.parse(left.mergedAt || left.closedAt || "") || 0;
+        const rightTime = Date.parse(right.mergedAt || right.closedAt || "") || 0;
+        return rightTime - leftTime || Number(right.number ?? 0) - Number(left.number ?? 0);
+      });
+    if (prs.length > 0) prsByBranch.set(branch, prs[0]);
+  }
+
+  return rawRuns.map((run) => {
+    if (!isMergeGateRun(run)) return run;
+    const pr = prsByBranch.get(run.headBranch);
+    if (!pr) return run;
+    return {
+      ...run,
+      pullRequestNumber: pr.number ?? run.pullRequestNumber,
+      pullRequestState: pr.state ?? run.pullRequestState,
+      pullRequestUrl: pr.url ?? run.pullRequestUrl,
+      pullRequestMergedAt: pr.mergedAt ?? run.pullRequestMergedAt,
+      pullRequestClosedAt: pr.closedAt ?? run.pullRequestClosedAt,
+    };
+  });
 }
 
 function enrichRunsWithAlertJobs(rawRuns, alertRefs, options, spawn = spawnSync) {
@@ -301,6 +373,11 @@ function normalizeRun(run) {
     latestJobUrl: run.latestJobUrl ?? run.currentJobUrl ?? latestJob?.url ?? "",
     jobs,
     ciLane: ciLaneForRun(run),
+    pullRequestNumber: normalizePositiveInteger(run.pullRequestNumber ?? run.prNumber ?? run.pr),
+    pullRequestState: String(run.pullRequestState ?? run.prState ?? "").toUpperCase(),
+    pullRequestUrl: run.pullRequestUrl ?? run.prUrl ?? "",
+    pullRequestMergedAt: run.pullRequestMergedAt ?? run.prMergedAt ?? "",
+    pullRequestClosedAt: run.pullRequestClosedAt ?? run.prClosedAt ?? "",
     createdAt: run.createdAt || "",
     updatedAt: run.updatedAt || run.createdAt || "",
     url: run.url || "",
@@ -697,6 +774,17 @@ function runTime(run) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function closedPullRequestReason(run) {
+  if (run.ciLane !== "pull_request_target:merge-gate") return "";
+  if (run.pullRequestState !== "MERGED" && run.pullRequestState !== "CLOSED") return "";
+  const pr = run.pullRequestNumber ? `PR #${run.pullRequestNumber}` : "matching PR";
+  const terminal = run.pullRequestState === "MERGED" ? "merged" : "closed";
+  const at = run.pullRequestState === "MERGED"
+    ? run.pullRequestMergedAt
+    : (run.pullRequestClosedAt || run.pullRequestMergedAt);
+  return at ? `${pr} ${terminal} at ${at}` : `${pr} ${terminal}`;
+}
+
 function classifyRuns(rawRuns) {
   const runs = rawRuns.map(normalizeRun).sort((left, right) => runTime(right) - runTime(left));
   const latestByKey = new Map();
@@ -709,12 +797,16 @@ function classifyRuns(rawRuns) {
   const rows = runs.map((run) => {
     const latest = latestByKey.get(runKey(run));
     const isLatest = latest === run;
+    const prClosedReason = closedPullRequestReason(run);
     let bucket = "informational";
     let reason = "not failing";
 
     if (STALE_CONCLUSIONS.has(run.conclusion)) {
       bucket = "stale";
       reason = `completed ${run.conclusion}`;
+    } else if (prClosedReason) {
+      bucket = "stale";
+      reason = prClosedReason;
     } else if (!isLatest) {
       bucket = "stale";
       reason = `superseded by run ${latest.id ?? "unknown"}`;
@@ -879,7 +971,9 @@ function runCli(argv = process.argv.slice(2), io = {}) {
   if (!Array.isArray(baseRuns)) throw new Error("Expected an array of GitHub Actions runs");
   const rawRuns = enrichRunsWithAlertJobs(baseRuns, alertRefs, options, spawn);
   if (!Array.isArray(rawRuns)) throw new Error("Expected an array of GitHub Actions runs");
-  const result = classifyRuns(rawRuns);
+  const enrichedRuns = enrichRunsWithPullRequestState(rawRuns, options, spawn);
+  if (!Array.isArray(enrichedRuns)) throw new Error("Expected an array of GitHub Actions runs");
+  const result = classifyRuns(enrichedRuns);
   const alertEvidence = buildAlertEvidence(alertRefs, result.rows, options);
   const tmuxHistoryEvidence = buildTmuxHistoryEvidence(alertText);
   result.alerts = alertEvidence.alerts;

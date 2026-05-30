@@ -1138,6 +1138,199 @@ test("CI alert triage marks superseded pull_request_target Merge Gate job failur
   }
 });
 
+test("CI alert triage marks merged PR Merge Gate failures as stale closed-PR echoes", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merged-pr-"));
+  const runsPath = path.join(tempDir, "runs.json");
+
+  fs.writeFileSync(runsPath, JSON.stringify([
+    {
+      databaseId: 26636594921,
+      workflowName: "Merge Gate",
+      name: "Merge Gate",
+      headBranch: "dogfood/backlog-scout-20260529T1200",
+      headSha: "df251c9133ce8334a0155d4426a867ae11981241",
+      event: "pull_request_target",
+      status: "completed",
+      conclusion: "failure",
+      createdAt: "2026-05-29T12:13:42Z",
+      updatedAt: "2026-05-29T12:13:54Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26636594921",
+      pullRequestNumber: 1124,
+      pullRequestState: "MERGED",
+      pullRequestMergedAt: "2026-05-30T04:04:25Z",
+      pullRequestUrl: "https://github.com/minislively/fooks/pull/1124",
+    },
+    {
+      databaseId: 26674008990,
+      workflowName: "CI",
+      name: "CI",
+      headBranch: "main",
+      headSha: "676c77f47496bea3cfe908f8b49a7f9c2fee1a1f",
+      event: "push",
+      status: "completed",
+      conclusion: "success",
+      createdAt: "2026-05-30T04:04:28Z",
+      updatedAt: "2026-05-30T04:07:34Z",
+      url: "https://github.com/minislively/fooks/actions/runs/26674008990",
+    },
+  ]));
+
+  try {
+    const stdout = execFileSync(process.execPath, [
+      triageScript,
+      "--input",
+      runsPath,
+      "--json",
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout);
+    const row = result.rows.find((entry) => entry.id === 26636594921);
+
+    assert.equal(row.bucket, "stale");
+    assert.match(row.reason, /PR #1124 merged at 2026-05-30T04:04:25Z/);
+    assert.equal(result.counts.actionable ?? 0, 0);
+    assert.equal(result.counts.stale, 1);
+    assert.equal(result.counts.informational, 1);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CI alert triage live PR enrichment marks merged PR Merge Gate failures stale", () => {
+  const chunks = [];
+  const spawn = (command, args) => {
+    if (command === "git" && args.join(" ") === "config --get remote.origin.url") {
+      return { status: 0, stdout: "https://github.com/minislively/fooks.git\n", stderr: "" };
+    }
+    if (command === "gh" && args[0] === "run" && args[1] === "list") {
+      return {
+        status: 0,
+        stdout: JSON.stringify([
+          {
+            databaseId: 26636594921,
+            workflowName: "Merge Gate",
+            name: "Merge Gate",
+            headBranch: "dogfood/backlog-scout-20260529T1200",
+            headSha: "df251c9133ce8334a0155d4426a867ae11981241",
+            event: "pull_request_target",
+            status: "completed",
+            conclusion: "failure",
+            createdAt: "2026-05-29T12:13:42Z",
+            updatedAt: "2026-05-29T12:13:54Z",
+            url: "https://github.com/minislively/fooks/actions/runs/26636594921",
+          },
+        ]),
+        stderr: "",
+      };
+    }
+    if (command === "gh" && args[0] === "pr" && args[1] === "list") {
+      assert.equal(args[args.indexOf("--head") + 1], "dogfood/backlog-scout-20260529T1200");
+      return {
+        status: 0,
+        stdout: JSON.stringify([
+          {
+            number: 1124,
+            state: "MERGED",
+            headRefName: "dogfood/backlog-scout-20260529T1200",
+            baseRefName: "main",
+            mergedAt: "2026-05-30T04:04:25Z",
+            closedAt: "2026-05-30T04:04:25Z",
+            url: "https://github.com/minislively/fooks/pull/1124",
+          },
+        ]),
+        stderr: "",
+      };
+    }
+    return { status: 1, stdout: "", stderr: `unexpected spawn ${command} ${JSON.stringify(args)}` };
+  };
+
+  runCli(["--json"], {
+    stdout: { write: (chunk) => chunks.push(String(chunk)) },
+    spawn,
+  });
+  const result = JSON.parse(chunks.join(""));
+  const row = result.rows.find((entry) => entry.id === 26636594921);
+
+  assert.equal(row.bucket, "stale");
+  assert.match(row.reason, /PR #1124 merged at 2026-05-30T04:04:25Z/);
+  assert.equal(result.counts.actionable ?? 0, 0);
+  assert.equal(result.counts.stale, 1);
+});
+
+test("CI alert triage prefers open PR state over older closed same-branch matches", () => {
+  const chunks = [];
+  const spawn = (command, args) => {
+    if (command === "git" && args.join(" ") === "config --get remote.origin.url") {
+      return { status: 0, stdout: "https://github.com/minislively/fooks.git\n", stderr: "" };
+    }
+    if (command === "gh" && args[0] === "run" && args[1] === "list") {
+      return {
+        status: 0,
+        stdout: JSON.stringify([
+          {
+            databaseId: 26600000001,
+            workflowName: "Merge Gate",
+            name: "Merge Gate",
+            headBranch: "reused-branch",
+            headSha: "openprsha",
+            event: "pull_request_target",
+            status: "completed",
+            conclusion: "failure",
+            createdAt: "2026-05-30T05:00:00Z",
+            updatedAt: "2026-05-30T05:05:00Z",
+            url: "https://github.com/minislively/fooks/actions/runs/26600000001",
+          },
+        ]),
+        stderr: "",
+      };
+    }
+    if (command === "gh" && args[0] === "pr" && args[1] === "list") {
+      return {
+        status: 0,
+        stdout: JSON.stringify([
+          {
+            number: 1100,
+            state: "MERGED",
+            headRefName: "reused-branch",
+            baseRefName: "main",
+            mergedAt: "2026-05-29T04:04:25Z",
+            closedAt: "2026-05-29T04:04:25Z",
+            url: "https://github.com/minislively/fooks/pull/1100",
+          },
+          {
+            number: 1126,
+            state: "OPEN",
+            headRefName: "reused-branch",
+            baseRefName: "main",
+            mergedAt: null,
+            closedAt: null,
+            url: "https://github.com/minislively/fooks/pull/1126",
+          },
+        ]),
+        stderr: "",
+      };
+    }
+    return { status: 1, stdout: "", stderr: `unexpected spawn ${command} ${JSON.stringify(args)}` };
+  };
+
+  runCli(["--json"], {
+    stdout: { write: (chunk) => chunks.push(String(chunk)) },
+    spawn,
+  });
+  const result = JSON.parse(chunks.join(""));
+  const row = result.rows.find((entry) => entry.id === 26600000001);
+
+  assert.equal(row.bucket, "actionable");
+  assert.equal(row.pullRequestNumber, 1126);
+  assert.equal(row.pullRequestState, "OPEN");
+  assert.equal(row.reason, "latest failure");
+  assert.equal(result.counts.actionable, 1);
+  assert.equal(result.counts.stale ?? 0, 0);
+});
+
 
 test("CI alert triage marks superseded pull_request_target Merge Gate job cancellations as stale rerun echoes", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-merge-gate-cancelled-rerun-"));
