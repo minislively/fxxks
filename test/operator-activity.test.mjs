@@ -4294,7 +4294,7 @@ test("status activity CLI route preserves existing status contracts", () => {
   const help = runText(["--help"], tempDir);
   assert.match(help, /fooks check \[--json\]/);
   assert.match(help, /fooks preflight \[--json\]/);
-  assert.match(help, /fooks status activity \[--include-remote-counts\]/);
+  assert.match(help, /fooks status activity \[--include-remote-counts\] \[--json\] \[--receipt-json\]/);
   assert.match(help, /--include-remote-counts belongs only to status activity/);
   assert.match(help, /fooks check --json for the operator\/check source-of-truth projection/);
 
