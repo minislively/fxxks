@@ -18,7 +18,11 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const { handleCodexRuntimeHook, summarizeRuntimeReactWebFactGraphDryRun } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const {
+  handleCodexRuntimeHook,
+  selectReactWebEditCardV2VariantForBudget,
+  summarizeRuntimeReactWebFactGraphDryRun,
+} = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
 const {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
@@ -88,6 +92,92 @@ test("runtime graph packing reasons cover every canonical omission and success s
   );
 });
 
+test("React Web edit-card v2 selector follows ordered first-fit degradation ladder", () => {
+  const card = {
+    k: "rw.edit.v2",
+    f: "src/components/FormSection.tsx",
+    fp: "abcdef123456:120",
+    c: "FormSection",
+    t: [[10, 20, "primary-component", "FormSection"]],
+    r: ["form:form-root", "intent:form"],
+    h: ["useForm", "Controller"],
+    d: ["FieldInput"],
+    g: [[1, "component", "FormSection"]],
+    p: ["source", "context", "graph"],
+    ri: true,
+  };
+  const prefix = "fooks: reused pre-read (compressed) · candidate: react-web-edit-card.v2";
+  const full = selectReactWebEditCardV2VariantForBudget(card, { renderPrefix: prefix });
+  const budgetForVariant = (variant) => {
+    for (let budget = full.bytes - 1; budget > 0; budget -= 1) {
+      const selected = selectReactWebEditCardV2VariantForBudget(card, { renderPrefix: prefix, maxCandidateBytes: budget });
+      if (selected.variant === variant) return budget;
+    }
+    throw new Error(`No budget selected ${variant}`);
+  };
+  const noGraph = selectReactWebEditCardV2VariantForBudget(card, {
+    renderPrefix: prefix,
+    maxCandidateBytes: full.bytes - 1,
+  });
+  const noGraphBytes = selectReactWebEditCardV2VariantForBudget({ ...card, g: undefined, p: ["source", "context"] }, { renderPrefix: prefix }).bytes;
+  const noDependencies = selectReactWebEditCardV2VariantForBudget(card, {
+    renderPrefix: prefix,
+    maxCandidateBytes: noGraphBytes - 1,
+  });
+  const targetsRolesHooksBytes = selectReactWebEditCardV2VariantForBudget(
+    { ...card, g: undefined, d: undefined, p: undefined },
+    { renderPrefix: prefix },
+  ).bytes;
+  const targetsRolesHooks = selectReactWebEditCardV2VariantForBudget(card, {
+    renderPrefix: prefix,
+    maxCandidateBytes: budgetForVariant("targets-roles-hooks"),
+  });
+  const targetsRolesBytes = selectReactWebEditCardV2VariantForBudget(
+    { k: card.k, f: card.f, fp: card.fp, c: card.c, t: card.t, r: card.r, ri: card.ri },
+    { renderPrefix: prefix },
+  ).bytes;
+  const targetsRoles = selectReactWebEditCardV2VariantForBudget(card, {
+    renderPrefix: prefix,
+    maxCandidateBytes: budgetForVariant("targets-roles"),
+  });
+  const fallback = selectReactWebEditCardV2VariantForBudget(card, {
+    renderPrefix: prefix,
+    maxCandidateBytes: 1,
+  });
+
+  assert.equal(full.variant, "full");
+  assert.equal(noGraph.variant, "no-graph");
+  assert.equal(noDependencies.variant, "no-dependencies");
+  assert.equal(targetsRolesHooks.variant, "targets-roles-hooks");
+  assert.equal(targetsRoles.variant, "targets-roles");
+  assert.equal(fallback.card, undefined);
+  assert.equal(fallback.variant, undefined);
+});
+
+test("React Web edit-card v2 selector trims stale provenance before over-degrading", () => {
+  const card = {
+    k: "rw.edit.v2",
+    f: "src/components/FormSection.tsx",
+    t: [[10, 20, "primary-component", "FormSection"]],
+    d: ["VeryLongDependencyOnlyAnchor"],
+    p: ["source", "context"],
+    ri: true,
+  };
+  const prefix = "fooks: reused pre-read (compressed) · candidate: react-web-edit-card.v2";
+  const noDependenciesBytes = selectReactWebEditCardV2VariantForBudget(
+    { k: card.k, f: card.f, t: card.t, ri: card.ri },
+    { renderPrefix: prefix },
+  ).bytes;
+  const selected = selectReactWebEditCardV2VariantForBudget(card, {
+    renderPrefix: prefix,
+    maxCandidateBytes: noDependenciesBytes,
+  });
+
+  assert.equal(selected.variant, "no-dependencies");
+  assert.deepEqual(selected.card.p, ["source"]);
+  assert.equal("d" in selected.card, false);
+});
+
 test("runtime bridge contract keeps repeated-read inject and fallback semantics stable", () => {
   const injectSession = `bridge-contract-inject-${Date.now()}`;
   const start = handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: injectSession }, repoRoot);
@@ -114,7 +204,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.action, "inject");
   assert.equal(secondInject.debug.decision.payload.domainPayload.domain, "react-web");
   assert.equal(secondInject.contextModeReason, "repeated-exact-file-edit-guidance");
-  assert.match(secondInject.additionalContext, /candidate: react-web-edit-card\.v1/);
+  assert.match(secondInject.additionalContext, /candidate: react-web-edit-card\.v2/);
   assert.doesNotMatch(secondInject.additionalContext, /domainPayload/);
   assert.doesNotMatch(secondInject.additionalContext, /editGuidance/);
   assert.ok(secondInject.reasons.includes("edit-guidance-opt-in"));
@@ -123,7 +213,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.debug.decision.debug.reactWebContextBudget.included, true);
   assert.equal(secondInject.debug.additionalContextAdmission.admitted, true);
   assert.equal(secondInject.debug.additionalContextAdmission.reason, "admitted");
-  assert.equal(secondInject.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.equal(secondInject.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v2");
+  assert.equal(typeof secondInject.debug.additionalContextAdmission.candidateVariant, "string");
   assert.ok(secondInject.debug.additionalContextAdmission.candidateBytes < secondInject.debug.additionalContextAdmission.sourceBytes);
   assert.ok(secondInject.debug.additionalContextAdmission.reductionPct >= secondInject.debug.additionalContextAdmission.minReductionPct);
   assert.equal(secondInject.debug.reactWebFactGraphPacking.included, true);
@@ -287,7 +378,7 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.deepEqual(secondWrapper.debug.decision.debug.frontendPayloadPolicy.evidenceGates, [CUSTOM_WRAPPER_DOM_SIGNAL_GAP]);
   assert.equal(secondWrapper.contextModeReason, "repeated-exact-file-edit-guidance");
   assert.equal(secondWrapper.debug.additionalContextAdmission.admitted, true);
-  assert.equal(secondWrapper.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v1");
+  assert.equal(secondWrapper.debug.additionalContextAdmission.candidateKind, "react-web-edit-card.v2");
 
   const readOnlySession = `bridge-contract-readonly-${Date.now()}`;
   handleCodexRuntimeHook({ hookEventName: "SessionStart", sessionId: readOnlySession }, repoRoot);

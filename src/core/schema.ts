@@ -794,7 +794,8 @@ export type CodexRuntimeHookDecision = {
         | "reduction-below-threshold";
       sourceBytes?: number;
       candidateBytes: number;
-      candidateKind?: "optimized-react-web-runtime-payload" | "react-web-edit-card.v1";
+      candidateKind?: "optimized-react-web-runtime-payload" | "react-web-edit-card.v1" | "react-web-edit-card.v2";
+      candidateVariant?: "full" | "no-graph" | "no-dependencies" | "targets-roles-hooks" | "targets-roles";
       reductionPct?: number;
       minSourceBytes: number;
       minReductionPct: number;

@@ -178,6 +178,7 @@ function summarizeArtifact(artifactRef, expectedFile) {
           reason: admission.reason,
           sourceBytes: admission.sourceBytes ?? null,
           candidateKind: admission.candidateKind ?? null,
+          candidateVariant: admission.candidateVariant ?? null,
           candidateBytes: admission.candidateBytes ?? 0,
           reductionPct: admission.reductionPct ?? null,
           minSourceBytes: admission.minSourceBytes ?? null,
