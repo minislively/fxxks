@@ -779,7 +779,10 @@ export type CodexRuntimeHookDecision = {
         | "freshness-not-fresh"
         | "no-anchors-selected"
         | "budget-exceeded"
-        | "source-relative-budget-exceeded";
+        | "source-relative-budget-exceeded"
+        | "snapshot-aware-gate-blocked";
+      gateStatus?: "allowed" | "blocked" | "unavailable";
+      gateBlockedReasons?: string[];
       selectedAnchorCount: number;
       deferredAnchorCount: number;
       freshnessStatus: "fresh" | "stale" | "unknown";

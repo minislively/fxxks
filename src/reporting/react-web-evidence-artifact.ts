@@ -43,6 +43,7 @@ const REACT_WEB_RUNTIME_GRAPH_REASONS = new Set([
   "no-anchors-selected",
   "budget-exceeded",
   "source-relative-budget-exceeded",
+  "snapshot-aware-gate-blocked",
 ]);
 const REACT_WEB_RUNTIME_GRAPH_FRESHNESS_STATUSES = new Set(["fresh", "stale", "unknown"]);
 const REACT_WEB_ADDITIONAL_CONTEXT_ADMISSION_REASONS = new Set([
