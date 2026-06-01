@@ -54,6 +54,14 @@ test("React Web profile surface aggregates exactly the approved six evidence art
   assert.equal(typeof evidence.summary.childSignals.stabilityWarningOnly, "boolean");
   assert.equal(evidence.summary.childSignals.mixedRoutingBoundaryIsolationClaimable, true);
   assert.equal(evidence.summary.childSignals.knowledgeContextBoundaryEvidenceClaimable, true);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.schemaVersion, "react-web-live-hook-dogfood-fixture-manifest.v1");
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.diagnosticOnly, true);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.claimable, false);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.advisoryOnly, true);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureCount, 10);
+  assert.deepEqual(evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels, []);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.countsByRole.positive, 8);
+  assert.match(evidence.summary.childSignals.liveHookDogfoodCoverage.claimBoundary, /not broad React Web support/);
 });
 
 test("React Web profile surface markdown keeps the top-level non-claims explicit", async () => {
@@ -70,6 +78,7 @@ test("React Web profile surface markdown keeps the top-level non-claims explicit
   assert.match(markdown, /Top-level provider billing savings claim widened: no/);
   assert.match(markdown, /Over-caching audit verdict: react-web-small-edit-refresh-no-repro/);
   assert.match(markdown, /Over-caching audit bug reproduced: no/);
+  assert.match(markdown, /Live-hook dogfood coverage advisory-only: yes \(10 fixtures, missing labels: none\)/);
   assert.match(markdown, /Context reduction claimable at top level: no/);
   assert.match(markdown, /Cache performance claimable at top level: no/);
   assert.match(markdown, /Provider billing savings claimable at top level: no/);

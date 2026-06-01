@@ -369,7 +369,9 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
-function summarizeFixtureManifestCoverage(manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST) {
+export function buildReactWebLiveHookDogfoodCoverageSummary({
+  manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+} = {}) {
   const requiredLabels = [...LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS];
   const expectedLabels = [...requiredLabels];
   const observedLabels = uniqueSorted(manifest.flatMap((entry) => entry.coverage ?? []));
@@ -386,12 +388,20 @@ function summarizeFixtureManifestCoverage(manifest = DEFAULT_LIVE_HOOK_DOGFOOD_S
   }
 
   return {
+    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+    source: "react-web-live-hook-dogfood-fixture-manifest",
+    diagnosticOnly: true,
+    claimable: false,
+    advisoryOnly: true,
+    fixtureCount: manifest.length,
     requiredLabels,
     expectedLabels,
     observedLabels,
     missingLabels,
     countsByLabel: Object.fromEntries(Object.entries(countsByLabel).sort(([left], [right]) => left.localeCompare(right))),
     countsByRole: Object.fromEntries(Object.entries(countsByRole).sort(([left], [right]) => left.localeCompare(right))),
+    claimBoundary:
+      "Local fixture-intent coverage summary only: not broad React Web support, not provider token/cost savings, and not runtime, pre-read, cache, or model-facing authorization.",
   };
 }
 
@@ -476,7 +486,7 @@ function summarizeLiveHookSuite(rows) {
       candidate_byte_reduction: distribution(candidateReductionValues),
       final_injection_byte_reduction: distribution(finalInjectionReductionValues),
     },
-    coverage: summarizeFixtureManifestCoverage(),
+    coverage: buildReactWebLiveHookDogfoodCoverageSummary(),
     allAdditionalContextsSmaller,
     allFreshGraphs,
     minAdditionalContextReductionPct: Math.min(...reductionValues),

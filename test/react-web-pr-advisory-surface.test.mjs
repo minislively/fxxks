@@ -49,6 +49,14 @@ test("React Web PR advisory surface stays advisory-only over the existing full p
 
   assert.equal(evidence.summary.advisoryOnly, true);
   assert.equal(evidence.summary.profileArtifactCount, 6);
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.schemaVersion, "react-web-live-hook-dogfood-fixture-manifest.v1");
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.advisoryOnly, true);
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.diagnosticOnly, true);
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.claimable, false);
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.fixtureCount, 10);
+  assert.deepEqual(evidence.summary.liveHookDogfoodCoverage.missingLabels, []);
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.countsByLabel["form-state"], 4);
+  assert.match(evidence.summary.liveHookDogfoodCoverage.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
   assert.equal(evidence.summary.nonClaims.profileTopLevelContextReduction, false);
   assert.equal(evidence.summary.nonClaims.cachePerformance, false);
   assert.equal(evidence.summary.nonClaims.runtimeTokenSavings, false);
@@ -67,6 +75,12 @@ test("React Web PR advisory markdown keeps advisory wording and explicit non-cla
   assert.match(markdown, /This advisory does not block merge or release in pass 1/);
   assert.match(markdown, /Cache performance proof: no/);
   assert.match(markdown, /Runtime-token savings proof: no/);
+  assert.match(markdown, /Live-hook dogfood coverage snapshot/);
+  assert.match(markdown, /Advisory-only: yes/);
+  assert.match(markdown, /Fixture count: 10/);
+  assert.match(markdown, /Missing labels: none/);
+  assert.match(markdown, /Counts by label: .*form-state/);
+  assert.match(markdown, /Claim boundary: .*not broad React Web support/);
   assert.match(markdown, /Provider billing\/cost savings proof: no/);
   assert.match(markdown, /Broad React\/RN\/WebView\/TUI support proof: no/);
   assert.doesNotMatch(markdown, /Cache performance proof: yes/i);

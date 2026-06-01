@@ -7,6 +7,7 @@ import { buildReactWebOverCachingAuditEvidence } from "./react-web-over-caching-
 import { buildReactWebStabilityEvidence } from "./react-web-stability-evidence.mjs";
 import { buildReactWebMixedRoutingEvidence } from "./react-web-mixed-routing-evidence.mjs";
 import { buildReactWebKnowledgeContextEvidence } from "./react-web-knowledge-context-evidence.mjs";
+import { buildReactWebLiveHookDogfoodCoverageSummary } from "./react-web-live-hook-dogfood-evidence.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +54,7 @@ export async function buildReactWebProfileSurface({
   const stability = await buildReactWebStabilityEvidence({ repoRoot, runId: `${runId}-stability` });
   const mixedRouting = await buildReactWebMixedRoutingEvidence({ repoRoot, runId: `${runId}-mixed-routing` });
   const knowledgeContext = await buildReactWebKnowledgeContextEvidence({ repoRoot, runId: `${runId}-knowledge-context` });
+  const liveHookDogfoodCoverage = buildReactWebLiveHookDogfoodCoverageSummary();
 
   const artifacts = {
     context,
@@ -92,6 +94,7 @@ export async function buildReactWebProfileSurface({
         stabilityWarningOnly: stability.summary.primaryMetric.warningOnly,
         mixedRoutingBoundaryIsolationClaimable: mixedRouting.summary.boundaryIsolationClaimable,
         knowledgeContextBoundaryEvidenceClaimable: knowledgeContext.summary.boundaryEvidenceOnlyClaimable,
+        liveHookDogfoodCoverage,
       },
       warnings: [
         ...(overCachingAudit.summary.bugReproduced
@@ -133,6 +136,7 @@ ${evidence.claimBoundary}
 - Stability warning-only: ${evidence.summary.childSignals.stabilityWarningOnly ? "yes" : "no"}
 - Mixed-routing boundary isolation claimable: ${evidence.summary.childSignals.mixedRoutingBoundaryIsolationClaimable ? "yes" : "no"}
 - Knowledge-context boundary evidence claimable: ${evidence.summary.childSignals.knowledgeContextBoundaryEvidenceClaimable ? "yes" : "no"}
+- Live-hook dogfood coverage advisory-only: ${evidence.summary.childSignals.liveHookDogfoodCoverage.advisoryOnly ? "yes" : "no"} (${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureCount} fixtures, missing labels: ${evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels.length > 0 ? evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels.join(", ") : "none"})
 
 ## Top-level non-claims
 
