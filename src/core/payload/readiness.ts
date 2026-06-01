@@ -1,6 +1,14 @@
 import type { ExtractionResult, ModelFacingPayload, PayloadReadiness } from "../schema";
 
-export function assessPayloadReadiness(result: ExtractionResult, payload: ModelFacingPayload): PayloadReadiness {
+export type PayloadReadinessOptions = {
+  allowReactWebContractlessReadiness?: boolean;
+};
+
+export function assessPayloadReadiness(
+  result: ExtractionResult,
+  payload: ModelFacingPayload,
+  options: PayloadReadinessOptions = {},
+): PayloadReadiness {
   const reasons: string[] = [];
   const moduleLanguage = result.language === "ts" || result.language === "js";
   const hasModuleStructure = Boolean(payload.structure?.moduleDeclarations?.some((item) => item.kind !== "variable"));
@@ -26,10 +34,11 @@ export function assessPayloadReadiness(result: ExtractionResult, payload: ModelF
   }
 
   if (result.mode === "raw") reasons.push("raw-mode");
-  const hasReactWebReuseShape =
+  const hasDiagnosticReactWebReuseShape =
+    options.allowReactWebContractlessReadiness === true &&
     result.domainDetection?.classification === "react-web" &&
     (payload.domainPayload?.domain === "react-web" || Boolean(payload.reactWebContext) || Boolean(payload.editGuidance));
-  if (!moduleLanguage && !payload.contract && !hasReactWebReuseShape) reasons.push("missing-contract");
+  if (!moduleLanguage && !payload.contract && !hasDiagnosticReactWebReuseShape) reasons.push("missing-contract");
   if (!payload.behavior) reasons.push("missing-behavior");
   if (!payload.structure) reasons.push("missing-structure");
   if (result.mode === "hybrid" && (!payload.snippets || payload.snippets.length === 0)) {

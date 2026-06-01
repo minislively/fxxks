@@ -363,7 +363,7 @@ export async function buildReactWebLiveHookDogfoodEvidence({
   runId = new Date().toISOString().replace(/[:.]/g, "-"),
 } = {}) {
   const { projectRoot, codexHome } = createLiveHookReplayProject({ repoRoot });
-  const env = { FOOKS_CODEX_HOME: codexHome };
+  const env = { FOOKS_CODEX_HOME: codexHome, FOOKS_REACT_WEB_CONTRACTLESS_DIAGNOSTIC_ONLY: "1" };
   const commands = [];
   const recordCommand = (name, args) => commands.push({ name, command: [process.execPath, cliPath(repoRoot), ...args].join(" ") });
 

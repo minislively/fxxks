@@ -42,7 +42,11 @@ export {
 };
 export { hasReactNativeWebViewBoundaryMarker, REACT_NATIVE_WEBVIEW_BOUNDARY_REASON } from "./pre-read-stack";
 
-export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance" | "includeReactWebContextMetadata">;
+export type PreReadOptions = Pick<ModelFacingPayloadOptions, "includeEditGuidance" | "includeReactWebContextMetadata"> & {
+  allowReactWebContractlessReadiness?: boolean;
+};
+
+const REACT_WEB_CONTRACTLESS_DIAGNOSTIC_ONLY_ENV = "FOOKS_REACT_WEB_CONTRACTLESS_DIAGNOSTIC_ONLY";
 export type { FrontendPayloadPolicyDecision };
 
 function eligibleExtensions(runtime: PreReadDecision["runtime"]): ReadonlySet<string> {
@@ -110,6 +114,8 @@ export function decidePreRead(
     cwd,
     includeEditGuidance: options.includeEditGuidance === true,
     includeReactWebContextMetadata: options.includeReactWebContextMetadata,
+    allowReactWebContractlessReadiness:
+      options.allowReactWebContractlessReadiness === true || process.env[REACT_WEB_CONTRACTLESS_DIAGNOSTIC_ONLY_ENV] === "1",
     domainDetection,
     frontendPayloadPolicy,
   });

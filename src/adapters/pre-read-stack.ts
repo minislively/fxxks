@@ -91,6 +91,7 @@ export type PreReadPayloadPlanInput = {
   cwd: string;
   includeEditGuidance: boolean;
   includeReactWebContextMetadata?: boolean;
+  allowReactWebContractlessReadiness?: boolean;
   domainDetection: DomainDetectionResult;
   frontendPayloadPolicy?: FrontendPayloadPolicyDecision;
 };
@@ -276,7 +277,9 @@ export function buildPreReadPayloadPlan(input: PreReadPayloadPlanInput): PreRead
     }
   }
 
-  const readiness = assessPayloadReadiness(result, payload);
+  const readiness = assessPayloadReadiness(result, payload, {
+    allowReactWebContractlessReadiness: input.allowReactWebContractlessReadiness === true,
+  });
   const debug = buildPreReadPayloadDebug({
     result,
     domainDetection: input.domainDetection,

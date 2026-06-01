@@ -1300,13 +1300,20 @@ test("readiness helper uses stable reasons and ignores debug metadata", () => {
   const formControls = extractFile(path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"));
   const formControlsPayload = toModelFacingPayload(formControls, repoRoot, { includeEditGuidance: true });
   assert.equal(formControlsPayload.contract, undefined);
-  const reactWebContractless = assessPayloadReadiness(formControls, formControlsPayload);
-  assert.equal(reactWebContractless.ready, true);
-  assert.deepEqual(reactWebContractless.reasons, []);
+  const reactWebContractlessDefault = assessPayloadReadiness(formControls, formControlsPayload);
+  assert.equal(reactWebContractlessDefault.ready, false);
+  assert.ok(reactWebContractlessDefault.reasons.includes("missing-contract"));
+
+  const reactWebContractlessDiagnostic = assessPayloadReadiness(formControls, formControlsPayload, {
+    allowReactWebContractlessReadiness: true,
+  });
+  assert.equal(reactWebContractlessDiagnostic.ready, true);
+  assert.deepEqual(reactWebContractlessDiagnostic.reasons, []);
 
   const genericContractlessForm = assessPayloadReadiness(
     { ...formControls, domainDetection: { ...formControls.domainDetection, classification: "unknown", domain: "unknown" } },
     formControlsPayload,
+    { allowReactWebContractlessReadiness: true },
   );
   assert.ok(genericContractlessForm.reasons.includes("missing-contract"));
 
@@ -1514,6 +1521,21 @@ test("codex pre-read chooses payload for eligible tsx/jsx and fallback otherwise
   assert.equal(compressed.debug.domainDetection.profile.lane, "react-web");
   assert.equal(compressed.debug.domainDetection.profile.claimStatus, "current-supported-lane");
   assert.ok(["low", "medium", "high"].includes(compressed.debug.decideConfidence));
+
+  const contractlessFormControls = decideCodexPreRead(path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"), repoRoot);
+  assert.equal(contractlessFormControls.eligible, true);
+  assert.equal(contractlessFormControls.decision, "fallback");
+  assert.ok(contractlessFormControls.reasons.includes("missing-contract"));
+
+  const diagnosticContractlessFormControls = preReadModule.decidePreRead(
+    path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"),
+    repoRoot,
+    "codex",
+    { allowReactWebContractlessReadiness: true },
+  );
+  assert.equal(diagnosticContractlessFormControls.decision, "payload");
+  assert.equal(diagnosticContractlessFormControls.readiness.ready, true);
+  assert.equal(diagnosticContractlessFormControls.readiness.signals.hasContract, false);
 
   const compressedOptIn = preReadModule.decidePreRead(path.join(repoRoot, "fixtures", "compressed", "FormSection.tsx"), repoRoot, "codex", {
     includeEditGuidance: true,
