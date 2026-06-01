@@ -707,6 +707,7 @@ Everyday commands:
 
 Remote-counts boundary: --include-remote-counts belongs only to status activity.
 Use ${displayCliName} status activity --include-remote-counts --json for remote counts, or ${displayCliName} check --json for the operator/check source-of-truth projection.
+Post-clean-merge session whip cue: receipt-only zero-backlog states stay idle until a source-backed issue, branch/session, PR, worktree/process, or blocker is named; help is read-only and creates no artifacts.
   ${displayCliName} codex-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]
   ${displayCliName} codex-runtime-hook --native-hook
   ${displayCliName} claude-runtime-hook --event <SessionStart|UserPromptSubmit|Stop> [--session-id <id>] [--prompt <text>] [--json]

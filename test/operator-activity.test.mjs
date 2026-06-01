@@ -4297,6 +4297,9 @@ test("status activity CLI route preserves existing status contracts", () => {
   assert.match(help, /fooks status activity \[--include-remote-counts\] \[--json\] \[--receipt-json\]/);
   assert.match(help, /--include-remote-counts belongs only to status activity/);
   assert.match(help, /fooks check --json for the operator\/check source-of-truth projection/);
+  assert.match(help, /Post-clean-merge session whip cue/);
+  assert.match(help, /receipt-only zero-backlog states stay idle/);
+  assert.match(help, /help is read-only and creates no artifacts/);
 
   let output = "";
   try {
