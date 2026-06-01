@@ -1,13 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
   LIVE_HOOK_DOGFOOD_ALLOWED_ROLES,
   LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
+  buildReactWebLiveHookDogfoodFixtureSourceFingerprint,
   buildReactWebLiveHookDogfoodManifestFingerprint,
   buildReactWebLiveHookDogfoodCoverageSummary,
   buildReactWebLiveHookDogfoodEvidence,
@@ -65,6 +70,17 @@ test("React Web live hook dogfood coverage summary is canonical and advisory-onl
     "manifest[].expectation.admission",
     "manifest[].expectation.metricBoundary",
   ]);
+  assert.equal(summary.fixtureSourceFreshnessStatus, "fresh");
+  assert.equal(summary.fixtureSourceFingerprintAlgorithm, REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM);
+  assert.match(summary.fixtureSourceFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(summary.fixtureSourceFingerprintShort, summary.fixtureSourceFingerprint.slice(0, 12));
+  assert.equal(summary.fixtureSourceFileCount, 10);
+  assert.ok(summary.fixtureSourceByteCount > 0);
+  assert.deepEqual(summary.fixtureSourceFingerprintInput, [
+    "manifest[].file",
+    "sha256(file bytes)",
+    "file byte length",
+  ]);
   assert.equal(summary.diagnosticOnly, true);
   assert.equal(summary.claimable, false);
   assert.equal(summary.advisoryOnly, true);
@@ -103,6 +119,24 @@ test("React Web live hook dogfood manifest fingerprint detects fixture intent dr
     buildReactWebLiveHookDogfoodManifestFingerprint({ manifest: expectationDriftManifest }),
     defaultFingerprint,
   );
+});
+
+test("React Web live hook dogfood fixture source fingerprint detects source drift", () => {
+  const defaultSourceIdentity = buildReactWebLiveHookDogfoodFixtureSourceFingerprint();
+  const repeatedSourceIdentity = buildReactWebLiveHookDogfoodFixtureSourceFingerprint();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-fixture-source-fingerprint-"));
+  const manifest = [{ ...DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST[0], file: "Fixture.tsx" }];
+  fs.writeFileSync(path.join(tempDir, "Fixture.tsx"), "export function Fixture() { return <div>one</div>; }\n");
+  const first = buildReactWebLiveHookDogfoodFixtureSourceFingerprint({ manifest, repoRoot: tempDir });
+  fs.writeFileSync(path.join(tempDir, "Fixture.tsx"), "export function Fixture() { return <div>two</div>; }\n");
+  const second = buildReactWebLiveHookDogfoodFixtureSourceFingerprint({ manifest, repoRoot: tempDir });
+
+  assert.equal(repeatedSourceIdentity.fingerprint, defaultSourceIdentity.fingerprint);
+  assert.match(defaultSourceIdentity.fingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(defaultSourceIdentity.fileCount, 10);
+  assert.ok(defaultSourceIdentity.byteCount > 0);
+  assert.notEqual(first.fingerprint, second.fingerprint);
+  assert.notEqual(first.files[0].sha256, second.files[0].sha256);
 });
 
 test("React Web live hook dogfood evidence replays built CLI native hook graph path", async () => {
