@@ -58,6 +58,12 @@ test("React Web profile surface aggregates exactly the approved six evidence art
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.diagnosticOnly, true);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.claimable, false);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.advisoryOnly, true);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.freshnessStatus, "fresh");
+  assert.equal(
+    evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintAlgorithm,
+    "sha256-json-stable-v1",
+  );
+  assert.match(evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureCount, 10);
   assert.deepEqual(evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.countsByRole.positive, 8);
@@ -79,6 +85,7 @@ test("React Web profile surface markdown keeps the top-level non-claims explicit
   assert.match(markdown, /Over-caching audit verdict: react-web-small-edit-refresh-no-repro/);
   assert.match(markdown, /Over-caching audit bug reproduced: no/);
   assert.match(markdown, /Live-hook dogfood coverage advisory-only: yes \(10 fixtures, missing labels: none\)/);
+  assert.match(markdown, /Live-hook dogfood coverage freshness: fresh \(sha256-json-stable-v1, [a-f0-9]{12}\)/);
   assert.match(markdown, /Context reduction claimable at top level: no/);
   assert.match(markdown, /Cache performance claimable at top level: no/);
   assert.match(markdown, /Provider billing savings claimable at top level: no/);

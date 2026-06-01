@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -11,6 +12,7 @@ const defaultRepoRoot = path.resolve(__dirname, "..");
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION =
   "react-web-live-hook-dogfood-fixture-manifest.v1";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM = "sha256-json-stable-v1";
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
 export const LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS = [
@@ -369,6 +371,46 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
+function stableJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function normalizeManifestFingerprintEntry(entry) {
+  return {
+    file: entry.file,
+    coverage: [...(entry.coverage ?? [])].sort(),
+    purpose: entry.purpose,
+    role: entry.role,
+    expectation: {
+      admission: entry.expectation?.admission,
+      classification: entry.expectation?.classification,
+      metricBoundary: entry.expectation?.metricBoundary,
+    },
+  };
+}
+
+export function buildReactWebLiveHookDogfoodManifestFingerprint({
+  manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+} = {}) {
+  const identity = {
+    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+    manifest: manifest.map(normalizeManifestFingerprintEntry),
+  };
+  return crypto
+    .createHash("sha256")
+    .update(stableJson(identity))
+    .digest("hex");
+}
+
 export function buildReactWebLiveHookDogfoodCoverageSummary({
   manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
 } = {}) {
@@ -387,9 +429,26 @@ export function buildReactWebLiveHookDogfoodCoverageSummary({
     }
   }
 
+  const manifestFingerprint = buildReactWebLiveHookDogfoodManifestFingerprint({ manifest });
+
   return {
     schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
     source: "react-web-live-hook-dogfood-fixture-manifest",
+    freshnessStatus: "fresh",
+    manifestFingerprintAlgorithm: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
+    manifestFingerprint,
+    manifestFingerprintShort: manifestFingerprint.slice(0, 12),
+    manifestFingerprintInput: [
+      "schemaVersion",
+      "manifest[].file",
+      "manifest[].coverage",
+      "manifest[].purpose",
+      "manifest[].role",
+      "manifest[].expectation.classification",
+      "manifest[].expectation.admission",
+      "manifest[].expectation.metricBoundary",
+    ],
+    manifestFileCount: manifest.length,
     diagnosticOnly: true,
     claimable: false,
     advisoryOnly: true,

@@ -123,6 +123,8 @@ ${evidence.claimBoundary}
 - Advisory-only: ${evidence.summary.liveHookDogfoodCoverage.advisoryOnly ? "yes" : "no"}
 - Diagnostic-only: ${evidence.summary.liveHookDogfoodCoverage.diagnosticOnly ? "yes" : "no"}
 - Fixture count: ${evidence.summary.liveHookDogfoodCoverage.fixtureCount}
+- Freshness status: ${evidence.summary.liveHookDogfoodCoverage.freshnessStatus}
+- Manifest fingerprint: ${evidence.summary.liveHookDogfoodCoverage.manifestFingerprintShort} (${evidence.summary.liveHookDogfoodCoverage.manifestFingerprintAlgorithm})
 - Required labels: ${evidence.summary.liveHookDogfoodCoverage.requiredLabels.join(", ")}
 - Missing labels: ${evidence.summary.liveHookDogfoodCoverage.missingLabels.length > 0 ? evidence.summary.liveHookDogfoodCoverage.missingLabels.join(", ") : "none"}
 - Counts by label: ${JSON.stringify(evidence.summary.liveHookDogfoodCoverage.countsByLabel)}

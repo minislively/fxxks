@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
   LIVE_HOOK_DOGFOOD_ALLOWED_ROLES,
   LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
+  buildReactWebLiveHookDogfoodManifestFingerprint,
   buildReactWebLiveHookDogfoodCoverageSummary,
   buildReactWebLiveHookDogfoodEvidence,
   renderReactWebLiveHookDogfoodEvidenceMarkdown,
@@ -48,6 +50,21 @@ test("React Web live hook dogfood coverage summary is canonical and advisory-onl
 
   assert.equal(summary.schemaVersion, REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION);
   assert.equal(summary.source, "react-web-live-hook-dogfood-fixture-manifest");
+  assert.equal(summary.freshnessStatus, "fresh");
+  assert.equal(summary.manifestFingerprintAlgorithm, REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM);
+  assert.match(summary.manifestFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(summary.manifestFingerprintShort, summary.manifestFingerprint.slice(0, 12));
+  assert.equal(summary.manifestFileCount, 10);
+  assert.deepEqual(summary.manifestFingerprintInput, [
+    "schemaVersion",
+    "manifest[].file",
+    "manifest[].coverage",
+    "manifest[].purpose",
+    "manifest[].role",
+    "manifest[].expectation.classification",
+    "manifest[].expectation.admission",
+    "manifest[].expectation.metricBoundary",
+  ]);
   assert.equal(summary.diagnosticOnly, true);
   assert.equal(summary.claimable, false);
   assert.equal(summary.advisoryOnly, true);
@@ -62,6 +79,30 @@ test("React Web live hook dogfood coverage summary is canonical and advisory-onl
   assert.match(summary.claimBoundary, /not broad React Web support/);
   assert.match(summary.claimBoundary, /not provider token\/cost savings/);
   assert.match(summary.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
+});
+
+test("React Web live hook dogfood manifest fingerprint detects fixture intent drift", () => {
+  const defaultFingerprint = buildReactWebLiveHookDogfoodManifestFingerprint();
+  const repeatedFingerprint = buildReactWebLiveHookDogfoodManifestFingerprint({
+    manifest: DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+  });
+  const coverageDriftManifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.map((entry, index) => (index === 0
+    ? { ...entry, coverage: [...entry.coverage, "new-form-intent"] }
+    : entry));
+  const expectationDriftManifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.map((entry, index) => (index === 1
+    ? { ...entry, expectation: { ...entry.expectation, admission: "discarded-source-too-small" } }
+    : entry));
+
+  assert.equal(repeatedFingerprint, defaultFingerprint);
+  assert.match(defaultFingerprint, /^[a-f0-9]{64}$/);
+  assert.notEqual(
+    buildReactWebLiveHookDogfoodManifestFingerprint({ manifest: coverageDriftManifest }),
+    defaultFingerprint,
+  );
+  assert.notEqual(
+    buildReactWebLiveHookDogfoodManifestFingerprint({ manifest: expectationDriftManifest }),
+    defaultFingerprint,
+  );
 });
 
 test("React Web live hook dogfood evidence replays built CLI native hook graph path", async () => {
