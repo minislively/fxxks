@@ -53,6 +53,9 @@ test("React Web PR advisory surface stays advisory-only over the existing full p
   assert.equal(evidence.summary.liveHookDogfoodCoverage.advisoryOnly, true);
   assert.equal(evidence.summary.liveHookDogfoodCoverage.diagnosticOnly, true);
   assert.equal(evidence.summary.liveHookDogfoodCoverage.claimable, false);
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.freshnessStatus, "fresh");
+  assert.equal(evidence.summary.liveHookDogfoodCoverage.manifestFingerprintAlgorithm, "sha256-json-stable-v1");
+  assert.match(evidence.summary.liveHookDogfoodCoverage.manifestFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(evidence.summary.liveHookDogfoodCoverage.fixtureCount, 10);
   assert.deepEqual(evidence.summary.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.liveHookDogfoodCoverage.countsByLabel["form-state"], 4);
@@ -78,6 +81,8 @@ test("React Web PR advisory markdown keeps advisory wording and explicit non-cla
   assert.match(markdown, /Live-hook dogfood coverage snapshot/);
   assert.match(markdown, /Advisory-only: yes/);
   assert.match(markdown, /Fixture count: 10/);
+  assert.match(markdown, /Freshness status: fresh/);
+  assert.match(markdown, /Manifest fingerprint: [a-f0-9]{12} \(sha256-json-stable-v1\)/);
   assert.match(markdown, /Missing labels: none/);
   assert.match(markdown, /Counts by label: .*form-state/);
   assert.match(markdown, /Claim boundary: .*not broad React Web support/);
