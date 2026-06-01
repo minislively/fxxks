@@ -38,6 +38,16 @@ test("React Web PR gate passes on the approved bounded advisory surface", async 
     "knowledgeContext",
   ]);
   assert.equal(evidence.summary.metricsRemainNonBlocking, true);
+  assert.deepEqual(evidence.summary.blockerCategories, [
+    "required-artifact-presence",
+    "routing-boundary-leakage",
+    "advisory-status-inconsistency",
+  ]);
+  assert.equal(
+    evidence.advisorySurface.summary.liveHookDogfoodCoverage.advisoryOnly,
+    true,
+  );
+  assert.deepEqual(evidence.advisorySurface.summary.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.reactWebOnly, true);
   assert.equal(evidence.summary.advisoryStatusRemainsUpstreamOnly, true);
 });

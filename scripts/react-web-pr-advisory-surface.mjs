@@ -55,6 +55,7 @@ export async function buildReactWebPrAdvisorySurface({
   assertReactWebPrAdvisoryContract({ profileSurface, releaseBenchmarkEvidence });
 
   const releaseBenchmarkSummary = buildReleaseBenchmarkSmokeSummary(releaseBenchmarkEvidence);
+  const liveHookDogfoodCoverage = profileSurface.summary.childSignals.liveHookDogfoodCoverage;
 
   return {
     schemaVersion: "react-web-pr-advisory-surface.v1",
@@ -77,6 +78,7 @@ export async function buildReactWebPrAdvisorySurface({
       warningCount: profileSurface.summary.warnings.length,
       warnings: profileSurface.summary.warnings,
       releaseSafeHeadline: releaseBenchmarkSummary.headline,
+      liveHookDogfoodCoverage,
       nonClaims: {
         profileTopLevelContextReduction: profileSurface.claimability.contextReduction,
         cachePerformance: releaseBenchmarkSummary.nonClaims.cachePerformanceImprovement,
@@ -115,6 +117,17 @@ ${evidence.claimBoundary}
 - Stability warning-only: ${evidence.summary.childSignals.stabilityWarningOnly ? "yes" : "no"}
 - Mixed-routing boundary isolation claimable: ${evidence.summary.childSignals.mixedRoutingBoundaryIsolationClaimable ? "yes" : "no"}
 - Knowledge-context boundary evidence claimable: ${evidence.summary.childSignals.knowledgeContextBoundaryEvidenceClaimable ? "yes" : "no"}
+
+## Live-hook dogfood coverage snapshot
+
+- Advisory-only: ${evidence.summary.liveHookDogfoodCoverage.advisoryOnly ? "yes" : "no"}
+- Diagnostic-only: ${evidence.summary.liveHookDogfoodCoverage.diagnosticOnly ? "yes" : "no"}
+- Fixture count: ${evidence.summary.liveHookDogfoodCoverage.fixtureCount}
+- Required labels: ${evidence.summary.liveHookDogfoodCoverage.requiredLabels.join(", ")}
+- Missing labels: ${evidence.summary.liveHookDogfoodCoverage.missingLabels.length > 0 ? evidence.summary.liveHookDogfoodCoverage.missingLabels.join(", ") : "none"}
+- Counts by label: ${JSON.stringify(evidence.summary.liveHookDogfoodCoverage.countsByLabel)}
+- Counts by role: ${JSON.stringify(evidence.summary.liveHookDogfoodCoverage.countsByRole)}
+- Claim boundary: ${evidence.summary.liveHookDogfoodCoverage.claimBoundary}
 
 ## Non-claims
 
