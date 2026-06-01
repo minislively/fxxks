@@ -82,6 +82,17 @@ function execFileSync(file, args, options = {}) {
   return chunks.join("");
 }
 
+test("CI alert triage help documents the pasted alert evidence limit", () => {
+  const stdout = realExecFileSync(process.execPath, [triageScript, "--help"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  assert.match(stdout, /--alert-evidence-limit <n>/);
+  assert.match(stdout, /Number of pasted alert rows to keep before summarizing low-signal history/);
+});
+
 test("CI alert triage marks cancelled and superseded historical runs as stale", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-ci-alert-triage-"));
   const inputPath = path.join(tempDir, "runs.json");
