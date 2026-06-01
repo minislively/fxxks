@@ -26,7 +26,10 @@ export function assessPayloadReadiness(result: ExtractionResult, payload: ModelF
   }
 
   if (result.mode === "raw") reasons.push("raw-mode");
-  if (!moduleLanguage && !payload.contract) reasons.push("missing-contract");
+  const hasReactWebReuseShape =
+    result.domainDetection?.classification === "react-web" &&
+    (payload.domainPayload?.domain === "react-web" || Boolean(payload.reactWebContext) || Boolean(payload.editGuidance));
+  if (!moduleLanguage && !payload.contract && !hasReactWebReuseShape) reasons.push("missing-contract");
   if (!payload.behavior) reasons.push("missing-behavior");
   if (!payload.structure) reasons.push("missing-structure");
   if (result.mode === "hybrid" && (!payload.snippets || payload.snippets.length === 0)) {

@@ -65,6 +65,23 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.ok(evidence.suite.summary.compactRowsCount > 0);
   assert.equal(typeof evidence.suite.summary.minAdditionalContextReductionPct, "number");
   assert.equal(typeof evidence.suite.summary.maxAdditionalContextReductionPct, "number");
+  assert.equal(DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length, 10);
+  assert.ok(DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.includes("fixtures/compressed/FormControls.tsx"));
+  assert.ok(
+    DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.includes(
+      "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+    ),
+  );
+  assert.ok(
+    DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.includes(
+      "test/fixtures/react-web-context-expansion/context-provider-workspace-preferences.tsx",
+    ),
+  );
+  assert.ok(
+    DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.includes(
+      "test/fixtures/react-web-context-expansion/client-state-release-store.tsx",
+    ),
+  );
   assert.deepEqual(evidence.suite.fixtures.map((row) => row.file), DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES);
   for (const row of evidence.suite.fixtures) {
     assert.equal(row.diagnosticOnly, true);

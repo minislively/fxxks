@@ -1297,6 +1297,19 @@ test("readiness helper uses stable reasons and ignores debug metadata", () => {
   const missingContract = assessPayloadReadiness(compressed, { ...compressedPayload, contract: undefined });
   assert.ok(missingContract.reasons.includes("missing-contract"));
 
+  const formControls = extractFile(path.join(repoRoot, "fixtures", "compressed", "FormControls.tsx"));
+  const formControlsPayload = toModelFacingPayload(formControls, repoRoot, { includeEditGuidance: true });
+  assert.equal(formControlsPayload.contract, undefined);
+  const reactWebContractless = assessPayloadReadiness(formControls, formControlsPayload);
+  assert.equal(reactWebContractless.ready, true);
+  assert.deepEqual(reactWebContractless.reasons, []);
+
+  const genericContractlessForm = assessPayloadReadiness(
+    { ...formControls, domainDetection: { ...formControls.domainDetection, classification: "unknown", domain: "unknown" } },
+    formControlsPayload,
+  );
+  assert.ok(genericContractlessForm.reasons.includes("missing-contract"));
+
   const missingBehavior = assessPayloadReadiness(compressed, { ...compressedPayload, behavior: undefined });
   assert.ok(missingBehavior.reasons.includes("missing-behavior"));
 
