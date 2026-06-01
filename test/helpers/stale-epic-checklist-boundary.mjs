@@ -209,6 +209,73 @@ export function classifyCleanEpicAdvisoryInventorySessionWhip(input) {
   };
 }
 
+
+function hasConcreteBlocker(evidence) {
+  return (evidence?.blockers ?? []).some((blocker) => normalizeRef(blocker?.reason ?? blocker));
+}
+
+function postCleanMergeActiveEvidenceKinds(evidence) {
+  return [
+    openIssueNumbers(evidence?.issues ?? evidence?.childIssues).length > 0 ? "open-issue" : null,
+    hasActiveBranch(evidence) ? "active-branch" : null,
+    hasActiveWorktree(evidence) ? "active-worktree" : null,
+    hasActiveSession(evidence) ? "active-session" : null,
+    hasOpenPullRequest(evidence) ? "open-pull-request" : null,
+    (evidence?.processes ?? []).some((process) =>
+      isOpenState(process?.state) || process?.active === true
+    ) ? "active-process" : null,
+    hasConcreteBlocker(evidence) ? "concrete-blocker" : null,
+  ].filter(Boolean);
+}
+
+export function classifyPostCleanMergeSessionWhipActivityCue(input) {
+  const evidence = input?.evidence ?? {};
+  const issues = openIssueNumbers(evidence.issues ?? evidence.childIssues);
+  const openIssueCount = typeof input?.openIssueCount === "number" ? input.openIssueCount : issues.length;
+  const openPullRequestCount = typeof input?.openPullRequestCount === "number"
+    ? input.openPullRequestCount
+    : (evidence.pullRequests ?? []).filter((pr) => isOpenState(pr?.state)).length;
+  const cleanPostMergeEcho = Boolean(input?.clean === true && input?.branch === "main" && input?.ahead === 0 && input?.behind === 0);
+  const zeroBacklog = openIssueCount === 0 && openPullRequestCount === 0;
+  const activeKinds = postCleanMergeActiveEvidenceKinds(evidence);
+  const sourceBackedActivityCue = activeKinds.length > 0;
+  const idleCueRequired = cleanPostMergeEcho && zeroBacklog && !sourceBackedActivityCue;
+
+  return {
+    issue: "#1137",
+    classification: sourceBackedActivityCue
+      ? "source-backed-session-whip-activity-cue"
+      : idleCueRequired
+        ? "post-clean-merge-session-whip-idle"
+        : "session-whip-activity-cue-unproven",
+    cleanPostMergeEcho,
+    zeroBacklog,
+    activeDevelopmentAllowed: sourceBackedActivityCue,
+    sourceBackedActivityCue,
+    activeEvidenceKinds: activeKinds,
+    requiredBeforeActiveDevelopment: [
+      "open-issue",
+      "active-branch",
+      "active-session",
+      "open-pull-request",
+      "active-worktree",
+      "active-process",
+      "concrete-blocker",
+    ],
+    mutationBoundary: {
+      createsIssuesFromCli: false,
+      mutatesGitHub: false,
+      mutatesWorktrees: false,
+      changesRuntimeProviderFrontendOrMergeGatePolicy: false,
+      changesReactWebBehavior: false,
+      inventsBacklog: false,
+    },
+    rule: sourceBackedActivityCue
+      ? "After a clean merge with an empty backlog, session whip activity is auditable only from the named issue, branch, session, PR, worktree/process, or blocker evidence; receipt-only closeout remains historical context."
+      : "A clean post-merge session whip with zero open issues, zero open PRs, and no concrete issue/branch/session/PR/worktree/process/blocker evidence remains idle; create or adopt exactly one bounded live artifact before claiming active development.",
+  };
+}
+
 export function classifyAdvisoryOnlyQueueAfterCompletedChild(input) {
   const epicNumber = issueNumber(input?.epic) ?? 960;
   const evidence = input?.evidence ?? {};
