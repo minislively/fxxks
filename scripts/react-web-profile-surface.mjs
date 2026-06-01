@@ -54,7 +54,7 @@ export async function buildReactWebProfileSurface({
   const stability = await buildReactWebStabilityEvidence({ repoRoot, runId: `${runId}-stability` });
   const mixedRouting = await buildReactWebMixedRoutingEvidence({ repoRoot, runId: `${runId}-mixed-routing` });
   const knowledgeContext = await buildReactWebKnowledgeContextEvidence({ repoRoot, runId: `${runId}-knowledge-context` });
-  const liveHookDogfoodCoverage = buildReactWebLiveHookDogfoodCoverageSummary();
+  const liveHookDogfoodCoverage = buildReactWebLiveHookDogfoodCoverageSummary({ repoRoot });
 
   const artifacts = {
     context,
@@ -139,6 +139,7 @@ ${evidence.claimBoundary}
 - Live-hook dogfood coverage advisory-only: ${evidence.summary.childSignals.liveHookDogfoodCoverage.advisoryOnly ? "yes" : "no"} (${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureCount} fixtures, missing labels: ${evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels.length > 0 ? evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels.join(", ") : "none"})
 - Live-hook dogfood coverage freshness: ${evidence.summary.childSignals.liveHookDogfoodCoverage.freshnessStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintAlgorithm}, ${evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintShort})
 - Live-hook dogfood fixture source freshness: ${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFreshnessStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprintAlgorithm}, ${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprintShort})
+- Live-hook dogfood snapshot drift: ${evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.driftStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons.length > 0 ? evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons.join(", ") : "none"})
 
 ## Top-level non-claims
 

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "react-web-live-hook-dogfood-snapshot.v1",
+  "generatedFrom": "buildReactWebLiveHookDogfoodCoverageSummary",
+  "advisoryOnly": true,
+  "diagnosticOnly": true,
+  "claimable": false,
+  "manifestFingerprintAlgorithm": "sha256-json-stable-v1",
+  "manifestFingerprint": "6fde19cd4073bfad3c678e188b90503d97b09daf1e2ee7b2224a0f4caffeaa28",
+  "fixtureSourceFingerprintAlgorithm": "sha256-file-set-v1",
+  "fixtureSourceFingerprint": "7383230f670eb5373e7eb6493afed432baecef78b10ff17e174ef7aa5caed8bd",
+  "fixtureCount": 10,
+  "requiredLabels": [
+    "baseline-component",
+    "effect-hooks",
+    "source-too-small-control",
+    "hybrid-dashboard",
+    "form-state",
+    "data-fetching",
+    "custom-hook-state",
+    "context-provider",
+    "client-state"
+  ],
+  "claimBoundary": "Advisory reviewed baseline only: not runtime/pre-read authorization, not a merge gate, and not provider token/cost/billing evidence."
+}

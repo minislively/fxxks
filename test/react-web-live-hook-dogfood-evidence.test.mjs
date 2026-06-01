@@ -6,14 +6,17 @@ import path from "node:path";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
   LIVE_HOOK_DOGFOOD_ALLOWED_ROLES,
   LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
+  buildReactWebLiveHookDogfoodCoverageSnapshot,
   buildReactWebLiveHookDogfoodFixtureSourceFingerprint,
   buildReactWebLiveHookDogfoodManifestFingerprint,
+  buildReactWebLiveHookDogfoodSnapshotDrift,
   buildReactWebLiveHookDogfoodCoverageSummary,
   buildReactWebLiveHookDogfoodEvidence,
   renderReactWebLiveHookDogfoodEvidenceMarkdown,
@@ -81,6 +84,13 @@ test("React Web live hook dogfood coverage summary is canonical and advisory-onl
     "sha256(file bytes)",
     "file byte length",
   ]);
+  assert.equal(summary.snapshotDrift.driftStatus, "fresh");
+  assert.equal(summary.snapshotDrift.advisoryOnly, true);
+  assert.equal(summary.snapshotDrift.diagnosticOnly, true);
+  assert.equal(summary.snapshotDrift.claimable, false);
+  assert.deepEqual(summary.snapshotDrift.reasons, []);
+  assert.equal(summary.snapshotDrift.manifest.matched, true);
+  assert.equal(summary.snapshotDrift.fixtureSource.matched, true);
   assert.equal(summary.diagnosticOnly, true);
   assert.equal(summary.claimable, false);
   assert.equal(summary.advisoryOnly, true);
@@ -95,6 +105,97 @@ test("React Web live hook dogfood coverage summary is canonical and advisory-onl
   assert.match(summary.claimBoundary, /not broad React Web support/);
   assert.match(summary.claimBoundary, /not provider token\/cost savings/);
   assert.match(summary.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
+});
+
+test("React Web live hook dogfood coverage snapshot captures reviewed identity fields", () => {
+  const summary = buildReactWebLiveHookDogfoodCoverageSummary();
+  const snapshot = buildReactWebLiveHookDogfoodCoverageSnapshot(summary);
+
+  assert.equal(snapshot.schemaVersion, REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION);
+  assert.equal(snapshot.generatedFrom, "buildReactWebLiveHookDogfoodCoverageSummary");
+  assert.equal(snapshot.manifestFingerprint, summary.manifestFingerprint);
+  assert.equal(snapshot.fixtureSourceFingerprint, summary.fixtureSourceFingerprint);
+  assert.deepEqual(snapshot.requiredLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
+  assert.match(snapshot.claimBoundary, /not runtime\/pre-read authorization/);
+});
+
+test("React Web live hook dogfood snapshot drift distinguishes missing and mismatched baselines", () => {
+  const summary = buildReactWebLiveHookDogfoodCoverageSummary();
+  const snapshot = buildReactWebLiveHookDogfoodCoverageSnapshot(summary);
+
+  const missing = buildReactWebLiveHookDogfoodSnapshotDrift({ summary, expectedSnapshot: null });
+  assert.equal(missing.driftStatus, "missing-baseline");
+  assert.deepEqual(missing.reasons, ["snapshot-baseline-missing"]);
+  assert.equal(missing.snapshotSchema.matched, false);
+  assert.equal(missing.fixtureCount.matched, false);
+  assert.equal(missing.requiredLabels.matched, false);
+
+  const schemaDrift = buildReactWebLiveHookDogfoodSnapshotDrift({
+    summary,
+    expectedSnapshot: { ...snapshot, schemaVersion: "react-web-live-hook-dogfood-snapshot.v0" },
+  });
+  assert.equal(schemaDrift.driftStatus, "drifted");
+  assert.deepEqual(schemaDrift.reasons, ["snapshot-schema-mismatch"]);
+  assert.equal(schemaDrift.snapshotSchema.matched, false);
+
+  const fixtureCountDrift = buildReactWebLiveHookDogfoodSnapshotDrift({
+    summary,
+    expectedSnapshot: { ...snapshot, fixtureCount: snapshot.fixtureCount - 1 },
+  });
+  assert.equal(fixtureCountDrift.driftStatus, "drifted");
+  assert.deepEqual(fixtureCountDrift.reasons, ["fixture-count-mismatch"]);
+  assert.equal(fixtureCountDrift.fixtureCount.matched, false);
+
+  const requiredLabelsDrift = buildReactWebLiveHookDogfoodSnapshotDrift({
+    summary,
+    expectedSnapshot: { ...snapshot, requiredLabels: snapshot.requiredLabels.slice(1) },
+  });
+  assert.equal(requiredLabelsDrift.driftStatus, "drifted");
+  assert.deepEqual(requiredLabelsDrift.reasons, ["required-labels-mismatch"]);
+  assert.equal(requiredLabelsDrift.requiredLabels.matched, false);
+
+  const manifestDrift = buildReactWebLiveHookDogfoodSnapshotDrift({
+    summary,
+    expectedSnapshot: { ...snapshot, manifestFingerprint: "0".repeat(64) },
+  });
+  assert.equal(manifestDrift.driftStatus, "drifted");
+  assert.deepEqual(manifestDrift.reasons, ["manifest-fingerprint-mismatch"]);
+  assert.equal(manifestDrift.manifest.matched, false);
+  assert.equal(manifestDrift.fixtureSource.matched, true);
+
+  const fixtureSourceDrift = buildReactWebLiveHookDogfoodSnapshotDrift({
+    summary,
+    expectedSnapshot: { ...snapshot, fixtureSourceFingerprint: "1".repeat(64) },
+  });
+  assert.equal(fixtureSourceDrift.driftStatus, "drifted");
+  assert.deepEqual(fixtureSourceDrift.reasons, ["fixture-source-fingerprint-mismatch"]);
+  assert.equal(fixtureSourceDrift.manifest.matched, true);
+  assert.equal(fixtureSourceDrift.fixtureSource.matched, false);
+});
+
+test("React Web live hook dogfood coverage summary uses the supplied repoRoot for snapshots", () => {
+  const baseline = buildReactWebLiveHookDogfoodCoverageSummary();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fooks-coverage-summary-root-"));
+  for (const entry of DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST) {
+    const source = path.join(process.cwd(), entry.file);
+    const target = path.join(tempDir, entry.file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(source, target);
+  }
+  const snapshotPath = path.join(tempDir, "fixtures", "react-web-live-hook-dogfood.snapshot.json");
+  fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+  const driftedSnapshot = {
+    ...buildReactWebLiveHookDogfoodCoverageSnapshot(baseline),
+    fixtureSourceFingerprint: "2".repeat(64),
+  };
+  fs.writeFileSync(snapshotPath, `${JSON.stringify(driftedSnapshot, null, 2)}\n`);
+
+  const alternateRootSummary = buildReactWebLiveHookDogfoodCoverageSummary({ repoRoot: tempDir });
+
+  assert.equal(alternateRootSummary.snapshotDrift.driftStatus, "drifted");
+  assert.deepEqual(alternateRootSummary.snapshotDrift.reasons, ["fixture-source-fingerprint-mismatch"]);
+  assert.equal(alternateRootSummary.snapshotDrift.fixtureSource.expectedFingerprint, "2".repeat(64));
+  assert.equal(alternateRootSummary.snapshotDrift.fixtureSource.actualFingerprint, baseline.fixtureSourceFingerprint);
 });
 
 test("React Web live hook dogfood manifest fingerprint detects fixture intent drift", () => {

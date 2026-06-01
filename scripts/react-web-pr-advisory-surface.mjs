@@ -127,6 +127,8 @@ ${evidence.claimBoundary}
 - Manifest fingerprint: ${evidence.summary.liveHookDogfoodCoverage.manifestFingerprintShort} (${evidence.summary.liveHookDogfoodCoverage.manifestFingerprintAlgorithm})
 - Fixture source freshness: ${evidence.summary.liveHookDogfoodCoverage.fixtureSourceFreshnessStatus}
 - Fixture source fingerprint: ${evidence.summary.liveHookDogfoodCoverage.fixtureSourceFingerprintShort} (${evidence.summary.liveHookDogfoodCoverage.fixtureSourceFingerprintAlgorithm})
+- Snapshot drift status: ${evidence.summary.liveHookDogfoodCoverage.snapshotDrift.driftStatus}
+- Snapshot drift reasons: ${evidence.summary.liveHookDogfoodCoverage.snapshotDrift.reasons.length > 0 ? evidence.summary.liveHookDogfoodCoverage.snapshotDrift.reasons.join(", ") : "none"}
 - Required labels: ${evidence.summary.liveHookDogfoodCoverage.requiredLabels.join(", ")}
 - Missing labels: ${evidence.summary.liveHookDogfoodCoverage.missingLabels.length > 0 ? evidence.summary.liveHookDogfoodCoverage.missingLabels.join(", ") : "none"}
 - Counts by label: ${JSON.stringify(evidence.summary.liveHookDogfoodCoverage.countsByLabel)}

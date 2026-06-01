@@ -12,8 +12,11 @@ const defaultRepoRoot = path.resolve(__dirname, "..");
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION =
   "react-web-live-hook-dogfood-fixture-manifest.v1";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION =
+  "react-web-live-hook-dogfood-snapshot.v1";
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM = "sha256-json-stable-v1";
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM = "sha256-file-set-v1";
+export const DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH = path.join("fixtures", "react-web-live-hook-dogfood.snapshot.json");
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
 export const LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS = [
@@ -441,9 +444,148 @@ export function buildReactWebLiveHookDogfoodFixtureSourceFingerprint({
   };
 }
 
+function readJsonIfExists(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function arraysEqual(left = [], right = []) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function buildReactWebLiveHookDogfoodCoverageSnapshot(summary) {
+  return {
+    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
+    generatedFrom: "buildReactWebLiveHookDogfoodCoverageSummary",
+    advisoryOnly: true,
+    diagnosticOnly: true,
+    claimable: false,
+    manifestFingerprintAlgorithm: summary.manifestFingerprintAlgorithm,
+    manifestFingerprint: summary.manifestFingerprint,
+    fixtureSourceFingerprintAlgorithm: summary.fixtureSourceFingerprintAlgorithm,
+    fixtureSourceFingerprint: summary.fixtureSourceFingerprint,
+    fixtureCount: summary.fixtureCount,
+    requiredLabels: summary.requiredLabels,
+    claimBoundary:
+      "Advisory reviewed baseline only: not runtime/pre-read authorization, not a merge gate, and not provider token/cost/billing evidence.",
+  };
+}
+
+export function readReactWebLiveHookDogfoodCoverageSnapshot({
+  repoRoot = defaultRepoRoot,
+  snapshotPath = DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH,
+} = {}) {
+  return readJsonIfExists(path.resolve(repoRoot, snapshotPath));
+}
+
+export function buildReactWebLiveHookDogfoodSnapshotDrift({
+  summary,
+  expectedSnapshot,
+  snapshotPath = DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH,
+} = {}) {
+  if (!expectedSnapshot) {
+    return {
+      advisoryOnly: true,
+      diagnosticOnly: true,
+      claimable: false,
+      snapshotPath,
+      driftStatus: "missing-baseline",
+      reasons: ["snapshot-baseline-missing"],
+      snapshotSchema: {
+        expected: null,
+        actual: REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
+        matched: false,
+      },
+      fixtureCount: {
+        expected: null,
+        actual: summary.fixtureCount,
+        matched: false,
+      },
+      requiredLabels: {
+        expected: null,
+        actual: summary.requiredLabels,
+        matched: false,
+      },
+      manifest: {
+        expectedFingerprint: null,
+        actualFingerprint: summary.manifestFingerprint,
+        matched: false,
+        algorithm: summary.manifestFingerprintAlgorithm,
+      },
+      fixtureSource: {
+        expectedFingerprint: null,
+        actualFingerprint: summary.fixtureSourceFingerprint,
+        matched: false,
+        algorithm: summary.fixtureSourceFingerprintAlgorithm,
+      },
+      updateCommandHint: `node scripts/react-web-live-hook-dogfood-evidence.mjs --write-coverage-snapshot=${snapshotPath}`,
+      claimBoundary:
+        "Advisory drift comparison only: not runtime/pre-read authorization and not a merge gate.",
+    };
+  }
+
+  const manifestMatched =
+    expectedSnapshot.manifestFingerprintAlgorithm === summary.manifestFingerprintAlgorithm
+    && expectedSnapshot.manifestFingerprint === summary.manifestFingerprint;
+  const fixtureSourceMatched =
+    expectedSnapshot.fixtureSourceFingerprintAlgorithm === summary.fixtureSourceFingerprintAlgorithm
+    && expectedSnapshot.fixtureSourceFingerprint === summary.fixtureSourceFingerprint;
+  const schemaMatched = expectedSnapshot.schemaVersion === REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION;
+  const fixtureCountMatched = expectedSnapshot.fixtureCount === summary.fixtureCount;
+  const requiredLabelsMatched = arraysEqual(expectedSnapshot.requiredLabels, summary.requiredLabels);
+  const reasons = [
+    ...(schemaMatched ? [] : ["snapshot-schema-mismatch"]),
+    ...(fixtureCountMatched ? [] : ["fixture-count-mismatch"]),
+    ...(requiredLabelsMatched ? [] : ["required-labels-mismatch"]),
+    ...(manifestMatched ? [] : ["manifest-fingerprint-mismatch"]),
+    ...(fixtureSourceMatched ? [] : ["fixture-source-fingerprint-mismatch"]),
+  ];
+
+  return {
+    advisoryOnly: true,
+    diagnosticOnly: true,
+    claimable: false,
+    snapshotPath,
+    driftStatus: reasons.length === 0 ? "fresh" : "drifted",
+    reasons,
+    snapshotSchema: {
+      expected: expectedSnapshot.schemaVersion,
+      actual: REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
+      matched: schemaMatched,
+    },
+    fixtureCount: {
+      expected: expectedSnapshot.fixtureCount,
+      actual: summary.fixtureCount,
+      matched: fixtureCountMatched,
+    },
+    requiredLabels: {
+      expected: expectedSnapshot.requiredLabels,
+      actual: summary.requiredLabels,
+      matched: requiredLabelsMatched,
+    },
+    manifest: {
+      expectedFingerprint: expectedSnapshot.manifestFingerprint,
+      actualFingerprint: summary.manifestFingerprint,
+      matched: manifestMatched,
+      algorithm: summary.manifestFingerprintAlgorithm,
+    },
+    fixtureSource: {
+      expectedFingerprint: expectedSnapshot.fixtureSourceFingerprint,
+      actualFingerprint: summary.fixtureSourceFingerprint,
+      matched: fixtureSourceMatched,
+      algorithm: summary.fixtureSourceFingerprintAlgorithm,
+    },
+    updateCommandHint: `node scripts/react-web-live-hook-dogfood-evidence.mjs --write-coverage-snapshot=${snapshotPath}`,
+    claimBoundary:
+      "Advisory drift comparison only: not runtime/pre-read authorization and not a merge gate.",
+  };
+}
+
 export function buildReactWebLiveHookDogfoodCoverageSummary({
   manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
   repoRoot = defaultRepoRoot,
+  snapshotPath = DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH,
+  expectedSnapshot = readReactWebLiveHookDogfoodCoverageSnapshot({ repoRoot, snapshotPath }),
 } = {}) {
   const requiredLabels = [...LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS];
   const expectedLabels = [...requiredLabels];
@@ -463,7 +605,7 @@ export function buildReactWebLiveHookDogfoodCoverageSummary({
   const manifestFingerprint = buildReactWebLiveHookDogfoodManifestFingerprint({ manifest });
   const fixtureSourceIdentity = buildReactWebLiveHookDogfoodFixtureSourceFingerprint({ manifest, repoRoot });
 
-  return {
+  const summary = {
     schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
     source: "react-web-live-hook-dogfood-fixture-manifest",
     freshnessStatus: "fresh",
@@ -505,9 +647,11 @@ export function buildReactWebLiveHookDogfoodCoverageSummary({
     claimBoundary:
       "Local fixture-intent coverage summary only: not broad React Web support, not provider token/cost savings, and not runtime, pre-read, cache, or model-facing authorization.",
   };
+  summary.snapshotDrift = buildReactWebLiveHookDogfoodSnapshotDrift({ summary, expectedSnapshot, snapshotPath });
+  return summary;
 }
 
-function summarizeLiveHookSuite(rows) {
+function summarizeLiveHookSuite(rows, { repoRoot = defaultRepoRoot } = {}) {
   const reductionValues = rows.map((row) => row.additionalContextReductionPct);
   const candidateReductionValues = rows
     .map((row) => row.evidenceArtifact.additionalContextAdmission?.reductionPct)
@@ -588,7 +732,7 @@ function summarizeLiveHookSuite(rows) {
       candidate_byte_reduction: distribution(candidateReductionValues),
       final_injection_byte_reduction: distribution(finalInjectionReductionValues),
     },
-    coverage: buildReactWebLiveHookDogfoodCoverageSummary(),
+    coverage: buildReactWebLiveHookDogfoodCoverageSummary({ repoRoot }),
     allAdditionalContextsSmaller,
     allFreshGraphs,
     minAdditionalContextReductionPct: Math.min(...reductionValues),
@@ -732,7 +876,7 @@ export async function buildReactWebLiveHookDogfoodEvidence({
     claimBoundary:
       "Live/native hook fixture-matrix evidence only: local source bytes are compared with host-facing additionalContext bytes after built CLI replay. This is not provider tokenizer output, not provider billing/cost proof, and not a broad runtime-token claim.",
     fixtures: suiteRows,
-    summary: summarizeLiveHookSuite(suiteRows),
+    summary: summarizeLiveHookSuite(suiteRows, { repoRoot }),
   };
   const boundary = {
     targetFile: DEFAULT_LIVE_HOOK_BOUNDARY_TARGET,
@@ -871,6 +1015,24 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const runId = process.argv.find((arg) => arg.startsWith("--run-id="))?.slice("--run-id=".length) ?? "local";
   const outputArg = process.argv.find((arg) => arg.startsWith("--output="))?.slice("--output=".length);
   const markdownArg = process.argv.find((arg) => arg.startsWith("--markdown-output="))?.slice("--markdown-output=".length);
+  const writeSnapshotArg = process.argv
+    .find((arg) => arg.startsWith("--write-coverage-snapshot="))
+    ?.slice("--write-coverage-snapshot=".length);
+
+  if (writeSnapshotArg) {
+    const snapshotPath = path.resolve(defaultRepoRoot, writeSnapshotArg);
+    const summary = buildReactWebLiveHookDogfoodCoverageSummary({
+      repoRoot: defaultRepoRoot,
+      expectedSnapshot: null,
+      snapshotPath: writeSnapshotArg,
+    });
+    const snapshot = buildReactWebLiveHookDogfoodCoverageSnapshot(summary);
+    fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+    fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
+    process.exit(0);
+  }
+
   const evidence = await buildReactWebLiveHookDogfoodEvidence({ repoRoot: defaultRepoRoot, runId });
 
   if (outputArg) {

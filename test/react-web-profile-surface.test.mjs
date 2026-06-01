@@ -70,6 +70,8 @@ test("React Web profile surface aggregates exactly the approved six evidence art
     "sha256-file-set-v1",
   );
   assert.match(evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.driftStatus, "fresh");
+  assert.deepEqual(evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons, []);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureCount, 10);
   assert.deepEqual(evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.countsByRole.positive, 8);
@@ -93,6 +95,7 @@ test("React Web profile surface markdown keeps the top-level non-claims explicit
   assert.match(markdown, /Live-hook dogfood coverage advisory-only: yes \(10 fixtures, missing labels: none\)/);
   assert.match(markdown, /Live-hook dogfood coverage freshness: fresh \(sha256-json-stable-v1, [a-f0-9]{12}\)/);
   assert.match(markdown, /Live-hook dogfood fixture source freshness: fresh \(sha256-file-set-v1, [a-f0-9]{12}\)/);
+  assert.match(markdown, /Live-hook dogfood snapshot drift: fresh \(none\)/);
   assert.match(markdown, /Context reduction claimable at top level: no/);
   assert.match(markdown, /Cache performance claimable at top level: no/);
   assert.match(markdown, /Provider billing savings claimable at top level: no/);
