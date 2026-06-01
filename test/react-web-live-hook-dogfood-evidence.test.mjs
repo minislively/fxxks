@@ -2,10 +2,45 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+  DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
+  LIVE_HOOK_DOGFOOD_ALLOWED_ROLES,
+  LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
   buildReactWebLiveHookDogfoodEvidence,
   renderReactWebLiveHookDogfoodEvidenceMarkdown,
 } from "../scripts/react-web-live-hook-dogfood-evidence.mjs";
+
+test("React Web live hook dogfood fixture manifest is explicit and order-preserving", () => {
+  assert.equal(REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION, "react-web-live-hook-dogfood-evidence.v3");
+  assert.equal(
+    REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+    "react-web-live-hook-dogfood-fixture-manifest.v1",
+  );
+  assert.equal(DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.length, 10);
+  assert.deepEqual(
+    DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
+    DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.map((entry) => entry.file),
+  );
+
+  for (const entry of DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST) {
+    assert.equal(typeof entry.file, "string");
+    assert.ok(entry.file.length > 0);
+    assert.ok(entry.coverage.length > 0);
+    assert.equal(typeof entry.purpose, "string");
+    assert.ok(entry.purpose.length > 0);
+    assert.ok(LIVE_HOOK_DOGFOOD_ALLOWED_ROLES.includes(entry.role));
+    assert.equal(entry.expectation.classification, "react-web");
+    assert.equal(entry.expectation.metricBoundary, "diagnostic-local-bytes-only");
+    assert.ok(["admitted", "discarded-source-too-small"].includes(entry.expectation.admission));
+    assert.equal(entry.coverage.includes("baseline/component"), false);
+  }
+
+  const observedLabels = new Set(DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.flatMap((entry) => entry.coverage));
+  for (const requiredLabel of LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS) {
+    assert.equal(observedLabels.has(requiredLabel), true, `missing required label ${requiredLabel}`);
+  }
+});
 
 test("React Web live hook dogfood evidence replays built CLI native hook graph path", async () => {
   const evidence = await buildReactWebLiveHookDogfoodEvidence({ runId: `test-${Date.now()}-${Math.random()}` });
@@ -48,6 +83,10 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.ok(evidence.success.evidenceArtifact.runtimeGraph.selectedAnchorCount > 0);
 
   assert.equal(evidence.suite.diagnosticOnly, true);
+  assert.equal(evidence.suite.manifest.schemaVersion, REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION);
+  assert.equal(evidence.suite.manifest.diagnosticOnly, true);
+  assert.equal(evidence.suite.manifest.claimable, false);
+  assert.deepEqual(evidence.suite.manifest.entries, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST);
   assert.match(evidence.suite.claimBoundary, /not provider tokenizer output/);
   assert.equal(evidence.suite.summary.measurement, "built-cli-native-hook-fixture-matrix-additional-context-bytes");
   assert.equal(evidence.suite.summary.diagnosticOnly, true);
@@ -107,10 +146,42 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
     const expectedReductionPct = Number.parseFloat(((1 - admission.candidateBytes / admission.sourceBytes) * 100).toFixed(3));
     assert.equal(admission.reductionPct, expectedReductionPct);
   }
+  const expectedSourceTooSmallEntry = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.find(
+    (entry) => entry.expectation.admission === "discarded-source-too-small",
+  );
+  assert.equal(expectedSourceTooSmallEntry.file, "fixtures/compressed/TinyEditCard.tsx");
+  const expectedSourceTooSmallRow = evidence.suite.fixtures.find((row) => row.file === expectedSourceTooSmallEntry.file);
+  assert.equal(expectedSourceTooSmallRow.evidenceArtifact.additionalContextAdmission.admitted, false);
+  assert.equal(expectedSourceTooSmallRow.evidenceArtifact.additionalContextAdmission.reason, "source-too-small");
+  for (const [index, entry] of DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.entries()) {
+    const row = evidence.suite.fixtures[index];
+    assert.equal(row.file, entry.file);
+    assert.equal(row.preReadGraphDiagnostics.classification, entry.expectation.classification);
+    assert.equal(row.evidenceArtifact.additionalContextAdmission.diagnosticOnly, true);
+    assert.equal(entry.expectation.metricBoundary, "diagnostic-local-bytes-only");
+    const actualAdmission =
+      row.evidenceArtifact.additionalContextAdmission.admitted === true
+        ? "admitted"
+        : row.evidenceArtifact.additionalContextAdmission.reason === "source-too-small"
+          ? "discarded-source-too-small"
+          : row.evidenceArtifact.additionalContextAdmission.reason;
+    assert.equal(actualAdmission, entry.expectation.admission);
+  }
   assert.equal(
     evidence.suite.summary.metricAliases.candidate_byte_reduction.min,
     Math.min(...evidence.suite.fixtures.map((row) => row.evidenceArtifact.additionalContextAdmission.reductionPct)),
   );
+  assert.deepEqual(evidence.suite.summary.coverage.requiredLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
+  assert.deepEqual(evidence.suite.summary.coverage.expectedLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
+  assert.equal(evidence.suite.summary.coverage.missingLabels.length, 0);
+  for (const requiredLabel of LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS) {
+    assert.ok(evidence.suite.summary.coverage.observedLabels.includes(requiredLabel));
+    assert.equal(typeof evidence.suite.summary.coverage.countsByLabel[requiredLabel], "number");
+    assert.ok(evidence.suite.summary.coverage.countsByLabel[requiredLabel] > 0);
+  }
+  assert.equal(evidence.suite.summary.coverage.countsByRole.positive, 8);
+  assert.equal(evidence.suite.summary.coverage.countsByRole["boundary-control"], 1);
+  assert.equal(evidence.suite.summary.coverage.countsByRole["reuse-baseline"], 1);
 
   assert.equal(evidence.boundary.diagnosticOnly, true);
   assert.equal(evidence.boundary.claimable, false);
@@ -148,6 +219,12 @@ test("React Web live hook dogfood evidence Markdown keeps diagnostic-only bounda
   assert.match(markdown, /Graph skipped for source-relative budget: \d+\/\d+/);
   assert.match(markdown, /Final hook output smaller than local source: \d+\/\d+/);
   assert.match(markdown, /Expanded final hook output rows: \d+\/\d+/);
+  assert.match(markdown, /Coverage labels/);
+  assert.match(markdown, /Manifest schema: react-web-live-hook-dogfood-fixture-manifest\.v1/);
+  assert.match(markdown, /Required labels: .*baseline-component/);
+  assert.match(markdown, /Observed labels: .*form-state/);
+  assert.match(markdown, /Missing labels: none/);
+  assert.match(markdown, /Counts by role:/);
   assert.match(markdown, /AdditionalContext admission diagnostics: \d+\/\d+/);
   assert.match(markdown, /AdditionalContext admitted rows: \d+\/\d+/);
   assert.match(markdown, /AdditionalContext discarded rows: \d+\/\d+/);

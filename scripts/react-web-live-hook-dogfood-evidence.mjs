@@ -9,20 +9,137 @@ const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
 
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION =
+  "react-web-live-hook-dogfood-fixture-manifest.v1";
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
-export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = [
-  "fixtures/compressed/FormSection.tsx",
-  "fixtures/compressed/HookEffectPanel.tsx",
-  "fixtures/compressed/TinyEditCard.tsx",
-  "fixtures/hybrid/DashboardPanel.tsx",
-  "fixtures/compressed/FormControls.tsx",
-  "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
-  "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
-  "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
-  "test/fixtures/react-web-context-expansion/context-provider-workspace-preferences.tsx",
-  "test/fixtures/react-web-context-expansion/client-state-release-store.tsx",
+export const LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS = [
+  "baseline-component",
+  "effect-hooks",
+  "source-too-small-control",
+  "hybrid-dashboard",
+  "form-state",
+  "data-fetching",
+  "custom-hook-state",
+  "context-provider",
+  "client-state",
 ];
+export const LIVE_HOOK_DOGFOOD_ALLOWED_ROLES = ["positive", "boundary-control", "reuse-baseline"];
+export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST = [
+  {
+    file: "fixtures/compressed/FormSection.tsx",
+    coverage: ["baseline-component", "form-state"],
+    purpose: "Primary React Web form-section reuse-shape baseline with same-file helpers.",
+    role: "reuse-baseline",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "fixtures/compressed/HookEffectPanel.tsx",
+    coverage: ["effect-hooks", "custom-hook-state"],
+    purpose: "Hook/effect-heavy React Web row for graph-assisted context diagnostics.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "fixtures/compressed/TinyEditCard.tsx",
+    coverage: ["source-too-small-control"],
+    purpose: "Small-source control that proves candidate admission can safely fall back.",
+    role: "boundary-control",
+    expectation: {
+      classification: "react-web",
+      admission: "discarded-source-too-small",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "fixtures/hybrid/DashboardPanel.tsx",
+    coverage: ["hybrid-dashboard", "custom-hook-state"],
+    purpose: "Hybrid dashboard row for mixed presentation/state graph diagnostics.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "fixtures/compressed/FormControls.tsx",
+    coverage: ["form-state", "react-hook-form"],
+    purpose: "React Hook Form/form-state reuse-shape baseline.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+    coverage: ["form-state", "modal-form"],
+    purpose: "Modal preferences form row for nested local form-state diagnostics.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+    coverage: ["data-fetching"],
+    purpose: "Server/data-fetching shaped React Web row reused as the suite baseline.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+    coverage: ["custom-hook-state", "effect-hooks"],
+    purpose: "Custom hook-heavy review inbox row for local state transition diagnostics.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "test/fixtures/react-web-context-expansion/context-provider-workspace-preferences.tsx",
+    coverage: ["context-provider", "form-state"],
+    purpose: "React Context provider/consumer row for workspace preference state.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+  {
+    file: "test/fixtures/react-web-context-expansion/client-state-release-store.tsx",
+    coverage: ["client-state", "zustand"],
+    purpose: "Client-state/store-hook component row for release store diagnostics.",
+    role: "positive",
+    expectation: {
+      classification: "react-web",
+      admission: "admitted",
+      metricBoundary: "diagnostic-local-bytes-only",
+    },
+  },
+];
+export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.map(
+  (entry) => entry.file,
+);
 
 const NON_CLAIMS = [
   "provider-token-savings",
@@ -248,6 +365,36 @@ function rate(numerator, denominator) {
   return denominator > 0 ? Number((numerator / denominator).toFixed(3)) : null;
 }
 
+function uniqueSorted(values) {
+  return [...new Set(values)].sort();
+}
+
+function summarizeFixtureManifestCoverage(manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST) {
+  const requiredLabels = [...LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS];
+  const expectedLabels = [...requiredLabels];
+  const observedLabels = uniqueSorted(manifest.flatMap((entry) => entry.coverage ?? []));
+  const observedSet = new Set(observedLabels);
+  const missingLabels = requiredLabels.filter((label) => !observedSet.has(label));
+  const countsByLabel = {};
+  const countsByRole = {};
+
+  for (const entry of manifest) {
+    countsByRole[entry.role] = (countsByRole[entry.role] ?? 0) + 1;
+    for (const label of new Set(entry.coverage ?? [])) {
+      countsByLabel[label] = (countsByLabel[label] ?? 0) + 1;
+    }
+  }
+
+  return {
+    requiredLabels,
+    expectedLabels,
+    observedLabels,
+    missingLabels,
+    countsByLabel: Object.fromEntries(Object.entries(countsByLabel).sort(([left], [right]) => left.localeCompare(right))),
+    countsByRole: Object.fromEntries(Object.entries(countsByRole).sort(([left], [right]) => left.localeCompare(right))),
+  };
+}
+
 function summarizeLiveHookSuite(rows) {
   const reductionValues = rows.map((row) => row.additionalContextReductionPct);
   const candidateReductionValues = rows
@@ -329,6 +476,7 @@ function summarizeLiveHookSuite(rows) {
       candidate_byte_reduction: distribution(candidateReductionValues),
       final_injection_byte_reduction: distribution(finalInjectionReductionValues),
     },
+    coverage: summarizeFixtureManifestCoverage(),
     allAdditionalContextsSmaller,
     allFreshGraphs,
     minAdditionalContextReductionPct: Math.min(...reductionValues),
@@ -346,7 +494,9 @@ function summarizeLiveHookSuite(rows) {
 
 function assertLiveHookSuite(suite) {
   const failures = [];
+  const manifestEntries = suite.manifest?.entries ?? [];
   if (suite.summary.fixtureCount === 0) failures.push("live hook suite had no fixtures");
+  if (manifestEntries.length !== suite.fixtures.length) failures.push("live hook suite manifest entry count did not match fixture row count");
   if (suite.summary.graphDiagnosticCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture preserved graph diagnostics");
   if (suite.summary.runtimeGraphIncludedArtifactCount <= 0) failures.push("no live hook suite fixture preserved an included runtime graph diagnostic in the artifact");
   if (suite.summary.firstPromptEmptyCount !== suite.summary.fixtureCount) failures.push("not every live hook suite first prompt was record-only empty stdout");
@@ -355,6 +505,26 @@ function assertLiveHookSuite(suite) {
   if (suite.summary.admittedAdditionalContextCount <= 0) failures.push("no live hook suite fixture admitted compact additionalContext");
   if (suite.summary.admittedAdditionalContextCount > suite.summary.compactRowsCount) failures.push("admitted additionalContext count exceeded compact final output rows");
   if (!suite.summary.allFreshGraphs) failures.push("not every live hook suite fixture had fresh pre-read/runtime graph diagnostics");
+  if (suite.summary.coverage?.missingLabels?.length > 0) failures.push(`live hook suite manifest missing required labels: ${suite.summary.coverage.missingLabels.join(", ")}`);
+
+  for (const [index, entry] of manifestEntries.entries()) {
+    const row = suite.fixtures[index];
+    if (!row) continue;
+    if (row.file !== entry.file) failures.push(`live hook suite manifest order drifted at ${entry.file}`);
+    if (row.preReadGraphDiagnostics.classification !== entry.expectation?.classification) {
+      failures.push(`live hook suite manifest classification mismatch for ${entry.file}`);
+    }
+    const admission = row.evidenceArtifact.additionalContextAdmission;
+    if (admission?.diagnosticOnly !== true || entry.expectation?.metricBoundary !== "diagnostic-local-bytes-only") {
+      failures.push(`live hook suite manifest metric boundary mismatch for ${entry.file}`);
+    }
+    const expectedAdmission = entry.expectation?.admission;
+    const actualAdmission =
+      admission?.admitted === true ? "admitted" : admission?.reason === "source-too-small" ? "discarded-source-too-small" : admission?.reason;
+    if (actualAdmission !== expectedAdmission) {
+      failures.push(`live hook suite manifest admission mismatch for ${entry.file}: expected ${expectedAdmission}, got ${actualAdmission}`);
+    }
+  }
   return failures;
 }
 
@@ -440,6 +610,12 @@ export async function buildReactWebLiveHookDogfoodEvidence({
     );
   }
   const suite = {
+    manifest: {
+      schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+      diagnosticOnly: true,
+      claimable: false,
+      entries: DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+    },
     diagnosticOnly: true,
     claimBoundary:
       "Live/native hook fixture-matrix evidence only: local source bytes are compared with host-facing additionalContext bytes after built CLI replay. This is not provider tokenizer output, not provider billing/cost proof, and not a broad runtime-token claim.",
@@ -528,6 +704,15 @@ ${evidence.claimBoundary}
 - Artifact identity matches: ${evidence.suite.summary.artifactIdentityMatchCount}/${evidence.suite.summary.fixtureCount}
 - Final hook output smaller than local source: ${evidence.suite.summary.compactRowsCount}/${evidence.suite.summary.fixtureCount}
 - Expanded final hook output rows: ${evidence.suite.summary.expandedRowsCount}/${evidence.suite.summary.fixtureCount}
+
+### Coverage labels
+
+- Manifest schema: ${evidence.suite.manifest?.schemaVersion ?? "none"}
+- Required labels: ${evidence.suite.summary.coverage.requiredLabels.join(", ")}
+- Observed labels: ${evidence.suite.summary.coverage.observedLabels.join(", ")}
+- Missing labels: ${evidence.suite.summary.coverage.missingLabels.length > 0 ? evidence.suite.summary.coverage.missingLabels.join(", ") : "none"}
+- Counts by label: ${JSON.stringify(evidence.suite.summary.coverage.countsByLabel)}
+- Counts by role: ${JSON.stringify(evidence.suite.summary.coverage.countsByRole)}
 
 ### Candidate generation quality
 
