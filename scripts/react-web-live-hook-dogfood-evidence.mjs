@@ -16,9 +16,12 @@ export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = [
   "fixtures/compressed/HookEffectPanel.tsx",
   "fixtures/compressed/TinyEditCard.tsx",
   "fixtures/hybrid/DashboardPanel.tsx",
+  "fixtures/compressed/FormControls.tsx",
   "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
   "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
   "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+  "test/fixtures/react-web-context-expansion/context-provider-workspace-preferences.tsx",
+  "test/fixtures/react-web-context-expansion/client-state-release-store.tsx",
 ];
 
 const NON_CLAIMS = [
