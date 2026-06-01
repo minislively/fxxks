@@ -48,6 +48,7 @@ test("React Web PR gate passes on the approved bounded advisory surface", async 
     true,
   );
   assert.equal(evidence.advisorySurface.summary.liveHookDogfoodCoverage.freshnessStatus, "fresh");
+  assert.equal(evidence.advisorySurface.summary.liveHookDogfoodCoverage.fixtureSourceFreshnessStatus, "fresh");
   assert.deepEqual(evidence.advisorySurface.summary.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.reactWebOnly, true);
   assert.equal(evidence.summary.advisoryStatusRemainsUpstreamOnly, true);

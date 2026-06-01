@@ -13,6 +13,7 @@ export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-d
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION =
   "react-web-live-hook-dogfood-fixture-manifest.v1";
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM = "sha256-json-stable-v1";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM = "sha256-file-set-v1";
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
 export const LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS = [
@@ -411,8 +412,38 @@ export function buildReactWebLiveHookDogfoodManifestFingerprint({
     .digest("hex");
 }
 
+export function buildReactWebLiveHookDogfoodFixtureSourceFingerprint({
+  manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+  repoRoot = defaultRepoRoot,
+} = {}) {
+  const files = manifest.map((entry) => {
+    const fixturePath = path.resolve(repoRoot, entry.file);
+    const content = fs.readFileSync(fixturePath);
+    return {
+      file: entry.file,
+      bytes: content.length,
+      sha256: crypto.createHash("sha256").update(content).digest("hex"),
+    };
+  });
+  const identity = {
+    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+    files,
+  };
+
+  return {
+    fingerprint: crypto
+      .createHash("sha256")
+      .update(stableJson(identity))
+      .digest("hex"),
+    fileCount: files.length,
+    byteCount: files.reduce((sum, file) => sum + file.bytes, 0),
+    files,
+  };
+}
+
 export function buildReactWebLiveHookDogfoodCoverageSummary({
   manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+  repoRoot = defaultRepoRoot,
 } = {}) {
   const requiredLabels = [...LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS];
   const expectedLabels = [...requiredLabels];
@@ -430,6 +461,7 @@ export function buildReactWebLiveHookDogfoodCoverageSummary({
   }
 
   const manifestFingerprint = buildReactWebLiveHookDogfoodManifestFingerprint({ manifest });
+  const fixtureSourceIdentity = buildReactWebLiveHookDogfoodFixtureSourceFingerprint({ manifest, repoRoot });
 
   return {
     schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
@@ -449,6 +481,17 @@ export function buildReactWebLiveHookDogfoodCoverageSummary({
       "manifest[].expectation.metricBoundary",
     ],
     manifestFileCount: manifest.length,
+    fixtureSourceFreshnessStatus: "fresh",
+    fixtureSourceFingerprintAlgorithm: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM,
+    fixtureSourceFingerprint: fixtureSourceIdentity.fingerprint,
+    fixtureSourceFingerprintShort: fixtureSourceIdentity.fingerprint.slice(0, 12),
+    fixtureSourceFileCount: fixtureSourceIdentity.fileCount,
+    fixtureSourceByteCount: fixtureSourceIdentity.byteCount,
+    fixtureSourceFingerprintInput: [
+      "manifest[].file",
+      "sha256(file bytes)",
+      "file byte length",
+    ],
     diagnosticOnly: true,
     claimable: false,
     advisoryOnly: true,

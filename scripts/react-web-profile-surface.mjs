@@ -138,6 +138,7 @@ ${evidence.claimBoundary}
 - Knowledge-context boundary evidence claimable: ${evidence.summary.childSignals.knowledgeContextBoundaryEvidenceClaimable ? "yes" : "no"}
 - Live-hook dogfood coverage advisory-only: ${evidence.summary.childSignals.liveHookDogfoodCoverage.advisoryOnly ? "yes" : "no"} (${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureCount} fixtures, missing labels: ${evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels.length > 0 ? evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels.join(", ") : "none"})
 - Live-hook dogfood coverage freshness: ${evidence.summary.childSignals.liveHookDogfoodCoverage.freshnessStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintAlgorithm}, ${evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintShort})
+- Live-hook dogfood fixture source freshness: ${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFreshnessStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprintAlgorithm}, ${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprintShort})
 
 ## Top-level non-claims
 
