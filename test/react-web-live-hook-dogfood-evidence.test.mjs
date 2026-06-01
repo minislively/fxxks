@@ -7,6 +7,7 @@ import {
   DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES,
   LIVE_HOOK_DOGFOOD_ALLOWED_ROLES,
   LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
+  buildReactWebLiveHookDogfoodCoverageSummary,
   buildReactWebLiveHookDogfoodEvidence,
   renderReactWebLiveHookDogfoodEvidenceMarkdown,
 } from "../scripts/react-web-live-hook-dogfood-evidence.mjs";
@@ -40,6 +41,27 @@ test("React Web live hook dogfood fixture manifest is explicit and order-preserv
   for (const requiredLabel of LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS) {
     assert.equal(observedLabels.has(requiredLabel), true, `missing required label ${requiredLabel}`);
   }
+});
+
+test("React Web live hook dogfood coverage summary is canonical and advisory-only", () => {
+  const summary = buildReactWebLiveHookDogfoodCoverageSummary();
+
+  assert.equal(summary.schemaVersion, REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION);
+  assert.equal(summary.source, "react-web-live-hook-dogfood-fixture-manifest");
+  assert.equal(summary.diagnosticOnly, true);
+  assert.equal(summary.claimable, false);
+  assert.equal(summary.advisoryOnly, true);
+  assert.equal(summary.fixtureCount, 10);
+  assert.deepEqual(summary.requiredLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
+  assert.deepEqual(summary.expectedLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
+  assert.equal(summary.missingLabels.length, 0);
+  assert.equal(summary.countsByRole.positive, 8);
+  assert.equal(summary.countsByRole["boundary-control"], 1);
+  assert.equal(summary.countsByRole["reuse-baseline"], 1);
+  assert.match(summary.claimBoundary, /Local fixture-intent coverage summary only/);
+  assert.match(summary.claimBoundary, /not broad React Web support/);
+  assert.match(summary.claimBoundary, /not provider token\/cost savings/);
+  assert.match(summary.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
 });
 
 test("React Web live hook dogfood evidence replays built CLI native hook graph path", async () => {
@@ -172,6 +194,10 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
     Math.min(...evidence.suite.fixtures.map((row) => row.evidenceArtifact.additionalContextAdmission.reductionPct)),
   );
   assert.deepEqual(evidence.suite.summary.coverage.requiredLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
+  assert.equal(evidence.suite.summary.coverage.source, "react-web-live-hook-dogfood-fixture-manifest");
+  assert.equal(evidence.suite.summary.coverage.diagnosticOnly, true);
+  assert.equal(evidence.suite.summary.coverage.claimable, false);
+  assert.equal(evidence.suite.summary.coverage.advisoryOnly, true);
   assert.deepEqual(evidence.suite.summary.coverage.expectedLabels, LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS);
   assert.equal(evidence.suite.summary.coverage.missingLabels.length, 0);
   for (const requiredLabel of LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS) {
