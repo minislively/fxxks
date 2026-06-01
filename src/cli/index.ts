@@ -703,7 +703,7 @@ Everyday commands:
   ${displayCliName} status artifacts [--json]
   ${displayCliName} status stale-worktrees [--json]
   ${displayCliName} status orphan-worktrees [--json]
-  ${displayCliName} status activity [--include-remote-counts] [--receipt-json]
+  ${displayCliName} status activity [--include-remote-counts] [--json] [--receipt-json]
 
 Remote-counts boundary: --include-remote-counts belongs only to status activity.
 Use ${displayCliName} status activity --include-remote-counts --json for remote counts, or ${displayCliName} check --json for the operator/check source-of-truth projection.
