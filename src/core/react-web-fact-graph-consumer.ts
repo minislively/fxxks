@@ -30,6 +30,17 @@ export const REACT_WEB_FACT_GRAPH_CONSUMER_CLAIM_BOUNDARY =
 export type ReactWebFactGraphConsumerAuthorization = "none";
 export type ReactWebFactGraphAnchorType = "node" | "edge";
 export type ReactWebFactGraphAnchorDeferredReason = "budget-deferred" | "stale-or-unknown-freshness";
+export type ReactWebFactGraphRoleCoverageStatus = "selected" | "deferred";
+
+export type ReactWebFactGraphRoleCoverage = {
+  role: string;
+  labels: string[];
+  selectedCount: number;
+  deferredCount: number;
+  totalCount: number;
+  status: ReactWebFactGraphRoleCoverageStatus;
+  reasons: string[];
+};
 
 export type ReactWebFactGraphAnchor = {
   rank: number;
@@ -78,6 +89,7 @@ export type ReactWebFactGraphConsumerDryRun = {
   };
   selectedAnchors: ReactWebFactGraphAnchor[];
   deferredAnchors: ReactWebFactGraphAnchor[];
+  formStateRoleCoverage: ReactWebFactGraphRoleCoverage[];
   warnings: string[];
   nonClaims: string[];
 };
@@ -201,6 +213,59 @@ function compareCandidates(left: Candidate, right: Candidate): number {
   return left.anchorId.localeCompare(right.anchorId);
 }
 
+
+function formStateRoleFor(anchor: ReactWebFactGraphAnchor): string | undefined {
+  const match = anchor.kind.match(/^form-state-role:(.+)$/);
+  return match?.[1];
+}
+
+function labelsForRoleAnchor(anchor: ReactWebFactGraphAnchor): string[] {
+  const value = anchor.label.trim();
+  if (!value) return [];
+  return value.split(/,\s*/).map((label) => label.trim()).filter(Boolean);
+}
+
+function buildFormStateRoleCoverage(
+  selectedAnchors: ReactWebFactGraphAnchor[],
+  deferredAnchors: ReactWebFactGraphAnchor[],
+): ReactWebFactGraphRoleCoverage[] {
+  const coverage = new Map<string, {
+    labels: Set<string>;
+    selectedCount: number;
+    deferredCount: number;
+    reasons: Set<string>;
+  }>();
+
+  const add = (anchor: ReactWebFactGraphAnchor, bucket: "selected" | "deferred") => {
+    const role = formStateRoleFor(anchor);
+    if (!role) return;
+    const current = coverage.get(role) ?? { labels: new Set<string>(), selectedCount: 0, deferredCount: 0, reasons: new Set<string>() };
+    for (const label of labelsForRoleAnchor(anchor)) current.labels.add(label);
+    if (bucket === "selected") current.selectedCount += 1;
+    else current.deferredCount += 1;
+    current.reasons.add(bucket === "selected" ? "selected-within-anchor-budget" : anchor.deferredReason ?? "deferred");
+    coverage.set(role, current);
+  };
+
+  selectedAnchors.forEach((anchor) => add(anchor, "selected"));
+  deferredAnchors.forEach((anchor) => add(anchor, "deferred"));
+
+  return [...coverage.entries()]
+    .map(([role, item]) => ({
+      role,
+      labels: [...item.labels].sort(),
+      selectedCount: item.selectedCount,
+      deferredCount: item.deferredCount,
+      totalCount: item.selectedCount + item.deferredCount,
+      status: item.selectedCount > 0 ? "selected" as const : "deferred" as const,
+      reasons: [...item.reasons].sort(),
+    }))
+    .sort((left, right) => {
+      if (left.status !== right.status) return left.status === "selected" ? -1 : 1;
+      return left.role.localeCompare(right.role);
+    });
+}
+
 function ranked(anchor: Candidate, rank: number, deferredReason?: ReactWebFactGraphAnchorDeferredReason): ReactWebFactGraphAnchor {
   const { firstLine: _firstLine, ...publicAnchor } = anchor;
   return {
@@ -250,6 +315,8 @@ export function selectReactWebFactGraphAnchors(
     warnings.push(`React Web fact graph freshness verification is ${verification.status}; all source-backed anchors were deferred.`);
   }
 
+  const formStateRoleCoverage = buildFormStateRoleCoverage(selectedAnchors, deferredAnchors);
+
   return {
     schemaVersion: REACT_WEB_FACT_GRAPH_CONSUMER_SCHEMA_VERSION,
     command: REACT_WEB_FACT_GRAPH_CONSUMER_COMMAND,
@@ -277,6 +344,7 @@ export function selectReactWebFactGraphAnchors(
     },
     selectedAnchors,
     deferredAnchors,
+    formStateRoleCoverage,
     warnings,
     nonClaims: [...FACT_GRAPH_REPORT_NON_CLAIMS],
   };
@@ -305,6 +373,14 @@ export function renderReactWebFactGraphConsumerDryRunText(dryRun: ReactWebFactGr
     ...dryRun.selectedAnchors.map((anchor) => `- #${anchor.rank} ${anchor.anchorType}:${anchor.kind} ${anchor.label} (${anchor.confidence}, priority=${anchor.priority})`),
     `Deferred anchors: ${dryRun.deferredAnchors.length}`,
   ];
+  if (dryRun.formStateRoleCoverage.length > 0) {
+    lines.push(
+      "Form-state role coverage:",
+      ...dryRun.formStateRoleCoverage.map((item) =>
+        `- ${item.role}: ${item.status} selected=${item.selectedCount} deferred=${item.deferredCount} labels=${item.labels.join(",") || "none"}`,
+      ),
+    );
+  }
   if (dryRun.freshnessVerification) {
     lines.push(`Freshness verification: ${dryRun.freshnessVerification.status}`);
     for (const [check, status] of Object.entries(dryRun.freshnessVerification.checks)) {

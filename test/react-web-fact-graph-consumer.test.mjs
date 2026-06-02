@@ -226,3 +226,46 @@ test("CLI inspect react-web-fact-graph-consumer parses JSON and max-anchors flag
   const invalid = runCli(["inspect", "react-web-fact-graph-consumer", "--max-anchors", "0", file, "--json"], 1);
   assert.match(invalid.stderr || invalid.stdout, /max-anchors must be an integer between 1 and 20/i);
 });
+
+
+test("consumer dry-run summarizes form-state role coverage for dynamic field anchors", () => {
+  const dryRun = buildReactWebFactGraphConsumerDryRun(
+    fixture("test/fixtures/react-web-context-expansion/field-array-contacts-form.tsx"),
+    repoRoot,
+    { maxAnchors: 20 },
+  );
+
+  const dynamicFields = dryRun.formStateRoleCoverage.find((item) => item.role === "dynamic-fields");
+  assert.ok(dynamicFields, "expected dynamic-fields role coverage");
+  assert.equal(dynamicFields.status, "deferred");
+  assert.equal(dynamicFields.selectedCount, 0);
+  assert.equal(dynamicFields.deferredCount, 1);
+  assert.ok(dynamicFields.labels.includes("useFieldArray"));
+  assert.ok(dynamicFields.reasons.includes("budget-deferred"));
+  assert.ok(dryRun.selectedAnchors.some((anchor) => anchor.kind === "patch-target:validation-anchor" && anchor.label === "useFieldArray"));
+
+  const text = runCli([
+    "inspect",
+    "react-web-fact-graph-consumer",
+    "test/fixtures/react-web-context-expansion/field-array-contacts-form.tsx",
+    "--max-anchors",
+    "20",
+  ]).stdout;
+  assert.match(text, /Form-state role coverage:/);
+  assert.match(text, /dynamic-fields: deferred/);
+});
+
+test("consumer dry-run marks form-state role coverage deferred when anchor budget excludes it", () => {
+  const dryRun = buildReactWebFactGraphConsumerDryRun(
+    fixture("test/fixtures/react-web-context-expansion/field-array-contacts-form.tsx"),
+    repoRoot,
+    { maxAnchors: 1 },
+  );
+
+  const dynamicFields = dryRun.formStateRoleCoverage.find((item) => item.role === "dynamic-fields");
+  assert.ok(dynamicFields, "expected dynamic-fields role coverage");
+  assert.equal(dynamicFields.status, "deferred");
+  assert.equal(dynamicFields.selectedCount, 0);
+  assert.equal(dynamicFields.deferredCount, 1);
+  assert.ok(dynamicFields.reasons.includes("budget-deferred"));
+});
