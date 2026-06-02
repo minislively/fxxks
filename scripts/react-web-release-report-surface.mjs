@@ -9,6 +9,7 @@ import {
 import {
   buildReleaseBenchmarkEvidence,
   buildReleaseBenchmarkSmokeSummary,
+  renderReactWebDogfoodMetricInterpretationMarkdown,
 } from "./release-benchmark-evidence.mjs";
 import { assertPublicSurfaceClaimBoundaries } from "./release-claim-guards.mjs";
 
@@ -144,6 +145,8 @@ ${evidence.claimBoundary}
 - React Web artifact count: ${evidence.summary.profileArtifactCount}
 - Artifact keys: ${evidence.summary.artifactKeys.join(", ")}
 - React Web only: ${evidence.summary.reactWebOnly ? "yes" : "no"}
+
+${renderReactWebDogfoodMetricInterpretationMarkdown()}
 
 ## Non-claims
 

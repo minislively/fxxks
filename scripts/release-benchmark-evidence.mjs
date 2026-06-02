@@ -22,6 +22,15 @@ function claimLine(contextEvidence, reuseEvidence) {
   return `React Web same-file reuse is routed correctly, and current-lane fixtures show ${min}% to ${max}% smaller actual injected additionalContext by local byte-size evidence.`;
 }
 
+export function renderReactWebDogfoodMetricInterpretationMarkdown() {
+  return `## React Web dogfood metric interpretation
+
+- Dogfood metrics are advisory-only and diagnostic-only; they do not block merge or release.
+- candidate_* metrics describe candidates, admission, and candidate compression before final host-facing hook output.
+- final_injection_byte_reduction is final hook-output size after admission/fallback and is not proof of candidate compression success.
+- Dogfood metrics are local byte diagnostics, not provider tokenizer output, and do not prove provider token/cost/billing, runtime-token, latency, invoice, charged-cost, or numeric gate outcomes.`;
+}
+
 export async function buildReleaseBenchmarkEvidence({
   repoRoot = defaultRepoRoot,
   runId = new Date().toISOString().replace(/[:.]/g, "-"),
@@ -205,6 +214,8 @@ ${evidence.releaseClaims.headline}
 - React Web runtime graph diagnostics: ${evidence.context.runtimeGraphDiagnostics.emittedCount}/${evidence.context.runtimeGraphDiagnostics.fixtureCount} emitted, diagnostic-only=yes
 - React Web graph-assisted context path: ${evidence.context.graphAssistedContextPath.correlatedFreshPathCount}/${evidence.context.graphAssistedContextPath.fixtureCount} correlated, diagnostic-only=yes
 - React Web reuse correctness: ${evidence.reuse.reuseCorrectnessClaimable ? "yes" : "no"}
+
+${renderReactWebDogfoodMetricInterpretationMarkdown()}
 
 ## Fixture context-size measurements
 
