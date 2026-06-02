@@ -76,7 +76,7 @@ test("React Web profile surface aggregates exactly the approved six evidence art
   assert.deepEqual(evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.countsByRole.positive, 8);
   assert.match(evidence.summary.childSignals.liveHookDogfoodCoverage.claimBoundary, /not broad React Web support/);
-  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.schemaVersion, "react-web-live-hook-dogfood-metric-summary.v1");
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.schemaVersion, "react-web-live-hook-dogfood-metric-summary.v2");
   assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.status, "not-supplied");
   assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.advisoryOnly, true);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.diagnosticOnly, true);
@@ -103,6 +103,15 @@ test("React Web profile surface accepts precomputed live hook metrics without re
       admissionObservedCount: 1,
       admittedAdditionalContextCount: 1,
       discardedAdditionalContextCount: 0,
+      candidateVariantDistribution: {
+        full: 1,
+        "no-graph": 0,
+        "no-dependencies": 0,
+        "targets-roles-hooks": 0,
+        "targets-roles": 0,
+        "fallback-or-no-candidate": 0,
+      },
+      candidateVariantDistributionTotalCount: 1,
       metricAliases: {
         candidate_admission_rate: 1,
         candidate_compression_success_rate: 1,
@@ -118,6 +127,8 @@ test("React Web profile surface accepts precomputed live hook metrics without re
   assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.replayExecuted, false);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.metricAliases.candidate_admission_rate, 1);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.metricAliases.fallback_used_rate, 0);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.candidateVariantDistribution.full, 1);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.candidateVariantDistributionTotalCount, 1);
   assert.equal(
     evidence.summary.childSignals.liveHookDogfoodMetrics.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof,
     false,
