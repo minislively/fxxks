@@ -50,7 +50,8 @@
     "evidence:react-web-pr-advisory": "npm run build && node scripts/react-web-pr-advisory-surface.mjs",
     "evidence:react-web-pr-gate": "npm run build && node scripts/react-web-pr-gate-surface.mjs",
     "evidence:react-web-release-report": "npm run build && node scripts/react-web-release-report-surface.mjs",
-    "evidence:react-web-live-hook-dogfood": "npm run build && node scripts/react-web-live-hook-dogfood-evidence.mjs"
+    "evidence:react-web-live-hook-dogfood": "npm run build && node scripts/react-web-live-hook-dogfood-evidence.mjs",
+    "evidence:react-web-field-array-dogfood": "npm run build && node scripts/react-web-field-array-dogfood-evidence.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
