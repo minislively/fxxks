@@ -488,7 +488,8 @@ export type ReactWebContextFormStateRole = {
     | "submit-flow"
     | "error-display"
     | "value-control-relation"
-    | "validation-defaults";
+    | "validation-defaults"
+    | "dynamic-fields";
   labels: string[];
   source: "formStateFlow" | "editGuidance" | "extraction";
   evidence: string[];

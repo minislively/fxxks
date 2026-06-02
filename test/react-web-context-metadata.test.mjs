@@ -390,6 +390,39 @@ test("React Web formStateRoles normalize source-backed form roles without deferr
   );
 });
 
+test("React Web formStateRoles expose useFieldArray as dynamic field evidence", () => {
+  const source = `
+    import React from "react";
+    import { useFieldArray, useForm } from "react-hook-form";
+
+    export function ContactsFieldArrayForm() {
+      const { control, register } = useForm({ defaultValues: { contacts: [{ email: "" }] } });
+      const { fields, append } = useFieldArray({ control, name: "contacts" });
+
+      return (
+        <form>
+          {fields.map((field, index) => (
+            <input key={field.id} {...register("contacts." + index + ".email")} />
+          ))}
+          <button type="button" onClick={() => append({ email: "" })}>Add contact</button>
+        </form>
+      );
+    }
+  `;
+  const result = extractSource(path.join(repoRoot, "fixtures", "compressed", "ContactsFieldArrayForm.tsx"), source);
+  const payload = toModelFacingPayload(result, repoRoot, {
+    includeEditGuidance: true,
+    includeReactWebContextMetadata: true,
+  });
+
+  const validationAnchors = result.behavior?.formSurface?.validationAnchors?.map((item) => item.value) ?? [];
+  assert.ok(validationAnchors.includes("useFieldArray"));
+  assert.ok(payload.editGuidance?.patchTargets.some((item) => item.kind === "validation-anchor" && item.label === "useFieldArray"));
+  assert.ok(payload.reactWebContext?.formStateRoles?.some((item) => item.role === "dynamic-fields" && item.labels.includes("useFieldArray")));
+  assert.ok(payload.reactWebContext?.formStateRoles?.some((item) => item.role === "field-registration"));
+  assert.ok(payload.behavior?.hooks?.includes("useFieldArray"));
+});
+
 test("React Web formStateRoles do not emit validation-defaults from import-only validation evidence", () => {
   const source = `
     import React from "react";

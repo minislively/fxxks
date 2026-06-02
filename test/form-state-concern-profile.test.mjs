@@ -66,6 +66,28 @@ test("concern-only form-state source emits non-authorizing form-state concern ev
   });
 });
 
+test("form-state concern profile records useFieldArray without authorizing domain reuse", () => {
+  const source = `
+    import { useFieldArray, useForm } from "react-hook-form";
+    export function ConcernOnlyFieldArrayNote() {
+      const { control } = useForm({ defaultValues: { contacts: [] } });
+      const { fields, append } = useFieldArray({ control, name: "contacts" });
+      return { fields, append };
+    }
+  `;
+  const { domainDetection, policy, payload } = buildPayloadForSource(source, "ConcernOnlyFieldArrayNote.tsx");
+
+  assert.equal(domainDetection.classification, "unknown");
+  assert.equal(policy.allowed, false);
+  assert.equal(payload.reactWebContext, undefined);
+  assert.ok(payload.concernProfiles?.[0].signals.includes("useFieldArray"));
+  assert.ok(payload.concernProfiles?.[0].signals.includes("useForm"));
+  assert.deepEqual(assessFrontendProfilePayloadReuse(".tsx", domainDetection, payload, policy), {
+    allowed: false,
+    reason: UNSUPPORTED_FRONTEND_DOMAIN_PROFILE_REASON,
+  });
+});
+
 test("React Web plus form-state concern keeps concern metadata separate from authorization", () => {
   const source = `
     import { useForm } from "react-hook-form";

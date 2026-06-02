@@ -1256,7 +1256,7 @@ function collectBehaviorAndStructure(sourceFile: ts.SourceFile): Pick<Extraction
         repeatedBlocks.add("array-map-render");
         addSnippet("repeated-block", textOf(sourceFile, node.parent), "repeated-rendering", node.parent);
       }
-      if (shortName === "useForm" || shortName === "register") {
+      if (shortName === "useForm" || shortName === "register" || shortName === "useFieldArray") {
         addLocatedAnchor(validationAnchors, shortName, node);
       }
       if (RN_NAVIGATION_HOOK_NAMES.has(shortName as Extract<ReactNativeNavigationConcernSignal, { kind: "navigation-hook" }>["hook"]) && reactNavigationImportedNames.has(shortName)) {
