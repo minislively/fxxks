@@ -32,6 +32,10 @@ export function collectFormStateConcernProfile(result: ExtractionResult): Fronte
     signals.add("useForm");
   }
 
+  if (result.behavior?.hooks?.includes("useFieldArray") || sourceText.includes("useFieldArray(")) {
+    signals.add("useFieldArray");
+  }
+
   if (sourceText.includes("register(") || sourceText.includes("...register(") || /\bregister\b/.test(sourceText)) {
     signals.add("register");
   }

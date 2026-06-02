@@ -40,6 +40,7 @@ export type FrontendConcernProfileId =
 export type FrontendConcernSignal =
   | "react-hook-form"
   | "useForm"
+  | "useFieldArray"
   | "register"
   | "control"
   | "handleSubmit"

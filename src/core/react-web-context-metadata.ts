@@ -781,6 +781,9 @@ function buildFormStateRoles(
     if (anchor.value === "register" || anchor.value === "Controller") {
       pushRole(roles, "field-registration", anchor.value, "extraction", `behavior.formSurface.validationAnchors.${anchor.value}`);
     }
+    if (anchor.value === "useFieldArray") {
+      pushRole(roles, "dynamic-fields", anchor.value, "extraction", "behavior.formSurface.validationAnchors.useFieldArray");
+    }
     if (validationDefaultAnchor(anchor.value)) {
       pushRole(
         roles,
@@ -838,6 +841,9 @@ function buildFormStateRoles(
       if (target.label === "useForm") pushRole(roles, "form-root", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
       if (target.label === "register" || target.label === "Controller") {
         pushRole(roles, "field-registration", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
+      }
+      if (target.label === "useFieldArray") {
+        pushRole(roles, "dynamic-fields", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
       }
       if (validationDefaultAnchor(target.label)) {
         pushRole(roles, "validation-defaults", target.label, "editGuidance", "editGuidance.patchTargets.validation-anchor");
