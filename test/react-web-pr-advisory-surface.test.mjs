@@ -65,7 +65,7 @@ test("React Web PR advisory surface stays advisory-only over the existing full p
   assert.deepEqual(evidence.summary.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.liveHookDogfoodCoverage.countsByLabel["form-state"], 4);
   assert.match(evidence.summary.liveHookDogfoodCoverage.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
-  assert.equal(evidence.summary.liveHookDogfoodMetrics.schemaVersion, "react-web-live-hook-dogfood-metric-summary.v1");
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.schemaVersion, "react-web-live-hook-dogfood-metric-summary.v2");
   assert.equal(evidence.summary.liveHookDogfoodMetrics.status, "not-supplied");
   assert.equal(evidence.summary.liveHookDogfoodMetrics.advisoryOnly, true);
   assert.equal(evidence.summary.liveHookDogfoodMetrics.diagnosticOnly, true);
@@ -132,6 +132,15 @@ test("React Web PR advisory renders supplied precomputed live hook metrics witho
       admissionObservedCount: 1,
       admittedAdditionalContextCount: 1,
       discardedAdditionalContextCount: 0,
+      candidateVariantDistribution: {
+        full: 1,
+        "no-graph": 0,
+        "no-dependencies": 0,
+        "targets-roles-hooks": 0,
+        "targets-roles": 0,
+        "fallback-or-no-candidate": 0,
+      },
+      candidateVariantDistributionTotalCount: 1,
       metricAliases: {
         candidate_admission_rate: 1,
         candidate_compression_success_rate: 1,
@@ -149,6 +158,8 @@ test("React Web PR advisory renders supplied precomputed live hook metrics witho
   assert.equal(evidence.summary.liveHookDogfoodMetrics.metricAliases.candidate_admission_rate, 1);
   assert.match(markdown, /candidate_admission_rate: 1/);
   assert.match(markdown, /fallback_used_rate: 0/);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.candidateVariantDistribution.full, 1);
+  assert.match(markdown, /candidate_variant_distribution:/);
   assert.match(markdown, /final_injection_byte_reduction: /);
   assert.match(markdown, /Candidate compression proof from final_injection_byte_reduction: no/);
 });
@@ -165,6 +176,15 @@ test("React Web PR advisory rejects malformed precomputed live hook metrics", as
         admissionObservedCount: 1,
         admittedAdditionalContextCount: 1,
         discardedAdditionalContextCount: 0,
+        candidateVariantDistribution: {
+          full: 1,
+          "no-graph": 0,
+          "no-dependencies": 0,
+          "targets-roles-hooks": 0,
+          "targets-roles": 0,
+          "fallback-or-no-candidate": 0,
+        },
+        candidateVariantDistributionTotalCount: 1,
         metricAliases: {
           candidate_admission_rate: 1,
           candidate_compression_success_rate: 1,

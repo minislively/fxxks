@@ -23,7 +23,15 @@ const {
 } = require(path.join(defaultRepoRoot, "dist", "core", "react-web-live-hook-dogfood-snapshot.js"));
 
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION = "react-web-live-hook-dogfood-metric-summary.v1";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION = "react-web-live-hook-dogfood-metric-summary.v2";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_CANDIDATE_VARIANT_BUCKETS = [
+  "full",
+  "no-graph",
+  "no-dependencies",
+  "targets-roles-hooks",
+  "targets-roles",
+  "fallback-or-no-candidate",
+];
 export {
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
@@ -249,6 +257,37 @@ function summarizeLiveHookSuiteRow({ projectRoot, relativeFile, preRead, firstNa
     diagnosticOnly: true,
     claimable: false,
   };
+}
+
+
+function emptyCandidateVariantDistribution() {
+  return Object.fromEntries(REACT_WEB_LIVE_HOOK_DOGFOOD_CANDIDATE_VARIANT_BUCKETS.map((bucket) => [bucket, 0]));
+}
+
+function buildCandidateVariantDistribution(rows) {
+  const distribution = emptyCandidateVariantDistribution();
+  for (const row of rows) {
+    const admission = row.evidenceArtifact.additionalContextAdmission;
+    const variant = admission?.candidateVariant;
+    if (variant && Object.hasOwn(distribution, variant)) {
+      distribution[variant] += 1;
+    } else {
+      distribution["fallback-or-no-candidate"] += 1;
+    }
+  }
+  return distribution;
+}
+
+function candidateVariantDistributionTotal(distribution) {
+  return REACT_WEB_LIVE_HOOK_DOGFOOD_CANDIDATE_VARIANT_BUCKETS.reduce((total, bucket) => total + (distribution?.[bucket] ?? 0), 0);
+}
+
+function isCandidateVariantDistribution(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    REACT_WEB_LIVE_HOOK_DOGFOOD_CANDIDATE_VARIANT_BUCKETS.every((bucket) => Number.isInteger(value[bucket]) && value[bucket] >= 0)
+  );
 }
 
 function distribution(values) {
@@ -528,6 +567,8 @@ function summarizeLiveHookSuite(rows, { repoRoot = defaultRepoRoot } = {}) {
   const candidateCompressionSuccessRate = rate(compressionSuccessCount, admissionObservedCount);
   const badCandidateBlockRate = rate(badCandidateBlockCount, badCandidateObservedCount);
   const fallbackUsageRate = rate(fallbackUsedCount, rows.length);
+  const candidateVariantDistribution = buildCandidateVariantDistribution(rows);
+  const candidateVariantDistributionTotalCount = candidateVariantDistributionTotal(candidateVariantDistribution);
 
   const discardedReasonCounts = rows.reduce((counts, row) => {
     const admission = row.evidenceArtifact.additionalContextAdmission;
@@ -572,6 +613,8 @@ function summarizeLiveHookSuite(rows, { repoRoot = defaultRepoRoot } = {}) {
       usedCount: fallbackUsedCount,
       usageRate: fallbackUsageRate,
     },
+    candidateVariantDistribution,
+    candidateVariantDistributionTotalCount,
     finalInjectionMetrics: {
       byteReduction: distribution(finalInjectionReductionValues),
     },
@@ -642,6 +685,15 @@ function assertMetricSummaryInput(summary) {
     throw new Error(`React Web live-hook dogfood metric summary requires rate alias ${invalidRateAlias}`);
   }
 
+  const candidateVariantDistribution = summary.candidateVariantDistribution ?? summary.candidateMetrics?.variantDistribution;
+  if (!isCandidateVariantDistribution(candidateVariantDistribution)) {
+    throw new Error("React Web live-hook dogfood metric summary requires candidateVariantDistribution with stable v2 buckets");
+  }
+  const variantTotal = summary.candidateVariantDistributionTotalCount ?? candidateVariantDistributionTotal(candidateVariantDistribution);
+  if (!Number.isInteger(variantTotal) || variantTotal !== summary.fixtureCount) {
+    throw new Error("React Web live-hook dogfood metric summary requires candidateVariantDistribution total to match fixtureCount");
+  }
+
   for (const field of ["candidate_byte_reduction", "final_injection_byte_reduction"]) {
     if (!isDistribution(aliases[field])) {
       throw new Error(`React Web live-hook dogfood metric summary requires distribution alias ${field}`);
@@ -690,7 +742,13 @@ export function buildReactWebLiveHookDogfoodMetricSummary(input) {
     admittedAdditionalContextCount: summary.admittedAdditionalContextCount ?? candidateMetrics.admittedCount ?? 0,
     discardedAdditionalContextCount: summary.discardedAdditionalContextCount ?? candidateMetrics.discardedCount ?? 0,
     discardedReasonCounts: summary.discardedReasonCounts ?? candidateMetrics.discardReasons ?? {},
-    candidateMetrics,
+    candidateVariantDistribution: summary.candidateVariantDistribution ?? candidateMetrics.variantDistribution,
+    candidateVariantDistributionTotalCount:
+      summary.candidateVariantDistributionTotalCount ?? candidateVariantDistributionTotal(summary.candidateVariantDistribution ?? candidateMetrics.variantDistribution),
+    candidateMetrics: {
+      ...candidateMetrics,
+      variantDistribution: summary.candidateVariantDistribution ?? candidateMetrics.variantDistribution,
+    },
     fallbackMetrics,
     finalInjectionMetrics,
     metricAliases: {
@@ -709,6 +767,7 @@ export function buildReactWebLiveHookDogfoodMetricSummary(input) {
       badCandidateBlockRateMeans: "share of observed rejected candidates blocked by the admission gate",
       fallbackUsedRateMeans: "share of fixture rows where final hook output used fallback text instead of an admitted candidate",
       finalInjectionByteReductionMeans: "final host-facing additionalContext byte reduction after admission/fallback",
+      candidateVariantDistributionMeans: "diagnostic generator-health distribution of the selected react-web-edit-card.v2 variant, including rejected candidates, before fallback/final-size claims",
       finalInjectionByteReductionIsCandidateCompressionProof: false,
       providerTokenSavingsClaimable: false,
       providerCostSavingsClaimable: false,
@@ -732,6 +791,8 @@ function assertLiveHookSuite(suite) {
   if (suite.summary.admissionObservedCount !== suite.summary.fixtureCount) failures.push("not every live hook suite fixture recorded additionalContext admission diagnostics");
   if (suite.summary.admittedAdditionalContextCount <= 0) failures.push("no live hook suite fixture admitted compact additionalContext");
   if (suite.summary.admittedAdditionalContextCount > suite.summary.compactRowsCount) failures.push("admitted additionalContext count exceeded compact final output rows");
+  if (!isCandidateVariantDistribution(suite.summary.candidateVariantDistribution)) failures.push("live hook suite candidate variant distribution was missing stable v2 buckets");
+  if (suite.summary.candidateVariantDistributionTotalCount !== suite.summary.fixtureCount) failures.push("live hook suite candidate variant distribution did not reconcile to fixture count");
   if (!suite.summary.allFreshGraphs) failures.push("not every live hook suite fixture had fresh pre-read/runtime graph diagnostics");
   if (suite.summary.coverage?.missingLabels?.length > 0) failures.push(`live hook suite manifest missing required labels: ${suite.summary.coverage.missingLabels.join(", ")}`);
 
@@ -952,6 +1013,9 @@ ${evidence.claimBoundary}
 - candidate_admission_rate: ${metricSummary.metricAliases.candidate_admission_rate}
 - candidate_compression_success_rate: ${metricSummary.metricAliases.candidate_compression_success_rate}
 - candidate_byte_reduction: ${JSON.stringify(metricSummary.metricAliases.candidate_byte_reduction)}
+- candidate variant distribution: ${JSON.stringify(metricSummary.candidateVariantDistribution)}
+- candidate variant distribution total: ${metricSummary.candidateVariantDistributionTotalCount}/${evidence.suite.summary.fixtureCount}
+- Variant distribution interpretation: diagnostic generator-health evidence for selected v2 variants, including rejected candidates; not provider token/cost proof.
 
 ### Gate/admission outcome
 

@@ -177,6 +177,8 @@ ${evidence.claimBoundary}
 - Live-hook dogfood snapshot drift: ${evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.driftStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons.length > 0 ? evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons.join(", ") : "none"})
 - Live-hook dogfood metrics status: ${evidence.summary.childSignals.liveHookDogfoodMetrics.status} (replay executed by profile: ${evidence.summary.childSignals.liveHookDogfoodMetrics.replayExecuted ? "yes" : "no"})
 - Live-hook dogfood metrics advisory-only: ${evidence.summary.childSignals.liveHookDogfoodMetrics.advisoryOnly ? "yes" : "no"}
+${evidence.summary.childSignals.liveHookDogfoodMetrics.status === "supplied" ? `- Live-hook dogfood candidate variant distribution: ${JSON.stringify(evidence.summary.childSignals.liveHookDogfoodMetrics.candidateVariantDistribution)}
+- Live-hook dogfood candidate variant distribution total: ${evidence.summary.childSignals.liveHookDogfoodMetrics.candidateVariantDistributionTotalCount}` : ""}
 
 ## Top-level non-claims
 

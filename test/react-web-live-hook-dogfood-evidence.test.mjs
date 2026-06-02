@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_CANDIDATE_VARIANT_BUCKETS,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
@@ -129,6 +130,14 @@ test("React Web live hook dogfood metric summary separates candidate fallback an
       badCandidateBlockRate: 1,
       byteReduction: { min: 33.3, max: 66.6, avg: 49.95 },
       discardReasons: { "source-too-small": 1 },
+      variantDistribution: {
+        full: 1,
+        "no-graph": 0,
+        "no-dependencies": 0,
+        "targets-roles-hooks": 0,
+        "targets-roles": 0,
+        "fallback-or-no-candidate": 1,
+      },
     },
     fallbackMetrics: {
       usedCount: 1,
@@ -156,6 +165,16 @@ test("React Web live hook dogfood metric summary separates candidate fallback an
   assert.equal(summary.metricAliases.candidate_compression_success_rate, 0.5);
   assert.equal(summary.metricAliases.bad_candidate_block_rate, 1);
   assert.equal(summary.metricAliases.fallback_used_rate, 0.5);
+  assert.deepEqual(summary.candidateVariantDistribution, {
+    full: 1,
+    "no-graph": 0,
+    "no-dependencies": 0,
+    "targets-roles-hooks": 0,
+    "targets-roles": 0,
+    "fallback-or-no-candidate": 1,
+  });
+  assert.equal(summary.candidateVariantDistributionTotalCount, 2);
+  assert.deepEqual(summary.candidateMetrics.variantDistribution, summary.candidateVariantDistribution);
   assert.deepEqual(summary.metricAliases.candidate_byte_reduction, { min: 33.3, max: 66.6, avg: 49.95 });
   assert.deepEqual(summary.metricAliases.final_injection_byte_reduction, { min: 20, max: 80, avg: 50 });
   assert.equal(summary.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof, false);
@@ -181,6 +200,15 @@ test("React Web live hook dogfood metric summary rejects malformed precomputed m
       admissionObservedCount: 1,
       admittedAdditionalContextCount: 1,
       discardedAdditionalContextCount: 0,
+      candidateVariantDistribution: {
+        full: 1,
+        "no-graph": 0,
+        "no-dependencies": 0,
+        "targets-roles-hooks": 0,
+        "targets-roles": 0,
+        "fallback-or-no-candidate": 0,
+      },
+      candidateVariantDistributionTotalCount: 1,
       metricAliases: {
         candidate_admission_rate: 1,
         candidate_compression_success_rate: 1,
@@ -384,6 +412,14 @@ test("React Web live hook dogfood evidence replays built CLI native hook graph p
   assert.equal(evidence.suite.summary.claimable, false);
   assert.equal(evidence.suite.summary.allFreshGraphs, true);
   assert.equal(evidence.suite.summary.admissionObservedCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.deepEqual(Object.keys(evidence.suite.summary.candidateVariantDistribution), REACT_WEB_LIVE_HOOK_DOGFOOD_CANDIDATE_VARIANT_BUCKETS);
+  assert.equal(evidence.suite.summary.candidateVariantDistributionTotalCount, DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length);
+  assert.equal(
+    Object.values(evidence.suite.summary.candidateVariantDistribution).reduce((total, count) => total + count, 0),
+    DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES.length,
+  );
+  assert.ok(evidence.suite.summary.candidateVariantDistribution["no-graph"] >= 1);
+  assert.equal(evidence.suite.summary.candidateVariantDistribution["fallback-or-no-candidate"], 0);
   assert.ok(evidence.suite.summary.admittedAdditionalContextCount > 0);
   assert.ok(evidence.suite.summary.compactRowsCount > 0);
   assert.equal(typeof evidence.suite.summary.minAdditionalContextReductionPct, "number");
@@ -517,6 +553,8 @@ test("React Web live hook dogfood evidence Markdown keeps diagnostic-only bounda
   assert.match(markdown, /AdditionalContext admitted rows: \d+\/\d+/);
   assert.match(markdown, /AdditionalContext discarded rows: \d+\/\d+/);
   assert.match(markdown, /candidate_compression_success_rate:/);
+  assert.match(markdown, /candidate variant distribution:/);
+  assert.match(markdown, /Variant distribution interpretation: diagnostic generator-health evidence for selected v2 variants, including rejected candidates; not provider token\/cost proof/);
   assert.match(markdown, /final_injection_byte_reduction:/);
   assert.match(markdown, /not proof of candidate compression success/);
   assert.match(markdown, /Claimable as broad token\/cost savings: no/);

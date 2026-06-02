@@ -151,7 +151,9 @@ ${evidence.summary.liveHookDogfoodMetrics.status === "supplied" ? `- candidate_a
 - bad_candidate_block_rate: ${evidence.summary.liveHookDogfoodMetrics.metricAliases.bad_candidate_block_rate}
 - fallback_used_rate: ${evidence.summary.liveHookDogfoodMetrics.metricAliases.fallback_used_rate}
 - candidate_byte_reduction: ${JSON.stringify(evidence.summary.liveHookDogfoodMetrics.metricAliases.candidate_byte_reduction)}
-- final_injection_byte_reduction: ${JSON.stringify(evidence.summary.liveHookDogfoodMetrics.metricAliases.final_injection_byte_reduction)}` : `- Reason: ${evidence.summary.liveHookDogfoodMetrics.reason}`}
+- final_injection_byte_reduction: ${JSON.stringify(evidence.summary.liveHookDogfoodMetrics.metricAliases.final_injection_byte_reduction)}
+- candidate_variant_distribution: ${JSON.stringify(evidence.summary.liveHookDogfoodMetrics.candidateVariantDistribution)}
+- candidate_variant_distribution_total: ${evidence.summary.liveHookDogfoodMetrics.candidateVariantDistributionTotalCount}` : `- Reason: ${evidence.summary.liveHookDogfoodMetrics.reason}`}
 - Note: final_injection_byte_reduction is final hook-output size after admission/fallback and is not proof of candidate compression success.
 - Candidate compression proof from final_injection_byte_reduction: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof ? "yes" : "no"}
 - Provider token savings claimable: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerTokenSavingsClaimable ? "yes" : "no"}
