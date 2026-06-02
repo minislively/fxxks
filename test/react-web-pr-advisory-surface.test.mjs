@@ -65,6 +65,17 @@ test("React Web PR advisory surface stays advisory-only over the existing full p
   assert.deepEqual(evidence.summary.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.liveHookDogfoodCoverage.countsByLabel["form-state"], 4);
   assert.match(evidence.summary.liveHookDogfoodCoverage.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.schemaVersion, "react-web-live-hook-dogfood-metric-summary.v1");
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.status, "not-supplied");
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.advisoryOnly, true);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.diagnosticOnly, true);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.claimable, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.replayExecuted, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerTokenSavingsClaimable, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerCostSavingsClaimable, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerBillingSavingsClaimable, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.metricInterpretation.numericPrGateThreshold, false);
   assert.equal(evidence.summary.nonClaims.profileTopLevelContextReduction, false);
   assert.equal(evidence.summary.nonClaims.cachePerformance, false);
   assert.equal(evidence.summary.nonClaims.runtimeTokenSavings, false);
@@ -95,9 +106,76 @@ test("React Web PR advisory markdown keeps advisory wording and explicit non-cla
   assert.match(markdown, /Missing labels: none/);
   assert.match(markdown, /Counts by label: .*form-state/);
   assert.match(markdown, /Claim boundary: .*not broad React Web support/);
+  assert.match(markdown, /Live-hook dogfood metric summary/);
+  assert.match(markdown, /Status: not-supplied/);
+  assert.match(markdown, /Replay executed by profile\/advisory: no/);
+  assert.match(markdown, /not proof of candidate compression success/);
+  assert.match(markdown, /Candidate compression proof from final_injection_byte_reduction: no/);
+  assert.match(markdown, /Provider token savings claimable: no/);
+  assert.match(markdown, /Provider cost savings claimable: no/);
+  assert.match(markdown, /Provider billing savings claimable: no/);
+  assert.match(markdown, /Numeric PR gate threshold: no/);
   assert.match(markdown, /Provider billing\/cost savings proof: no/);
   assert.match(markdown, /Broad React\/RN\/WebView\/TUI support proof: no/);
   assert.doesNotMatch(markdown, /Cache performance proof: yes/i);
+});
+
+test("React Web PR advisory renders supplied precomputed live hook metrics without replay", async () => {
+  const evidence = await buildReactWebPrAdvisorySurface({
+    runId: `precomputed-${Date.now()}-${Math.random()}`,
+    liveHookDogfoodMetrics: {
+      measurement: "built-cli-native-hook-fixture-matrix-additional-context-bytes",
+      fixtureCount: 1,
+      graphDiagnosticCount: 1,
+      runtimeGraphIncludedArtifactCount: 1,
+      graphSkippedForBudgetCount: 0,
+      admissionObservedCount: 1,
+      admittedAdditionalContextCount: 1,
+      discardedAdditionalContextCount: 0,
+      metricAliases: {
+        candidate_admission_rate: 1,
+        candidate_compression_success_rate: 1,
+        bad_candidate_block_rate: null,
+        fallback_used_rate: 0,
+        candidate_byte_reduction: { min: 42, max: 42, avg: 42 },
+        final_injection_byte_reduction: { min: 52, max: 52, avg: 52 },
+      },
+    },
+  });
+  const markdown = renderReactWebPrAdvisoryMarkdown(evidence);
+
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.status, "supplied");
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.replayExecuted, false);
+  assert.equal(evidence.summary.liveHookDogfoodMetrics.metricAliases.candidate_admission_rate, 1);
+  assert.match(markdown, /candidate_admission_rate: 1/);
+  assert.match(markdown, /fallback_used_rate: 0/);
+  assert.match(markdown, /final_injection_byte_reduction: /);
+  assert.match(markdown, /Candidate compression proof from final_injection_byte_reduction: no/);
+});
+
+test("React Web PR advisory rejects malformed precomputed live hook metrics", async () => {
+  await assert.rejects(
+    () => buildReactWebPrAdvisorySurface({
+      runId: `malformed-${Date.now()}-${Math.random()}`,
+      liveHookDogfoodMetrics: {
+        fixtureCount: 1,
+        graphDiagnosticCount: 1,
+        runtimeGraphIncludedArtifactCount: 1,
+        graphSkippedForBudgetCount: 0,
+        admissionObservedCount: 1,
+        admittedAdditionalContextCount: 1,
+        discardedAdditionalContextCount: 0,
+        metricAliases: {
+          candidate_admission_rate: 1,
+          candidate_compression_success_rate: 1,
+          bad_candidate_block_rate: null,
+          fallback_used_rate: 0,
+          final_injection_byte_reduction: { min: 50, max: 50, avg: 50 },
+        },
+      },
+    }),
+    /requires distribution alias candidate_byte_reduction/,
+  );
 });
 
 test("React Web PR advisory contract fails closed on malformed upstream inputs", () => {

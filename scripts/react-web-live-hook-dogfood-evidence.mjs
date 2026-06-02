@@ -23,6 +23,7 @@ const {
 } = require(path.join(defaultRepoRoot, "dist", "core", "react-web-live-hook-dogfood-snapshot.js"));
 
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
+export const REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION = "react-web-live-hook-dogfood-metric-summary.v1";
 export {
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
@@ -598,6 +599,127 @@ function summarizeLiveHookSuite(rows, { repoRoot = defaultRepoRoot } = {}) {
   };
 }
 
+function isDistribution(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    ["min", "max", "avg"].every((key) => value[key] === null || typeof value[key] === "number")
+  );
+}
+
+function isRate(value) {
+  return value === null || typeof value === "number";
+}
+
+function assertMetricSummaryInput(summary) {
+  const requiredNumberFields = [
+    "fixtureCount",
+    "graphDiagnosticCount",
+    "runtimeGraphIncludedArtifactCount",
+    "graphSkippedForBudgetCount",
+    "admissionObservedCount",
+    "admittedAdditionalContextCount",
+    "discardedAdditionalContextCount",
+  ];
+  const missingNumberField = requiredNumberFields.find((field) => typeof summary[field] !== "number");
+  if (missingNumberField) {
+    throw new Error(`React Web live-hook dogfood metric summary requires numeric ${missingNumberField}`);
+  }
+
+  const aliases = summary.metricAliases;
+  if (!aliases || typeof aliases !== "object") {
+    throw new Error("React Web live-hook dogfood metric summary requires metricAliases");
+  }
+
+  const requiredRateAliases = [
+    "candidate_admission_rate",
+    "candidate_compression_success_rate",
+    "bad_candidate_block_rate",
+    "fallback_used_rate",
+  ];
+  const invalidRateAlias = requiredRateAliases.find((field) => !isRate(aliases[field]));
+  if (invalidRateAlias) {
+    throw new Error(`React Web live-hook dogfood metric summary requires rate alias ${invalidRateAlias}`);
+  }
+
+  for (const field of ["candidate_byte_reduction", "final_injection_byte_reduction"]) {
+    if (!isDistribution(aliases[field])) {
+      throw new Error(`React Web live-hook dogfood metric summary requires distribution alias ${field}`);
+    }
+  }
+}
+
+export function buildReactWebLiveHookDogfoodMetricSummary(input) {
+  const summary = input?.suite?.summary ?? input?.summary ?? input;
+  if (!summary || typeof summary !== "object") {
+    throw new Error("React Web live-hook dogfood metric summary requires an evidence or suite summary object");
+  }
+  assertMetricSummaryInput(summary);
+  const metricAliases = summary.metricAliases ?? {};
+  const candidateMetrics = summary.candidateMetrics ?? {
+    observedCount: summary.admissionObservedCount ?? 0,
+    admittedCount: summary.admittedAdditionalContextCount ?? 0,
+    discardedCount: summary.discardedAdditionalContextCount ?? 0,
+    admissionRate: metricAliases.candidate_admission_rate ?? null,
+    compressionSuccessRate: metricAliases.candidate_compression_success_rate ?? null,
+    badCandidateBlockRate: metricAliases.bad_candidate_block_rate ?? null,
+    byteReduction: metricAliases.candidate_byte_reduction ?? { min: null, max: null, avg: null },
+    discardReasons: summary.discardedReasonCounts ?? {},
+  };
+  const fallbackMetrics = summary.fallbackMetrics ?? {
+    usedCount: null,
+    usageRate: metricAliases.fallback_used_rate ?? null,
+  };
+  const finalInjectionMetrics = summary.finalInjectionMetrics ?? {
+    byteReduction: metricAliases.final_injection_byte_reduction ?? { min: null, max: null, avg: null },
+  };
+
+  return {
+    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION,
+    source: "react-web-live-hook-dogfood-evidence",
+    status: "supplied",
+    advisoryOnly: true,
+    diagnosticOnly: true,
+    claimable: false,
+    measurement: summary.measurement ?? "built-cli-native-hook-fixture-matrix-additional-context-bytes",
+    fixtureCount: summary.fixtureCount ?? 0,
+    graphDiagnosticCount: summary.graphDiagnosticCount ?? 0,
+    runtimeGraphIncludedArtifactCount: summary.runtimeGraphIncludedArtifactCount ?? 0,
+    graphSkippedForBudgetCount: summary.graphSkippedForBudgetCount ?? 0,
+    admissionObservedCount: summary.admissionObservedCount ?? candidateMetrics.observedCount ?? 0,
+    admittedAdditionalContextCount: summary.admittedAdditionalContextCount ?? candidateMetrics.admittedCount ?? 0,
+    discardedAdditionalContextCount: summary.discardedAdditionalContextCount ?? candidateMetrics.discardedCount ?? 0,
+    discardedReasonCounts: summary.discardedReasonCounts ?? candidateMetrics.discardReasons ?? {},
+    candidateMetrics,
+    fallbackMetrics,
+    finalInjectionMetrics,
+    metricAliases: {
+      candidate_admission_rate: metricAliases.candidate_admission_rate ?? candidateMetrics.admissionRate ?? null,
+      candidate_compression_success_rate:
+        metricAliases.candidate_compression_success_rate ?? candidateMetrics.compressionSuccessRate ?? null,
+      bad_candidate_block_rate: metricAliases.bad_candidate_block_rate ?? candidateMetrics.badCandidateBlockRate ?? null,
+      fallback_used_rate: metricAliases.fallback_used_rate ?? fallbackMetrics.usageRate ?? null,
+      candidate_byte_reduction: metricAliases.candidate_byte_reduction ?? candidateMetrics.byteReduction ?? { min: null, max: null, avg: null },
+      final_injection_byte_reduction:
+        metricAliases.final_injection_byte_reduction ?? finalInjectionMetrics.byteReduction ?? { min: null, max: null, avg: null },
+    },
+    metricInterpretation: {
+      candidateAdmissionRateMeans: "share of observed candidates admitted by the local additionalContext admission gate",
+      candidateCompressionSuccessRateMeans: "share of observed candidates whose own source-relative byte reduction passed admission",
+      badCandidateBlockRateMeans: "share of observed rejected candidates blocked by the admission gate",
+      fallbackUsedRateMeans: "share of fixture rows where final hook output used fallback text instead of an admitted candidate",
+      finalInjectionByteReductionMeans: "final host-facing additionalContext byte reduction after admission/fallback",
+      finalInjectionByteReductionIsCandidateCompressionProof: false,
+      providerTokenSavingsClaimable: false,
+      providerCostSavingsClaimable: false,
+      providerBillingSavingsClaimable: false,
+      numericPrGateThreshold: false,
+    },
+    claimBoundary:
+      "Diagnostic local byte metric summary only: separates candidate, admission, fallback, and final injection metrics; not provider tokenizer output, not provider token/cost/billing proof, not runtime/pre-read authorization, and not a numeric PR gate.",
+  };
+}
+
 function assertLiveHookSuite(suite) {
   const failures = [];
   const manifestEntries = suite.manifest?.entries ?? [];
@@ -778,6 +900,7 @@ export async function buildReactWebLiveHookDogfoodEvidence({
 }
 
 export function renderReactWebLiveHookDogfoodEvidenceMarkdown(evidence) {
+  const metricSummary = buildReactWebLiveHookDogfoodMetricSummary(evidence);
   return `# React Web live/native hook dogfood evidence
 
 ${evidence.claimBoundary}
@@ -822,27 +945,36 @@ ${evidence.claimBoundary}
 
 ### Candidate generation quality
 
-- candidate_admission_rate: ${evidence.suite.summary.metricAliases.candidate_admission_rate}
-- candidate_compression_success_rate: ${evidence.suite.summary.metricAliases.candidate_compression_success_rate}
-- candidate_byte_reduction: ${JSON.stringify(evidence.suite.summary.metricAliases.candidate_byte_reduction)}
+- Metric summary schema: ${metricSummary.schemaVersion}
+- Advisory-only: ${metricSummary.advisoryOnly ? "yes" : "no"}
+- Diagnostic-only: ${metricSummary.diagnosticOnly ? "yes" : "no"}
+- Claimable: ${metricSummary.claimable ? "yes" : "no"}
+- candidate_admission_rate: ${metricSummary.metricAliases.candidate_admission_rate}
+- candidate_compression_success_rate: ${metricSummary.metricAliases.candidate_compression_success_rate}
+- candidate_byte_reduction: ${JSON.stringify(metricSummary.metricAliases.candidate_byte_reduction)}
 
 ### Gate/admission outcome
 
 - AdditionalContext admission diagnostics: ${evidence.suite.summary.admissionObservedCount}/${evidence.suite.summary.fixtureCount}
 - AdditionalContext admitted rows: ${evidence.suite.summary.admittedAdditionalContextCount}/${evidence.suite.summary.fixtureCount}
 - AdditionalContext discarded rows: ${evidence.suite.summary.discardedAdditionalContextCount}/${evidence.suite.summary.fixtureCount}
-- bad_candidate_block_rate: ${evidence.suite.summary.metricAliases.bad_candidate_block_rate}
+- bad_candidate_block_rate: ${metricSummary.metricAliases.bad_candidate_block_rate}
 - AdditionalContext discard reasons: ${JSON.stringify(evidence.suite.summary.discardedReasonCounts)}
 
 ### Fallback behavior
 
-- fallback_used_rate: ${evidence.suite.summary.metricAliases.fallback_used_rate}
+- fallback_used_rate: ${metricSummary.metricAliases.fallback_used_rate}
 
 ### Final injection size
 
-- final_injection_byte_reduction: ${JSON.stringify(evidence.suite.summary.metricAliases.final_injection_byte_reduction)}
+- final_injection_byte_reduction: ${JSON.stringify(metricSummary.metricAliases.final_injection_byte_reduction)}
 - Note: final_injection_byte_reduction is final hook-output size after admission/fallback and is not proof of candidate compression success.
+- Candidate compression proof from final_injection_byte_reduction: ${metricSummary.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof ? "yes" : "no"}
 - Claimable as broad token/cost savings: no
+- Provider token savings claimable: ${metricSummary.metricInterpretation.providerTokenSavingsClaimable ? "yes" : "no"}
+- Provider cost savings claimable: ${metricSummary.metricInterpretation.providerCostSavingsClaimable ? "yes" : "no"}
+- Provider billing savings claimable: ${metricSummary.metricInterpretation.providerBillingSavingsClaimable ? "yes" : "no"}
+- Numeric PR gate threshold: ${metricSummary.metricInterpretation.numericPrGateThreshold ? "yes" : "no"}
 - Claim boundary: ${evidence.suite.claimBoundary}
 
 ## Boundary replay

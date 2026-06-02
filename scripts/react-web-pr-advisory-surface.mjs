@@ -46,16 +46,18 @@ export function assertReactWebPrAdvisoryContract({ profileSurface, releaseBenchm
 export async function buildReactWebPrAdvisorySurface({
   repoRoot = defaultRepoRoot,
   runId = new Date().toISOString().replace(/[:.]/g, "-"),
+  liveHookDogfoodMetrics,
   profileSurfaceBuilder = buildReactWebProfileSurface,
   releaseBenchmarkBuilder = buildReleaseBenchmarkEvidence,
 } = {}) {
-  const profileSurface = await profileSurfaceBuilder({ repoRoot, runId: `${runId}-profile` });
+  const profileSurface = await profileSurfaceBuilder({ repoRoot, runId: `${runId}-profile`, liveHookDogfoodMetrics });
   const releaseBenchmarkEvidence = await releaseBenchmarkBuilder({ repoRoot, runId: `${runId}-release-benchmark` });
 
   assertReactWebPrAdvisoryContract({ profileSurface, releaseBenchmarkEvidence });
 
   const releaseBenchmarkSummary = buildReleaseBenchmarkSmokeSummary(releaseBenchmarkEvidence);
   const liveHookDogfoodCoverage = profileSurface.summary.childSignals.liveHookDogfoodCoverage;
+  const liveHookDogfoodMetricsSummary = profileSurface.summary.childSignals.liveHookDogfoodMetrics;
 
   return {
     schemaVersion: "react-web-pr-advisory-surface.v1",
@@ -79,6 +81,7 @@ export async function buildReactWebPrAdvisorySurface({
       warnings: profileSurface.summary.warnings,
       releaseSafeHeadline: releaseBenchmarkSummary.headline,
       liveHookDogfoodCoverage,
+      liveHookDogfoodMetrics: liveHookDogfoodMetricsSummary,
       nonClaims: {
         profileTopLevelContextReduction: profileSurface.claimability.contextReduction,
         cachePerformance: releaseBenchmarkSummary.nonClaims.cachePerformanceImprovement,
@@ -134,6 +137,27 @@ ${evidence.claimBoundary}
 - Counts by label: ${JSON.stringify(evidence.summary.liveHookDogfoodCoverage.countsByLabel)}
 - Counts by role: ${JSON.stringify(evidence.summary.liveHookDogfoodCoverage.countsByRole)}
 - Claim boundary: ${evidence.summary.liveHookDogfoodCoverage.claimBoundary}
+
+## Live-hook dogfood metric summary
+
+- Status: ${evidence.summary.liveHookDogfoodMetrics.status}
+- Schema: ${evidence.summary.liveHookDogfoodMetrics.schemaVersion}
+- Advisory-only: ${evidence.summary.liveHookDogfoodMetrics.advisoryOnly ? "yes" : "no"}
+- Diagnostic-only: ${evidence.summary.liveHookDogfoodMetrics.diagnosticOnly ? "yes" : "no"}
+- Claimable: ${evidence.summary.liveHookDogfoodMetrics.claimable ? "yes" : "no"}
+- Replay executed by profile/advisory: ${evidence.summary.liveHookDogfoodMetrics.replayExecuted ? "yes" : "no"}
+${evidence.summary.liveHookDogfoodMetrics.status === "supplied" ? `- candidate_admission_rate: ${evidence.summary.liveHookDogfoodMetrics.metricAliases.candidate_admission_rate}
+- candidate_compression_success_rate: ${evidence.summary.liveHookDogfoodMetrics.metricAliases.candidate_compression_success_rate}
+- bad_candidate_block_rate: ${evidence.summary.liveHookDogfoodMetrics.metricAliases.bad_candidate_block_rate}
+- fallback_used_rate: ${evidence.summary.liveHookDogfoodMetrics.metricAliases.fallback_used_rate}
+- candidate_byte_reduction: ${JSON.stringify(evidence.summary.liveHookDogfoodMetrics.metricAliases.candidate_byte_reduction)}
+- final_injection_byte_reduction: ${JSON.stringify(evidence.summary.liveHookDogfoodMetrics.metricAliases.final_injection_byte_reduction)}` : `- Reason: ${evidence.summary.liveHookDogfoodMetrics.reason}`}
+- Note: final_injection_byte_reduction is final hook-output size after admission/fallback and is not proof of candidate compression success.
+- Candidate compression proof from final_injection_byte_reduction: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof ? "yes" : "no"}
+- Provider token savings claimable: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerTokenSavingsClaimable ? "yes" : "no"}
+- Provider cost savings claimable: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerCostSavingsClaimable ? "yes" : "no"}
+- Provider billing savings claimable: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.providerBillingSavingsClaimable ? "yes" : "no"}
+- Numeric PR gate threshold: ${evidence.summary.liveHookDogfoodMetrics.metricInterpretation.numericPrGateThreshold ? "yes" : "no"}
 
 ## Non-claims
 

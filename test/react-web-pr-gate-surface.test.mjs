@@ -43,10 +43,15 @@ test("React Web PR gate passes on the approved bounded advisory surface", async 
     "routing-boundary-leakage",
     "advisory-status-inconsistency",
   ]);
+  assert.equal(evidence.summary.blockerCategories.includes("metric-threshold"), false);
+  assert.equal(evidence.summary.blockerCategories.includes("live-hook-dogfood-metric-threshold"), false);
   assert.equal(
     evidence.advisorySurface.summary.liveHookDogfoodCoverage.advisoryOnly,
     true,
   );
+  assert.equal(evidence.advisorySurface.summary.liveHookDogfoodMetrics.status, "not-supplied");
+  assert.equal(evidence.advisorySurface.summary.liveHookDogfoodMetrics.replayExecuted, false);
+  assert.equal(evidence.advisorySurface.summary.liveHookDogfoodMetrics.metricInterpretation.numericPrGateThreshold, false);
   assert.equal(evidence.advisorySurface.summary.liveHookDogfoodCoverage.freshnessStatus, "fresh");
   assert.equal(evidence.advisorySurface.summary.liveHookDogfoodCoverage.fixtureSourceFreshnessStatus, "fresh");
   assert.equal(evidence.advisorySurface.summary.liveHookDogfoodCoverage.snapshotDrift.driftStatus, "fresh");

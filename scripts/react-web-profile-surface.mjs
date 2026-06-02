@@ -7,7 +7,11 @@ import { buildReactWebOverCachingAuditEvidence } from "./react-web-over-caching-
 import { buildReactWebStabilityEvidence } from "./react-web-stability-evidence.mjs";
 import { buildReactWebMixedRoutingEvidence } from "./react-web-mixed-routing-evidence.mjs";
 import { buildReactWebKnowledgeContextEvidence } from "./react-web-knowledge-context-evidence.mjs";
-import { buildReactWebLiveHookDogfoodCoverageSummary } from "./react-web-live-hook-dogfood-evidence.mjs";
+import {
+  buildReactWebLiveHookDogfoodCoverageSummary,
+  buildReactWebLiveHookDogfoodMetricSummary,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION,
+} from "./react-web-live-hook-dogfood-evidence.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,10 +48,40 @@ function prefixedWarnings(prefix, warnings = []) {
   return warnings.map((warning) => `${prefix}: ${warning}`);
 }
 
+export function reactWebLiveHookDogfoodMetricsNotSupplied() {
+  return {
+    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION,
+    source: "react-web-profile-surface",
+    status: "not-supplied",
+    advisoryOnly: true,
+    diagnosticOnly: true,
+    claimable: false,
+    replayExecuted: false,
+    reason: "live-hook dogfood metrics require precomputed evidence and are never replayed by the default profile surface",
+    metricInterpretation: {
+      finalInjectionByteReductionIsCandidateCompressionProof: false,
+      providerTokenSavingsClaimable: false,
+      providerCostSavingsClaimable: false,
+      providerBillingSavingsClaimable: false,
+      numericPrGateThreshold: false,
+    },
+  };
+}
+
+function resolveLiveHookDogfoodMetrics(input) {
+  if (input === undefined || input === null) return reactWebLiveHookDogfoodMetricsNotSupplied();
+  return {
+    ...buildReactWebLiveHookDogfoodMetricSummary(input),
+    replayExecuted: false,
+  };
+}
+
 export async function buildReactWebProfileSurface({
   repoRoot = defaultRepoRoot,
   runId = new Date().toISOString().replace(/[:.]/g, "-"),
+  liveHookDogfoodMetrics,
 } = {}) {
+  const liveHookDogfoodMetricsSummary = resolveLiveHookDogfoodMetrics(liveHookDogfoodMetrics);
   const context = await buildReactWebContextEvidence({ repoRoot, runId: `${runId}-context` });
   const reuse = await buildReactWebReuseEvidence({ repoRoot, runId: `${runId}-reuse` });
   const overCachingAudit = await buildReactWebOverCachingAuditEvidence({ repoRoot, runId: `${runId}-over-caching-audit` });
@@ -95,6 +129,7 @@ export async function buildReactWebProfileSurface({
         mixedRoutingBoundaryIsolationClaimable: mixedRouting.summary.boundaryIsolationClaimable,
         knowledgeContextBoundaryEvidenceClaimable: knowledgeContext.summary.boundaryEvidenceOnlyClaimable,
         liveHookDogfoodCoverage,
+        liveHookDogfoodMetrics: liveHookDogfoodMetricsSummary,
       },
       warnings: [
         ...(overCachingAudit.summary.bugReproduced
@@ -140,6 +175,8 @@ ${evidence.claimBoundary}
 - Live-hook dogfood coverage freshness: ${evidence.summary.childSignals.liveHookDogfoodCoverage.freshnessStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintAlgorithm}, ${evidence.summary.childSignals.liveHookDogfoodCoverage.manifestFingerprintShort})
 - Live-hook dogfood fixture source freshness: ${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFreshnessStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprintAlgorithm}, ${evidence.summary.childSignals.liveHookDogfoodCoverage.fixtureSourceFingerprintShort})
 - Live-hook dogfood snapshot drift: ${evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.driftStatus} (${evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons.length > 0 ? evidence.summary.childSignals.liveHookDogfoodCoverage.snapshotDrift.reasons.join(", ") : "none"})
+- Live-hook dogfood metrics status: ${evidence.summary.childSignals.liveHookDogfoodMetrics.status} (replay executed by profile: ${evidence.summary.childSignals.liveHookDogfoodMetrics.replayExecuted ? "yes" : "no"})
+- Live-hook dogfood metrics advisory-only: ${evidence.summary.childSignals.liveHookDogfoodMetrics.advisoryOnly ? "yes" : "no"}
 
 ## Top-level non-claims
 

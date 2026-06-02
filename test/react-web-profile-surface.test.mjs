@@ -76,6 +76,62 @@ test("React Web profile surface aggregates exactly the approved six evidence art
   assert.deepEqual(evidence.summary.childSignals.liveHookDogfoodCoverage.missingLabels, []);
   assert.equal(evidence.summary.childSignals.liveHookDogfoodCoverage.countsByRole.positive, 8);
   assert.match(evidence.summary.childSignals.liveHookDogfoodCoverage.claimBoundary, /not broad React Web support/);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.schemaVersion, "react-web-live-hook-dogfood-metric-summary.v1");
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.status, "not-supplied");
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.advisoryOnly, true);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.diagnosticOnly, true);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.claimable, false);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.replayExecuted, false);
+  assert.match(evidence.summary.childSignals.liveHookDogfoodMetrics.reason, /never replayed by the default profile surface/);
+  assert.equal(
+    evidence.summary.childSignals.liveHookDogfoodMetrics.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof,
+    false,
+  );
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.metricInterpretation.providerTokenSavingsClaimable, false);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.metricInterpretation.numericPrGateThreshold, false);
+});
+
+test("React Web profile surface accepts precomputed live hook metrics without replaying", async () => {
+  const evidence = await buildReactWebProfileSurface({
+    runId: `precomputed-${Date.now()}-${Math.random()}`,
+    liveHookDogfoodMetrics: {
+      measurement: "built-cli-native-hook-fixture-matrix-additional-context-bytes",
+      fixtureCount: 1,
+      graphDiagnosticCount: 1,
+      runtimeGraphIncludedArtifactCount: 1,
+      graphSkippedForBudgetCount: 0,
+      admissionObservedCount: 1,
+      admittedAdditionalContextCount: 1,
+      discardedAdditionalContextCount: 0,
+      metricAliases: {
+        candidate_admission_rate: 1,
+        candidate_compression_success_rate: 1,
+        bad_candidate_block_rate: null,
+        fallback_used_rate: 0,
+        candidate_byte_reduction: { min: 50, max: 50, avg: 50 },
+        final_injection_byte_reduction: { min: 50, max: 50, avg: 50 },
+      },
+    },
+  });
+
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.status, "supplied");
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.replayExecuted, false);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.metricAliases.candidate_admission_rate, 1);
+  assert.equal(evidence.summary.childSignals.liveHookDogfoodMetrics.metricAliases.fallback_used_rate, 0);
+  assert.equal(
+    evidence.summary.childSignals.liveHookDogfoodMetrics.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof,
+    false,
+  );
+});
+
+test("React Web profile surface rejects malformed precomputed live hook metrics before replay-prone work", async () => {
+  await assert.rejects(
+    () => buildReactWebProfileSurface({
+      runId: `malformed-${Date.now()}-${Math.random()}`,
+      liveHookDogfoodMetrics: {},
+    }),
+    /requires numeric fixtureCount/,
+  );
 });
 
 test("React Web profile surface markdown keeps the top-level non-claims explicit", async () => {
@@ -96,6 +152,8 @@ test("React Web profile surface markdown keeps the top-level non-claims explicit
   assert.match(markdown, /Live-hook dogfood coverage freshness: fresh \(sha256-json-stable-v1, [a-f0-9]{12}\)/);
   assert.match(markdown, /Live-hook dogfood fixture source freshness: fresh \(sha256-file-set-v1, [a-f0-9]{12}\)/);
   assert.match(markdown, /Live-hook dogfood snapshot drift: fresh \(none\)/);
+  assert.match(markdown, /Live-hook dogfood metrics status: not-supplied \(replay executed by profile: no\)/);
+  assert.match(markdown, /Live-hook dogfood metrics advisory-only: yes/);
   assert.match(markdown, /Context reduction claimable at top level: no/);
   assert.match(markdown, /Cache performance claimable at top level: no/);
   assert.match(markdown, /Provider billing savings claimable at top level: no/);
