@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
   REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
@@ -19,6 +20,7 @@ import {
   buildReactWebLiveHookDogfoodSnapshotDrift,
   buildReactWebLiveHookDogfoodCoverageSummary,
   buildReactWebLiveHookDogfoodEvidence,
+  buildReactWebLiveHookDogfoodMetricSummary,
   renderReactWebLiveHookDogfoodEvidenceMarkdown,
 } from "../scripts/react-web-live-hook-dogfood-evidence.mjs";
 
@@ -105,6 +107,90 @@ test("React Web live hook dogfood coverage summary is canonical and advisory-onl
   assert.match(summary.claimBoundary, /not broad React Web support/);
   assert.match(summary.claimBoundary, /not provider token\/cost savings/);
   assert.match(summary.claimBoundary, /not runtime, pre-read, cache, or model-facing authorization/);
+});
+
+test("React Web live hook dogfood metric summary separates candidate fallback and final metrics", () => {
+  const summary = buildReactWebLiveHookDogfoodMetricSummary({
+    measurement: "built-cli-native-hook-fixture-matrix-additional-context-bytes",
+    fixtureCount: 2,
+    graphDiagnosticCount: 2,
+    runtimeGraphIncludedArtifactCount: 1,
+    graphSkippedForBudgetCount: 1,
+    admissionObservedCount: 2,
+    admittedAdditionalContextCount: 1,
+    discardedAdditionalContextCount: 1,
+    discardedReasonCounts: { "source-too-small": 1 },
+    candidateMetrics: {
+      observedCount: 2,
+      admittedCount: 1,
+      discardedCount: 1,
+      admissionRate: 0.5,
+      compressionSuccessRate: 0.5,
+      badCandidateBlockRate: 1,
+      byteReduction: { min: 33.3, max: 66.6, avg: 49.95 },
+      discardReasons: { "source-too-small": 1 },
+    },
+    fallbackMetrics: {
+      usedCount: 1,
+      usageRate: 0.5,
+    },
+    finalInjectionMetrics: {
+      byteReduction: { min: 20, max: 80, avg: 50 },
+    },
+    metricAliases: {
+      candidate_admission_rate: 0.5,
+      candidate_compression_success_rate: 0.5,
+      bad_candidate_block_rate: 1,
+      fallback_used_rate: 0.5,
+      candidate_byte_reduction: { min: 33.3, max: 66.6, avg: 49.95 },
+      final_injection_byte_reduction: { min: 20, max: 80, avg: 50 },
+    },
+  });
+
+  assert.equal(summary.schemaVersion, REACT_WEB_LIVE_HOOK_DOGFOOD_METRIC_SUMMARY_SCHEMA_VERSION);
+  assert.equal(summary.status, "supplied");
+  assert.equal(summary.advisoryOnly, true);
+  assert.equal(summary.diagnosticOnly, true);
+  assert.equal(summary.claimable, false);
+  assert.equal(summary.metricAliases.candidate_admission_rate, 0.5);
+  assert.equal(summary.metricAliases.candidate_compression_success_rate, 0.5);
+  assert.equal(summary.metricAliases.bad_candidate_block_rate, 1);
+  assert.equal(summary.metricAliases.fallback_used_rate, 0.5);
+  assert.deepEqual(summary.metricAliases.candidate_byte_reduction, { min: 33.3, max: 66.6, avg: 49.95 });
+  assert.deepEqual(summary.metricAliases.final_injection_byte_reduction, { min: 20, max: 80, avg: 50 });
+  assert.equal(summary.metricInterpretation.finalInjectionByteReductionIsCandidateCompressionProof, false);
+  assert.equal(summary.metricInterpretation.providerTokenSavingsClaimable, false);
+  assert.equal(summary.metricInterpretation.providerCostSavingsClaimable, false);
+  assert.equal(summary.metricInterpretation.providerBillingSavingsClaimable, false);
+  assert.equal(summary.metricInterpretation.numericPrGateThreshold, false);
+  assert.match(summary.claimBoundary, /not provider tokenizer output/);
+  assert.match(summary.claimBoundary, /not a numeric PR gate/);
+});
+
+test("React Web live hook dogfood metric summary rejects malformed precomputed metrics", () => {
+  assert.throws(
+    () => buildReactWebLiveHookDogfoodMetricSummary({}),
+    /requires numeric fixtureCount/,
+  );
+  assert.throws(
+    () => buildReactWebLiveHookDogfoodMetricSummary({
+      fixtureCount: 1,
+      graphDiagnosticCount: 1,
+      runtimeGraphIncludedArtifactCount: 1,
+      graphSkippedForBudgetCount: 0,
+      admissionObservedCount: 1,
+      admittedAdditionalContextCount: 1,
+      discardedAdditionalContextCount: 0,
+      metricAliases: {
+        candidate_admission_rate: 1,
+        candidate_compression_success_rate: 1,
+        bad_candidate_block_rate: null,
+        fallback_used_rate: 0,
+        candidate_byte_reduction: { min: 50, max: 50, avg: 50 },
+      },
+    }),
+    /requires distribution alias final_injection_byte_reduction/,
+  );
 });
 
 test("React Web live hook dogfood coverage snapshot captures reviewed identity fields", () => {
