@@ -130,6 +130,12 @@ test("release benchmark evidence Markdown gives safe public wording and explicit
   assert.match(markdown, /React Web runtime graph diagnostics:/);
   assert.match(markdown, /React Web graph-assisted context path:/);
   assert.match(markdown, /React Web reuse correctness: yes/);
+  assert.match(markdown, /React Web dogfood metric interpretation/);
+  assert.match(markdown, /Dogfood metrics are advisory-only and diagnostic-only; they do not block merge or release/);
+  assert.match(markdown, /candidate_\* metrics describe candidates, admission, and candidate compression before final host-facing hook output/);
+  assert.match(markdown, /final_injection_byte_reduction is final hook-output size after admission\/fallback and is not proof of candidate compression success/);
+  assert.match(markdown, /not provider tokenizer output/);
+  assert.match(markdown, /do not prove provider token\/cost\/billing, runtime-token, latency, invoice, charged-cost, or numeric gate outcomes/);
   assert.match(markdown, /Cache performance improvement: no/);
   assert.match(markdown, /Runtime-token savings: no/);
   assert.match(markdown, /Provider billing\/cost savings: no/);
@@ -140,4 +146,6 @@ test("release benchmark evidence Markdown gives safe public wording and explicit
   assert.doesNotMatch(markdown, /Cache performance improvement: yes/i);
   assert.doesNotMatch(markdown, /Runtime-token savings: yes/i);
   assert.doesNotMatch(markdown, /Provider billing\/cost savings: yes/i);
+  assert.doesNotMatch(markdown, /Candidate compression proof from final_injection_byte_reduction: yes/i);
+  assert.doesNotMatch(markdown, /numeric gate outcomes: yes/i);
 });

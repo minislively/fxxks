@@ -74,12 +74,20 @@ test("React Web release report markdown keeps release-facing wording and explici
   assert.match(markdown, /Advisory only: yes/);
   assert.match(markdown, /Consumer: release/);
   assert.match(markdown, /Release-safe headline:/);
+  assert.match(markdown, /React Web dogfood metric interpretation/);
+  assert.match(markdown, /Dogfood metrics are advisory-only and diagnostic-only; they do not block merge or release/);
+  assert.match(markdown, /candidate_\* metrics describe candidates, admission, and candidate compression before final host-facing hook output/);
+  assert.match(markdown, /final_injection_byte_reduction is final hook-output size after admission\/fallback and is not proof of candidate compression success/);
+  assert.match(markdown, /not provider tokenizer output/);
+  assert.match(markdown, /do not prove provider token\/cost\/billing, runtime-token, latency, invoice, charged-cost, or numeric gate outcomes/);
   assert.match(markdown, /Cache performance proof: no/);
   assert.match(markdown, /Runtime-token savings proof: no/);
   assert.match(markdown, /Provider billing\/cost savings proof: no/);
   assert.match(markdown, /Broad React\/RN\/WebView\/TUI support proof: no/);
   assert.match(markdown, /does not block merge or release/i);
   assert.doesNotMatch(markdown, /Cache performance proof: yes/i);
+  assert.doesNotMatch(markdown, /Candidate compression proof from final_injection_byte_reduction: yes/i);
+  assert.doesNotMatch(markdown, /numeric gate outcomes: yes/i);
 });
 
 test("React Web release report contract fails closed on malformed upstream inputs", () => {
