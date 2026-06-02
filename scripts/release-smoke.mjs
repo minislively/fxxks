@@ -180,6 +180,17 @@ function assertPackedFiles(packEntry) {
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
+    "fixtures/react-web-live-hook-dogfood.snapshot.json",
+    "fixtures/compressed/FormSection.tsx",
+    "fixtures/compressed/HookEffectPanel.tsx",
+    "fixtures/compressed/TinyEditCard.tsx",
+    "fixtures/compressed/FormControls.tsx",
+    "fixtures/hybrid/DashboardPanel.tsx",
+    "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
+    "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
+    "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
+    "test/fixtures/react-web-context-expansion/context-provider-workspace-preferences.tsx",
+    "test/fixtures/react-web-context-expansion/client-state-release-store.tsx",
   ];
 
   for (const filePath of required) {

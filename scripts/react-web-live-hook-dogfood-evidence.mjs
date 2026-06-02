@@ -4,145 +4,37 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
+const require = createRequire(import.meta.url);
+const {
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM,
+  DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH,
+  LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
+  DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+  buildReactWebLiveHookDogfoodManifestFingerprint: buildCoreReactWebLiveHookDogfoodManifestFingerprint,
+  buildReactWebLiveHookDogfoodFixtureSourceFingerprint: buildCoreReactWebLiveHookDogfoodFixtureSourceFingerprint,
+} = require(path.join(defaultRepoRoot, "dist", "core", "react-web-live-hook-dogfood-snapshot.js"));
 
 export const REACT_WEB_LIVE_HOOK_DOGFOOD_SCHEMA_VERSION = "react-web-live-hook-dogfood-evidence.v3";
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION =
-  "react-web-live-hook-dogfood-fixture-manifest.v1";
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION =
-  "react-web-live-hook-dogfood-snapshot.v1";
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM = "sha256-json-stable-v1";
-export const REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM = "sha256-file-set-v1";
-export const DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH = path.join("fixtures", "react-web-live-hook-dogfood.snapshot.json");
+export {
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_SNAPSHOT_SCHEMA_VERSION,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_FINGERPRINT_ALGORITHM,
+  REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_SOURCE_FINGERPRINT_ALGORITHM,
+  DEFAULT_LIVE_HOOK_DOGFOOD_SNAPSHOT_PATH,
+  LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS,
+  DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
+};
+export const LIVE_HOOK_DOGFOOD_ALLOWED_ROLES = ["positive", "boundary-control", "reuse-baseline"];
 export const DEFAULT_LIVE_HOOK_REACT_WEB_TARGET = path.join("src", "components", "FormSection.tsx");
 export const DEFAULT_LIVE_HOOK_BOUNDARY_TARGET = path.join("src", "components", "SimpleButton.tsx");
-export const LIVE_HOOK_DOGFOOD_REQUIRED_COVERAGE_LABELS = [
-  "baseline-component",
-  "effect-hooks",
-  "source-too-small-control",
-  "hybrid-dashboard",
-  "form-state",
-  "data-fetching",
-  "custom-hook-state",
-  "context-provider",
-  "client-state",
-];
-export const LIVE_HOOK_DOGFOOD_ALLOWED_ROLES = ["positive", "boundary-control", "reuse-baseline"];
-export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST = [
-  {
-    file: "fixtures/compressed/FormSection.tsx",
-    coverage: ["baseline-component", "form-state"],
-    purpose: "Primary React Web form-section reuse-shape baseline with same-file helpers.",
-    role: "reuse-baseline",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "fixtures/compressed/HookEffectPanel.tsx",
-    coverage: ["effect-hooks", "custom-hook-state"],
-    purpose: "Hook/effect-heavy React Web row for graph-assisted context diagnostics.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "fixtures/compressed/TinyEditCard.tsx",
-    coverage: ["source-too-small-control"],
-    purpose: "Small-source control that proves candidate admission can safely fall back.",
-    role: "boundary-control",
-    expectation: {
-      classification: "react-web",
-      admission: "discarded-source-too-small",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "fixtures/hybrid/DashboardPanel.tsx",
-    coverage: ["hybrid-dashboard", "custom-hook-state"],
-    purpose: "Hybrid dashboard row for mixed presentation/state graph diagnostics.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "fixtures/compressed/FormControls.tsx",
-    coverage: ["form-state", "react-hook-form"],
-    purpose: "React Hook Form/form-state reuse-shape baseline.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "test/fixtures/react-web-context-expansion/modal-dialog-preferences-form.tsx",
-    coverage: ["form-state", "modal-form"],
-    purpose: "Modal preferences form row for nested local form-state diagnostics.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "test/fixtures/react-web-context-expansion/data-fetching-user-table.tsx",
-    coverage: ["data-fetching"],
-    purpose: "Server/data-fetching shaped React Web row reused as the suite baseline.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "test/fixtures/react-web-context-expansion/custom-hook-heavy-review-inbox.tsx",
-    coverage: ["custom-hook-state", "effect-hooks"],
-    purpose: "Custom hook-heavy review inbox row for local state transition diagnostics.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "test/fixtures/react-web-context-expansion/context-provider-workspace-preferences.tsx",
-    coverage: ["context-provider", "form-state"],
-    purpose: "React Context provider/consumer row for workspace preference state.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-  {
-    file: "test/fixtures/react-web-context-expansion/client-state-release-store.tsx",
-    coverage: ["client-state", "zustand"],
-    purpose: "Client-state/store-hook component row for release store diagnostics.",
-    role: "positive",
-    expectation: {
-      classification: "react-web",
-      admission: "admitted",
-      metricBoundary: "diagnostic-local-bytes-only",
-    },
-  },
-];
 export const DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURES = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST.map(
   (entry) => entry.file,
 );
@@ -375,44 +267,10 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
-function stableJson(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableJson(item)).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function normalizeManifestFingerprintEntry(entry) {
-  return {
-    file: entry.file,
-    coverage: [...(entry.coverage ?? [])].sort(),
-    purpose: entry.purpose,
-    role: entry.role,
-    expectation: {
-      admission: entry.expectation?.admission,
-      classification: entry.expectation?.classification,
-      metricBoundary: entry.expectation?.metricBoundary,
-    },
-  };
-}
-
 export function buildReactWebLiveHookDogfoodManifestFingerprint({
   manifest = DEFAULT_LIVE_HOOK_DOGFOOD_SUITE_FIXTURE_MANIFEST,
 } = {}) {
-  const identity = {
-    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
-    manifest: manifest.map(normalizeManifestFingerprintEntry),
-  };
-  return crypto
-    .createHash("sha256")
-    .update(stableJson(identity))
-    .digest("hex");
+  return buildCoreReactWebLiveHookDogfoodManifestFingerprint(manifest);
 }
 
 export function buildReactWebLiveHookDogfoodFixtureSourceFingerprint({
@@ -428,16 +286,8 @@ export function buildReactWebLiveHookDogfoodFixtureSourceFingerprint({
       sha256: crypto.createHash("sha256").update(content).digest("hex"),
     };
   });
-  const identity = {
-    schemaVersion: REACT_WEB_LIVE_HOOK_DOGFOOD_FIXTURE_MANIFEST_SCHEMA_VERSION,
-    files,
-  };
-
   return {
-    fingerprint: crypto
-      .createHash("sha256")
-      .update(stableJson(identity))
-      .digest("hex"),
+    fingerprint: buildCoreReactWebLiveHookDogfoodFixtureSourceFingerprint({ repoRoot, manifest }),
     fileCount: files.length,
     byteCount: files.reduce((sum, file) => sum + file.bytes, 0),
     files,

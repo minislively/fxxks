@@ -23,6 +23,7 @@ const {
   selectReactWebEditCardV2VariantForBudget,
   summarizeRuntimeReactWebFactGraphDryRun,
 } = await import(path.join(repoRoot, "dist", "adapters", "codex-runtime-hook.js"));
+const { evaluateReactWebSnapshotAwareConsumerGate } = await import(path.join(repoRoot, "dist", "core", "react-web-snapshot-aware-consumer-gate.js"));
 const {
   CUSTOM_WRAPPER_DOM_SIGNAL_GAP,
   REACT_NATIVE_WEBVIEW_BOUNDARY_REASON,
@@ -64,6 +65,9 @@ test.after(async () => {
 function graphDryRunFixture(overrides = {}) {
   return {
     inScope: true,
+    schemaVersion: "react-web-fact-graph-consumer-dry-run.v1",
+    advisoryOnly: true,
+    selectionPolicy: { authorization: "none", maxAnchors: 3, staleBehavior: "defer-all" },
     graphSummary: {
       freshnessStatus: "fresh",
     },
@@ -90,6 +94,26 @@ test("runtime graph packing reasons cover every canonical omission and success s
     summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture(), { sourceRelativeBudgetExceeded: true }).reason,
     "source-relative-budget-exceeded",
   );
+
+  const blockedGate = evaluateReactWebSnapshotAwareConsumerGate({
+    snapshot: { driftStatus: "drifted", manifestMatched: false, fixtureSourceMatched: false },
+    graphConsumer: {
+      schemaVersion: "react-web-fact-graph-consumer-dry-run.v1",
+      freshnessStatus: "fresh",
+      selectedAnchorCount: 1,
+      deferredAnchorCount: 0,
+      maxAnchors: 3,
+      staleBehavior: "defer-all",
+      authorization: "none",
+      advisoryOnly: true,
+    },
+    probeBoundary: { payloadContainsGraph: false, diagnosticOnly: true, claimable: false },
+  });
+  const blockedPacking = summarizeRuntimeReactWebFactGraphDryRun(graphDryRunFixture(), { snapshotAwareGate: blockedGate });
+  assert.equal(blockedPacking.reason, "snapshot-aware-gate-blocked");
+  assert.equal(blockedPacking.included, false);
+  assert.equal(blockedPacking.gateStatus, "blocked");
+  assert.deepEqual(blockedPacking.gateBlockedReasons, ["snapshot-drift-not-fresh", "snapshot-manifest-not-matched", "snapshot-fixture-source-not-matched"]);
 });
 
 test("React Web edit-card v2 selector follows ordered first-fit degradation ladder", () => {
@@ -220,6 +244,8 @@ test("runtime bridge contract keeps repeated-read inject and fallback semantics 
   assert.equal(secondInject.debug.reactWebFactGraphPacking.included, true);
   assert.equal(secondInject.debug.reactWebFactGraphPacking.reason, "fresh-anchors-packed");
   assert.equal(secondInject.debug.reactWebFactGraphPacking.freshnessStatus, "fresh");
+  assert.equal(secondInject.debug.reactWebFactGraphPacking.gateStatus, "allowed");
+  assert.deepEqual(secondInject.debug.reactWebFactGraphPacking.gateBlockedReasons, []);
   assert.ok(secondInject.debug.reactWebFactGraphPacking.selectedAnchorCount > 0);
   assert.equal(secondInject.debug.reactWebContextPacking.included, true);
   assert.equal(secondInject.debug.reactWebContextPacking.reason, "packed");

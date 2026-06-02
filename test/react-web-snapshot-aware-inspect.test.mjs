@@ -94,10 +94,10 @@ test("React Web snapshot-aware inspect blocks on drifted or missing snapshot", (
   const missingEvidence = buildReactWebSnapshotAwareInspect({ coverageSummary: missing, graphConsumer: graph(), probeBoundary: cleanProbeBoundary() });
 
   assert.equal(driftedEvidence.inspectStatus, "blocked");
-  assert.deepEqual(driftedEvidence.blockedReasons, ["snapshot-drift-not-fresh"]);
+  assert.deepEqual(driftedEvidence.blockedReasons, ["snapshot-drift-not-fresh", "snapshot-fixture-source-not-matched", "snapshot-reasons-present"]);
   assert.equal(driftedEvidence.wouldSelectAnchorCount, 0);
   assert.equal(missingEvidence.inspectStatus, "blocked");
-  assert.deepEqual(missingEvidence.blockedReasons, ["snapshot-drift-not-fresh"]);
+  assert.deepEqual(missingEvidence.blockedReasons, ["snapshot-drift-not-fresh", "snapshot-manifest-not-matched", "snapshot-fixture-source-not-matched", "snapshot-reasons-present"]);
   assert.equal(missingEvidence.wouldSelectAnchorCount, 0);
 });
 

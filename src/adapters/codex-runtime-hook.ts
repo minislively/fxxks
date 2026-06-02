@@ -30,6 +30,12 @@ import { finalizeWorktreeEvidenceSafe, initializeWorktreeEvidenceSafe } from "..
 import { emitReactWebEvidenceArtifact } from "../reporting/react-web-evidence-artifact";
 import { buildReactWebActivationModeFromRuntimeDecision, summarizeReactWebActivationMode } from "../reporting/react-web-activation-mode";
 import { buildReactWebFactGraphConsumerDryRun, type ReactWebFactGraphConsumerDryRun } from "../core/react-web-fact-graph-consumer";
+import {
+  evaluateReactWebSnapshotAwareConsumerGate,
+  type ReactWebSnapshotAwareConsumerGateInput,
+  type ReactWebSnapshotAwareConsumerGateResult,
+} from "../core/react-web-snapshot-aware-consumer-gate";
+import { buildReactWebRuntimeSnapshotGateInput } from "../core/react-web-live-hook-dogfood-snapshot";
 
 const EDIT_INTENT_PATTERN = /\b(?:update|fix|change|add|remove|refactor|patch|modify|implement|rename|replace|adjust|simplify|rewrite)\b/i;
 const FRONTEND_EXTENSIONS = new Set([".tsx", ".jsx"]);
@@ -41,6 +47,7 @@ const DOMAIN_MEMORY_ADVISORY_CONTEXT_MARKER = "FOOKS DOMAIN MEMORY ADVISORY";
 const PREFLIGHT_ISSUE_OR_PR_PATTERN = /(?:#\d+\b|\b(?:issue|issues|pr|pull\s+request)\s*#?\d+\b)/iu;
 const PREFLIGHT_TEST_COMMAND_PATTERN = /(?:\bnpm\s+(?:run\s+)?test\b|\bnode\s+--test\b|\bpytest\b|\bvitest\b|\bjest\b|테스트)/iu;
 const PREFLIGHT_STACK_OR_ERROR_PATTERN = /(?:\b(?:typeerror|referenceerror|syntaxerror|stack\s+trace|traceback|failed|failure|exception|error)\b|에러|오류|실패|스택|이상한데)/iu;
+const FOOKS_PACKAGE_ROOT = path.resolve(__dirname, "..", "..");
 
 type RuntimeAdditionalContextAdmissionReason = "admitted" | "unknown-source-size" | "source-too-small" | "candidate-not-smaller-than-source" | "reduction-below-threshold";
 type RuntimeAdditionalContextAdmission = {
@@ -709,10 +716,12 @@ export function runtimeReactWebFactGraphPackingSummary(
   reason: RuntimeReactWebFactGraphPackingReason,
   reactWebFactGraph?: PackedRuntimeReactWebFactGraph,
   dryRun?: ReactWebFactGraphConsumerDryRun,
+  gate?: ReactWebSnapshotAwareConsumerGateResult,
 ): RuntimeReactWebFactGraphPackingSummary {
   return {
     included: reason === "fresh-anchors-packed",
     reason,
+    ...(gate ? { gateStatus: gate.status, gateBlockedReasons: gate.blockedReasons } : {}),
     selectedAnchorCount: reactWebFactGraph?.selectedAnchors.length ?? dryRun?.selectedAnchors.length ?? 0,
     deferredAnchorCount: reactWebFactGraph?.deferredAnchorCount ?? dryRun?.deferredAnchors.length ?? 0,
     freshnessStatus: reactWebFactGraph?.freshnessStatus ?? dryRun?.graphSummary.freshnessStatus ?? "unknown",
@@ -721,8 +730,11 @@ export function runtimeReactWebFactGraphPackingSummary(
 
 export function summarizeRuntimeReactWebFactGraphDryRun(
   dryRun: ReactWebFactGraphConsumerDryRun,
-  options: { budgetExceeded?: boolean; sourceRelativeBudgetExceeded?: boolean } = {},
+  options: { budgetExceeded?: boolean; sourceRelativeBudgetExceeded?: boolean; snapshotAwareGate?: ReactWebSnapshotAwareConsumerGateResult } = {},
 ): RuntimeReactWebFactGraphPackingSummary {
+  if (options.snapshotAwareGate && !options.snapshotAwareGate.allowed) {
+    return runtimeReactWebFactGraphPackingSummary("snapshot-aware-gate-blocked", undefined, dryRun, options.snapshotAwareGate);
+  }
   if (!dryRun.inScope) {
     return runtimeReactWebFactGraphPackingSummary("out-of-scope", undefined, dryRun);
   }
@@ -738,7 +750,20 @@ export function summarizeRuntimeReactWebFactGraphDryRun(
   if (options.sourceRelativeBudgetExceeded) {
     return runtimeReactWebFactGraphPackingSummary("source-relative-budget-exceeded", undefined, dryRun);
   }
-  return runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", undefined, dryRun);
+  return runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", undefined, dryRun, options.snapshotAwareGate);
+}
+
+function graphInputFromDryRun(dryRun: ReactWebFactGraphConsumerDryRun): NonNullable<ReactWebSnapshotAwareConsumerGateInput["graphConsumer"]> {
+  return {
+    schemaVersion: dryRun.schemaVersion,
+    freshnessStatus: dryRun.graphSummary.freshnessStatus,
+    selectedAnchorCount: dryRun.selectedAnchors.length,
+    deferredAnchorCount: dryRun.deferredAnchors.length,
+    maxAnchors: dryRun.selectionPolicy.maxAnchors,
+    staleBehavior: dryRun.selectionPolicy.staleBehavior,
+    authorization: dryRun.selectionPolicy.authorization,
+    advisoryOnly: dryRun.advisoryOnly,
+  };
 }
 
 function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): {
@@ -749,7 +774,16 @@ function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): {
     verifyFreshness: true,
     maxAnchors: 3,
   });
-  const basePacking = summarizeRuntimeReactWebFactGraphDryRun(dryRun);
+  const gate = evaluateReactWebSnapshotAwareConsumerGate({
+    snapshot: buildReactWebRuntimeSnapshotGateInput({ repoRoot: FOOKS_PACKAGE_ROOT }),
+    graphConsumer: graphInputFromDryRun(dryRun),
+    probeBoundary: {
+      payloadContainsGraph: false,
+      diagnosticOnly: true,
+      claimable: false,
+    },
+  });
+  const basePacking = summarizeRuntimeReactWebFactGraphDryRun(dryRun, { snapshotAwareGate: gate });
   if (basePacking.reason !== "fresh-anchors-packed") {
     return { packing: basePacking };
   }
@@ -770,7 +804,7 @@ function compactRuntimeReactWebFactGraph(filePath: string, cwd: string): {
     deferredAnchorCount: dryRun.deferredAnchors.length,
     boundary: "advisory-current-source-only",
   };
-  return { graph, packing: runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", graph, dryRun) };
+  return { graph, packing: runtimeReactWebFactGraphPackingSummary("fresh-anchors-packed", graph, dryRun, gate) };
 }
 
 function runtimeReactWebFactGraphOutOfScopePacking(): RuntimeReactWebFactGraphPackingSummary {

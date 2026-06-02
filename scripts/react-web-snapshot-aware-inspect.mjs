@@ -1,26 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { buildReactWebLiveHookDogfoodCoverageSummary } from "./react-web-live-hook-dogfood-evidence.mjs";
 import { measureReactWebPreReadGraphDiagnosticFixture } from "./react-web-context-evidence.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, "..");
+const require = createRequire(import.meta.url);
+const {
+  REACT_WEB_FACT_GRAPH_CONSUMER_DRY_RUN_SCHEMA_VERSION,
+  REACT_WEB_SNAPSHOT_AWARE_CONSUMER_GATE_CLAIM_BOUNDARY,
+  evaluateReactWebSnapshotAwareConsumerGate,
+} = require(path.join(defaultRepoRoot, "dist", "core", "react-web-snapshot-aware-consumer-gate.js"));
 
 export const REACT_WEB_SNAPSHOT_AWARE_INSPECT_SCHEMA_VERSION = "react-web-snapshot-aware-inspect.v1";
 export const REACT_WEB_SNAPSHOT_AWARE_INSPECT_COMMAND = "inspect react-web-snapshot-aware-anchors";
 export const REACT_WEB_SNAPSHOT_AWARE_INSPECT_MODE = "snapshot-aware-dry-run";
-export const REACT_WEB_FACT_GRAPH_CONSUMER_DRY_RUN_SCHEMA_VERSION = "react-web-fact-graph-consumer-dry-run.v1";
-export const REACT_WEB_SNAPSHOT_AWARE_INSPECT_CLAIM_BOUNDARY =
-  "React Web snapshot-aware inspect is a read-only dry-run report: it does not authorize runtime/pre-read injection, does not change PR gate policy, does not prove provider token/cost/billing savings, and does not claim broad React Web support.";
+export { REACT_WEB_FACT_GRAPH_CONSUMER_DRY_RUN_SCHEMA_VERSION };
+export const REACT_WEB_SNAPSHOT_AWARE_INSPECT_CLAIM_BOUNDARY = REACT_WEB_SNAPSHOT_AWARE_CONSUMER_GATE_CLAIM_BOUNDARY;
 export const DEFAULT_REACT_WEB_SNAPSHOT_AWARE_INSPECT_FIXTURE = "fixtures/compressed/FormSection.tsx";
 
 function emptyArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
-function normalizedSnapshot(snapshotDrift = {}) {
+function snapshotInput(snapshotDrift = {}) {
   return {
     driftStatus: snapshotDrift.driftStatus ?? "missing-baseline",
     reasons: emptyArray(snapshotDrift.reasons),
@@ -29,73 +35,8 @@ function normalizedSnapshot(snapshotDrift = {}) {
   };
 }
 
-function normalizedGraph(graphConsumer) {
-  if (!graphConsumer) return null;
-  return {
-    schemaVersion: graphConsumer.schemaVersion,
-    freshnessStatus: graphConsumer.freshnessStatus ?? "unknown",
-    selectedAnchorCount: graphConsumer.selectedAnchorCount ?? 0,
-    deferredAnchorCount: graphConsumer.deferredAnchorCount ?? 0,
-    maxAnchors: graphConsumer.maxAnchors ?? 0,
-    countsPresent:
-      typeof graphConsumer.selectedAnchorCount === "number" &&
-      typeof graphConsumer.deferredAnchorCount === "number" &&
-      typeof graphConsumer.maxAnchors === "number",
-    staleBehavior: graphConsumer.staleBehavior ?? "defer-all",
-    authorization: graphConsumer.authorization,
-    advisoryOnly: graphConsumer.advisoryOnly === true,
-  };
-}
-
-function normalizedProbeBoundary(probeBoundary) {
-  if (!probeBoundary) return null;
-  return {
-    payloadContainsGraph: probeBoundary.payloadContainsGraph,
-    diagnosticOnly: probeBoundary.diagnosticOnly,
-    claimable: probeBoundary.claimable,
-  };
-}
-
-function probeBoundaryBlockers(probeBoundary) {
-  if (!probeBoundary) return ["pre-read-probe-boundary-missing"];
-  return [
-    ...(probeBoundary.payloadContainsGraph === false ? [] : ["pre-read-payload-graph-leak"]),
-    ...(probeBoundary.diagnosticOnly === true ? [] : ["pre-read-probe-not-diagnostic-only"]),
-    ...(probeBoundary.claimable === false ? [] : ["pre-read-probe-claimable"]),
-  ];
-}
-
-function decideInspectStatus({ snapshot, graph, probeBoundary = null }) {
-  const blockedReasons = [];
-  if (snapshot.driftStatus !== "fresh") {
-    blockedReasons.push("snapshot-drift-not-fresh");
-  }
-  blockedReasons.push(...probeBoundaryBlockers(probeBoundary));
-  if (!graph) {
-    return { inspectStatus: "unavailable", blockedReasons: [...blockedReasons, "graph-consumer-unavailable"] };
-  }
-  if (graph.schemaVersion !== REACT_WEB_FACT_GRAPH_CONSUMER_DRY_RUN_SCHEMA_VERSION) {
-    blockedReasons.push("graph-consumer-schema-mismatch");
-  }
-  if (graph.countsPresent !== true) {
-    blockedReasons.push("graph-consumer-counts-missing");
-  }
-  if (graph.staleBehavior !== "defer-all") {
-    blockedReasons.push("graph-consumer-stale-behavior-mismatch");
-  }
-  if (graph.authorization !== "none" || graph.advisoryOnly !== true) {
-    blockedReasons.push("graph-consumer-authority-widened");
-  }
-  if (graph.freshnessStatus !== "fresh") {
-    blockedReasons.push("graph-consumer-not-fresh");
-  }
-  if (blockedReasons.length > 0) {
-    return { inspectStatus: "blocked", blockedReasons };
-  }
-  if (graph.selectedAnchorCount <= 0) {
-    return { inspectStatus: "unavailable", blockedReasons: ["no-anchors-selected"] };
-  }
-  return { inspectStatus: "ready", blockedReasons: [] };
+function inspectStatusFromGate(status) {
+  return status === "allowed" ? "ready" : status;
 }
 
 export function buildReactWebSnapshotAwareInspect({
@@ -106,11 +47,17 @@ export function buildReactWebSnapshotAwareInspect({
   selectedAnchors = [],
   deferredAnchors = [],
 } = {}) {
-  const snapshot = normalizedSnapshot(coverageSummary.snapshotDrift);
-  const graph = normalizedGraph(graphConsumer);
-  const normalizedProbe = normalizedProbeBoundary(probeBoundary);
-  const { inspectStatus, blockedReasons } = decideInspectStatus({ snapshot, graph, probeBoundary: normalizedProbe });
-  const wouldSelectAnchorCount = inspectStatus === "ready" ? graph.selectedAnchorCount : 0;
+  const gate = evaluateReactWebSnapshotAwareConsumerGate({
+    snapshot: snapshotInput(coverageSummary.snapshotDrift),
+    graphConsumer,
+    probeBoundary,
+  });
+  const snapshot = gate.snapshot;
+  const graph = gate.graphConsumer;
+  const normalizedProbe = gate.probeBoundary;
+  const inspectStatus = inspectStatusFromGate(gate.status);
+  const blockedReasons = gate.blockedReasons;
+  const wouldSelectAnchorCount = gate.allowed ? gate.wouldSelectAnchorCount : 0;
   const selectedAnchorDetails = emptyArray(selectedAnchors);
   const deferredAnchorDetails = emptyArray(deferredAnchors);
 
@@ -126,6 +73,14 @@ export function buildReactWebSnapshotAwareInspect({
     file,
     inspectStatus,
     claimBoundary: REACT_WEB_SNAPSHOT_AWARE_INSPECT_CLAIM_BOUNDARY,
+    consumerGate: {
+      schemaVersion: gate.schemaVersion,
+      status: gate.status,
+      allowed: gate.allowed,
+      authorization: gate.authorization,
+      blockedReasons: gate.blockedReasons,
+      wouldSelectAnchorCount: gate.wouldSelectAnchorCount,
+    },
     snapshot,
     graphConsumer: graph,
     probeBoundary: normalizedProbe,
